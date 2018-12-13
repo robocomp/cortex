@@ -27,14 +27,13 @@ void InnerModelAPI::innerModelTreeWalk(const IMType &id)
 void InnerModelAPI::innerModelTreeWalk(const IDType &id)
 {
 	//std::cout << "id: " << id << std::endl;
-
 	if (graph->nodeExists(id) == false)
 	{
-		std::cout << __FUNCTION__ << "Non existing node: " << id << std::endl;
+		std::cout << __FUNCTION__ << " Non existing node: " << id << std::endl;
 		return;
 	}
-	std::cout << "node: " << id << std::endl;
-	for(auto &child_id : graph->edgesByLabel(id, "RT")) 
+	std::cout << __FUNCTION__ << " node: " << id << std::endl;
+	for(auto child_id : graph->getEdgesByLabel(id, "RT")) 
 	{
 		innerModelTreeWalk(child_id);
 		//exit(-1);
@@ -62,6 +61,7 @@ RMat::QVec InnerModelAPI::transform(const IMType &destId, const QVec &initVec, c
 		ret(5) = b(2);
 		return ret;
 	}
+	return QVec();
 	// else
 	// {
 	// 	throw InnerModelException("InnerModel::transform was called with an unsupported vector size.");
@@ -89,12 +89,12 @@ RMat::RTMat InnerModelAPI::getTransformationMatrix(const IDType &to, const IDTyp
 		{
 			//ret = ((RTMat)(*i)).operator*(ret);
 			std::cout << "List A id " << *to << std::endl;
-			ret = graph->edgeAttrib<RMat::RTMat>(*(std::next(to,1)), *to, "RT") * ret;
+			ret = graph->getEdgeAttrib<RMat::RTMat>(*(std::next(to,1)), *to, "RT") * ret;
 		}
 		for (auto from = listB.begin(); from != std::prev(listB.end()); ++from)
 		{
 			//ret = i->invert() * ret;
-			ret = graph->edgeAttrib<RMat::RTMat>(*from, *(std::next(from)), "RT").invert() * ret;
+			ret = graph->getEdgeAttrib<RMat::RTMat>(*from, *(std::next(from)), "RT").invert() * ret;
 			std::cout << "List B id " << *from << std::endl;
 		}
 		//localHashTr[QPair<QString, QString>(to, from)] = ret;
@@ -115,7 +115,7 @@ RMat::RTMat InnerModelAPI::getTransformationMatrix(const IMType &to_, const IMTy
 	auto to = graph->getNodeByInnerModelName("imName", to_);
     auto from = graph->getNodeByInnerModelName("imName", from_);
 	
-	getTransformationMatrix(to, from);
+	return getTransformationMatrix(to, from);
  }
 
 QMat InnerModelAPI::getRotationMatrixTo(const IMType &to_, const IMType &from_)
@@ -137,13 +137,13 @@ QMat InnerModelAPI::getRotationMatrixTo(const IMType &to_, const IMType &from_)
 		{
 			//ret = ((RTMat)(*i)).operator*(ret);
 			std::cout << "getRotationMatrix List A id " << *to << std::endl;
-			rret = graph->edgeAttrib<RMat::RTMat>(*(std::next(to,1)), *to, "RT").getR() * rret;
+			rret = graph->getEdgeAttrib<RMat::RTMat>(*(std::next(to,1)), *to, "RT").getR() * rret;
 		}
 		for (auto from = listB.begin(); from != std::prev(listB.end()); ++from)
 		{
 			//ret = i->invert() * ret;
 			std::cout << "getRotationMatrix List B id " << *from << std::endl;
-			rret = graph->edgeAttrib<RMat::RTMat>(*from, *(std::next(from)), "RT").getR().transpose() * rret;
+			rret = graph->getEdgeAttrib<RMat::RTMat>(*from, *(std::next(from)), "RT").getR().transpose() * rret;
 		}
 		//localHashRot[QPair<QString, QString>(to, from)] = rret;
 	//}
@@ -182,25 +182,25 @@ InnerModelAPI::ABLists InnerModelAPI::setLists(const IDType &origId, const IDTyp
 	while (a_level >= min_level)
 	{
 		listA.push_back(a);
-		if(graph->getParent(a) == 0)
+		if(graph->getParentID(a) == 0)
 			break;
-		a = graph->getParent(a);
+		a = graph->getParentID(a);
 	}
 	//std::cout << "caca2 "  << std::endl;
 	while (b_level >= min_level)
 	{
 		listB.push_front(b);
-		if(graph->getParent(b) == 0)
+		if(graph->getParentID(b) == 0)
 			break;
-		b = graph->getParent(b);
+		b = graph->getParentID(b);
 	}
 	//std::cout << "caca3 " << std::endl;
 	while (b != a)
 	{
 		listA.push_back(a);
 		listB.push_front(b);
-		a = graph->getParent(a);
-		b = graph->getParent(b);
+		a = graph->getParentID(a);
+		b = graph->getParentID(b);
 	}
 
 	for(auto a : listA)
@@ -232,7 +232,7 @@ void InnerModelAPI::updateTransformValues(const IMType &transformId_, float tx, 
 				Tbi.setTr(tx,ty,tz);
 				Tbi.setR (rx,ry,rz);
 				//RTMat Tpb = getTransformationMatrix( getNode (transformId)->parent->id,parentId );
-                RTMat Tpb = getTransformationMatrix( graph->getParent(transformId), parentId );
+                RTMat Tpb = getTransformationMatrix( graph->getParentID(transformId), parentId );
 				RTMat Tpi = Tpb*Tbi;
 				QVec angles = Tpi.extractAnglesR();
 				QVec tr = Tpi.getTr();
@@ -253,7 +253,7 @@ void InnerModelAPI::updateTransformValues(const IMType &transformId_, float tx, 
 		RMat::RTMat rt;
 		rt.setTr( tx, ty, tz);
 		rt.setRX(rx); rt.setRY(ry); rt.setRZ(rz);
- 		graph->addEdgeAttribs(graph->getParent(transformId), transformId, DSR::Attribs{std::pair("RT", rt)});
+ 		graph->addEdgeAttribs(graph->getParentID(transformId), transformId, DSR::Attribs{std::pair("RT", rt)});
 	}
 	else
 	{

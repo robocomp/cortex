@@ -41,6 +41,7 @@ namespace DSR
 	using DrawAttribs = std::unordered_map<std::string, std::any>;
 	struct EdgeAttrs
 	{ 
+		std::string label;
 		Attribs attrs; 
 		DrawAttribs draw_attrs;
 	};
@@ -52,6 +53,7 @@ namespace DSR
 		public:
 			 struct Value
 			{
+				std::string type;
 				Attribs attrs;
 				DrawAttribs draw_attrs;
 				FanOut fanout;
@@ -69,10 +71,10 @@ namespace DSR
 			typename Nodes::const_iterator end() const 	 		{ return nodes.begin(); };
 			
 			size_t size() const 								{ return nodes.size();  };
-			void addNode(IDType id) 							{ nodes.insert(std::pair(id, Value()));};
-			void addEdge(IDType from, IDType to) 			
+			void addNode(IDType id, const std::string &type_) 	{ Value v; v.type = type_; nodes.insert(std::pair(id, v));};
+			void addEdge(IDType from, IDType to, const std::string &label_) 			
 			{ 
-				nodes[from].fanout.insert(std::pair(to, EdgeAttrs()));
+				nodes[from].fanout.insert(std::pair(to, EdgeAttrs{label_, Attribs(), DrawAttribs()}));
 				nodes[to].fanin.push_back(from);
 			};
 			void addNodeAttribs(IDType id, const Attribs &att)
@@ -118,8 +120,9 @@ namespace DSR
 			void print()
 			{
 				std::cout << "------------Printing Graph: " << nodes.size() << " elements -------------------------" << std::endl;
-				for( auto &[k,v] : nodes)
+				for( auto &par : nodes)
 				{
+					auto &v = par.second;
 					std::cout << "[" << attr<std::string>(v.draw_attrs["name"]) << "] : " << std::endl;
 					std::cout << "	attrs:	";
 					for( auto &[ka, kv] : v.attrs)
@@ -129,7 +132,7 @@ namespace DSR
 					std::cout << std::endl << "	edges:	";
 					for( auto &[kf,vf] : v.fanout)
 					{
-						std::cout << printVisitor(vf.attrs["name"]) << "( " << printVisitor(nodes[kf].attrs["name"]) << " ) " << std::endl;
+						std::cout << vf.label << "( " << attr<std::string>(nodes[kf].draw_attrs["name"])  << " ) " << std::endl;
 						std::cout << "			edge attrs: ";
 						for( auto &[ke, ve] : vf.attrs)
 						{
@@ -141,24 +144,21 @@ namespace DSR
 				}
 				std::cout << "---------------- graph ends here --------------------------" << std::endl;
 			}
-			
+
 			FanOut fanout(IDType id) const   										{ return nodes.at(id).fanout;};
 			FanOut& fanout(IDType id)            									{ return nodes.at(id).fanout;};
-			FanIn fanin(IDType id) const    										{ return nodes.at(id).fanin;};
-			FanIn& fanin(IDType id)             				   					{ return nodes.at(id).fanin;};
-			template <typename Ta> Ta edgeAttrib(IDType from, IDType to, const std::string &tag) const 	
+			template <typename Ta> Ta getEdgeAttrib(IDType from, IDType to, const std::string &tag) const 	
 			{ 	auto &attrs = nodes.at(from).fanout.at(to).attrs;
 				if(attrs.count(tag) > 0)
 					return std::get<Ta>(attrs.at(tag));
 				else return Ta();
 			};
-			Attribs attrs(IDType id) const  	 									{ return nodes.at(id).attrs;};
-			Attribs& attrs(IDType id)       										{ return nodes.at(id).attrs;};
-			DrawAttribs nodeDrawAttrs(IDType id) const								{ return nodes.at(id).draw_attrs;};
-			DrawAttribs& nodeDrawAttrs(IDType id)      								{ return nodes.at(id).draw_attrs;};
-			Attribs& edgeAttrs(IDType from, IDType to) 								{ return nodes.at(from).fanout.at(to).attrs;};
-			//cambiar por getEdgeAttribs
-			Attribs edgeAttrs(IDType from,  IDType to) const						{ return nodes.at(from).fanout.at(to).attrs;};
+			// Attribs attrs(IDType id) const  	 									{ return nodes.at(id).attrs;};
+			// Attribs& attrs(IDType id)       										{ return nodes.at(id).attrs;};
+			DrawAttribs getNodeDrawAttrs(IDType id) const							{ return nodes.at(id).draw_attrs;};
+			DrawAttribs& getNodeDrawAttrs(IDType id)      							{ return nodes.at(id).draw_attrs;};
+			//Attribs& getEdgeAttrs(IDType from, IDType to) 							{ return nodes.at(from).fanout.at(to).attrs;};
+			//Attribs getEdgeAttrs(IDType from,  IDType to) const						{ return nodes.at(from).fanout.at(to).attrs;};
 			
 			template<typename Ta>
 			Ta attr(const std::any &s) const     									{ return std::any_cast<Ta>(s);};
@@ -173,17 +173,19 @@ namespace DSR
 				auto &ats = nodes.at(id).attrs;
 				return (ats.count(key) > 0) and (this->attr<Ta>(ats.at(key))==value);
 			};
-			std::vector<IDType> edgesByLabel(IDType id, const std::string &tag) 	
+			template<typename Ta>		
+			T getNodeAttribByName(IDType id, const std::string &key) const 
+			{  
+				return this->attr<Ta>(nodes.at(id).attrs.at(key));
+			};
+			std::vector<IDType> getEdgesByLabel(IDType id, const std::string &tag) 	
 			{ 
 				std::vector<IDType> keys;
 				for(auto &[k, v] : nodes.at(id).fanout)
-					if( attr<std::string>(v.attrs["name"]) == tag )
-						keys.push_back(k);
+				 	if( v.label == tag )
+				 		keys.push_back(k);
 				return keys;
     		};
-			std::int32_t getNodeLevel(IDType id)  									{ return std::get<IDType>(this->attrs(id)["level"]); };
-        	//CAMBIAR A getParentID
-			IDType getParent(IDType id)   											{ return std::get<IDType>(this->attrs(id)["parent"]); };
 			IDType getNodeByInnerModelName(const std::string &key, const std::string &tag)
 			{ 
 				if(tag == std::string())
@@ -193,10 +195,15 @@ namespace DSR
 						return k;
 				return NO_PARENT;  /// CHECK THIS IN ALL RESPONSES
 			};
-			
-
+			std::int32_t getNodeLevel(IDType id)  				{ return getNodeAttribByName<std::int32_t>(id, "level");};
+			IDType getParentID(IDType id)  						{ return getNodeAttribByName<IDType>(id, "parent");};
+		
 		private:
 			Nodes nodes;
+
+			
+			FanIn fanin(IDType id) const    										{ return nodes.at(id).fanin;};
+			FanIn& fanin(IDType id)             				   					{ return nodes.at(id).fanin;};
 	};
 }
 #endif // GRAPH_H
