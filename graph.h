@@ -157,6 +157,7 @@ namespace DSR
 			DrawAttribs nodeDrawAttrs(IDType id) const								{ return nodes.at(id).draw_attrs;};
 			DrawAttribs& nodeDrawAttrs(IDType id)      								{ return nodes.at(id).draw_attrs;};
 			Attribs& edgeAttrs(IDType from, IDType to) 								{ return nodes.at(from).fanout.at(to).attrs;};
+			//cambiar por getEdgeAttribs
 			Attribs edgeAttrs(IDType from,  IDType to) const						{ return nodes.at(from).fanout.at(to).attrs;};
 			
 			template<typename Ta>
@@ -181,7 +182,8 @@ namespace DSR
 				return keys;
     		};
 			std::int32_t getNodeLevel(IDType id)  									{ return std::get<IDType>(this->attrs(id)["level"]); };
-        	IDType getParent(IDType id)   											{ return std::get<IDType>(this->attrs(id)["parent"]); };
+        	//CAMBIAR A getParentID
+			IDType getParent(IDType id)   											{ return std::get<IDType>(this->attrs(id)["parent"]); };
 			IDType getNodeByInnerModelName(const std::string &key, const std::string &tag)
 			{ 
 				if(tag == std::string())

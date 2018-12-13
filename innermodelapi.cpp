@@ -179,7 +179,6 @@ InnerModelAPI::ABLists InnerModelAPI::setLists(const IDType &origId, const IDTyp
 	std::int32_t min_level = std::min(a_level,b_level);
 	 
 	//std::cout << "caca " << a_level << " " << b_level << " " << min_level << std::endl;
-	listA.clear();
 	while (a_level >= min_level)
 	{
 		listA.push_back(a);
@@ -188,7 +187,6 @@ InnerModelAPI::ABLists InnerModelAPI::setLists(const IDType &origId, const IDTyp
 		a = graph->getParent(a);
 	}
 	//std::cout << "caca2 "  << std::endl;
-	listB.clear();
 	while (b_level >= min_level)
 	{
 		listB.push_front(b);
@@ -252,8 +250,10 @@ void InnerModelAPI::updateTransformValues(const IMType &transformId_, float tx, 
 		}
 		//always update
 		//aux->update(tx,ty,tz,rx,ry,rz);
-        Attribs attr{ std::pair("tx",tx), std::pair("ty",ty), std::pair("tz",tz), std::pair("rx",rx), std::pair("ry",ry), std::pair("rz",rz) };
-        graph->addNodeAttribs(transformId, attr);
+		RMat::RTMat rt;
+		rt.setTr( tx, ty, tz);
+		rt.setRX(rx); rt.setRY(ry); rt.setRZ(rz);
+ 		graph->addEdgeAttribs(graph->getParent(transformId), transformId, DSR::Attribs{std::pair("RT", rt)});
 	}
 	else
 	{
