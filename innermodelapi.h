@@ -41,7 +41,7 @@ class InnerModelAPI
         // ///////////////////////////////////////////////////
         // void setRoot(InnerModelNode *node);
         // void cleanupTables();
-        void updateTransformValues(const IMType &transformId_, float tx, float ty, float tz, float rx, float ry, float rz, const IMType &parentId_ = 0);
+        void updateTransformValues(const IMType &transformId_, float tx, float ty, float tz, float rx, float ry, float rz, const IMType &parentId_ = IMType());
         void innerModelTreeWalk(const IMType &id);
         void innerModelTreeWalk(const IDType &id);  //overload
 
@@ -54,6 +54,7 @@ class InnerModelAPI
         RTMat getTransformationMatrix(const IMType &to_, const IMType &from_);
         RTMat getTransformationMatrix(const IDType &to, const IDType &from);   //overload
         QVec transform(const IMType &destId, const QVec &initVec, const IMType &origId);
+        QVec transform(const IMType &destId, const IMType &origId);
         RTMat getTransformationMatrixS(const std::string &destId, const std::string &origId);
         QMat getRotationMatrixTo(const IMType &to, const IMType &from);
         QVec getTranslationVectorTo(const IMType &to_, const IMType &from_);

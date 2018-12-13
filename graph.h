@@ -25,6 +25,8 @@
 #include <variant>
 #include <qmat/QMatAll>
 
+#define NO_PARENT -1
+
 // Overload pattern used inprintVisitor
 template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
 template<class... Ts> overload(Ts...) -> overload<Ts...>;
@@ -33,7 +35,7 @@ namespace DSR
 {
 	using IDType = std::int32_t;
 	using IMType = QString;
-
+	
 	using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;		
 	using Attribs = std::unordered_map<std::string, MTypes>;
 	using DrawAttribs = std::unordered_map<std::string, std::any>;
@@ -182,10 +184,12 @@ namespace DSR
         	IDType getParent(IDType id)   											{ return std::get<IDType>(this->attrs(id)["parent"]); };
 			IDType getNodeByInnerModelName(const std::string &key, const std::string &tag)
 			{ 
+				if(tag == std::string())
+					return NO_PARENT;
 				for(auto &[k, v] : nodes)
 					if( attr<std::string>(v.attrs["imName"]) == tag )
 						return k;
-				return 0;
+				return NO_PARENT;  /// CHECK THIS IN ALL RESPONSES
 			};
 			
 

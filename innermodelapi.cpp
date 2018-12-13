@@ -68,6 +68,11 @@ RMat::QVec InnerModelAPI::transform(const IMType &destId, const QVec &initVec, c
 	// }
 }
 
+RMat::QVec InnerModelAPI::transform(const IMType &destId, const IMType &origId)
+{
+	return transform(destId, QVec::zeros(3), origId);
+}
+
 RMat::RTMat InnerModelAPI::getTransformationMatrix(const IDType &to, const IDType &from)
 {
     
@@ -218,12 +223,12 @@ void InnerModelAPI::updateTransformValues(const IMType &transformId_, float tx, 
     auto transformId = graph->getNodeByInnerModelName("imName", transformId_.toStdString());
     auto parentId = graph->getNodeByInnerModelName("imName", parentId_.toStdString());
 
-	if(graph->nodeExists(transformId) and graph->nodeHasAttrib<std::string>(transformId, "imType", "transform"))
+	if(graph->nodeExists(transformId) and (graph->nodeHasAttrib<std::string>(transformId, "imType", "transform") or graph->nodeHasAttrib<std::string>(transformId, "imType", "differentialrobot")))
 	{
-		if(parentId != 0)
+		if(parentId != NO_PARENT)
 		{
 			//InnerModelTransform *auxParent = dynamic_cast<InnerModelTransform *>(hash[parentId]);
-			if (graph->nodeExists(parentId) and graph->nodeHasAttrib<std::string>(parentId, "imType", "transform"))
+			if (graph->nodeExists(parentId) and (graph->nodeHasAttrib<std::string>(parentId, "imType", "transform") or graph->nodeHasAttrib<std::string>(parentId, "imType", "differentialrobot")))
 			{
 				RTMat Tbi;
 				Tbi.setTr(tx,ty,tz);
