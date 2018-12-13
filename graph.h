@@ -42,6 +42,7 @@ namespace DSR
 	struct EdgeAttrs
 	{ 
 		std::string label;
+		IDType from, to;
 		Attribs attrs; 
 		DrawAttribs draw_attrs;
 	};
@@ -54,6 +55,7 @@ namespace DSR
 			 struct Value
 			{
 				std::string type;
+				IDType id;
 				Attribs attrs;
 				DrawAttribs draw_attrs;
 				FanOut fanout;
@@ -71,10 +73,14 @@ namespace DSR
 			typename Nodes::const_iterator end() const 	 		{ return nodes.begin(); };
 			
 			size_t size() const 								{ return nodes.size();  };
-			void addNode(IDType id, const std::string &type_) 	{ Value v; v.type = type_; nodes.insert(std::pair(id, v));};
+
+			//////////////////////////////////////////////////////////////////////////////////////////////////////
+			///// Graph editing methods. These should be intercepted and publishd to ether
+			///////////////////////////////////////////////////////////////////////////////////////////////////////
+			void addNode(IDType id, const std::string &type_) 	{ Value v; v.type = type_; v.id = id; nodes.insert(std::pair(id, v));};
 			void addEdge(IDType from, IDType to, const std::string &label_) 			
 			{ 
-				nodes[from].fanout.insert(std::pair(to, EdgeAttrs{label_, Attribs(), DrawAttribs()}));
+				nodes[from].fanout.insert(std::pair(to, EdgeAttrs{label_, from, to, Attribs(), DrawAttribs()}));
 				nodes[to].fanin.push_back(from);
 			};
 			void addNodeAttribs(IDType id, const Attribs &att)
@@ -99,6 +105,7 @@ namespace DSR
 					for(auto &[k,v] : att)
 						edgeAtts.draw_attrs.insert_or_assign(k,v);
 			};
+			///////////////////////////////////////////////////////////////////////////////////////////
 
 			std::string printVisitor(const MTypes &t)
 			{			
@@ -191,17 +198,16 @@ namespace DSR
 				if(tag == std::string())
 					return NO_PARENT;
 				for(auto &[k, v] : nodes)
-					if( attr<std::string>(v.attrs["imName"]) == tag )
+					if( attr<std::string>(v.attrs.at("imName")) == tag )
 						return k;
 				return NO_PARENT;  /// CHECK THIS IN ALL RESPONSES
 			};
-			std::int32_t getNodeLevel(IDType id)  				{ return getNodeAttribByName<std::int32_t>(id, "level");};
-			IDType getParentID(IDType id)  						{ return getNodeAttribByName<IDType>(id, "parent");};
+			std::int32_t getNodeLevel(IDType id)  									{ return getNodeAttribByName<std::int32_t>(id, "level");};
+			IDType getParentID(IDType id)  											{ return getNodeAttribByName<IDType>(id, "parent");};
 		
 		private:
 			Nodes nodes;
 
-			
 			FanIn fanin(IDType id) const    										{ return nodes.at(id).fanin;};
 			FanIn& fanin(IDType id)             				   					{ return nodes.at(id).fanin;};
 	};
