@@ -20,9 +20,9 @@
 #include <QDesktopWidget>
 #include <QGLViewer/qglviewer.h>
 #include <QApplication>
-
 #include "graphnode.h"
 #include "graphedge.h"
+#include "specificworker.h"
 
 GraphViewer::GraphViewer()
 {
@@ -41,54 +41,56 @@ GraphViewer::GraphViewer()
 	this->adjustSize();
  	QRect availableGeometry(QApplication::desktop()->availableGeometry());
  	this->move((availableGeometry.width() - width()) / 2, (availableGeometry.height() - height()) / 2);
+
+	central_point = new QGraphicsEllipseItem();
+	central_point->setPos(scene.sceneRect().center());
+
 }
 
-void GraphViewer::setGraph(std::shared_ptr<DSR::Graph> graph_, QScrollArea *scrollArea)
+//void GraphViewer::setWidget(QScrollArea *scrollArea, QListView *list_view_)
+void GraphViewer::setWidget(SpecificWorker *worker_)
 {
-	std::cout << __FUNCTION__ << "-- Entering setGraph" << std::endl;
-	this->graph = graph_;
-	this->setParent(scrollArea);
-	scrollArea->setWidget(this);
-	scrollArea->setMinimumSize(600,600);
-	
-	for(const auto &par : *graph)
-	{
-			const auto &node_id = par.first;
-			// get attrs from graph
-			auto &node_draw_attrs = graph->getNodeDrawAttrs(node_id);
-			float node_posx = graph->attr<float>(node_draw_attrs.at("posx"));
-			float node_posy = graph->attr<float>(node_draw_attrs.at("posy"));
-	
-			std::string color_name = graph->attr<std::string>(node_draw_attrs.at("color"));
-			QString qname = QString::fromStdString(graph->attr<std::string>(node_draw_attrs.at("name")));
-			
-			//create graphic nodes 
-			auto gnode = new GraphNode(this);
-			gnode->setColor(color_name.c_str());
-			scene.addItem(gnode);
-			gnode->setPos(node_posx, node_posy);
-			gnode->setTag(qname);
-			
-			//add to graph
-			node_draw_attrs["gnode"] = gnode;
-	}		
+	worker = worker_;
+	this->setParent(worker->scrollArea);
+	worker->scrollArea->setWidget(this);
+	worker->scrollArea->setMinimumSize(600,600);
 
-	// add edges after all nodes have been created
-	for(const auto &par : *graph)
-	{
-			const auto &node_id = par.first;
-			const auto &node_draw_attrs = graph->getNodeDrawAttrs(node_id);
-			auto node_origen = graph->attr<GraphNode*>(node_draw_attrs.at("gnode")); 
-			auto &node_fanout = graph->fanout(node_id);
-			for( auto &[node_adj, edge_atts] : node_fanout)
-			{
-				auto node_dest_draw_attrs = graph->getNodeDrawAttrs(node_adj);
-				auto node_dest = graph->attr<GraphNode*>(node_dest_draw_attrs.at("gnode")); 
-				auto edge_tag = graph->attr<std::string>(edge_atts.draw_attrs.at("name"));
-				scene.addItem(new GraphEdge(node_origen, node_dest, edge_tag.c_str()));
-			}
-	}
+	//connect(worker->actionSave, SIGNAL(activated()), this, SLOT(saveGraphSLOT()));
+	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 }
+
+
+////////////////////////////////////////
+/// update slots
+////////////////////////////////////////
+
+void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color)
+{	
+	auto gnode = new GraphNode(this);
+	gnode->setColor(color.c_str());
+	scene.addItem(gnode);
+	gnode->setPos(posx, posy);
+	gnode->setTag(QString::fromStdString(name));
+	gmap.insert(std::pair(id, gnode));
+	nodes_types_list << QString::fromStdString(type);
+	nodes_types_list.removeDuplicates();
+	types_nodes_model.setStringList(nodes_types_list);
+	worker->listViewNodes->setModel(&types_nodes_model);
+}
+
+void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
+{
+	auto node_origen = gmap.at(from);
+	auto node_dest = gmap.at(to);
+	scene.addItem(new GraphEdge(node_origen, node_dest, edge_tag.c_str()));
+	edges_types_list << QString::fromStdString(edge_tag);
+	edges_types_list.removeDuplicates();
+	types_edges_model.setStringList(edges_types_list);
+	worker->listViewEdges->setModel(&types_edges_model);
+}
+
+
+///////////////////////////////////////
 
 void GraphViewer::draw()
 {
@@ -100,8 +102,8 @@ void GraphViewer::draw()
 void GraphViewer::itemMoved()
 {
 	//std::cout << "timerId " << timerId << std::endl;
-    // if (timerId == -1)
-    //    timerId = startTimer(1000 / 25);
+     if (timerId == -1)
+        timerId = startTimer(1000 / 25);
 }
 
 void GraphViewer::timerEvent(QTimerEvent *event)
@@ -125,7 +127,6 @@ void GraphViewer::timerEvent(QTimerEvent *event)
         if (node->advancePosition())
             itemsMoved = true;
     }
-
     if (!itemsMoved) 
 	{
         killTimer(timerId);

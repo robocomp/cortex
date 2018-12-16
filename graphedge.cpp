@@ -21,11 +21,12 @@
 #include <QDebug>
 #include <QTableWidget>
 #include <QGraphicsSceneMouseEvent>
+#include <iostream>
 
 GraphEdge::GraphEdge(GraphNode *sourceNode, GraphNode *destNode, const QString &edge_name) : arrowSize(10)
 {
-    setAcceptedMouseButtons(0);
-		//setFlags(QGraphicsItem::ItemIsSelectable);
+    //setAcceptedMouseButtons(0);
+	setFlags(QGraphicsItem::ItemIsSelectable);
     source = sourceNode;
     dest = destNode;
     source->addEdge(this);
@@ -139,9 +140,9 @@ void GraphEdge::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidg
 
 void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+	    std::cout << "edge: " << tag.toStdString() << std::endl;
 		if(event->button() == Qt::RightButton and tag == "RT")
 		{
-			//qDebug() << "hola";
 			rt_values = new QGraphicsTextItem(this);
 			rt_values->setPlainText("Matrix showing RT values");
 			rt_values->setX(event->scenePos().x());

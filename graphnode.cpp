@@ -67,7 +67,7 @@ void GraphNode::calculateForces()
     qreal xvel = 0;
     qreal yvel = 0;
     foreach (QGraphicsItem *item, scene()->items()) 
-		{
+	{
         GraphNode *node = qgraphicsitem_cast<GraphNode *>(item);
         if (!node)
             continue;
@@ -77,7 +77,7 @@ void GraphNode::calculateForces()
         qreal dy = vec.y();
         double l = 2.0 * (dx * dx + dy * dy);
         if (l > 0) 
-				{
+		{
             xvel += (dx * 150.0) / l;
             yvel += (dy * 150.0) / l;
         }
@@ -86,7 +86,7 @@ void GraphNode::calculateForces()
     // Now subtract all forces pulling items together
     double weight = (edgeList.size() + 1) * 10;
     foreach (GraphEdge *edge, edgeList) 
-		{
+	{
         QPointF vec;
         if (edge->sourceNode() == this)
             vec = mapToItem(edge->destNode(), 0, 0);
@@ -96,6 +96,12 @@ void GraphNode::calculateForces()
         yvel -= vec.y() / weight;
     }
 
+    // Subtract force from central pos pulling item to the center of the image
+    QPointF to_central_point = mapFromItem(graph->central_point, 0, 0);
+    xvel += to_central_point.x() / (weight/2) ;
+    yvel += to_central_point.y() / (weight/2) ;
+
+    // sludge
     if (qAbs(xvel) < 0.1 && qAbs(yvel) < 0.1)
         xvel = yvel = 0;
 
@@ -168,6 +174,7 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+    std::cout << "node: " << tag->text().toStdString() << std::endl;
     update();
     QGraphicsItem::mousePressEvent(event);
 }

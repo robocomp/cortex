@@ -152,6 +152,10 @@ namespace DSR
 				std::cout << "---------------- graph ends here --------------------------" << std::endl;
 			}
 
+			void save(const std::string &xml_file_path);
+
+			/////////////////////////////////////////////////////////////////////////////////////////////
+
 			FanOut fanout(IDType id) const   										{ return nodes.at(id).fanout;};
 			FanOut& fanout(IDType id)            									{ return nodes.at(id).fanout;};
 			template <typename Ta> Ta getEdgeAttrib(IDType from, IDType to, const std::string &tag) const 	
@@ -204,7 +208,8 @@ namespace DSR
 			};
 			std::int32_t getNodeLevel(IDType id)  									{ return getNodeAttribByName<std::int32_t>(id, "level");};
 			IDType getParentID(IDType id)  											{ return getNodeAttribByName<IDType>(id, "parent");};
-		
+			std::string getNodeType(IDType id) const 								{ return nodes.at(id).type; }
+
 		private:
 			Nodes nodes;
 

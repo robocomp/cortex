@@ -20,24 +20,23 @@
 #include <memory>
 #include <QGraphicsScene>
 #include <QGraphicsView>
-#include <QGraphicsEllipseItem>
-#include <QGraphicsRectItem>
-#include <QGraphicsItem>
+#include <QListView>
 #include "graph.h"
 
-//class Graph;
+class SpecificWorker;
 class GraphNode;
 class GraphEdge;
 
 class GraphViewer : public QGraphicsView
 {
+	Q_OBJECT
 	public:
 		GraphViewer();
-  		void setGraph(std::shared_ptr<DSR::Graph> graph_,  QScrollArea *scrollArea);
+		void setWidget(SpecificWorker *worker_);
 		void draw();
-// 		void applyForces(std::shared_ptr<Graph> g);
-// 		void applyForces2(std::shared_ptr<Graph> g);
 		void itemMoved();
+			
+		QGraphicsEllipseItem *central_point;
 	
 	protected:
 		void wheelEvent(QWheelEvent *event) override;
@@ -46,18 +45,21 @@ class GraphViewer : public QGraphicsView
 		void timerEvent(QTimerEvent *event) override;
 		
 	private:
-		std::shared_ptr<DSR::Graph> graph;
 		QGraphicsScene scene;
-		QGraphicsEllipseItem *node;
-		
-		int m_originX, m_originY;
-		QGraphicsItem *pressed_item;
-		
+		std::unordered_map<std::int32_t, GraphNode*> gmap;
 		int timerId = -1;
-    	GraphNode *centerNode;
-		
+		QStringListModel types_edges_model, types_nodes_model;
+		QStringList nodes_types_list, edges_types_list;
+		SpecificWorker *worker;
+
 	public slots:
-	
+		void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type,float posx, float posy, const std::string &color);
+		void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &ege_tag);
+		void saveGraphSLOT() 			{ emit saveGraphSIGNAL(); };
+
+	signals:
+		void saveGraphSIGNAL();
+
 };
 
 #endif // GRAPHVIEWER_H
