@@ -28,10 +28,11 @@ class GraphNode : public QGraphicsItem
 {
 	public:
     GraphNode(GraphViewer *graph_viewer);
-
-    enum { Type = UserType + 1 };
-    int type() const override { return Type; }
-		void addEdge(GraphEdge *edge);
+    
+    std::int32_t id_in_graph;
+    GraphViewer *graph;
+    
+    void addEdge(GraphEdge *edge);
     QList<GraphEdge *> edges() const;
     void calculateForces();
     bool advancePosition();
@@ -47,14 +48,15 @@ class GraphNode : public QGraphicsItem
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;  
     // void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
     // void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
-	
+    void keyPressEvent(QKeyEvent *event) override;
+
 	private:
-    GraphViewer *graph;
+   
     QPointF newPos;
 		QList<GraphEdge *> edgeList;
 		QGraphicsSimpleTextItem *tag;
 		QString dark_color = "darkyello", plain_color = "yellow";
-    QTableWidget *label;
+    QTableWidget *label = nullptr;
 };
 
 #endif // GRAPHNODE_H

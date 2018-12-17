@@ -37,6 +37,7 @@ class GraphViewer : public QGraphicsView
 		void itemMoved();
 			
 		QGraphicsEllipseItem *central_point;
+		SpecificWorker *worker;
 	
 	protected:
 		void wheelEvent(QWheelEvent *event) override;
@@ -48,9 +49,8 @@ class GraphViewer : public QGraphicsView
 		QGraphicsScene scene;
 		std::unordered_map<std::int32_t, GraphNode*> gmap;
 		int timerId = -1;
-		QStringListModel types_edges_model, types_nodes_model;
 		QStringList nodes_types_list, edges_types_list;
-		SpecificWorker *worker;
+		
 
 	public slots:
 		void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type,float posx, float posy, const std::string &color);

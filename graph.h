@@ -165,10 +165,10 @@ namespace DSR
 				else return Ta();
 			};
 			// Attribs attrs(IDType id) const  	 									{ return nodes.at(id).attrs;};
-			// Attribs& attrs(IDType id)       										{ return nodes.at(id).attrs;};
+			Attribs& getNodeAttrs(IDType id)       									{ return nodes.at(id).attrs;};
 			DrawAttribs getNodeDrawAttrs(IDType id) const							{ return nodes.at(id).draw_attrs;};
 			DrawAttribs& getNodeDrawAttrs(IDType id)      							{ return nodes.at(id).draw_attrs;};
-			//Attribs& getEdgeAttrs(IDType from, IDType to) 							{ return nodes.at(from).fanout.at(to).attrs;};
+			Attribs& getEdgeAttrs(IDType from, IDType to) 							{ return nodes.at(from).fanout.at(to).attrs;};
 			//Attribs getEdgeAttrs(IDType from,  IDType to) const						{ return nodes.at(from).fanout.at(to).attrs;};
 			
 			template<typename Ta>

@@ -19,6 +19,7 @@
 
 #include <QGraphicsItem>
 #include <QContextMenuEvent>
+#include <QTableWidget>
 
 class GraphNode;
 
@@ -30,7 +31,6 @@ class GraphEdge : public QGraphicsItem
     GraphNode *sourceNode() const;
     GraphNode *destNode() const;
     void adjust();
-    enum { Type = UserType + 2 };
     int type() const override { return Type; }
 
 	protected:
@@ -39,6 +39,7 @@ class GraphEdge : public QGraphicsItem
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
 		void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;  
+    void keyPressEvent(QKeyEvent *event) override;
 	
 	private:
 		GraphNode *source, *dest;
@@ -47,6 +48,7 @@ class GraphEdge : public QGraphicsItem
     QPointF destPoint;
 		QString tag;
 		QGraphicsTextItem *rt_values = nullptr;
+    QTableWidget *label = nullptr;
 };
 
 #endif // GRAPHEDGE_H

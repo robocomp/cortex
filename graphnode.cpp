@@ -23,17 +23,19 @@
 #include <QStyleOption>
 #include <QDebug>
 #include <QDialog>
-#include <QMessageBox>
-
+#include <QHeaderView>
+#include "specificworker.h"
 
 GraphNode::GraphNode(GraphViewer *graph_viewer) : graph(graph_viewer)
 {
     setFlag(ItemIsMovable);
     setFlag(ItemSendsGeometryChanges);
+    setFlag(QGraphicsItem::ItemIsFocusable);
     setCacheMode(DeviceCoordinateCache);
     setAcceptHoverEvents(true);
     setZValue(-1);
 }
+
 
 void GraphNode::setTag(const QString &tag_)
 {
@@ -181,11 +183,21 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
     std::cout << "node: " << tag->text().toStdString() << std::endl;
     if( event->button()== Qt::RightButton)
     {
+        if(label != nullptr) { delete label; label = nullptr; }
         label = new QTableWidget(graph);
         label->setColumnCount(2);
-        label->setRowCount(3);
-        label->setHorizontalHeaderLabels(QStringList{"#", "Name", "Text"}); 
-        label->setItem(0, 1, new QTableWidgetItem("Hello"));
+        auto g = graph->worker->graph;
+        label->setRowCount(g->getNodeAttrs(id_in_graph).size() );
+        label->setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
+        int i=0;
+        for( auto &[k, v] : g->getNodeAttrs(id_in_graph) )
+        {
+            label->setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+            label->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
+            i++;
+        }
+        label->horizontalHeader()->setStretchLastSection(true);
+        label->resizeRowsToContents();
         label->show();
     }
     update();
@@ -194,13 +206,21 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if( event->button() == Qt::RightButton)
-    {
-        label->close();
-        delete label;
-    }
     update();
     QGraphicsItem::mouseReleaseEvent(event);
+}
+
+void GraphNode::keyPressEvent(QKeyEvent *event) 
+{
+    if (event->key() == Qt::Key_Escape)
+    {
+        if(label != nullptr)
+        {
+            label->close();
+            delete label; 
+            label = nullptr;
+        }
+    }
 }
 
 // void GraphNode::hoverEnterEvent(QGraphicsSceneHoverEvent* event)

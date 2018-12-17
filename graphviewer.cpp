@@ -20,6 +20,7 @@
 #include <QDesktopWidget>
 #include <QGLViewer/qglviewer.h>
 #include <QApplication>
+#include <QTableWidget>
 #include "graphnode.h"
 #include "graphedge.h"
 #include "specificworker.h"
@@ -45,10 +46,8 @@ GraphViewer::GraphViewer()
     viewport()->setMouseTracking(true);
 	central_point = new QGraphicsEllipseItem();
 	central_point->setPos(scene.sceneRect().center());
-
 }
 
-//void GraphViewer::setWidget(QScrollArea *scrollArea, QListView *list_view_)
 void GraphViewer::setWidget(SpecificWorker *worker_)
 {
 	worker = worker_;
@@ -68,15 +67,28 @@ void GraphViewer::setWidget(SpecificWorker *worker_)
 void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color)
 {	
 	auto gnode = new GraphNode(this);
+	gnode->id_in_graph = id;
 	gnode->setColor(color.c_str());
 	scene.addItem(gnode);
 	gnode->setPos(posx, posy);
 	gnode->setTag(QString::fromStdString(name));
 	gmap.insert(std::pair(id, gnode));
+
+	worker->tableWidgetNodes->setColumnCount(2);
+    worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"#", "type"}); 
 	nodes_types_list << QString::fromStdString(type);
 	nodes_types_list.removeDuplicates();
-	types_nodes_model.setStringList(nodes_types_list);
-	worker->listViewNodes->setModel(&types_nodes_model);
+	int i = 0;
+	worker->tableWidgetNodes->clearContents();
+	for( auto &s : nodes_types_list)
+	{
+		worker->tableWidgetNodes->setItem(i, 0, new QTableWidgetItem(QString::number(i)));
+    	worker->tableWidgetNodes->setItem(i, 1, new QTableWidgetItem(s));
+    	i++;
+	}
+	worker->tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);
+    worker->tableWidgetNodes->resizeRowsToContents();
+    worker->tableWidgetNodes->show();
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
@@ -85,9 +97,9 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 	auto node_dest = gmap.at(to);
 	scene.addItem(new GraphEdge(node_origen, node_dest, edge_tag.c_str()));
 	edges_types_list << QString::fromStdString(edge_tag);
-	edges_types_list.removeDuplicates();
-	types_edges_model.setStringList(edges_types_list);
-	worker->listViewEdges->setModel(&types_edges_model);
+	//edges_types_list.removeDuplicates();
+	//types_edges_model.setStringList(edges_types_list);
+	//worker->tableWidgetEdges->setModel(&types_edges_model);
 }
 
 

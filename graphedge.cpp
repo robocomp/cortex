@@ -19,22 +19,24 @@
 #include <qmath.h>
 #include <QPainter>
 #include <QDebug>
-#include <QTableWidget>
+#include "graphviewer.h"
+#include "specificworker.h"
 #include <QGraphicsSceneMouseEvent>
 #include <iostream>
+#include <cppitertools/range.hpp>
 
 GraphEdge::GraphEdge(GraphNode *sourceNode, GraphNode *destNode, const QString &edge_name) : arrowSize(10)
 {
-    //setAcceptedMouseButtons(0);
-	setFlags(QGraphicsItem::ItemIsSelectable);
+    setFlags(QGraphicsItem::ItemIsSelectable);
+	setFlag(QGraphicsItem::ItemIsFocusable);
     source = sourceNode;
     dest = destNode;
     source->addEdge(this);
     dest->addEdge(this);
-		//tag = new QGraphicsSimpleTextItem(edge_name, this);
-		tag = edge_name;
-		//tag->setBrush(QBrush(QColor("coral")));
-		adjust();
+	//tag = new QGraphicsSimpleTextItem(edge_name, this);
+	tag = edge_name;
+	//tag->setBrush(QBrush(QColor("coral")));
+	adjust();
 }
 
 GraphNode *GraphEdge::sourceNode() const
@@ -70,16 +72,17 @@ void GraphEdge::adjust()
 
 QRectF GraphEdge::boundingRect() const
 {
-    qreal adjust = 5;
-		QLineF p(sourcePoint, destPoint);
-    return QRectF( p.center().x() - adjust, p.center().y() - adjust, 10 , 10);
+    qreal adjust = 10;
+	QLineF p(sourcePoint, destPoint);
+    return QRectF( p.center().x() - adjust, p.center().y() - adjust, 20 , 20);
 }
 
 QPainterPath GraphEdge::shape() const
 {
     QPainterPath path;
-		QLineF p(sourcePoint, destPoint);
-    path.addEllipse( p.center().x() - 5, p.center().y() - 5, 10, 10);
+	qreal adjust = 10;
+	QLineF p(sourcePoint, destPoint);
+    path.addEllipse( p.center().x() - adjust, p.center().y() - adjust, 20, 20);
     return path;
 }
 
@@ -137,9 +140,36 @@ void GraphEdge::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidg
 	
 }
 
-
 void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+	std::cout << "node: " << tag.toStdString() << std::endl;
+    if( event->button()== Qt::RightButton)
+    {
+        if(label != nullptr) { delete label; label = nullptr; }
+        label = new QTableWidget(source->graph);
+		// For RT 
+        label->setColumnCount(4);
+		label->setRowCount(4);
+        auto g = source->graph->worker->graph;
+        //label->setRowCount(g->getEdgeAttrs(source->id_in_graph, dest->id_in_graph).size() );
+        //label->setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
+        // int i=0;
+        // for( auto &[k, v] : g->getEdgeAttrs(source->id_in_graph, dest->id_in_graph))
+        // {
+        //     label->setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+        //     label->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
+        //     i++;
+        // }
+		auto mat = g->getEdgeAttrib<RTMat>(source->id_in_graph, dest->id_in_graph, "RT");
+		for(auto i : iter::range(mat.nRows()))
+			for(auto j : iter::range(mat.nCols()))
+				label->setItem(i, j, new QTableWidgetItem(QString::number(mat(i,j))));
+		
+        label->horizontalHeader()->setStretchLastSection(true);
+        label->resizeRowsToContents();
+        label->show();
+    }
+
 	    std::cout << "edge: " << tag.toStdString() << std::endl;
 		if(event->button() == Qt::RightButton and tag == "RT")
 		{
@@ -156,3 +186,15 @@ void GraphEdge::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 		delete rt_values;
 }
 
+void GraphEdge::keyPressEvent(QKeyEvent *event) 
+{
+    if (event->key() == Qt::Key_Escape)
+    {
+        if(label != nullptr)
+        {
+            label->close();
+            delete label; 
+            label = nullptr;
+        }
+    }
+}
