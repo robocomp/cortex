@@ -41,7 +41,8 @@ GraphViewer::GraphViewer()
 	this->adjustSize();
  	QRect availableGeometry(QApplication::desktop()->availableGeometry());
  	this->move((availableGeometry.width() - width()) / 2, (availableGeometry.height() - height()) / 2);
-
+	setMouseTracking(true);
+    viewport()->setMouseTracking(true);
 	central_point = new QGraphicsEllipseItem();
 	central_point->setPos(scene.sceneRect().center());
 
@@ -102,14 +103,13 @@ void GraphViewer::draw()
 void GraphViewer::itemMoved()
 {
 	//std::cout << "timerId " << timerId << std::endl;
-     if (timerId == -1)
-        timerId = startTimer(1000 / 25);
+    //  if (timerId == -1)
+    //     timerId = startTimer(1000 / 25);
 }
 
 void GraphViewer::timerEvent(QTimerEvent *event)
 {
     //Q_UNUSED(event);
-
 	//std::cout << "gola"  << std::endl;
 
     QList<GraphNode *> nodes;
@@ -119,7 +119,9 @@ void GraphViewer::timerEvent(QTimerEvent *event)
             nodes << node;
     }
     foreach (GraphNode *node, nodes)
+	{
         node->calculateForces();
+	}
 
     bool itemsMoved = false;
     foreach (GraphNode *node, nodes) 

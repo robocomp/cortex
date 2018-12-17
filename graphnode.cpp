@@ -22,12 +22,16 @@
 #include <QPainter>
 #include <QStyleOption>
 #include <QDebug>
+#include <QDialog>
+#include <QMessageBox>
+
 
 GraphNode::GraphNode(GraphViewer *graph_viewer) : graph(graph_viewer)
 {
     setFlag(ItemIsMovable);
     setFlag(ItemSendsGeometryChanges);
     setCacheMode(DeviceCoordinateCache);
+    setAcceptHoverEvents(true);
     setZValue(-1);
 }
 
@@ -175,12 +179,46 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     std::cout << "node: " << tag->text().toStdString() << std::endl;
+    if( event->button()== Qt::RightButton)
+    {
+        label = new QTableWidget(graph);
+        label->setColumnCount(2);
+        label->setRowCount(3);
+        label->setHorizontalHeaderLabels(QStringList{"#", "Name", "Text"}); 
+        label->setItem(0, 1, new QTableWidgetItem("Hello"));
+        label->show();
+    }
     update();
     QGraphicsItem::mousePressEvent(event);
 }
 
 void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
+    if( event->button() == Qt::RightButton)
+    {
+        label->close();
+        delete label;
+    }
     update();
     QGraphicsItem::mouseReleaseEvent(event);
 }
+
+// void GraphNode::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
+// {
+//    // label = new QTableWidget(graph);
+//     //label->setText(tag->text().toStdString());
+//     //label->show();
+//     //label->exec();
+//     std::cout << "entering node: " << tag->text().toStdString() << std::endl;
+//     update (boundingRect());
+// }
+
+// void GraphNode::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+// {
+//     // QDialog *label = new QDialog(graph);
+//     // label->exec();
+//     //label->close();
+//     //lable->delete();
+//     std::cout << "exiting node: " << tag->text().toStdString() << std::endl;
+//     update (boundingRect());
+// }

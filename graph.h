@@ -185,9 +185,14 @@ namespace DSR
 				return (ats.count(key) > 0) and (this->attr<Ta>(ats.at(key))==value);
 			};
 			template<typename Ta>		
-			T getNodeAttribByName(IDType id, const std::string &key) const 
+			Ta getNodeAttribByName(IDType id, const std::string &key) const 
 			{  
 				return this->attr<Ta>(nodes.at(id).attrs.at(key));
+			};
+			template<typename Ta>		
+			Ta getNodeDrawAttribByName(IDType id, const std::string &key) const 
+			{  
+				return this->attr<Ta>(nodes.at(id).draw_attrs.at(key));
 			};
 			std::vector<IDType> getEdgesByLabel(IDType id, const std::string &tag) 	
 			{ 
