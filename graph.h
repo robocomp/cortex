@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 <copyright holder> <email>
+ * Copyright 2018 <RoboLab> <email>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,16 +88,20 @@ namespace DSR
 				for(auto &[k,v] : att)
 					nodes[id].attrs.insert_or_assign(k,v);
 			};
-			void addNodeDrawAttribs(IDType id, const DrawAttribs &att)
-			{ 
-				for(auto &[k,v] : att)
-					nodes[id].draw_attrs.insert_or_assign(k,v);
-			};
+			
 			void addEdgeAttribs(IDType from, IDType to, const Attribs &att)
 			{ 
 					auto &edgeAtts = nodes[from].fanout.at(to);
 					for(auto &[k,v] : att)
 						edgeAtts.attrs.insert_or_assign(k,v);
+			};
+			/////////////////////////////////////////////////////////////////////////////////
+			// Draw editing. Not to be distributed
+			/////////////////////////////////////////////////////////////////////////////////////
+			void addNodeDrawAttribs(IDType id, const DrawAttribs &att)
+			{ 
+				for(auto &[k,v] : att)
+					nodes[id].draw_attrs.insert_or_assign(k,v);
 			};
 			void addEdgeDrawAttribs(IDType from, IDType to, const DrawAttribs &att)
 			{ 
@@ -106,56 +110,15 @@ namespace DSR
 						edgeAtts.draw_attrs.insert_or_assign(k,v);
 			};
 			///////////////////////////////////////////////////////////////////////////////////////////
-
-			std::string printVisitor(const MTypes &t)
-			{			
-				return std::visit(overload
-				{
-    				[](RTMat m) -> std::string										{ return m.asQString("RT").toStdString(); },
-    				[](std::vector<float> a)-> std::string	
-					{ 
-						std::string str;
-						for(auto &f : a)
-							str += std::to_string(f) + " ";
-						return  str += "\n"; 
-					},
-					[](std::string a) -> std::string								{ return  a; },
-					[](auto a) -> std::string										{ return std::to_string(a);} 
-				}, t);
-    		};
-
-			void print()
-			{
-				std::cout << "------------Printing Graph: " << nodes.size() << " elements -------------------------" << std::endl;
-				for( auto &par : nodes)
-				{
-					auto &v = par.second;
-					std::cout << "[" << attr<std::string>(v.draw_attrs["name"]) << "] : " << std::endl;
-					std::cout << "	attrs:	";
-					for( auto &[ka, kv] : v.attrs)
-					{
-						std::cout << ka << " -> " << printVisitor(kv)  << " , ";
-					}
-					std::cout << std::endl << "	edges:	";
-					for( auto &[kf,vf] : v.fanout)
-					{
-						std::cout << vf.label << "( " << attr<std::string>(nodes[kf].draw_attrs["name"])  << " ) " << std::endl;
-						std::cout << "			edge attrs: ";
-						for( auto &[ke, ve] : vf.attrs)
-						{
-							std::cout << ke << " -> " << printVisitor(ve) << " , ";
-						}
-						std::cout << std::endl << "		";
-					}
-					std::cout << std::endl;
-				}
-				std::cout << "---------------- graph ends here --------------------------" << std::endl;
-			}
-
-			void save(const std::string &xml_file_path);
-
+			/// Printing and visitors
+			///////////////////////////////////////////////////////////////////////////////////////////
+			std::string printVisitor(const MTypes &t);
+			void print();
+			void saveToFile(const std::string &xml_file_path);
+			void readFromFile(const std::string &xml_file_path);
 			/////////////////////////////////////////////////////////////////////////////////////////////
-
+			////
+			/////////////////////////////////////////////////////////////////////////////////////////////////
 			FanOut fanout(IDType id) const   										{ return nodes.at(id).fanout;};
 			FanOut& fanout(IDType id)            									{ return nodes.at(id).fanout;};
 			template <typename Ta> Ta getEdgeAttrib(IDType from, IDType to, const std::string &tag) const 	

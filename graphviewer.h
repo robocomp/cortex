@@ -38,6 +38,7 @@ class GraphViewer : public QGraphicsView
 			
 		QGraphicsEllipseItem *central_point;
 		SpecificWorker *worker;
+		std::unordered_map<std::int32_t, GraphNode*> gmap;
 	
 	protected:
 		void wheelEvent(QWheelEvent *event) override;
@@ -47,15 +48,17 @@ class GraphViewer : public QGraphicsView
 		
 	private:
 		QGraphicsScene scene;
-		std::unordered_map<std::int32_t, GraphNode*> gmap;
-		int timerId = -1;
+		
+		int timerId = 0;
 		QStringList nodes_types_list, edges_types_list;
+		bool do_simulate = false;
 		
 
 	public slots:
 		void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type,float posx, float posy, const std::string &color);
 		void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &ege_tag);
-		void saveGraphSLOT() 			{ emit saveGraphSIGNAL(); };
+		void saveGraphSLOT();		
+		void toggleSimulationSLOT();
 
 	signals:
 		void saveGraphSIGNAL();

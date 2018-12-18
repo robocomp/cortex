@@ -33,9 +33,7 @@ GraphEdge::GraphEdge(GraphNode *sourceNode, GraphNode *destNode, const QString &
     dest = destNode;
     source->addEdge(this);
     dest->addEdge(this);
-	//tag = new QGraphicsSimpleTextItem(edge_name, this);
 	tag = edge_name;
-	//tag->setBrush(QBrush(QColor("coral")));
 	adjust();
 }
 
@@ -169,15 +167,6 @@ void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
         label->resizeRowsToContents();
         label->show();
     }
-
-	    std::cout << "edge: " << tag.toStdString() << std::endl;
-		if(event->button() == Qt::RightButton and tag == "RT")
-		{
-			rt_values = new QGraphicsTextItem(this);
-			rt_values->setPlainText("Matrix showing RT values");
-			rt_values->setX(event->scenePos().x());
-			rt_values->setY(event->scenePos().y());
-   	}
 }
 
 void GraphEdge::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)

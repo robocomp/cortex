@@ -37,6 +37,7 @@ class GraphNode : public QGraphicsItem
     void calculateForces();
     bool advancePosition();
 		void setTag(const QString &tag_);
+    QString getTag() const { return tag->text();};
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
@@ -51,7 +52,6 @@ class GraphNode : public QGraphicsItem
     void keyPressEvent(QKeyEvent *event) override;
 
 	private:
-   
     QPointF newPos;
 		QList<GraphEdge *> edgeList;
 		QGraphicsSimpleTextItem *tag;

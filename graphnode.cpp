@@ -72,11 +72,13 @@ void GraphNode::calculateForces()
     // Sum up all forces pushing this item away
     qreal xvel = 0;
     qreal yvel = 0;
-    foreach (QGraphicsItem *item, scene()->items()) 
+    //foreach (QGraphicsItem *item, scene()->items()) 
+    for( auto &[k,node] : graph->gmap)
 	{
-        GraphNode *node = qgraphicsitem_cast<GraphNode *>(item);
-        if (!node)
-            continue;
+        //GraphNode *node = qgraphicsitem_cast<GraphNode *>(item);
+        //if (!node)
+        //    continue;
+        (void)k;
 
         QPointF vec = mapToItem(node, 0, 0);
         qreal dx = vec.x();
@@ -94,6 +96,7 @@ void GraphNode::calculateForces()
     foreach (GraphEdge *edge, edgeList) 
 	{
         QPointF vec;
+       
         if (edge->sourceNode() == this)
             vec = mapToItem(edge->destNode(), 0, 0);
         else
@@ -115,6 +118,8 @@ void GraphNode::calculateForces()
     newPos = pos() + QPointF(xvel, yvel);
     newPos.setX(qMin(qMax(newPos.x(), sceneRect.left() + 10), sceneRect.right() - 10));
     newPos.setY(qMin(qMax(newPos.y(), sceneRect.top() + 10), sceneRect.bottom() - 10));
+     
+   
 }
 
 bool GraphNode::advancePosition()

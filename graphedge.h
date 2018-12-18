@@ -32,6 +32,7 @@ class GraphEdge : public QGraphicsItem
     GraphNode *destNode() const;
     void adjust();
     int type() const override { return Type; }
+    QString getTag() const { return tag;};
 
 	protected:
     QPainterPath shape() const override;

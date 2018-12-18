@@ -55,10 +55,26 @@ void GraphViewer::setWidget(SpecificWorker *worker_)
 	worker->scrollArea->setWidget(this);
 	worker->scrollArea->setMinimumSize(600,600);
 
-	//connect(worker->actionSave, SIGNAL(activated()), this, SLOT(saveGraphSLOT()));
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
+	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
 }
 
+////////////////////////////////////////
+/// UI slots
+////////////////////////////////////////
+
+
+void GraphViewer::saveGraphSLOT()
+{ 
+	emit saveGraphSIGNAL(); 
+};
+
+void GraphViewer::toggleSimulationSLOT()
+{
+	this->do_simulate = !do_simulate;
+	if(do_simulate)
+	   timerId = startTimer(1000 / 25);
+}
 
 ////////////////////////////////////////
 /// update slots
@@ -67,39 +83,59 @@ void GraphViewer::setWidget(SpecificWorker *worker_)
 void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color)
 {	
 	auto gnode = new GraphNode(this);
+	qDebug() << "node id " << id;
 	gnode->id_in_graph = id;
 	gnode->setColor(color.c_str());
-	scene.addItem(gnode);
 	gnode->setPos(posx, posy);
 	gnode->setTag(QString::fromStdString(name));
+	scene.addItem(gnode);
 	gmap.insert(std::pair(id, gnode));
-
+	// table filling
 	worker->tableWidgetNodes->setColumnCount(2);
-    worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"#", "type"}); 
+	worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"#", "type"}); 
 	nodes_types_list << QString::fromStdString(type);
 	nodes_types_list.removeDuplicates();
 	int i = 0;
 	worker->tableWidgetNodes->clearContents();
+	worker->tableWidgetNodes->setRowCount(nodes_types_list.size());
 	for( auto &s : nodes_types_list)
 	{
-		worker->tableWidgetNodes->setItem(i, 0, new QTableWidgetItem(QString::number(i)));
-    	worker->tableWidgetNodes->setItem(i, 1, new QTableWidgetItem(s));
+		worker->tableWidgetNodes->setItem(i,0, new QTableWidgetItem());
+		worker->tableWidgetNodes->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+		worker->tableWidgetNodes->setItem(i, 1, new QTableWidgetItem(s));
     	i++;
 	}
 	worker->tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);
     worker->tableWidgetNodes->resizeRowsToContents();
+	worker->tableWidgetNodes->resizeColumnsToContents();
     worker->tableWidgetNodes->show();
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
+	qDebug() << "edge id " << QString::fromStdString(edge_tag);
 	auto node_origen = gmap.at(from);
 	auto node_dest = gmap.at(to);
 	scene.addItem(new GraphEdge(node_origen, node_dest, edge_tag.c_str()));
+	//table filling
+	worker->tableWidgetEdges->setColumnCount(2);
+	worker->tableWidgetEdges->setHorizontalHeaderLabels(QStringList{"#", "label"}); 
 	edges_types_list << QString::fromStdString(edge_tag);
-	//edges_types_list.removeDuplicates();
-	//types_edges_model.setStringList(edges_types_list);
-	//worker->tableWidgetEdges->setModel(&types_edges_model);
+	edges_types_list.removeDuplicates();
+	int i = 0;
+	worker->tableWidgetEdges->clearContents();
+	worker->tableWidgetEdges->setRowCount(edges_types_list.size());
+	for( auto &s : edges_types_list)
+	{
+		worker->tableWidgetEdges->setItem(i,0, new QTableWidgetItem());
+		worker->tableWidgetEdges->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+		worker->tableWidgetEdges->setItem(i, 1, new QTableWidgetItem(s));
+    	i++;
+	}
+	worker->tableWidgetEdges->horizontalHeader()->setStretchLastSection(true);
+    worker->tableWidgetEdges->resizeRowsToContents();
+	worker->tableWidgetEdges->resizeColumnsToContents();
+    worker->tableWidgetEdges->show();
 }
 
 
@@ -115,33 +151,29 @@ void GraphViewer::draw()
 void GraphViewer::itemMoved()
 {
 	//std::cout << "timerId " << timerId << std::endl;
-    //  if (timerId == -1)
-    //     timerId = startTimer(1000 / 25);
+	//if(do_simulate and timerId == 0)
+    //if (timerId == 0)
+    //   timerId = startTimer(1000 / 25);
 }
 
 void GraphViewer::timerEvent(QTimerEvent *event)
 {
-    //Q_UNUSED(event);
-	//std::cout << "gola"  << std::endl;
+    Q_UNUSED(event);
 
-    QList<GraphNode *> nodes;
-    foreach (QGraphicsItem *item, scene.items()) 
-		{
-        if (GraphNode *node = qgraphicsitem_cast<GraphNode *>(item))
-            nodes << node;
-    }
-    foreach (GraphNode *node, nodes)
+	for( auto &[k,node] : gmap)
 	{
-        node->calculateForces();
+		(void)k;
+	    node->calculateForces();
 	}
-
-    bool itemsMoved = false;
-    foreach (GraphNode *node, nodes) 
-		{
+	bool itemsMoved = false;
+	
+	for( auto &[k,node] : gmap)
+	{
+		(void)k;
         if (node->advancePosition())
             itemsMoved = true;
     }
-    if (!itemsMoved) 
+	if (!itemsMoved) 
 	{
         killTimer(timerId);
         timerId = 0;
