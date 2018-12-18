@@ -36,6 +36,10 @@ void Graph::saveToFile(const std::string &xml_file_path)
         if( v.attrs.size() > 0)
         {
            	myfile <<">\n";
+			if( this->nodes.at(k).attrs.count("pos_x") == 0)
+				myfile << "\t<attribute key=\"" << "pos_x" << "\" value=\""<< getNodeDrawAttribByName<float>(k, "posx") <<"\" />\n";
+			if( this->nodes.at(k).attrs.count("pos_y") == 0)
+				myfile << "\t<attribute key=\"" << "pos_y" << "\" value=\""<< getNodeDrawAttribByName<float>(k, "posy") <<"\" />\n";	
             for( auto &[ka, va] : v.attrs)
 				myfile <<"\t<attribute key=\"" << ka <<"\" value=\"" << printVisitor(va) <<"\" />\n";		
 			myfile <<"</symbol>\n";
@@ -118,21 +122,18 @@ void Graph::readFromFile(const std::string &file_name)
 			IDType node_id = std::atoi((char *)sid);
 			std::string node_type((char *)stype);
 			this->addNode(node_id, node_type);
-			this->addNodeAttribs(node_id, DSR::Attribs{ 
-								//std::pair("name", node_type), 
-								//std::pair("type", node_type),
-								std::pair("level", std::int32_t(0)),
-								std::pair("parent", IDType(0))
-				});
+			// this->addNodeAttribs(node_id, DSR::Attribs{ 
+			// 					std::pair("level", std::int32_t(0)),
+			// 					std::pair("parent", IDType(0))	});
 	
 			// Draw attributes come now
 			DSR::DrawAttribs atts;
 			std::string qname = (char *)stype;
 			std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
-			auto rd = QVec::uniformVector(2,-200,200);
 			atts.insert(std::pair("name", full_name));
-			atts.insert(std::pair("posx", rd[0]));
-			atts.insert(std::pair("posy", rd[1]));
+			//auto rd = QVec::uniformVector(2,-200,200);
+			//atts.insert(std::pair("pos_x", rd[0]));
+			//atts.insert(std::pair("pos_y", rd[1]));
 			
 			// color selection
 			std::string color = "coral";
@@ -143,9 +144,6 @@ void Graph::readFromFile(const std::string &file_name)
 			else if(qname == "laser") color = "GreenYellow";
 			else if(qname == "mesh") color = "LightBlue";
 			else if(qname == "imu") color = "LightSalmon";
-			
-			
-			
 			
 			atts.insert(std::pair("color", color));
 			this->addNodeDrawAttribs(node_id, atts);
@@ -162,8 +160,14 @@ void Graph::readFromFile(const std::string &file_name)
 					xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
 					
 					//s->setAttribute(std::string((char *)attr_key), std::string((char *)attr_value));
-					this->addNodeAttribs(node_id, DSR::Attribs{ std::pair(std::string((char *)attr_key), std::string((char *)attr_value))});
-					
+					std::string sk = std::string((char *)attr_key);
+					if( sk == "level" or sk == "parent")
+						this->addNodeAttribs(node_id, DSR::Attribs{ std::pair(sk, std::stoi(std::string((char *)attr_value)))});
+					else if( sk == "pos_x" or sk == "pos_y")
+						this->addNodeAttribs(node_id, DSR::Attribs{ std::pair(sk, (float)std::stod(std::string((char *)attr_value)))});
+					else 
+						this->addNodeAttribs(node_id, DSR::Attribs{ std::pair(sk, std::string((char *)attr_value))});
+							
 					xmlFree(attr_key);
 					xmlFree(attr_value);
 				}
@@ -176,7 +180,7 @@ void Graph::readFromFile(const std::string &file_name)
 		else if (xmlStrcmp(cur->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
 		else if (xmlStrcmp(cur->name, (const xmlChar *)"comment") == 0) { }  // coments are always ignored
 		else { printf("unexpected tag #1: %s\n", cur->name); exit(-1); }      // unexpected tags make the program exit
-	}
+	}		
 
 	// Read links
 	for (xmlNodePtr cur=root->xmlChildrenNode; cur!=NULL; cur=cur->next)
@@ -220,7 +224,7 @@ void Graph::readFromFile(const std::string &file_name)
  			DSR::Attribs edge_attribs;
 			if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
 			{ 	
-				this->addNodeAttribs(b, DSR::Attribs{ std::pair("level", this->getNodeLevel(a)+1), std::pair("parent", a)});
+				//this->addNodeAttribs(b, DSR::Attribs{ std::pair("level", this->getNodeLevel(a)+1), std::pair("parent", a)});
 				RMat::RTMat rt;
 				float x,y,z;
 				for(auto &[k,v] : attrs)

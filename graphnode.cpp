@@ -211,6 +211,12 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
+    if( event->button()== Qt::LeftButton)
+    {
+        auto g = graph->worker->graph;
+        g->addNodeAttribs(id_in_graph, DSR::Attribs{ std::pair("pos_x", (float)event->scenePos().x())});
+        g->addNodeAttribs(id_in_graph, DSR::Attribs{ std::pair("pos_y", (float)event->scenePos().y())}); 
+    }
     update();
     QGraphicsItem::mouseReleaseEvent(event);
 }

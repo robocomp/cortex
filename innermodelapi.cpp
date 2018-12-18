@@ -104,9 +104,9 @@ RMat::RTMat InnerModelAPI::getTransformationMatrix(const IDType &to, const IDTyp
  
 RMat::RTMat InnerModelAPI::getTransformationMatrix(const IMType &to_, const IMType &from_)
 {
+	//std::cout << __FUNCTION__ << std::endl;
     auto to = graph->getNodeByInnerModelName("imName", to_.toStdString());
     auto from = graph->getNodeByInnerModelName("imName", from_.toStdString());
-	
 	return getTransformationMatrix(to, from);	
 } 
 
@@ -174,10 +174,12 @@ InnerModelAPI::ABLists InnerModelAPI::setLists(const IDType &origId, const IDTyp
 	if (!b)
 		throw InnerModelException("Cannot find node: "+ destId.toStdString()+"\"");
  */
-	std::int32_t a_level = graph->getNodeLevel(origId);
+ std::cout << __FUNCTION__ << origId << " " << destId << std::endl;
+	
+ 	std::int32_t a_level = graph->getNodeLevel(origId);
 	std::int32_t b_level = graph->getNodeLevel(destId);
 	std::int32_t min_level = std::min(a_level,b_level);
-	 
+		
 	//std::cout << "caca " << a_level << " " << b_level << " " << min_level << std::endl;
 	while (a_level >= min_level)
 	{
