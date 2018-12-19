@@ -49,8 +49,9 @@ namespace DSR
 	using FanOut = std::unordered_map<IDType, EdgeAttrs>;
 	using FanIn = std::vector<IDType>;
 
-	class Graph 
+	class Graph : public QObject
 	{
+		Q_OBJECT
 		public:
 			 struct Value
 			{
@@ -87,6 +88,7 @@ namespace DSR
 			{ 
 				for(auto &[k,v] : att)
 					nodes[id].attrs.insert_or_assign(k,v);
+				emit NodeAttrsChangedSIGNAL(att);
 			};
 			
 			void addEdgeAttribs(IDType from, IDType to, const Attribs &att)
@@ -127,8 +129,8 @@ namespace DSR
 					return std::get<Ta>(attrs.at(tag));
 				else return Ta();
 			};
-			// Attribs attrs(IDType id) const  	 									{ return nodes.at(id).attrs;};
-			Attribs& getNodeAttrs(IDType id)       									{ return nodes.at(id).attrs;};
+			Attribs getNodeAttrs(IDType id) const  	 								{ return nodes.at(id).attrs;};
+			//Attribs& getNodeAttrs(IDType id)       								{ return nodes.at(id).attrs;};
 			DrawAttribs getNodeDrawAttrs(IDType id) const							{ return nodes.at(id).draw_attrs;};
 			DrawAttribs& getNodeDrawAttrs(IDType id)      							{ return nodes.at(id).draw_attrs;};
 			Attribs& getEdgeAttrs(IDType from, IDType to) 							{ return nodes.at(from).fanout.at(to).attrs;};
@@ -165,7 +167,7 @@ namespace DSR
 				 		keys.push_back(k);
 				return keys;
     		};
-			IDType getNodeByInnerModelName(const std::string &key, const std::string &tag)
+			IDType getNodeByInnerModelName(const std::string &tag)
 			{ 
 				if(tag == std::string())
 					return NO_PARENT;
@@ -183,6 +185,9 @@ namespace DSR
 
 			FanIn fanin(IDType id) const    										{ return nodes.at(id).fanin;};
 			FanIn& fanin(IDType id)             				   					{ return nodes.at(id).fanin;};
+
+		signals:
+			void NodeAttrsChangedSIGNAL(Attribs);
 	};
 }
 #endif // GRAPH_H

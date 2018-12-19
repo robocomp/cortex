@@ -138,6 +138,10 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
     worker->tableWidgetEdges->show();
 }
 
+ void GraphViewer::NodeAttrsChangedSLOT(const IDType &node, const DSR::Attribs &attr)
+ {
+	 
+ }
 
 ///////////////////////////////////////
 
@@ -181,6 +185,7 @@ void GraphViewer::timerEvent(QTimerEvent *event)
 }
 
 /////////////////////////
+/////
 /////////////////////////
 
 void GraphViewer::wheelEvent(QWheelEvent *event)
@@ -214,5 +219,12 @@ void GraphViewer::wheelEvent(QWheelEvent *event)
 	
 // 	qDebug() << "scene rect" << scene.sceneRect();
 // 	qDebug() << "view rect" << rect();
+}
 
+void GraphViewer::keyPressEvent(QKeyEvent* event) 
+{
+	if (event->key() == Qt::Key_Escape)
+    {
+		emit closeWindowSIGNAL();
+	}
 }

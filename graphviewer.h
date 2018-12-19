@@ -43,7 +43,8 @@ class GraphViewer : public QGraphicsView
 	protected:
 		void wheelEvent(QWheelEvent *event) override;
 		//void mousePressEvent(QMouseEvent* event) override;
-		//void mouseMoveEvent(QMouseEvent* event) override;
+		//void mousePressEvent(QMouseEvent* event) override;
+		void keyPressEvent(QKeyEvent *event) override;
 		void timerEvent(QTimerEvent *event) override;
 		
 	private:
@@ -59,9 +60,11 @@ class GraphViewer : public QGraphicsView
 		void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &ege_tag);
 		void saveGraphSLOT();		
 		void toggleSimulationSLOT();
+		void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
 
 	signals:
 		void saveGraphSIGNAL();
+		void closeWindowSIGNAL();
 
 };
 

@@ -121,19 +121,20 @@ void Graph::readFromFile(const std::string &file_name)
 			//AGMModelSymbol::SPtr s = newSymbol(atoi((char *)sid), (char *)stype);
 			IDType node_id = std::atoi((char *)sid);
 			std::string node_type((char *)stype);
+			auto rd = QVec::uniformVector(2,-200,200);
 			this->addNode(node_id, node_type);
-			// this->addNodeAttribs(node_id, DSR::Attribs{ 
-			// 					std::pair("level", std::int32_t(0)),
-			// 					std::pair("parent", IDType(0))	});
+			this->addNodeAttribs(node_id, DSR::Attribs{ 
+			 					std::pair("level", std::int32_t(0)),
+			 					std::pair("parent", IDType(0)),
+								//std::pair("pos_x", rd[0]),
+								//std::pair("pos_y", rd[1]),
+								 });
 	
 			// Draw attributes come now
 			DSR::DrawAttribs atts;
 			std::string qname = (char *)stype;
 			std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
 			atts.insert(std::pair("name", full_name));
-			//auto rd = QVec::uniformVector(2,-200,200);
-			//atts.insert(std::pair("pos_x", rd[0]));
-			//atts.insert(std::pair("pos_y", rd[1]));
 			
 			// color selection
 			std::string color = "coral";
@@ -224,7 +225,7 @@ void Graph::readFromFile(const std::string &file_name)
  			DSR::Attribs edge_attribs;
 			if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
 			{ 	
-				//this->addNodeAttribs(b, DSR::Attribs{ std::pair("level", this->getNodeLevel(a)+1), std::pair("parent", a)});
+				this->addNodeAttribs(b, DSR::Attribs{ std::pair("level", this->getNodeLevel(a)+1), std::pair("parent", a)});
 				RMat::RTMat rt;
 				float x,y,z;
 				for(auto &[k,v] : attrs)
@@ -256,7 +257,6 @@ void Graph::readFromFile(const std::string &file_name)
 		else if (xmlStrcmp(cur->name, (const xmlChar *)"comment") == 0) { }  // comments are always ignored
 		else { printf("unexpected tag #2: %s\n", cur->name); exit(-1); }      // unexpected tags make the program exit
 	}
-	
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

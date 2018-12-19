@@ -19,13 +19,51 @@
 
 #include <QGraphicsItem>
 #include <QTableWidget>
+#include <QGraphicsScene>
+#include <cppitertools/zip.hpp>
+
 
 class GraphEdge;
 class GraphViewer;
 class QGraphicsSceneMouseEvent;
+#include "specificworker.h"
 
-class GraphNode : public QGraphicsItem
+class DoLaserStuff : public QGraphicsView
 {
+  public:
+    DoLaserStuff(const GraphViewer *graph_viewer, IDType node_id_)
+    {
+      auto node_id = node_id_;
+      resize(400,400);
+      setWindowTitle("Laser");
+      scene.setSceneRect(-5000, -100, 10000, 5000);
+      setScene(&scene);
+      //setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
+	    setRenderHint(QPainter::Antialiasing);
+	    fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
+      scale(1, -1);
+      const auto &g = graph_viewer->worker->graph;
+      QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [g, node_id, this](const DSR::Attribs &attrs){ 
+                          const auto &lDists = g->getNodeAttribByName<std::vector<float>>(node_id, "laser_data_dists"); 
+                          const auto &lAngles = g->getNodeAttribByName<std::vector<float>>(node_id, "laser_data_angles"); 
+                          QPolygonF polig;
+                          for(const auto &[dist, angle] : iter::zip(lDists, lAngles))
+                              polig << QPointF(dist*sin(angle), dist*cos(angle));
+                          scene.clear();
+                          QPolygonF robot; robot << QPointF(-200, 0) << QPointF(-100,150) << QPointF(0,200) << QPointF(100,150) << QPointF(200,0);
+                          scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
+                          scene.addPolygon(polig, QPen(Qt::red, 8));                          
+                          });
+      show();
+    };
+  private:
+    QGraphicsScene scene;
+
+};
+
+class GraphNode : public QObject, public QGraphicsItem
+{
+  Q_OBJECT
 	public:
     GraphNode(GraphViewer *graph_viewer);
     
@@ -51,12 +89,16 @@ class GraphNode : public QGraphicsItem
     // void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
+  public slots:
+    void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
+
 	private:
     QPointF newPos;
 		QList<GraphEdge *> edgeList;
 		QGraphicsSimpleTextItem *tag;
 		QString dark_color = "darkyello", plain_color = "yellow";
     QTableWidget *label = nullptr;
+    DoLaserStuff *laser_stuff;
 };
 
 #endif // GRAPHNODE_H

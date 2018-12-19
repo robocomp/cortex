@@ -165,6 +165,8 @@ void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
 		
         label->horizontalHeader()->setStretchLastSection(true);
         label->resizeRowsToContents();
+        label->resizeColumnsToContents();
+        QObject::connect(source->graph, &GraphViewer::closeWindowSIGNAL, label, &QTableWidget::close);
         label->show();
     }
 }
