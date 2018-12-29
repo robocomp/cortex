@@ -32,6 +32,7 @@ class GraphViewer : public QGraphicsView
 	Q_OBJECT
 	public:
 		GraphViewer();
+		~GraphViewer();
 		void setWidget(SpecificWorker *worker_);
 		void draw();
 		void itemMoved();
@@ -49,7 +50,6 @@ class GraphViewer : public QGraphicsView
 		
 	private:
 		QGraphicsScene scene;
-		
 		int timerId = 0;
 		QStringList nodes_types_list, edges_types_list;
 		bool do_simulate = false;

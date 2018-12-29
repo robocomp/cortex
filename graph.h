@@ -123,6 +123,8 @@ namespace DSR
 			/////////////////////////////////////////////////////////////////////////////////////////////////
 			FanOut fanout(IDType id) const   										{ return nodes.at(id).fanout;};
 			FanOut& fanout(IDType id)            									{ return nodes.at(id).fanout;};
+			FanIn fanin(IDType id) const    										{ return nodes.at(id).fanin;};
+			FanIn& fanin(IDType id)             				   					{ return nodes.at(id).fanin;};
 			template <typename Ta> Ta getEdgeAttrib(IDType from, IDType to, const std::string &tag) const 	
 			{ 	auto &attrs = nodes.at(from).fanout.at(to).attrs;
 				if(attrs.count(tag) > 0)
@@ -182,9 +184,6 @@ namespace DSR
 
 		private:
 			Nodes nodes;
-
-			FanIn fanin(IDType id) const    										{ return nodes.at(id).fanin;};
-			FanIn& fanin(IDType id)             				   					{ return nodes.at(id).fanin;};
 
 		signals:
 			void NodeAttrsChangedSIGNAL(Attribs);

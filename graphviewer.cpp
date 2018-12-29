@@ -48,15 +48,37 @@ GraphViewer::GraphViewer()
 	central_point->setPos(scene.sceneRect().center());
 }
 
+GraphViewer::~GraphViewer()
+{
+	QSettings settings("RoboComp", "DSR");
+    settings.beginGroup("MainWindow");
+		settings.setValue("size", size());
+		settings.setValue("pos", pos());
+    settings.endGroup();
+}
+
 void GraphViewer::setWidget(SpecificWorker *worker_)
 {
 	worker = worker_;
 	this->setParent(worker->scrollArea);
 	worker->scrollArea->setWidget(this);
 	worker->scrollArea->setMinimumSize(600,600);
+	auto ind_2 = worker->splitter_1->indexOf(worker->scrollArea);
+	auto ind_1 = worker->splitter_1->indexOf(worker->splitter_1);
+	worker->splitter_1->setStretchFactor(ind_1,1);	
+	worker->splitter_1->setStretchFactor(ind_2,9);
+	QSettings settings("RoboComp", "DSR");
+    settings.beginGroup("MainWindow");
+    	resize(settings.value("size", QSize(400, 400)).toSize());
+    	move(settings.value("pos", QPoint(200, 200)).toPoint());
+    settings.endGroup();
+	settings.beginGroup("QGraphicsView");
+		setTransform(settings.value("matrix", QTransform()).value<QTransform>());
+	settings.endGroup();
 
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
+
 }
 
 ////////////////////////////////////////
@@ -88,11 +110,15 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const st
 	gnode->setColor(color.c_str());
 	gnode->setPos(posx, posy);
 	gnode->setTag(QString::fromStdString(name));
+	gnode->setType( type );
 	scene.addItem(gnode);
 	gmap.insert(std::pair(id, gnode));
+
 	// table filling
-	worker->tableWidgetNodes->setColumnCount(2);
-	worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"#", "type"}); 
+	worker->tableWidgetNodes->setColumnCount(1);
+	worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"type"}); 
+	worker->tableWidgetNodes->verticalHeader()->setVisible(false);
+	worker->tableWidgetNodes->setShowGrid(false);
 	nodes_types_list << QString::fromStdString(type);
 	nodes_types_list.removeDuplicates();
 	int i = 0;
@@ -100,15 +126,69 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const st
 	worker->tableWidgetNodes->setRowCount(nodes_types_list.size());
 	for( auto &s : nodes_types_list)
 	{
-		worker->tableWidgetNodes->setItem(i,0, new QTableWidgetItem());
+		worker->tableWidgetNodes->setItem(i,0, new QTableWidgetItem(s));
 		worker->tableWidgetNodes->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
-		worker->tableWidgetNodes->setItem(i, 1, new QTableWidgetItem(s));
     	i++;
 	}
 	worker->tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);
     worker->tableWidgetNodes->resizeRowsToContents();
 	worker->tableWidgetNodes->resizeColumnsToContents();
     worker->tableWidgetNodes->show();
+	
+	// connect QTableWidget itemClicked to hide/show nodes of selected type and nodes fanning into it
+	disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, 0, 0);
+	connect(worker->tableWidgetNodes, &QTableWidget::itemClicked, this, [this](const auto &item){ 
+						static bool state = true;
+						std::cout << "hide all nodes of type " << item->text().toStdString() << std::endl;
+						for( auto &[k, v] : gmap) 
+							if( item->text().toStdString() == v->getType()) 
+							{
+								if( state ) v->hide();
+								else v->show();
+								for(auto &[ka, va] : worker->graph->fanout(k))
+								{
+									(void)va;
+									if( state ) 
+									{
+										//gmap.at(ka)->hide();
+										for(auto ge : gmap.at(ka)->edgeList)
+										{
+											ge->hide();
+											qDebug() << ge->sourceNode()->id_in_graph;
+										}
+									}
+									else 
+									{
+										//gmap.at(ka)->show();		
+										for(auto ge : gmap.at(ka)->edgeList)
+											ge->show();
+									}
+								}
+								// for(auto &ka : worker->graph->fanin(k))
+								// {
+								// 	if( state ) 
+								// 	{
+								// 		//	gmap.at(ka)->hide();
+								// 		for(auto ge : gmap.at(ka)->edgeList)
+								// 		 {
+								// 			ge->hide();
+								// 			qDebug() << ge->sourceNode()->id_in_graph;
+								// 		 }
+								// 	}
+								// 	else
+								// 	{
+								// 		//gmap.at(ka)->show();		
+								// 		for(auto ge : gmap.at(ka)->edgeList)
+								// 			ge->show();
+								// 	}
+								// }
+							}
+						if(state) 
+							worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+						else 
+							worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/redBall.png")));
+						state = !state;
+					} , Qt::UniqueConnection);
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
@@ -117,9 +197,11 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 	auto node_origen = gmap.at(from);
 	auto node_dest = gmap.at(to);
 	scene.addItem(new GraphEdge(node_origen, node_dest, edge_tag.c_str()));
-	//table filling
-	worker->tableWidgetEdges->setColumnCount(2);
-	worker->tableWidgetEdges->setHorizontalHeaderLabels(QStringList{"#", "label"}); 
+	// side table filling
+	worker->tableWidgetEdges->setColumnCount(1);
+	worker->tableWidgetEdges->setHorizontalHeaderLabels(QStringList{"label"}); 
+	worker->tableWidgetNodes->verticalHeader()->setVisible(false);
+	worker->tableWidgetNodes->setShowGrid(false);
 	edges_types_list << QString::fromStdString(edge_tag);
 	edges_types_list.removeDuplicates();
 	int i = 0;
@@ -127,10 +209,9 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 	worker->tableWidgetEdges->setRowCount(edges_types_list.size());
 	for( auto &s : edges_types_list)
 	{
-		worker->tableWidgetEdges->setItem(i,0, new QTableWidgetItem());
+		worker->tableWidgetEdges->setItem(i,0, new QTableWidgetItem(s));
 		worker->tableWidgetEdges->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
-		worker->tableWidgetEdges->setItem(i, 1, new QTableWidgetItem(s));
-    	i++;
+		i++;
 	}
 	worker->tableWidgetEdges->horizontalHeader()->setStretchLastSection(true);
     worker->tableWidgetEdges->resizeRowsToContents();
@@ -190,13 +271,6 @@ void GraphViewer::timerEvent(QTimerEvent *event)
 
 void GraphViewer::wheelEvent(QWheelEvent *event)
 {
-		//zoom
-// 	  double scaleFactor = pow((double)2, -event->delta() / 240.0);
-// 	  qreal factor = this->transform().scale(scaleFactor, scaleFactor).mapRect(QRectF(0, 0, 1, 1)).width();
-//     if (factor < 0.07 || factor > 100)
-//         return;
-//     this->scale(scaleFactor, scaleFactor);
-		
 	// zoom
 	const ViewportAnchor anchor = this->transformationAnchor();
 	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
@@ -217,14 +291,14 @@ void GraphViewer::wheelEvent(QWheelEvent *event)
 	this->scale(factor, factor);
 	this->setTransformationAnchor(anchor);
 	
-// 	qDebug() << "scene rect" << scene.sceneRect();
-// 	qDebug() << "view rect" << rect();
+	QSettings settings("RoboComp", "DSR");
+	settings.beginGroup("QGraphicsView");
+		settings.setValue("matrix", this->transform());
+	settings.endGroup();
 }
 
 void GraphViewer::keyPressEvent(QKeyEvent* event) 
 {
 	if (event->key() == Qt::Key_Escape)
-    {
 		emit closeWindowSIGNAL();
-	}
 }

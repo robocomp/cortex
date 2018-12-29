@@ -44,6 +44,11 @@ void GraphNode::setTag(const QString &tag_)
 	tag->setY(-10);
 }
 
+void GraphNode::setType(const std::string &type_)
+{
+    type = type_;
+}
+
 void GraphNode::setColor(const QString &plain)
 {
 	plain_color = plain;
@@ -185,43 +190,16 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+    static std::unique_ptr<QWidget> do_stuff;
     std::cout << "node: " << tag->text().toStdString() << std::endl;
     if( event->button()== Qt::RightButton)
     {
-        //if(label != nullptr) { delete label; label = nullptr; }
         if(tag->text().contains("laser"))
-            laser_stuff = new DoLaserStuff(graph, id_in_graph);
+            do_stuff = std::make_unique<DoLaserStuff>(graph, id_in_graph);
+        else if(tag->text().contains("rgdb"))
+            do_stuff = std::make_unique<DoRGBDStuff>(graph, id_in_graph);
         else
-        {
-            label = new QTableWidget(graph);
-            label->setColumnCount(2);
-            auto g = graph->worker->graph;
-            label->setRowCount(g->getNodeAttrs(id_in_graph).size() );
-            label->setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
-            int i=0;
-            for( auto &[k, v] : g->getNodeAttrs(id_in_graph) )
-            {
-                label->setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-                label->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
-                i++;
-            }
-            label->horizontalHeader()->setStretchLastSection(true);
-            label->resizeRowsToContents();
-            label->resizeColumnsToContents();
-            QObject::connect(graph, &GraphViewer::closeWindowSIGNAL, label, &QTableWidget::close);
-            QTableWidget *l = label;
-            QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [g,l](const DSR::Attribs &attrs)
-                                                { 
-                                                  int i= 0; 
-                                                  for(auto &[k,v]: attrs)
-                                                  {
-                                                    l->setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-                                                    l->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
-                                                    i++;
-                                                  }
-                                                });
-            label->show();
-        }
+            do_stuff = std::make_unique<DoTableStuff>(graph, id_in_graph);
     }
     update();
     QGraphicsItem::mousePressEvent(event);

@@ -21,7 +21,7 @@
 #include <QTableWidget>
 #include <QGraphicsScene>
 #include <cppitertools/zip.hpp>
-
+#include <QLabel>
 
 class GraphEdge;
 class GraphViewer;
@@ -34,6 +34,7 @@ class DoLaserStuff : public QGraphicsView
     DoLaserStuff(const GraphViewer *graph_viewer, IDType node_id_)
     {
       auto node_id = node_id_;
+      //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       resize(400,400);
       setWindowTitle("Laser");
       scene.setSceneRect(-5000, -100, 10000, 5000);
@@ -58,7 +59,64 @@ class DoLaserStuff : public QGraphicsView
     };
   private:
     QGraphicsScene scene;
+};
 
+class DoRGBDStuff : public  QLabel
+{
+  public:
+    DoRGBDStuff(const GraphViewer *graph_viewer, IDType node_id_)
+    {
+      auto node_id = node_id_;
+      //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
+      resize(640,480);
+      setWindowTitle("RGBD");
+      //setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
+	    const auto &g = graph_viewer->worker->graph;
+      setParent(this);
+      QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [&](const DSR::Attribs &attrs){ 
+                            const auto &lDists = g->getNodeAttribByName<std::vector<float>>(node_id, "rgbd_data"); 
+                            //label.setPixmap(QImage());                          
+                          });
+      show();
+    };
+  private:
+    //QLabel label;
+};
+
+class DoTableStuff : public  QTableWidget
+{
+  public:
+    DoTableStuff(const GraphViewer *graph_viewer, IDType node_id_)
+    {
+      auto node_id = node_id_;
+      //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
+      setColumnCount(2);
+      auto g = graph_viewer->worker->graph;
+      setRowCount(g->getNodeAttrs(node_id).size() );
+      setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
+      int i=0;
+      for( auto &[k, v] : g->getNodeAttrs(node_id) )
+      {
+        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
+        i++;
+      }
+      horizontalHeader()->setStretchLastSection(true);
+      resizeRowsToContents();
+      resizeColumnsToContents();
+      QObject::connect(graph_viewer, &GraphViewer::closeWindowSIGNAL, &QTableWidget::close);
+      QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [&](const DSR::Attribs &attrs)
+                    { 
+                      int i= 0; 
+                      for(auto &[k,v]: attrs)
+                      {
+                          setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+                          setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
+                          i++;
+                      }});
+      show();
+  };
+   private:
 };
 
 class GraphNode : public QObject, public QGraphicsItem
@@ -69,6 +127,7 @@ class GraphNode : public QObject, public QGraphicsItem
     
     std::int32_t id_in_graph;
     GraphViewer *graph;
+    QList<GraphEdge *> edgeList;
     
     void addEdge(GraphEdge *edge);
     QList<GraphEdge *> edges() const;
@@ -76,6 +135,8 @@ class GraphNode : public QObject, public QGraphicsItem
     bool advancePosition();
 		void setTag(const QString &tag_);
     QString getTag() const { return tag->text();};
+    void setType(const std::string &type_);
+    std::string getType() const { return type;};
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
@@ -94,11 +155,12 @@ class GraphNode : public QObject, public QGraphicsItem
 
 	private:
     QPointF newPos;
-		QList<GraphEdge *> edgeList;
+		
 		QGraphicsSimpleTextItem *tag;
 		QString dark_color = "darkyello", plain_color = "yellow";
-    QTableWidget *label = nullptr;
-    DoLaserStuff *laser_stuff;
+    std::string type;
+    //QTableWidget *label = nullptr;
+    //DoLaserStuff *do_stuff;
 };
 
 #endif // GRAPHNODE_H
