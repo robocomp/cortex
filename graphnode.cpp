@@ -15,7 +15,6 @@
  */
 
 #include "graphnode.h"
-#include "graphviewer.h"
 #include "graphedge.h"
 #include <QGraphicsScene>
 #include <QGraphicsSceneMouseEvent>
@@ -26,7 +25,7 @@
 #include <QHeaderView>
 #include "graph.h"
 
-GraphNode::GraphNode(GraphViewer *graph_viewer) : graph(graph_viewer)
+GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_viewer(graph_viewer_)
 {
     setFlag(ItemIsMovable);
     setFlag(ItemSendsGeometryChanges);
@@ -78,7 +77,7 @@ void GraphNode::calculateForces()
     qreal xvel = 0;
     qreal yvel = 0;
     //foreach (QGraphicsItem *item, scene()->items()) 
-    for( auto &[k,node] : graph->gmap)
+    for( auto &[k,node] : graph_viewer->gmap)
 	{
         //GraphNode *node = qgraphicsitem_cast<GraphNode *>(item);
         //if (!node)
@@ -111,7 +110,7 @@ void GraphNode::calculateForces()
     }
 
     // Subtract force from central pos pulling item to the center of the image
-    QPointF to_central_point = mapFromItem(graph->central_point, 0, 0);
+    QPointF to_central_point = mapFromItem(graph_viewer->central_point, 0, 0);
     xvel += to_central_point.x() / (weight/2) ;
     yvel += to_central_point.y() / (weight/2) ;
 
@@ -179,7 +178,7 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
     case ItemPositionHasChanged:
         foreach (GraphEdge *edge, edgeList)
             edge->adjust();
-        graph->itemMoved();
+        graph_viewer->itemMoved();
         break;
     default:
         break;
@@ -192,6 +191,7 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     static std::unique_ptr<QWidget> do_stuff;
     std::cout << "node: " << tag->text().toStdString() << std::endl;
+    const auto graph = graph_viewer->getGraph();
     if( event->button()== Qt::RightButton)
     {
         if(tag->text().contains("laser"))
@@ -209,7 +209,7 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
     if( event->button()== Qt::LeftButton)
     {
-        auto g = graph->worker->graph;
+        auto g = graph_viewer->getGraph();
         g->addNodeAttribs(id_in_graph, DSR::Attribs{ std::pair("pos_x", (float)event->scenePos().x())});
         g->addNodeAttribs(id_in_graph, DSR::Attribs{ std::pair("pos_y", (float)event->scenePos().y())}); 
     }
@@ -233,7 +233,7 @@ void GraphNode::keyPressEvent(QKeyEvent *event)
 /////////////////////////////////////////////////////////////////////////////////////////7
 ////
 /////////////////////////////////////////////////////////////////////////////////////////
- void GraphNode::NodeAttrsChangedSLOT(const IDType &node, const DSR::Attribs &attr)
+ void GraphNode::NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs &attr)
  {
 	 std::cout << "do cool stuff" << std::endl;
  }

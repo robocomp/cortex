@@ -27,45 +27,47 @@ class SpecificWorker;
 class GraphNode;
 class GraphEdge;
 
-class GraphViewer : public QGraphicsView
+namespace DSR
 {
-	Q_OBJECT
-	public:
-		GraphViewer();
-		~GraphViewer();
-		void setWidget(SpecificWorker *worker_);
-		void draw();
-		void itemMoved();
+	class GraphViewer : public QGraphicsView
+	{
+		Q_OBJECT
+		public:
+			GraphViewer();
+			~GraphViewer();
+			void setWidget(SpecificWorker *worker_);
+			void draw();
+			void itemMoved();
+			std::shared_ptr<DSR::Graph> getGraph() const {return graph;};
+				
+			QGraphicsEllipseItem *central_point;
+			SpecificWorker *worker;
+			std::unordered_map<std::int32_t, GraphNode*> gmap;
+		
+		protected:
+			void wheelEvent(QWheelEvent *event) override;
+			void keyPressEvent(QKeyEvent *event) override;
+			void timerEvent(QTimerEvent *event) override;
 			
-		QGraphicsEllipseItem *central_point;
-		SpecificWorker *worker;
-		std::unordered_map<std::int32_t, GraphNode*> gmap;
-	
-	protected:
-		void wheelEvent(QWheelEvent *event) override;
-		//void mousePressEvent(QMouseEvent* event) override;
-		//void mousePressEvent(QMouseEvent* event) override;
-		void keyPressEvent(QKeyEvent *event) override;
-		void timerEvent(QTimerEvent *event) override;
-		
-	private:
-		QGraphicsScene scene;
-		int timerId = 0;
-		QStringList nodes_types_list, edges_types_list;
-		bool do_simulate = false;
-		
+		private:
+			QGraphicsScene scene;
+			int timerId = 0;
+			QStringList nodes_types_list, edges_types_list;
+			bool do_simulate = false;
+			std::shared_ptr<DSR::Graph> graph;
+			
 
-	public slots:
-		void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type,float posx, float posy, const std::string &color);
-		void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &ege_tag);
-		void saveGraphSLOT();		
-		void toggleSimulationSLOT();
-		void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
+		public slots:
+			void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type,float posx, float posy, const std::string &color);
+			void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &ege_tag);
+			void saveGraphSLOT();		
+			void toggleSimulationSLOT();
+			void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
 
-	signals:
-		void saveGraphSIGNAL();
-		void closeWindowSIGNAL();
+		signals:
+			void saveGraphSIGNAL();
+			void closeWindowSIGNAL();
 
-};
-
+	};
+}
 #endif // GRAPHVIEWER_H

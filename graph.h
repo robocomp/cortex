@@ -88,7 +88,7 @@ namespace DSR
 			{ 
 				for(auto &[k,v] : att)
 					nodes[id].attrs.insert_or_assign(k,v);
-				emit NodeAttrsChangedSIGNAL(att);
+				emit NodeAttrsChangedSIGNAL(id, att);
 			};
 			
 			void addEdgeAttribs(IDType from, IDType to, const Attribs &att)
@@ -186,7 +186,7 @@ namespace DSR
 			Nodes nodes;
 
 		signals:
-			void NodeAttrsChangedSIGNAL(Attribs);
+			void NodeAttrsChangedSIGNAL(const IDType, const Attribs);
 	};
 }
 #endif // GRAPH_H

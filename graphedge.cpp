@@ -144,20 +144,11 @@ void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
     if( event->button()== Qt::RightButton)
     {
         if(label != nullptr) { delete label; label = nullptr; }
-        label = new QTableWidget(source->graph);
+        label = new QTableWidget(source->getGraphViewer().get());
 		// For RT 
         label->setColumnCount(4);
 		label->setRowCount(4);
-        auto g = source->graph->worker->graph;
-        //label->setRowCount(g->getEdgeAttrs(source->id_in_graph, dest->id_in_graph).size() );
-        //label->setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
-        // int i=0;
-        // for( auto &[k, v] : g->getEdgeAttrs(source->id_in_graph, dest->id_in_graph))
-        // {
-        //     label->setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-        //     label->setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
-        //     i++;
-        // }
+        auto g = source->getGraphViewer()->getGraph();
 		auto mat = g->getEdgeAttrib<RTMat>(source->id_in_graph, dest->id_in_graph, "RT");
 		for(auto i : iter::range(mat.nRows()))
 			for(auto j : iter::range(mat.nCols()))
@@ -166,7 +157,7 @@ void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
         label->horizontalHeader()->setStretchLastSection(true);
         label->resizeRowsToContents();
         label->resizeColumnsToContents();
-        QObject::connect(source->graph, &GraphViewer::closeWindowSIGNAL, label, &QTableWidget::close);
+        QObject::connect(source->getGraphViewer().get(), &DSR::GraphViewer::closeWindowSIGNAL, label, &QTableWidget::close);
         label->show();
     }
 }

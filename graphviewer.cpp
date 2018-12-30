@@ -25,6 +25,8 @@
 #include "graphedge.h"
 #include "specificworker.h"
 
+using namespace DSR;
+
 GraphViewer::GraphViewer()
 {
 	scene.setItemIndexMethod(QGraphicsScene::NoIndex);
@@ -60,6 +62,7 @@ GraphViewer::~GraphViewer()
 void GraphViewer::setWidget(SpecificWorker *worker_)
 {
 	worker = worker_;
+	graph = worker->getGraph();
 	this->setParent(worker->scrollArea);
 	worker->scrollArea->setWidget(this);
 	worker->scrollArea->setMinimumSize(600,600);
@@ -104,7 +107,7 @@ void GraphViewer::toggleSimulationSLOT()
 
 void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color)
 {	
-	auto gnode = new GraphNode(this);
+	auto gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));
 	qDebug() << "node id " << id;
 	gnode->id_in_graph = id;
 	gnode->setColor(color.c_str());
@@ -114,7 +117,7 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const st
 	scene.addItem(gnode);
 	gmap.insert(std::pair(id, gnode));
 
-	// table filling
+	// left table filling
 	worker->tableWidgetNodes->setColumnCount(1);
 	worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"type"}); 
 	worker->tableWidgetNodes->verticalHeader()->setVisible(false);
@@ -128,7 +131,7 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const st
 	{
 		worker->tableWidgetNodes->setItem(i,0, new QTableWidgetItem(s));
 		worker->tableWidgetNodes->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
-    	i++;
+		i++;
 	}
 	worker->tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);
     worker->tableWidgetNodes->resizeRowsToContents();
@@ -138,56 +141,20 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const st
 	// connect QTableWidget itemClicked to hide/show nodes of selected type and nodes fanning into it
 	disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, 0, 0);
 	connect(worker->tableWidgetNodes, &QTableWidget::itemClicked, this, [this](const auto &item){ 
-						static bool state = true;
-						std::cout << "hide all nodes of type " << item->text().toStdString() << std::endl;
+						static bool visible = true;
+						std::cout << "hide or show all nodes of type " << item->text().toStdString() << std::endl;
 						for( auto &[k, v] : gmap) 
 							if( item->text().toStdString() == v->getType()) 
 							{
-								if( state ) v->hide();
-								else v->show();
-								for(auto &[ka, va] : worker->graph->fanout(k))
-								{
-									(void)va;
-									if( state ) 
-									{
-										//gmap.at(ka)->hide();
-										for(auto ge : gmap.at(ka)->edgeList)
-										{
-											ge->hide();
-											qDebug() << ge->sourceNode()->id_in_graph;
-										}
-									}
-									else 
-									{
-										//gmap.at(ka)->show();		
-										for(auto ge : gmap.at(ka)->edgeList)
-											ge->show();
-									}
-								}
-								// for(auto &ka : worker->graph->fanin(k))
-								// {
-								// 	if( state ) 
-								// 	{
-								// 		//	gmap.at(ka)->hide();
-								// 		for(auto ge : gmap.at(ka)->edgeList)
-								// 		 {
-								// 			ge->hide();
-								// 			qDebug() << ge->sourceNode()->id_in_graph;
-								// 		 }
-								// 	}
-								// 	else
-								// 	{
-								// 		//gmap.at(ka)->show();		
-								// 		for(auto ge : gmap.at(ka)->edgeList)
-								// 			ge->show();
-								// 	}
-								// }
+								v->setVisible(!v->isVisible());
+								for(const auto &gedge: gmap.at(k)->edgeList)
+									gedge->setVisible(!gedge->isVisible());
 							}
-						if(state) 
+						visible = !visible;
+						if(visible)
 							worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
 						else 
 							worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/redBall.png")));
-						state = !state;
 					} , Qt::UniqueConnection);
 }
 

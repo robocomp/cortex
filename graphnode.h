@@ -22,18 +22,19 @@
 #include <QGraphicsScene>
 #include <cppitertools/zip.hpp>
 #include <QLabel>
+#include "graphviewer.h"
 
 class GraphEdge;
-class GraphViewer;
 class QGraphicsSceneMouseEvent;
+
 #include "specificworker.h"
 
 class DoLaserStuff : public QGraphicsView
 {
+  Q_OBJECT
   public:
-    DoLaserStuff(const GraphViewer *graph_viewer, IDType node_id_)
+    DoLaserStuff(std::shared_ptr<DSR::Graph> graph_, DSR::IDType node_id_) : graph(graph_), node_id(node_id_)
     {
-      auto node_id = node_id_;
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       resize(400,400);
       setWindowTitle("Laser");
@@ -43,75 +44,77 @@ class DoLaserStuff : public QGraphicsView
 	    setRenderHint(QPainter::Antialiasing);
 	    fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
       scale(1, -1);
-      const auto &g = graph_viewer->worker->graph;
-      QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [g, node_id, this](const DSR::Attribs &attrs){ 
-                          const auto &lDists = g->getNodeAttribByName<std::vector<float>>(node_id, "laser_data_dists"); 
-                          const auto &lAngles = g->getNodeAttribByName<std::vector<float>>(node_id, "laser_data_angles"); 
-                          QPolygonF polig;
-                          for(const auto &[dist, angle] : iter::zip(lDists, lAngles))
-                              polig << QPointF(dist*sin(angle), dist*cos(angle));
-                          scene.clear();
-                          QPolygonF robot; robot << QPointF(-200, 0) << QPointF(-100,150) << QPointF(0,200) << QPointF(100,150) << QPointF(200,0);
-                          scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
-                          scene.addPolygon(polig, QPen(Qt::red, 8));                          
-                          });
+      QObject::connect(graph.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, this, &DoLaserStuff::drawLaserSLOT);                        
       show();
+    };
+  public slots:
+    void drawLaserSLOT(const DSR::IDType &id, const DSR::Attribs &attribs)
+    {
+      const auto &lDists = graph->getNodeAttribByName<std::vector<float>>(node_id, "laser_data_dists"); 
+      const auto &lAngles = graph->getNodeAttribByName<std::vector<float>>(node_id, "laser_data_angles"); 
+      QPolygonF polig;
+      for(const auto &[dist, angle] : iter::zip(lDists, lAngles))
+          polig << QPointF(dist*sin(angle), dist*cos(angle));
+      scene.clear();
+      QPolygonF robot; robot << QPointF(-200, 0) << QPointF(-100,150) << QPointF(0,200) << QPointF(100,150) << QPointF(200,0);
+      scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
+      scene.addPolygon(polig, QPen(Qt::red, 8));  
     };
   private:
     QGraphicsScene scene;
+    std::shared_ptr<DSR::Graph> graph;
+    DSR::IDType node_id;
 };
 
 class DoRGBDStuff : public  QLabel
 {
   public:
-    DoRGBDStuff(const GraphViewer *graph_viewer, IDType node_id_)
+    DoRGBDStuff(std::shared_ptr<DSR::Graph> graph, DSR::IDType node_id_)
     {
       auto node_id = node_id_;
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
+      //setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
       resize(640,480);
       setWindowTitle("RGBD");
-      //setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
-	    const auto &g = graph_viewer->worker->graph;
       setParent(this);
-      QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [&](const DSR::Attribs &attrs){ 
-                            const auto &lDists = g->getNodeAttribByName<std::vector<float>>(node_id, "rgbd_data"); 
+      QObject::connect(graph.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [&](const DSR::IDType &id, const DSR::Attribs &attrs){ 
+                            const auto &lDists = graph->getNodeAttribByName<std::vector<float>>(node_id, "rgbd_data"); 
                             //label.setPixmap(QImage());                          
                           });
       show();
     };
   private:
-    //QLabel label;
+    QLabel label;
 };
 
 class DoTableStuff : public  QTableWidget
 {
   public:
-    DoTableStuff(const GraphViewer *graph_viewer, IDType node_id_)
+    DoTableStuff(std::shared_ptr<DSR::Graph> graph, DSR::IDType node_id_)
     {
       auto node_id = node_id_;
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       setColumnCount(2);
-      auto g = graph_viewer->worker->graph;
-      setRowCount(g->getNodeAttrs(node_id).size() );
+      setRowCount(graph->getNodeAttrs(node_id).size() );
       setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
       int i=0;
-      for( auto &[k, v] : g->getNodeAttrs(node_id) )
+      for( auto &[k, v] : graph->getNodeAttrs(node_id) )
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
+        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(graph->printVisitor(v))));
         i++;
       }
       horizontalHeader()->setStretchLastSection(true);
       resizeRowsToContents();
       resizeColumnsToContents();
-      QObject::connect(graph_viewer, &GraphViewer::closeWindowSIGNAL, &QTableWidget::close);
-      QObject::connect(g.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [&](const DSR::Attribs &attrs)
+      //QObject::connect(graph_viewer, &GraphViewer::closeWindowSIGNAL, &QTableWidget::close);
+      QObject::connect(graph.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, [&](const DSR::IDType &id, const DSR::Attribs &attrs)
                     { 
                       int i= 0; 
                       for(auto &[k,v]: attrs)
                       {
                           setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-                          setItem(i, 1, new QTableWidgetItem(QString::fromStdString(g->printVisitor(v))));
+                          setItem(i, 1, new QTableWidgetItem(QString::fromStdString(graph->printVisitor(v))));
                           i++;
                       }});
       show();
@@ -123,10 +126,9 @@ class GraphNode : public QObject, public QGraphicsItem
 {
   Q_OBJECT
 	public:
-    GraphNode(GraphViewer *graph_viewer);
+    GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_);
     
     std::int32_t id_in_graph;
-    GraphViewer *graph;
     QList<GraphEdge *> edgeList;
     
     void addEdge(GraphEdge *edge);
@@ -141,6 +143,7 @@ class GraphNode : public QObject, public QGraphicsItem
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
 		void setColor(const QString &plain);
+    std::shared_ptr<DSR::GraphViewer> getGraphViewer() const { return graph_viewer;};
 
 	protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
@@ -155,12 +158,10 @@ class GraphNode : public QObject, public QGraphicsItem
 
 	private:
     QPointF newPos;
-		
 		QGraphicsSimpleTextItem *tag;
 		QString dark_color = "darkyello", plain_color = "yellow";
     std::string type;
-    //QTableWidget *label = nullptr;
-    //DoLaserStuff *do_stuff;
+    std::shared_ptr<DSR::GraphViewer> graph_viewer;
 };
 
 #endif // GRAPHNODE_H
