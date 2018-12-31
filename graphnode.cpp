@@ -68,7 +68,7 @@ QList<GraphEdge *> GraphNode::edges() const
 void GraphNode::calculateForces()
 {
     if (!scene() || scene()->mouseGrabberItem() == this) 
-		{
+	{
         newPos = pos();
         return;
     }

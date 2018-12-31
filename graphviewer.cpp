@@ -53,7 +53,6 @@ GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worke
 	central_point = new QGraphicsEllipseItem();
 	central_point->setPos(scene.sceneRect().center());
 
-	//graph = worker->getGraph();
 	this->setParent(worker->scrollArea);
 	worker->scrollArea->setWidget(this);
 	worker->scrollArea->setMinimumSize(600,600);
@@ -110,8 +109,6 @@ void GraphViewer::createGraph()
 ////////////////////////////////////////
 /// UI slots
 ////////////////////////////////////////
-
-
 void GraphViewer::saveGraphSLOT()
 { 
 	emit saveGraphSIGNAL(); 
@@ -144,8 +141,8 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 	std::string color; std::string qname;
 	try 
 	{ 
-		color = graph->getNodeDrawAttribByName<std::string>(id, "color");
-		qname = graph->getNodeDrawAttribByName<std::string>(id, "name");
+		color = graph->getNodeAttribByName<std::string>(id, "color");
+		qname = graph->getNodeAttribByName<std::string>(id, "name");
 	}
 	catch(const std::exception &e){ };	
 	gnode->setColor(color.c_str());
@@ -197,7 +194,7 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
-	qDebug() << "edge id " << QString::fromStdString(edge_tag);
+	//qDebug() << "edge id " << QString::fromStdString(edge_tag);
 	auto node_origen = gmap.at(from);
 	auto node_dest = gmap.at(to);
 	scene.addItem(new GraphEdge(node_origen, node_dest, edge_tag.c_str()));

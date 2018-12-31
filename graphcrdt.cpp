@@ -8,7 +8,10 @@ using namespace DSR;
 
 GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agent_name_)
 {
-    qRegisterMetaType<DSR::IDType>();
+    qRegisterMetaType<std::int32_t>("std::int32_t");
+	qRegisterMetaType<std::string>("std::string");
+	qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
+
     graph = graph_;
     agent_name = agent_name_;
     int argc = 0; char *argv[0];
@@ -19,7 +22,6 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
     this->createGraph();
     // init subscription thread
     read_thread = std::thread(&GraphCRDT::subscribeThread, this);
-
 }
 
 void GraphCRDT::createGraph()
@@ -67,7 +69,6 @@ void GraphCRDT::subscribeThread()
     // regex to filter out myself as publisher
     std::string f = "^(?!" + agent_name + "$).*$";
     auto reader = DataStorm::makeFilteredKeyReader(topic, DataStorm::Filter<std::string>("_regex", f.c_str()));
-    std::cout << "starting reader " << std::endl;
     reader.waitForWriters();
     std::cout << __FUNCTION__ << " Initiating thread" << std::endl;
     while(true)
@@ -97,7 +98,7 @@ void GraphCRDT::subscribeThread()
                 {
                     DSR::Attribs edge_attrs;
                     for(const auto &[name, value] : edge_content.attrs)
-                        edge_attrs.insert_or_assign(name, iceToGraph(name, value));
+                        edge_attrs.insert_or_assign(name, iceToGraph(edge_content.label, value));
                     graph->addEdge(node_id, to, edge_content.label);
                     graph->addEdgeAttribs(node_id, to, edge_attrs);
                 }
@@ -105,14 +106,16 @@ void GraphCRDT::subscribeThread()
         }
         catch (const std::exception &ex) 
         {   std::cout << "exception: " << ex.what() << std::endl;  }
+        std::this_thread::sleep_for(20ms);
     }
 }
 
 DSR::MTypes GraphCRDT::iceToGraph(const std::string &name, const std::string &val)
 {
-    static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render"};
+    static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render", "color", "name"};
     static const std::list<std::string> bool_types{ "collidable", "collide"};
-   
+    static const std::list<std::string> RT_types{ "RT"};
+    
     //std::cout << name << " " << val << std::endl;
     DSR::MTypes res;
     if(std::find(string_types.begin(), string_types.end(), name) != string_types.end())
@@ -124,7 +127,7 @@ DSR::MTypes GraphCRDT::iceToGraph(const std::string &name, const std::string &va
         try
         { res = (float)std::stod(val); }
         catch(const std::exception &e) 
-        { std::cout << name << " " << val << std::endl; res = std::string{""}; }
+        { std::cout << __FUNCTION__ << "catch: " << name << " " << val << std::endl; res = std::string{""}; }
     }
     return res;
 };

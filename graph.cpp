@@ -132,6 +132,7 @@ void Graph::readFromFile(const std::string &file_name)
 	
 			// Draw attributes come now
 			DSR::DrawAttribs atts;
+			DSR::Attribs gatts;
 			std::string qname = (char *)stype;
 			std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
 			atts.insert(std::pair("name", full_name));
@@ -147,7 +148,9 @@ void Graph::readFromFile(const std::string &file_name)
 			else if(qname == "imu") color = "LightSalmon";
 			
 			atts.insert(std::pair("color", color));
-			this->addNodeDrawAttribs(node_id, atts);
+			gatts.insert(std::pair("color", color));
+			this->addNodeDrawAttribs(node_id, atts);  //DEPREC
+			this->addNodeAttribs(node_id, gatts);
 			std::cout << node_id << " " <<  std::string((char *)stype) << std::endl;
 			
 			xmlFree(sid);
@@ -220,8 +223,9 @@ void Graph::readFromFile(const std::string &file_name)
 			}
 			
 			this->addEdge(a, b, edgeName);
- 			//this->addEdgeAttribs(a, b, DSR::Attribs{std::pair("name", edgeName)});
-			this->addEdgeDrawAttribs(a, b, DSR::DrawAttribs{std::pair("name", edgeName)});
+			this->addEdgeDrawAttribs(a, b, DSR::DrawAttribs{std::pair("name", edgeName)}); //DEPREC
+			this->addEdgeAttribs(a, b, DSR::Attribs{std::pair("name", edgeName)});
+			
  			DSR::Attribs edge_attribs;
 			if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
 			{ 	
