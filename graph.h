@@ -48,22 +48,21 @@ namespace DSR
 	};
 	using FanOut = std::unordered_map<IDType, EdgeAttrs>;
 	using FanIn = std::vector<IDType>;
-
+	struct Value
+	{
+		std::string type;
+		IDType id;
+		Attribs attrs;
+		DrawAttribs draw_attrs;
+		FanOut fanout;
+		FanIn fanin;
+	}; 
 	class Graph : public QObject
 	{
 		Q_OBJECT
-		public:
-			 struct Value
-			{
-				std::string type;
-				IDType id;
-				Attribs attrs;
-				DrawAttribs draw_attrs;
-				FanOut fanout;
-				FanIn fanin;
-			}; 
+		public:		 
 			using Nodes = std::unordered_map<IDType, Value>;
-			
+
 			////////////////////////////////////////////////////////////////////////////////////////////
 			//									Graph API 
 			////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,11 +77,16 @@ namespace DSR
 			//////////////////////////////////////////////////////////////////////////////////////////////////////
 			///// Graph editing methods. These should be intercepted and publishd to ether
 			///////////////////////////////////////////////////////////////////////////////////////////////////////
-			void addNode(IDType id, const std::string &type_) 	{ Value v; v.type = type_; v.id = id; nodes.insert(std::pair(id, v));};
+			void addNode(IDType id, const std::string &type_) 	
+			{ 
+				Value v; v.type = type_; v.id = id; nodes.insert(std::pair(id, v));
+				emit addNodeSIGNAL(id, type_);
+			};
 			void addEdge(IDType from, IDType to, const std::string &label_) 			
 			{ 
 				nodes[from].fanout.insert(std::pair(to, EdgeAttrs{label_, from, to, Attribs(), DrawAttribs()}));
 				nodes[to].fanin.push_back(from);
+				emit addEdgeSIGNAL(from, to, label_);
 			};
 			void addNodeAttribs(IDType id, const Attribs &att)
 			{ 
@@ -186,9 +190,18 @@ namespace DSR
 			Nodes nodes;
 
 		signals:
-			void NodeAttrsChangedSIGNAL(const IDType, const Attribs);
+			void NodeAttrsChangedSIGNAL(const std::int32_t, const DSR::Attribs);
+			void addNodeSIGNAL(const std::int32_t, const std::string &type);
+			void addEdgeSIGNAL(const std::int32_t from, const std::int32_t to, const std::string &label);
 	};
 }
+
+Q_DECLARE_METATYPE(std::int32_t);
+Q_DECLARE_METATYPE(std::string);
+Q_DECLARE_METATYPE(DSR::Attribs);
+
+
+
 #endif // GRAPH_H
 
 

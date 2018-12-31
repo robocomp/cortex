@@ -33,16 +33,14 @@ namespace DSR
 	{
 		Q_OBJECT
 		public:
-			GraphViewer();
+			GraphViewer(std::shared_ptr<SpecificWorker> worker_);
 			~GraphViewer();
-			void setWidget(SpecificWorker *worker_);
 			void draw();
 			void itemMoved();
-			std::shared_ptr<DSR::Graph> getGraph() const {return graph;};
-				
-			QGraphicsEllipseItem *central_point;
-			SpecificWorker *worker;
-			std::unordered_map<std::int32_t, GraphNode*> gmap;
+			void createGraph();
+			std::shared_ptr<DSR::Graph> getGraph() const 			  		{return graph;};
+			std::unordered_map<std::int32_t, GraphNode*> getGMap() const 	{return gmap;};
+			QGraphicsEllipseItem* getCentralPoint() const 					{return central_point;};
 		
 		protected:
 			void wheelEvent(QWheelEvent *event) override;
@@ -54,15 +52,18 @@ namespace DSR
 			int timerId = 0;
 			QStringList nodes_types_list, edges_types_list;
 			bool do_simulate = false;
+			std::shared_ptr<SpecificWorker> worker;
 			std::shared_ptr<DSR::Graph> graph;
-			
+			std::unordered_map<std::int32_t, GraphNode*> gmap;
+			QGraphicsEllipseItem *central_point;
 
 		public slots:
-			void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type,float posx, float posy, const std::string &color);
-			void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &ege_tag);
+			//void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color);
+			void addNodeSLOT(const std::int32_t id, const std::string &type);
+			void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
 			void saveGraphSLOT();		
 			void toggleSimulationSLOT();
-			void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
+			void NodeAttrsChangedSLOT(const std::int32_t node, const DSR::Attribs&);
 
 		signals:
 			void saveGraphSIGNAL();

@@ -77,7 +77,7 @@ void GraphNode::calculateForces()
     qreal xvel = 0;
     qreal yvel = 0;
     //foreach (QGraphicsItem *item, scene()->items()) 
-    for( auto &[k,node] : graph_viewer->gmap)
+    for( auto &[k,node] : graph_viewer->getGMap())
 	{
         //GraphNode *node = qgraphicsitem_cast<GraphNode *>(item);
         //if (!node)
@@ -110,7 +110,7 @@ void GraphNode::calculateForces()
     }
 
     // Subtract force from central pos pulling item to the center of the image
-    QPointF to_central_point = mapFromItem(graph_viewer->central_point, 0, 0);
+    QPointF to_central_point = mapFromItem(graph_viewer->getCentralPoint(), 0, 0);
     xvel += to_central_point.x() / (weight/2) ;
     yvel += to_central_point.y() / (weight/2) ;
 

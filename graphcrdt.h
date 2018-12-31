@@ -18,6 +18,7 @@ namespace DSR
         public:
             GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agent_name_);
             ~GraphCRDT(){};
+            void createGraph();
             
         private:
             std::shared_ptr<DSR::Graph> graph;
@@ -28,10 +29,12 @@ namespace DSR
 	        void subscribeThread();
 	        std::thread read_thread;
             G ice_graph;
+
+            DSR::MTypes iceToGraph(const std::string &type, const std::string &val);
     
         public slots:
-            void NodeAttrsChangedSLOT(const DSR::IDType&, const DSR::Attribs&);
-            void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float , float , const std::string&);
+            void NodeAttrsChangedSLOT(const std::int32_t, const DSR::Attribs&);
+            void addNodeSLOT(std::int32_t id, const std::string &type);
             void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string&);
 
         signals:

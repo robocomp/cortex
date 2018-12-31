@@ -27,8 +27,12 @@
 
 using namespace DSR;
 
-GraphViewer::GraphViewer()
+GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worker_), graph(worker_->getGraph())
 {
+	qRegisterMetaType<std::int32_t>("std::int32_t");
+	qRegisterMetaType<std::string>("std::string");
+	qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
+	
 	scene.setItemIndexMethod(QGraphicsScene::NoIndex);
 	scene.setSceneRect(-200, -200, 400, 400);
 	this->setScene(&scene);
@@ -48,21 +52,8 @@ GraphViewer::GraphViewer()
     viewport()->setMouseTracking(true);
 	central_point = new QGraphicsEllipseItem();
 	central_point->setPos(scene.sceneRect().center());
-}
 
-GraphViewer::~GraphViewer()
-{
-	QSettings settings("RoboComp", "DSR");
-    settings.beginGroup("MainWindow");
-		settings.setValue("size", size());
-		settings.setValue("pos", pos());
-    settings.endGroup();
-}
-
-void GraphViewer::setWidget(SpecificWorker *worker_)
-{
-	worker = worker_;
-	graph = worker->getGraph();
+	//graph = worker->getGraph();
 	this->setParent(worker->scrollArea);
 	worker->scrollArea->setWidget(this);
 	worker->scrollArea->setMinimumSize(600,600);
@@ -79,9 +70,41 @@ void GraphViewer::setWidget(SpecificWorker *worker_)
 		setTransform(settings.value("matrix", QTransform()).value<QTransform>());
 	settings.endGroup();
 
+	this->createGraph();
+
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
+}
 
+GraphViewer::~GraphViewer()
+{
+	QSettings settings("RoboComp", "DSR");
+    settings.beginGroup("MainWindow");
+		settings.setValue("size", size());
+		settings.setValue("pos", pos());
+    settings.endGroup();
+}
+
+void GraphViewer::createGraph()
+{
+	std::cout << __FUNCTION__ << "-- Entering drawGraph" << std::endl;
+	for(const auto &par : *graph)
+	{
+		const auto &node_id = par.first;
+		std::string type = graph->getNodeType(node_id);
+		addNodeSLOT(node_id, type);
+	}		
+
+	// add edges after all nodes have been created
+	for(const auto &par : *graph)
+	{
+		auto &node_fanout = graph->fanout(par.first);
+		for( auto &[node_adj, edge_atts] : node_fanout)
+		{
+			auto edge_tag = graph->attr<std::string>(edge_atts.draw_attrs.at("name"));
+			addEdgeSLOT(par.first, node_adj, edge_tag);
+		}
+	}
 }
 
 ////////////////////////////////////////
@@ -105,14 +128,28 @@ void GraphViewer::toggleSimulationSLOT()
 /// update slots
 ////////////////////////////////////////
 
-void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color)
+void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 {	
 	auto gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));
-	qDebug() << "node id " << id;
+	//qDebug() << __FUNCTION__ << "node id " << id;
 	gnode->id_in_graph = id;
-	gnode->setColor(color.c_str());
+	float posx = 10; float posy = 10;
+	try 
+	{ 
+		posx = graph->getNodeAttribByName<float>(id, "pos_x");
+		posy = graph->getNodeAttribByName<float>(id, "pos_y");
+	}
+	catch(const std::exception &e){ };
 	gnode->setPos(posx, posy);
-	gnode->setTag(QString::fromStdString(name));
+	std::string color; std::string qname;
+	try 
+	{ 
+		color = graph->getNodeDrawAttribByName<std::string>(id, "color");
+		qname = graph->getNodeDrawAttribByName<std::string>(id, "name");
+	}
+	catch(const std::exception &e){ };	
+	gnode->setColor(color.c_str());
+	gnode->setTag(QString::fromStdString(qname));
 	gnode->setType( type );
 	scene.addItem(gnode);
 	gmap.insert(std::pair(id, gnode));
@@ -186,7 +223,7 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
     worker->tableWidgetEdges->show();
 }
 
- void GraphViewer::NodeAttrsChangedSLOT(const IDType &node, const DSR::Attribs &attr)
+ void GraphViewer::NodeAttrsChangedSLOT(const std::int32_t node, const DSR::Attribs &attr)
  {
 	 
  }
@@ -233,7 +270,7 @@ void GraphViewer::timerEvent(QTimerEvent *event)
 }
 
 /////////////////////////
-/////
+///// Qt Events
 /////////////////////////
 
 void GraphViewer::wheelEvent(QWheelEvent *event)
@@ -269,3 +306,4 @@ void GraphViewer::keyPressEvent(QKeyEvent* event)
 	if (event->key() == Qt::Key_Escape)
 		emit closeWindowSIGNAL();
 }
+
