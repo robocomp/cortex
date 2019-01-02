@@ -125,7 +125,7 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 	GraphNode *gnode;
 	if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
-		//qDebug() << __FUNCTION__ << "node id " << id;
+		qDebug() << __FUNCTION__ << "node id " << id;
 		gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));
 		gnode->id_in_graph = id;
 		gnode->setType( type );
@@ -193,9 +193,6 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 	catch(const std::exception &e){ };
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
-	
-//	if(color != gnode->getColor()) gnode->setColor(color);
-//	if(qname != gnode->getTag()) gnode->setTag(qname);
 	
 }
 

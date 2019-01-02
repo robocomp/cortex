@@ -24,7 +24,7 @@ namespace DSR
         Q_OBJECT
         public:
             GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agent_name_);
-            ~GraphCRDT(){};
+            ~GraphCRDT();
             
         private:
             std::shared_ptr<DSR::Graph> graph;

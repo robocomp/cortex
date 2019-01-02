@@ -6,15 +6,12 @@
 
 using namespace DSR;
 
-GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agent_name_)
+GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agent_name_): graph(graph_), agent_name(agent_name_)
 {
     qRegisterMetaType<std::int32_t>("std::int32_t");
 	qRegisterMetaType<std::string>("std::string");
 	qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
-    qRegisterMetaType<DSR::Attribs>("DSR::IDType");
 
-    graph = graph_;
-    agent_name = agent_name_;
     int argc = 0; char *argv[0];
     node = DataStorm::Node(argc, argv);
     topic = std::make_shared<DataStorm::Topic<std::string, G>>(node, "DSR");
@@ -22,7 +19,13 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
     writer = std::make_shared<DataStorm::SingleKeyWriter<std::string, G>>(*topic.get(), agent_name);
     this->createGraph();
     // init subscription thread
-    read_thread = std::thread(&GraphCRDT::subscribeThread, this);
+    if(agent_name != "Laser Agent") 
+        read_thread = std::thread(&GraphCRDT::subscribeThread, this);
+}
+
+GraphCRDT::~GraphCRDT()
+{
+    node.shutdown();
 }
 
 void GraphCRDT::createGraph()
@@ -61,49 +64,53 @@ void GraphCRDT::createGraph()
 
 void GraphCRDT::subscribeThread()
 {
-    qRegisterMetaType<std::int32_t>("std::int32_t");
-    qRegisterMetaType<std::string>("std::string");
-	qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
-	
     DataStorm::Topic<std::string, G> topic(node, "DSR");
     topic.setReaderDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never });
-    // regex to filter out myself as publisher
+    // regex to filter out myself as publisher. Filters must be declared in the writer and in the reader
     std::string f = "^(?!" + agent_name + "$).*$";
     auto reader = DataStorm::makeFilteredKeyReader(topic, DataStorm::Filter<std::string>("_regex", f.c_str()));
     reader.waitForWriters();
+    reader.onConnectedWriters([](const auto &ws){for(auto w:ws) std::cout << w << " " << std::endl;}, 
+        [](auto reason, auto writer){ std::cout << "CB: " << " " << writer << std::endl;});
+    
     std::cout << __FUNCTION__ << " Initiating thread" << std::endl;
     while(true)
     {
-        try
-        {
-            auto local = reader.getNextUnread();
-           
-            // recorrer ice_graph llamando a la API de graph para reescribirlo entero. Ojo que no lo borra antes
-            for( const auto &[k, v] : local.getValue())
+        std::cout << "Has writers: " << reader.hasWriters() << " " << reader.hasUnread() << std::endl;
+        // auto printSample = [](const auto &sample){ std::cout << "Sample: " << sample.getKey() << std::endl;};
+        // reader.onSamples([printSample](const auto &samples){ for(const auto &s : samples) printSample(s);}, printSample);
+                
+        if(reader.hasUnread())
+            try
             {
-                DSR::Value value;
-                value.type = v.type;
-                value.id = v.id;
-                for(const auto &[ka, va] : v.attrs)
-                    value.attrs.insert_or_assign(ka, iceToGraph(ka, va));
-                graph->addNode(k, v.type);
-                graph->addNodeAttribs(k, value.attrs);
-            }
-            for( const auto &[node_id, node_content] : local.getValue())
-            {
-                for(const auto &[to, edge_content] : node_content.fano)
+                auto local = reader.getNextUnread();
+            
+                // recorrer ice_graph llamando a la API de graph para reescribirlo entero. Ojo que no lo borra antes
+                for( const auto &[k, v] : local.getValue())
                 {
-                    DSR::Attribs edge_attrs;
-                    for(const auto &[name, value] : edge_content.attrs)
-                        edge_attrs.insert_or_assign(name, iceToGraph(edge_content.label, value));
-                    graph->addEdge(node_id, to, edge_content.label);
-                    graph->addEdgeAttribs(node_id, to, edge_attrs);
+                    DSR::Value value;
+                    value.type = v.type;
+                    value.id = v.id;
+                    for(const auto &[ka, va] : v.attrs)
+                        value.attrs.insert_or_assign(ka, iceToGraph(ka, va));
+                    graph->addNode(k, v.type);
+                    graph->addNodeAttribs(k, value.attrs);
+                }
+                for( const auto &[node_id, node_content] : local.getValue())
+                {
+                    for(const auto &[to, edge_content] : node_content.fano)
+                    {
+                        DSR::Attribs edge_attrs;
+                        for(const auto &[name, value] : edge_content.attrs)
+                            edge_attrs.insert_or_assign(name, iceToGraph(edge_content.label, value));
+                        graph->addEdge(node_id, to, edge_content.label);
+                        graph->addEdgeAttribs(node_id, to, edge_attrs);
+                    }
                 }
             }
-        }
-        catch (const std::exception &ex) 
-        {   std::cout << "exception: " << ex.what() << std::endl;  }
-        //std::this_thread::sleep_for(20ms);
+            catch (const std::exception &ex) 
+            {   std::cout << "exception: " << ex.what() << std::endl;  }
+        std::this_thread::sleep_for(20ms);
     }
 }
 
@@ -165,7 +172,9 @@ void GraphCRDT::NodeAttrsChangedSLOT(const std::int32_t id, const DSR::Attribs& 
         try{ ice_graph.at(id).attrs.insert_or_assign(k, graph->printVisitor(v)); }
         catch(const std::exception &e) { std::cout << e.what() << std::endl;}
      }  
-    writer->update(ice_graph);
+    std::cout << "Has readers: "<< writer->hasReaders() << std::endl;
+    if( writer->hasReaders()) 
+        writer->update(ice_graph);
 }
 
 void GraphCRDT::addNodeSLOT(std::int32_t id, const std::string &type)
