@@ -36,9 +36,10 @@ GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_vi
 }
 
 
-void GraphNode::setTag(const QString &tag_)
+void GraphNode::setTag(const std::string &tag_)
 {
-	tag = new QGraphicsSimpleTextItem(tag_, this);
+    QString c = QString::fromStdString(tag_);
+	tag = new QGraphicsSimpleTextItem(c, this);
 	tag->setX(20);	
 	tag->setY(-10);
 }
@@ -48,10 +49,11 @@ void GraphNode::setType(const std::string &type_)
     type = type_;
 }
 
-void GraphNode::setColor(const QString &plain)
+void GraphNode::setColor(const std::string &plain)
 {
-	plain_color = plain;
-	dark_color = "dark" + plain;
+    QString c = QString::fromStdString(plain);
+	plain_color = c;
+	dark_color = "dark" + c;
 }
 
 void GraphNode::addEdge(GraphEdge *edge)

@@ -11,6 +11,7 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
     qRegisterMetaType<std::int32_t>("std::int32_t");
 	qRegisterMetaType<std::string>("std::string");
 	qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
+    qRegisterMetaType<DSR::Attribs>("DSR::IDType");
 
     graph = graph_;
     agent_name = agent_name_;
@@ -76,12 +77,8 @@ void GraphCRDT::subscribeThread()
         try
         {
             auto local = reader.getNextUnread();
-            // for( const auto &[k,v] : sample.getValue())
-            //     std::cout << "Received: node " << k << " with laser_data " << v.attrs.at("laser_data_dists") << " from " << sample.getKey() << std::endl;
-            //std::cout << "received: " << sample.getValue().at(134).attrs.at("laser_data_dists") << std::endl;
-            //std::cout << "--------------------" << std::endl;
-            
-            // recorrer ice_graph llamando a la API de graph
+           
+            // recorrer ice_graph llamando a la API de graph para reescribirlo entero. Ojo que no lo borra antes
             for( const auto &[k, v] : local.getValue())
             {
                 DSR::Value value;
@@ -106,7 +103,7 @@ void GraphCRDT::subscribeThread()
         }
         catch (const std::exception &ex) 
         {   std::cout << "exception: " << ex.what() << std::endl;  }
-        std::this_thread::sleep_for(20ms);
+        //std::this_thread::sleep_for(20ms);
     }
 }
 
@@ -115,13 +112,35 @@ DSR::MTypes GraphCRDT::iceToGraph(const std::string &name, const std::string &va
     static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render", "color", "name"};
     static const std::list<std::string> bool_types{ "collidable", "collide"};
     static const std::list<std::string> RT_types{ "RT"};
-    
+    static const std::list<std::string> vector_float_types{ "laser_data_dists", "laser_data_angles"};
+
     //std::cout << name << " " << val << std::endl;
     DSR::MTypes res;
     if(std::find(string_types.begin(), string_types.end(), name) != string_types.end())
         res = val;
     else if(std::find(bool_types.begin(), bool_types.end(), name) != bool_types.end())
-        { if( val == "true") res = true; else res = false; }
+    { if( val == "true") res = true; else res = false; }
+    else if(std::find(vector_float_types.begin(), vector_float_types.end(), name) != vector_float_types.end())
+    {
+        std::vector<float> numbers;
+        std::istringstream iss(val);
+        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), 
+                        std::back_inserter(numbers), [](const std::string &s){ return (float)std::stod(s);});
+        res = numbers;
+    }
+    else if(std::find(RT_types.begin(), RT_types.end(), name) != RT_types.end())
+    {
+        std::vector<float> numbers;
+        std::istringstream iss(val);
+        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), 
+                        std::back_inserter(numbers), [](const std::string &s){ return (float)std::stod(s);});
+        RMat::RTMat rt;
+    	rt.setTr( QVec::vec3(numbers[0], numbers[1], numbers[2]));
+		rt.setRX(numbers[3]);
+		rt.setRY(numbers[4]);
+		rt.setRZ(numbers[5]);
+        res = rt;
+    }
 	else 
     {   
         try
@@ -138,7 +157,7 @@ DSR::MTypes GraphCRDT::iceToGraph(const std::string &name, const std::string &va
 
 void GraphCRDT::NodeAttrsChangedSLOT(const std::int32_t id, const DSR::Attribs& attrs)
 {
-    std::cout << __FUNCTION__ << " Attribute change in node " << id << std::endl;
+    //std::cout << __FUNCTION__ << " Attribute change in node " << id << std::endl;
     // update ice_graph 
     for(const auto &[k,v] : attrs)
      {

@@ -66,12 +66,12 @@ namespace DSR
 			////////////////////////////////////////////////////////////////////////////////////////////
 			//									Graph API 
 			////////////////////////////////////////////////////////////////////////////////////////////
+			/// iterator so the class works in range loops
 			
 			typename Nodes::iterator begin() 					{ return nodes.begin(); };
 			typename Nodes::iterator end() 						{ return nodes.end();   };
 			typename Nodes::const_iterator begin() const  		{ return nodes.begin(); };
 			typename Nodes::const_iterator end() const 	 		{ return nodes.begin(); };
-			
 			size_t size() const 								{ return nodes.size();  };
 
 			//////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,8 +101,12 @@ namespace DSR
 					for(auto &[k,v] : att)
 						edgeAtts.attrs.insert_or_assign(k,v);
 			};
+			void clear()
+			{
+				nodes.clear();
+			}
 			/////////////////////////////////////////////////////////////////////////////////
-			// Draw editing. Not to be distributed
+			// Draw editing. Not to be distributed DEPRECATED
 			/////////////////////////////////////////////////////////////////////////////////////
 			void addNodeDrawAttribs(IDType id, const DrawAttribs &att)
 			{ 
@@ -123,7 +127,7 @@ namespace DSR
 			void saveToFile(const std::string &xml_file_path);
 			void readFromFile(const std::string &xml_file_path);
 			/////////////////////////////////////////////////////////////////////////////////////////////
-			////
+			//// utility access  HAS TO BE REVIEWED FOR CONCURRENT ACCESS
 			/////////////////////////////////////////////////////////////////////////////////////////////////
 			FanOut fanout(IDType id) const   										{ return nodes.at(id).fanout;};
 			FanOut& fanout(IDType id)            									{ return nodes.at(id).fanout;};
@@ -199,7 +203,6 @@ namespace DSR
 Q_DECLARE_METATYPE(std::int32_t);
 Q_DECLARE_METATYPE(std::string);
 Q_DECLARE_METATYPE(DSR::Attribs);
-
 
 
 #endif // GRAPH_H

@@ -136,7 +136,7 @@ void Graph::readFromFile(const std::string &file_name)
 			std::string qname = (char *)stype;
 			std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
 			atts.insert(std::pair("name", full_name));
-			
+			gatts.insert(std::pair("name", full_name));
 			// color selection
 			std::string color = "coral";
 			if(qname == "world") color = "SeaGreen";
@@ -270,7 +270,7 @@ std::string Graph::printVisitor(const MTypes &t)
 {			
 	return std::visit(overload
 	{
-		[](RTMat m) -> std::string										{ return m.asQString("RT").toStdString(); },
+		[](RMat::RTMat m) -> std::string										{ return m.asQString("RT").toStdString(); },
 		[](std::vector<float> a)-> std::string	
 		{ 
 			std::string str;

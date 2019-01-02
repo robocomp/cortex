@@ -29,6 +29,10 @@ class GraphEdge;
 
 namespace DSR
 {
+	//////////////////////////////////////////////////////////////////////////////////////////////77
+	/// Drawing controller to display the graph in real-time using Qt
+	//////////////////////////////////////////////////////////////////////////////////////////////77
+	
 	class GraphViewer : public QGraphicsView
 	{
 		Q_OBJECT
@@ -38,8 +42,8 @@ namespace DSR
 			void draw();
 			void itemMoved();
 			void createGraph();
-			std::shared_ptr<DSR::Graph> getGraph() const 			  		{return graph;};
-			std::unordered_map<std::int32_t, GraphNode*> getGMap() const 	{return gmap;};
+			std::shared_ptr<DSR::Graph> getGraph() const 			  		{ return graph;};
+			std::map<std::int32_t, GraphNode*> getGMap() const 	{return gmap;};
 			QGraphicsEllipseItem* getCentralPoint() const 					{return central_point;};
 		
 		protected:
@@ -54,11 +58,11 @@ namespace DSR
 			bool do_simulate = false;
 			std::shared_ptr<SpecificWorker> worker;
 			std::shared_ptr<DSR::Graph> graph;
-			std::unordered_map<std::int32_t, GraphNode*> gmap;
+			std::map<std::int32_t, GraphNode*> gmap;
+			std::map<std::tuple<std::int32_t, std::int32_t, std::string>, GraphEdge*> gmap_edges;
 			QGraphicsEllipseItem *central_point;
 
 		public slots:
-			//void addNodeSLOT(std::int32_t id, const std::string &name, const std::string &type, float posx, float posy, const std::string &color);
 			void addNodeSLOT(const std::int32_t id, const std::string &type);
 			void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
 			void saveGraphSLOT();		
