@@ -37,9 +37,9 @@ void Graph::saveToFile(const std::string &xml_file_path)
         {
            	myfile <<">\n";
 			if( this->nodes.at(k).attrs.count("pos_x") == 0)
-				myfile << "\t<attribute key=\"" << "pos_x" << "\" value=\""<< getNodeDrawAttribByName<float>(k, "posx") <<"\" />\n";
+				myfile << "\t<attribute key=\"" << "pos_x" << "\" value=\""<< getNodeAttribByName<float>(k, "posx") <<"\" />\n";
 			if( this->nodes.at(k).attrs.count("pos_y") == 0)
-				myfile << "\t<attribute key=\"" << "pos_y" << "\" value=\""<< getNodeDrawAttribByName<float>(k, "posy") <<"\" />\n";	
+				myfile << "\t<attribute key=\"" << "pos_y" << "\" value=\""<< getNodeAttribByName<float>(k, "posy") <<"\" />\n";	
             for( auto &[ka, va] : v.attrs)
 				myfile <<"\t<attribute key=\"" << ka <<"\" value=\"" << printVisitor(va) <<"\" />\n";		
 			myfile <<"</symbol>\n";
@@ -131,11 +131,9 @@ void Graph::readFromFile(const std::string &file_name)
 								 });
 	
 			// Draw attributes come now
-			DSR::DrawAttribs atts;
 			DSR::Attribs gatts;
 			std::string qname = (char *)stype;
 			std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
-			atts.insert(std::pair("name", full_name));
 			gatts.insert(std::pair("name", full_name));
 			// color selection
 			std::string color = "coral";
@@ -147,9 +145,8 @@ void Graph::readFromFile(const std::string &file_name)
 			else if(qname == "mesh") color = "LightBlue";
 			else if(qname == "imu") color = "LightSalmon";
 			
-			atts.insert(std::pair("color", color));
+
 			gatts.insert(std::pair("color", color));
-			this->addNodeDrawAttribs(node_id, atts);  //DEPREC
 			this->addNodeAttribs(node_id, gatts);
 			std::cout << node_id << " " <<  std::string((char *)stype) << std::endl;
 			
@@ -162,8 +159,6 @@ void Graph::readFromFile(const std::string &file_name)
 				{
 					xmlChar *attr_key   = xmlGetProp(cur2, (const xmlChar *)"key");
 					xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
-					
-					//s->setAttribute(std::string((char *)attr_key), std::string((char *)attr_value));
 					std::string sk = std::string((char *)attr_key);
 					if( sk == "level" or sk == "parent")
 						this->addNodeAttribs(node_id, DSR::Attribs{ std::pair(sk, std::stoi(std::string((char *)attr_value)))});
@@ -223,7 +218,6 @@ void Graph::readFromFile(const std::string &file_name)
 			}
 			
 			this->addEdge(a, b, edgeName);
-			this->addEdgeDrawAttribs(a, b, DSR::DrawAttribs{std::pair("name", edgeName)}); //DEPREC
 			this->addEdgeAttribs(a, b, DSR::Attribs{std::pair("name", edgeName)});
 			
  			DSR::Attribs edge_attribs;
@@ -289,7 +283,7 @@ void Graph::print()
 	for( auto &par : nodes)
 	{
 		auto &v = par.second;
-		std::cout << "[" << attr<std::string>(v.draw_attrs["name"]) << "] : " << std::endl;
+		std::cout << "[" << attr<std::string>(v.attrs["name"]) << "] : " << std::endl;
 		std::cout << "	attrs:	";
 		for( auto &[ka, kv] : v.attrs)
 		{
@@ -298,7 +292,7 @@ void Graph::print()
 		std::cout << std::endl << "	edges:	";
 		for( auto &[kf,vf] : v.fanout)
 		{
-			std::cout << vf.label << "( " << attr<std::string>(nodes[kf].draw_attrs["name"])  << " ) " << std::endl;
+			std::cout << vf.label << "( " << attr<std::string>(nodes[kf].attrs["name"])  << " ) " << std::endl;
 			std::cout << "			edge attrs: ";
 			for( auto &[ke, ve] : vf.attrs)
 			{

@@ -15,11 +15,11 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
     int argc = 0; char *argv[0];
     node = DataStorm::Node(argc, argv);
     topic = std::make_shared<DataStorm::Topic<std::string, G>>(node, "DSR");
-    topic->setWriterDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never });
-    writer = std::make_shared<DataStorm::SingleKeyWriter<std::string, G>>(*topic.get(), agent_name);
+    topic->setWriterDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate });
+    writer = std::make_shared<DataStorm::SingleKeyWriter<std::string, G>>(*topic.get(), agent_name, agent_name + " Writer");
     this->createGraph();
     // init subscription thread
-    if(agent_name != "Laser Agent") 
+    if(agent_name != "Laser Agent") // just fordebugging
         read_thread = std::thread(&GraphCRDT::subscribeThread, this);
 }
 
@@ -30,36 +30,44 @@ GraphCRDT::~GraphCRDT()
 
 void GraphCRDT::createGraph()
 {
-	std::cout << __FUNCTION__ << "-- Entering createGraph" << std::endl;
-	for(const auto &[k, v] : *graph)
-	{
-        RoboCompDSR::Attribs attrs;
-        for(const auto &[ka, va] : v.attrs)
-            attrs.insert_or_assign(ka, graph->printVisitor(va));
-        RoboCompDSR::FanOut fano;
-        for(const auto &[ka, va] : v.fanout)
+	std::cout << __FUNCTION__ << "-- Entering GraphCRDT::createGraph" << std::endl;
+    try
+    {
+        for(const auto &[k, v] : *graph)
         {
-            RoboCompDSR::EdgeAttribs eattrs;
-            eattrs.label = va.label;
-            eattrs.from = va.from;
-            eattrs.to = va.to;
-            for(const auto &[ke, ve] : va.attrs)
-                eattrs.attrs.insert_or_assign(ke, graph->printVisitor(ve));
-            fano.insert_or_assign(ka, eattrs);
-        }    
-        ice_graph.insert(std::make_pair(k, RoboCompDSR::Content{v.type, v.id, attrs, fano}));
-	}		
-
+            RoboCompDSR::Attribs attrs;
+            for(const auto &[ka, va] : v.attrs)
+                attrs.insert_or_assign(ka, graph->printVisitor(va));
+            RoboCompDSR::FanOut fano;
+            for(const auto &[ka, va] : v.fanout)
+            {
+                RoboCompDSR::EdgeAttribs eattrs;
+                eattrs.label = va.label;
+                eattrs.from = va.from;
+                eattrs.to = va.to;
+                for(const auto &[ke, ve] : va.attrs)
+                    eattrs.attrs.insert_or_assign(ke, graph->printVisitor(ve));
+                fano.insert_or_assign(ka, eattrs);
+            }    
+            ice_graph.insert(std::make_pair(k, RoboCompDSR::Content{v.type, v.id, attrs, fano}));
+        }
+    }
+    catch(const std::exception &e){ std::cout << e.what() << std::endl;}
+		
 	// add edges after all nodes have been created
-	for(const auto &par : *graph)
-	{
-		auto &node_fanout = graph->fanout(par.first);
-		for( auto &[node_adj, edge_atts] : node_fanout)
-		{
-			auto edge_tag = graph->attr<std::string>(edge_atts.draw_attrs.at("name"));
-			addEdgeSLOT(par.first, node_adj, edge_tag);
-		}
-	}
+    try
+    {
+        for(const auto &par : *graph)
+        {
+            auto &node_fanout = graph->fanout(par.first);
+            for( auto &[node_adj, edge_atts] : node_fanout)
+            {
+                auto edge_tag = graph->attr<std::string>(edge_atts.attrs.at("name"));
+                addEdgeSLOT(par.first, node_adj, edge_tag);
+            }
+        }
+    }
+    catch(const std::exception &e){ std::cout << e.what() << std::endl;}
 }
 
 void GraphCRDT::subscribeThread()
@@ -70,17 +78,23 @@ void GraphCRDT::subscribeThread()
     std::string f = "^(?!" + agent_name + "$).*$";
     auto reader = DataStorm::makeFilteredKeyReader(topic, DataStorm::Filter<std::string>("_regex", f.c_str()));
     reader.waitForWriters();
-    reader.onConnectedWriters([](const auto &ws){for(auto w:ws) std::cout << w << " " << std::endl;}, 
-        [](auto reason, auto writer){ std::cout << "CB: " << " " << writer << std::endl;});
-    
+    reader.onConnectedWriters([](const auto &ws){for(auto w:ws) std::cout << w << " ";}, 
+        [](auto reason, auto writer){ std::cout << "WRITER: "  << writer << std::endl;
+                                      if( reason == DataStorm::CallbackReason::Connect) std::cout << "Connect" << std::endl;
+                                      else std::cout << "Disconnect" << std::endl;});
+    reader.onConnectedKeys([](auto init){for(auto i:init) std::cout << i << " ";}, 
+                           [](auto reason, auto key){ std::cout << "KEY: "  << key << std::endl;
+                                      if( reason == DataStorm::CallbackReason::Connect) std::cout << "Connect" << std::endl;
+                                      else std::cout << "Disconnect" << std::endl;});
+
     std::cout << __FUNCTION__ << " Initiating thread" << std::endl;
     while(true)
     {
         std::cout << "Has writers: " << reader.hasWriters() << " " << reader.hasUnread() << std::endl;
-        // auto printSample = [](const auto &sample){ std::cout << "Sample: " << sample.getKey() << std::endl;};
-        // reader.onSamples([printSample](const auto &samples){ for(const auto &s : samples) printSample(s);}, printSample);
-                
-        if(reader.hasUnread())
+        auto printSample = [](const auto &sample){ std::cout << "Sample: " << sample.getKey() << std::endl;};
+        reader.onSamples([printSample](const auto &samples){ for(const auto &s : samples) printSample(s);}, printSample);
+        reader.waitForWriters();
+        //if(reader.hasUnread())
             try
             {
                 auto local = reader.getNextUnread();

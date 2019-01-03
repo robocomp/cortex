@@ -86,17 +86,25 @@ GraphViewer::~GraphViewer()
 
 void GraphViewer::createGraph()
 {
-	std::cout << __FUNCTION__ << "-- Entering createGraph" << std::endl;
+	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
 	for(const auto &[id, content] : *graph)
 	{
-		std::string type = graph->getNodeType(id);
-		addNodeSLOT(id, content.type);
+		try
+		{
+			std::string type = graph->getNodeType(id);
+			addNodeSLOT(id, content.type);
+		}
+		catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << id << std::endl;}
 	}		
 	// add edges after all nodes have been created
 	for(const auto &[from, node_content] : *graph)
 	{
-		for( auto &[to, edge_atts] : node_content.fanout)
-			addEdgeSLOT(from, to, edge_atts.label);
+		try
+		{
+			for( auto &[to, edge_atts] : node_content.fanout)
+				addEdgeSLOT(from, to, edge_atts.label);
+		}
+		catch(const std::exception &e) { std::cout << e.what() << " Error accessing " << from << std::endl;}
 	}
 }
 
@@ -173,13 +181,18 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 						} , Qt::UniqueConnection);
 		try 
 		{ 	
-			std::string qname; std::string color; 
-			color = graph->getNodeAttribByName<std::string>(id, "color");
+			std::string qname = "unknown"; 
 			qname = graph->getNodeAttribByName<std::string>(id, "name");
-			gnode->setColor(color);
 			gnode->setTag(qname);	
 		}
-		catch(const std::exception &e){ std::cout << "in color and name" << std::endl;};	
+		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};	
+		try
+		{
+			std::string color = "red"; 
+			color = graph->getNodeAttribByName<std::string>(id, "color");
+			gnode->setColor(color);
+		}
+		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;};		
 	}
 	else
 		gnode = gmap.at(id);
