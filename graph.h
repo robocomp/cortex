@@ -79,6 +79,10 @@ namespace DSR
 				nodes[id].attrs.insert(std::make_pair("name",std::string("unknown")));
 				emit addNodeSIGNAL(id, type_);
 			};
+			void replaceNode(IDType id, const Value &value)
+			{
+				nodes[id] = value;
+			};
 			void addEdge(IDType from, IDType to, const std::string &label_) 			
 			{ 
 				nodes[from].fanout.insert(std::pair(to, EdgeAttrs{label_, from, to, Attribs()}));

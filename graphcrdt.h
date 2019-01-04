@@ -7,12 +7,12 @@
 #include <sstream>
 #include <iterator>
 #include "graph.h"
-#include "src/DSRGraph.h"
+#include "../../graph-related-classes/DSRGraph.h"
 #include <DataStorm/DataStorm.h>
 
 namespace DSR
 {
-    using G = RoboCompDSR::DSRGraph;
+    using G = RoboCompDSR::DSRPackage;
     using namespace std::chrono_literals;  
     
     //////////////////////////////////////////////////////////////////////////////////////////////77
@@ -33,10 +33,12 @@ namespace DSR
             std::shared_ptr<DataStorm::SingleKeyWriter<std::string, G>> writer;
 	        std::shared_ptr<DataStorm::Topic<std::string, G>> topic;
             std::thread read_thread;
-            G ice_graph;
+            G ice_package;
 
 	        void subscribeThread();
-            void createGraph();	        
+            void createIceGraph();	 
+            void copyIceGraphToDSR(const RoboCompDSR::DSRGraph &new_ice_graph);     
+            void updateDSRNode(const RoboCompDSR::DSRGraph &new_ice_graph, const DSR::IDType &id);     
             DSR::MTypes iceToGraph(const std::string &type, const std::string &val);
     
         public slots:

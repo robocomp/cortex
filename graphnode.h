@@ -60,7 +60,7 @@ class DoLaserStuff : public QGraphicsView
         scene.clear();
         QPolygonF robot; robot << QPointF(-200, 0) << QPointF(-100,150) << QPointF(0,200) << QPointF(100,150) << QPointF(200,0);
         scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
-        scene.addPolygon(polig, QPen(Qt::red, 8));  
+        scene.addPolygon(polig, QPen(QColor("LightPink"), 8), QBrush(QColor("LightPink")));  
       }
       catch(const std::exception &e){ std::cout << "Node " << node_id << " not found" << std::endl;};
     };
