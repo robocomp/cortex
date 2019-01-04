@@ -12,7 +12,7 @@
 
 namespace DSR
 {
-    using G = RoboCompDSR::DSRPackage;
+    using G = RoboCompDSR::DSRGraph;
     using namespace std::chrono_literals;  
     
     //////////////////////////////////////////////////////////////////////////////////////////////77
@@ -33,7 +33,8 @@ namespace DSR
             std::shared_ptr<DataStorm::SingleKeyWriter<std::string, G>> writer;
 	        std::shared_ptr<DataStorm::Topic<std::string, G>> topic;
             std::thread read_thread;
-            G ice_package;
+            G ice_graph;
+            DSR::IDType id_updating_node;       //to store node id in partial updates 
 
 	        void subscribeThread();
             void createIceGraph();	 

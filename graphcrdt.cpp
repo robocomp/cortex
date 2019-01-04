@@ -18,7 +18,7 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
     topic = std::make_shared<DataStorm::Topic<std::string, G>>(node, "DSR");
     topic->setWriterDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate });
 
-    topic->setUpdater<RoboCompDSR::Content>("node", [](G &g, const RoboCompDSR::Content &node){ g.graph[node.id] = node; g.node.id = node.id;});
+    topic->setUpdater<RoboCompDSR::Content>("node", [this](G &g, const RoboCompDSR::Content &node){ g[node.id] = node; this->id_updating_node = node.id;});
     
     writer = std::make_shared<DataStorm::SingleKeyWriter<std::string, G>>(*topic.get(), agent_name, agent_name + " Writer");
 
@@ -55,7 +55,7 @@ void GraphCRDT::createIceGraph()
                     eattrs.attrs.insert_or_assign(ke, graph->printVisitor(ve));
                 fano.insert_or_assign(ka, eattrs);
             }    
-            ice_package.graph.insert(std::make_pair(k, RoboCompDSR::Content{v.type, v.id, attrs, fano}));
+            ice_graph.insert(std::make_pair(k, RoboCompDSR::Content{v.type, v.id, attrs, fano}));
         }
     }
     catch(const std::exception &e){ std::cout << e.what() << std::endl;}
@@ -78,7 +78,7 @@ void GraphCRDT::createIceGraph()
     // now we publish the whole graph
     try
     {
-        writer->add(ice_package);
+        writer->add(ice_graph);
     }
     catch(const std::exception &e){ std::cout << e.what() << std::endl; }
 }
@@ -87,7 +87,7 @@ void GraphCRDT::subscribeThread()
 {
     DataStorm::Topic<std::string, G> topic(node, "DSR");
     topic.setReaderDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate });
-    topic.setUpdater<RoboCompDSR::Content>("node", [](G &g, const RoboCompDSR::Content &node) { g.graph[node.id] = node; g.node.id = node.id ;});
+    topic.setUpdater<RoboCompDSR::Content>("node", [this](G &g, const RoboCompDSR::Content &node) { g[node.id] = node; this->id_updating_node = node.id ;});
     
     // regex to filter out myself as publisher. Filters must be declared in the writer and in the reader
     std::string f = "^(?!" + agent_name + "$).*$";
@@ -112,11 +112,13 @@ void GraphCRDT::subscribeThread()
                             { 
                                 //std::cout << __FUNCTION__ << " update tag " << sample.getUpdateTag() <<  " " << sample.getKey() << std::endl;
                                 //std::cout << __FUNCTION__ << " node " << sample.getValue().node.id << " type " << sample.getValue().node.type << std::endl;
-                                this->updateDSRNode(sample.getValue().graph, sample.getValue().node.id); 
+                                //this->updateDSRNode(sample.getValue().graph, sample.getValue().node.id); 
+                                this->updateDSRNode(sample.getValue(), this->id_updating_node); 
+                                
                                 //this->copyIceGraphToDSR(sample.getValue().graph);  
                             }
                             else if(sample.getEvent() == DataStorm::SampleEvent::Add || sample.getEvent() == DataStorm::SampleEvent::Update)
-                            { this->copyIceGraphToDSR(sample.getValue().graph); }
+                            { this->copyIceGraphToDSR(sample.getValue()); }
                         };
     
     reader->onSamples([processSample](const auto &samples){ for(const auto &s : samples) processSample(s);}, processSample);
@@ -224,15 +226,17 @@ void GraphCRDT::NodeAttrsChangedSLOT(const std::int32_t id, const DSR::Attribs& 
     // update ice_graph 
     try
     {
-        auto node = writer->getLast().getValue().node;
+        //auto node = writer->getLast().getValue().node;
+        auto node = writer->getLast().getValue().at(id);
         for(const auto &[k,v] : graph->getNodeAttrs(id))
+            // node.attrs.insert_or_assign(k, graph->printVisitor(v));   //ADD FANOUT
             node.attrs.insert_or_assign(k, graph->printVisitor(v));   //ADD FANOUT
         node.id = id;
         node.type = graph->getNodeType(id);
         std::cout << __FUNCTION__ << " updated node " << node.id << " type " << node.type << std::endl;
         if( writer->hasReaders()) 
             writer->partialUpdate<RoboCompDSR::Content>("node")(node);
-            // writer->update(ice_package);
+            // writer->update(ice_graph);
 
     }  
     catch(const std::exception &e) { std::cout << e.what() << std::endl;}  
@@ -240,10 +244,10 @@ void GraphCRDT::NodeAttrsChangedSLOT(const std::int32_t id, const DSR::Attribs& 
 
 void GraphCRDT::addNodeSLOT(std::int32_t id, const std::string &type)
 {
-    ice_package.graph.insert_or_assign(id, RoboCompDSR::Content{type, id, RoboCompDSR::Attribs(), RoboCompDSR::FanOut()});
+    ice_graph.insert_or_assign(id, RoboCompDSR::Content{type, id, RoboCompDSR::Attribs(), RoboCompDSR::FanOut()});
 }
 
 void GraphCRDT::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &tag)
 {
-    ice_package.graph.at(from).fano.insert_or_assign(to, RoboCompDSR::EdgeAttribs{tag, from, to, RoboCompDSR::Attribs()});
+    ice_graph.at(from).fano.insert_or_assign(to, RoboCompDSR::EdgeAttribs{tag, from, to, RoboCompDSR::Attribs()});
 }

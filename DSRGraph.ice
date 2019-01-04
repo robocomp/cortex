@@ -17,10 +17,4 @@ module RoboCompDSR
         FanOut fano;
     };
     dictionary<int, Content> DSRGraph;
-    
-    struct DSRPackage
-    {
-        DSRGraph graph;
-        Content node;
-    }
 }
