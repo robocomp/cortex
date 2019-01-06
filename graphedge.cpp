@@ -140,32 +140,20 @@ void GraphEdge::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidg
 
 void GraphEdge::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-	std::cout << "node: " << tag.toStdString() << std::endl;
+	std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << source->id_in_graph << " to " << dest->id_in_graph <<" tag: " << tag.toStdString() << std::endl;
+ 	static std::unique_ptr<QWidget> do_stuff;
+    const auto graph = source->getGraphViewer()->getGraph();
     if( event->button()== Qt::RightButton)
     {
-        if(label != nullptr) { delete label; label = nullptr; }
-        label = new QTableWidget(source->getGraphViewer().get());
-		// For RT 
-        label->setColumnCount(4);
-		label->setRowCount(4);
-        auto g = source->getGraphViewer()->getGraph();
-		auto mat = g->getEdgeAttrib<RTMat>(source->id_in_graph, dest->id_in_graph, "RT");
-		for(auto i : iter::range(mat.nRows()))
-			for(auto j : iter::range(mat.nCols()))
-				label->setItem(i, j, new QTableWidgetItem(QString::number(mat(i,j))));
-		
-        label->horizontalHeader()->setStretchLastSection(true);
-        label->resizeRowsToContents();
-        label->resizeColumnsToContents();
-        QObject::connect(source->getGraphViewer().get(), &DSR::GraphViewer::closeWindowSIGNAL, label, &QTableWidget::close);
-        label->show();
+        if(tag == "RT")
+            do_stuff = std::make_unique<DoRTStuff>(graph, source->id_in_graph, dest->id_in_graph, tag.toStdString());
     }
+	update();
+    QGraphicsItem::mousePressEvent(event);
 }
 
 void GraphEdge::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
-	if( rt_values != nullptr)
-		delete rt_values;
 }
 
 void GraphEdge::keyPressEvent(QKeyEvent *event) 

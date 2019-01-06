@@ -16,5 +16,13 @@ module RoboCompDSR
         Attribs attrs;
         FanOut fano;
     };
+    
+    // Topic for graph  updates
     dictionary<int, Content> DSRGraph;
+
+    // Topic for full graph requests
+    struct GraphRequest
+    {
+        string from;
+    };
 }

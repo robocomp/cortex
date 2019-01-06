@@ -47,6 +47,12 @@ class DoLaserStuff : public QGraphicsView
       QObject::connect(graph.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, this, &DoLaserStuff::drawLaserSLOT);                        
       show();
     };
+
+  void closeEvent (QCloseEvent *event) override 
+  {
+    disconnect(graph.get(), 0, this, 0);
+  };
+
   public slots:
     void drawLaserSLOT(const DSR::IDType &id, const DSR::Attribs &attribs)
     {
@@ -102,6 +108,7 @@ class DoTableStuff : public  QTableWidget
 	    qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
+      setWindowTitle("Node " + QString::fromStdString(graph->getNodeType(node_id)) + " [" + QString::number(node_id) + "]");
       setColumnCount(2);
       setRowCount(graph->getNodeAttrs(node_id).size() );
       setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
@@ -117,14 +124,15 @@ class DoTableStuff : public  QTableWidget
       resizeColumnsToContents();
       QObject::connect(graph.get(), &DSR::Graph::NodeAttrsChangedSIGNAL, this, &DoTableStuff::drawSLOT);      
       show();
-    }
+    };
+    
   public slots:
     void drawSLOT(const DSR::IDType &id, const DSR::Attribs &attribs)
     {
       int i= 0; 
       for(auto &[k,v]: attribs)
       {
-        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET 
         setItem(i, 1, new QTableWidgetItem(QString::fromStdString(graph->printVisitor(v))));
         i++;
       }
@@ -162,8 +170,6 @@ class GraphNode : public QObject, public QGraphicsItem
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;  
-    // void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
-    // void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
   public slots:

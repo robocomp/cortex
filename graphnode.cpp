@@ -39,7 +39,7 @@ GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_vi
 void GraphNode::setTag(const std::string &tag_)
 {
     QString c = QString::fromStdString(tag_);
-	tag = new QGraphicsSimpleTextItem(c, this);
+	tag = new QGraphicsSimpleTextItem(c, this);    
 	tag->setX(20);	
 	tag->setY(-10);
 }
@@ -124,8 +124,6 @@ void GraphNode::calculateForces()
     newPos = pos() + QPointF(xvel, yvel);
     newPos.setX(qMin(qMax(newPos.x(), sceneRect.left() + 10), sceneRect.right() - 10));
     newPos.setY(qMin(qMax(newPos.y(), sceneRect.top() + 10), sceneRect.bottom() - 10));
-     
-   
 }
 
 bool GraphNode::advancePosition()
@@ -192,7 +190,7 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     static std::unique_ptr<QWidget> do_stuff;
-    std::cout << "node: " << tag->text().toStdString() << std::endl;
+    std::cout << __FILE__ << __FUNCTION__<< " node: " << tag->text().toStdString() << std::endl;
     const auto graph = graph_viewer->getGraph();
     if( event->button()== Qt::RightButton)
     {
@@ -212,11 +210,12 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     if( event->button()== Qt::LeftButton)
     {
         auto g = graph_viewer->getGraph();
-        g->addNodeAttribs(id_in_graph, DSR::Attribs{ std::pair("pos_x", (float)event->scenePos().x())});
-        g->addNodeAttribs(id_in_graph, DSR::Attribs{ std::pair("pos_y", (float)event->scenePos().y())}); 
+        std::cout << __FILE__ << __FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
+        g->addNodeAttribs(id_in_graph, 
+            DSR::Attribs{ std::pair("pos_x", (float)event->scenePos().x()), std::pair("pos_y", (float)event->scenePos().y())});
     }
-    update();
-    QGraphicsItem::mouseReleaseEvent(event);
+    // update();
+    // QGraphicsItem::mouseReleaseEvent(event);
 }
 
 void GraphNode::keyPressEvent(QKeyEvent *event) 

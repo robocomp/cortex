@@ -39,12 +39,11 @@ namespace DSR
 		public:
 			GraphViewer(std::shared_ptr<SpecificWorker> worker_);
 			~GraphViewer();
-			void draw();
 			void itemMoved();
 			void createGraph();
-			std::shared_ptr<DSR::Graph> getGraph() const 			  		{ return graph;};
-			std::map<std::int32_t, GraphNode*> getGMap() const 	{return gmap;};
-			QGraphicsEllipseItem* getCentralPoint() const 					{return central_point;};
+			std::shared_ptr<DSR::Graph> getGraph()  			  		{ return graph;};
+			std::map<std::int32_t, GraphNode*> getGMap() const 			{return gmap;};
+			QGraphicsEllipseItem* getCentralPoint() const 				{return central_point;};
 		
 		protected:
 			void wheelEvent(QWheelEvent *event) override;
@@ -67,7 +66,7 @@ namespace DSR
 			void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
 			void saveGraphSLOT();		
 			void toggleSimulationSLOT();
-			void NodeAttrsChangedSLOT(const std::int32_t node, const DSR::Attribs&);
+			void NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs);
 
 		signals:
 			void saveGraphSIGNAL();

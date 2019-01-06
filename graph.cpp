@@ -280,9 +280,8 @@ std::string Graph::printVisitor(const MTypes &t)
 void Graph::print()
 {
 	std::cout << "------------Printing Graph: " << nodes.size() << " elements -------------------------" << std::endl;
-	for( auto &par : nodes)
+	for( auto &[k,v] : nodes)
 	{
-		auto &v = par.second;
 		std::cout << "[" << attr<std::string>(v.attrs["name"]) << "] : " << std::endl;
 		std::cout << "	attrs:	";
 		for( auto &[ka, kv] : v.attrs)
@@ -292,7 +291,7 @@ void Graph::print()
 		std::cout << std::endl << "	edges:	";
 		for( auto &[kf,vf] : v.fanout)
 		{
-			std::cout << vf.label << "( " << attr<std::string>(nodes[kf].attrs["name"])  << " ) " << std::endl;
+			std::cout << vf.label << "( from " << k << " to " << kf  << " ) " << std::endl;
 			std::cout << "			edge attrs: ";
 			for( auto &[ke, ve] : vf.attrs)
 			{

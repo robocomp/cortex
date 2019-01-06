@@ -130,11 +130,11 @@ void GraphViewer::toggleSimulationSLOT()
 void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 {	
 	//qDebug() << __FUNCTION__ << "node id " << id;
-	GraphNode *gnode;
+	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 	if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
-		qDebug() << __FUNCTION__ << "node id " << id;
-		gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));
+		//qDebug() << __FUNCTION__ << "node id " << id;
+		gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));  //REEMPLAZAR THIS 
 		gnode->id_in_graph = id;
 		gnode->setType( type );
 		scene.addItem(gnode);
@@ -165,7 +165,7 @@ void GraphViewer::addNodeSLOT(std::int32_t id, const std::string &type)
 		disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, 0, 0);
 		connect(worker->tableWidgetNodes, &QTableWidget::itemClicked, this, [this](const auto &item){ 
 							static bool visible = true;
-							std::cout << "hide or show all nodes of type " << item->text().toStdString() << std::endl;
+							std::cout << __FILE__ << " " << __FUNCTION__ << "hide or show all nodes of type " << item->text().toStdString() << std::endl;
 							for( auto &[k, v] : gmap) 
 								if( item->text().toStdString() == v->getType()) 
 								{
@@ -244,19 +244,21 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 	}
 }
 
- void GraphViewer::NodeAttrsChangedSLOT(const std::int32_t node, const DSR::Attribs &attr)
+ void GraphViewer::NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs)
  {
-	 
+	try 
+	{
+		//std::cout << graph->getNodeType(id) << std::endl;
+		float posx = std::get<float>(attribs.at("pos_x"));
+		float posy = std::get<float>(attribs.at("pos_y"));
+		auto &gnode = gmap.at(id);
+		if(posx != gnode->x() or posy != gnode->y())
+			gnode->setPos(posx, posy);
+	}
+	catch(const std::exception &e){ std::cout << "Exception: " << e.what() << " pos_x and pos_y attribs not found in node "  << id << std::endl;};
  }
 
 ///////////////////////////////////////
-
-void GraphViewer::draw()
-{
-	//std::cout << this->width() << " " << this->height() << std::endl;
-	//this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
-	show();
-}
 
 void GraphViewer::itemMoved()
 {

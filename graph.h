@@ -37,13 +37,13 @@ namespace DSR
 	using IMType = QString;
 	using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;		
 	using Attribs = std::unordered_map<std::string, MTypes>;
-	struct EdgeAttrs
+	struct EdgeAttribs
 	{ 
 		std::string label;
 		IDType from, to;
 		Attribs attrs; 
 	};
-	using FanOut = std::unordered_map<IDType, EdgeAttrs>;
+	using FanOut = std::unordered_map<IDType, EdgeAttribs>;
 	using FanIn = std::vector<IDType>;
 	struct Value
 	{
@@ -79,13 +79,18 @@ namespace DSR
 				nodes[id].attrs.insert(std::make_pair("name",std::string("unknown")));
 				emit addNodeSIGNAL(id, type_);
 			};
+			void addNode(IDType id, Value &&content) 	
+			{ 
+				nodes.insert_or_assign(id, std::move(content));
+				emit addNodeSIGNAL(id, content.type);
+			};
 			void replaceNode(IDType id, const Value &value)
 			{
 				nodes[id] = value;
 			};
 			void addEdge(IDType from, IDType to, const std::string &label_) 			
 			{ 
-				nodes[from].fanout.insert(std::pair(to, EdgeAttrs{label_, from, to, Attribs()}));
+				nodes[from].fanout.insert(std::pair(to, EdgeAttribs{label_, from, to, Attribs()}));
 				nodes[to].fanin.push_back(from);
 				emit addEdgeSIGNAL(from, to, label_);
 			};
@@ -96,11 +101,12 @@ namespace DSR
 				emit NodeAttrsChangedSIGNAL(id, att);
 			};
 			
-			void addEdgeAttribs(IDType from, IDType to, const Attribs &att)
+			void addEdgeAttribs(IDType from, IDType to, const Attribs &att)  //HAY QUE METER EL TAG para desambiguar
 			{ 
-					auto &edgeAtts = nodes[from].fanout.at(to);
-					for(auto &[k,v] : att)
-						edgeAtts.attrs.insert_or_assign(k,v);
+				auto &edgeAtts = nodes[from].fanout.at(to);
+				for(auto &[k,v] : att)
+					edgeAtts.attrs.insert_or_assign(k,v);
+				emit EdgeAttrsChangedSIGNAL(from, to, att);
 			};
 			void clear()
 			{
@@ -130,9 +136,10 @@ namespace DSR
 			Attribs getNodeAttrs(IDType id) const  	 								{ return nodes.at(id).attrs;};
 			Attribs& getEdgeAttrs(IDType from, IDType to) 							{ return nodes.at(from).fanout.at(to).attrs;};
 			
+			//DEPRECATED
 			template<typename Ta>
 			Ta attr(const std::any &s) const     									{ return std::any_cast<Ta>(s);};
-
+			
 			template<typename Ta>
 			Ta attr(const MTypes &s) const    	 									{ return std::get<Ta>(s);};
 			
@@ -178,7 +185,8 @@ namespace DSR
 			Nodes nodes;
 
 		signals:
-			void NodeAttrsChangedSIGNAL(const std::int32_t, const DSR::Attribs);
+			void NodeAttrsChangedSIGNAL(const std::int32_t, const DSR::Attribs&);
+			void EdgeAttrsChangedSIGNAL(const DSR::IDType&, const DSR::IDType&, const DSR::Attribs&);
 			void addNodeSIGNAL(const std::int32_t, const std::string &type);
 			void addEdgeSIGNAL(const std::int32_t from, const std::int32_t to, const std::string &label);
 	};
