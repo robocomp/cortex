@@ -145,10 +145,9 @@ void Graph::readFromFile(const std::string &file_name)
 			else if(qname == "mesh") color = "LightBlue";
 			else if(qname == "imu") color = "LightSalmon";
 			
-
 			gatts.insert(std::pair("color", color));
 			this->addNodeAttribs(node_id, gatts);
-			std::cout << node_id << " " <<  std::string((char *)stype) << std::endl;
+			std::cout << __FILE__ << " " << __FUNCTION__ << "Node: " << node_id << " " <<  std::string((char *)stype) << std::endl;
 			
 			xmlFree(sid);
 			xmlFree(stype);
@@ -217,6 +216,7 @@ void Graph::readFromFile(const std::string &file_name)
 				else { printf("unexpected tag inside symbol: %s ==> %s\n", cur2->name,xmlGetProp(cur2, (const xmlChar *)"id") ); exit(-1); } // unexpected tags make the program exit
 			}
 			
+			std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << a << " to " << b << " label "  << edgeName <<  std::endl;
 			this->addEdge(a, b, edgeName);
 			this->addEdgeAttribs(a, b, DSR::Attribs{std::pair("name", edgeName)});
 			
@@ -225,27 +225,26 @@ void Graph::readFromFile(const std::string &file_name)
 			{ 	
 				this->addNodeAttribs(b, DSR::Attribs{ std::pair("level", this->getNodeLevel(a)+1), std::pair("parent", a)});
 				RMat::RTMat rt;
-				float x,y,z;
+				float tx,ty,tz,rx,ry,rz;
 				for(auto &[k,v] : attrs)
 				{
-					if(k=="tx")	( x = std::stof(v) );
-					if(k=="ty")	( y = std::stof(v) );
-					if(k=="tz")	( z = std::stof(v) );
-					rt.setTr( x, y, z);
-					if(k=="rx")	rt.setRX(std::stof(v));
-					if(k=="ry")	rt.setRY(std::stof(v));
-					if(k=="rz")	rt.setRZ(std::stof(v));
- 					this->addEdgeAttribs(a, b, DSR::Attribs{std::pair("RT", rt)});
+					if(k=="tx")	tx = std::stof(v);
+					if(k=="ty")	ty = std::stof(v);
+					if(k=="tz")	tz = std::stof(v);
+					if(k=="rx")	rx = std::stof(v);
+					if(k=="ry")	ry = std::stof(v);
+					if(k=="rz")	rz = std::stof(v);
 				}
+				rt.set(rx, ry, rz, tx, ty, tz);
+				//rt.print("in reader");
+ 				this->addEdgeAttribs(a, b, DSR::Attribs{std::pair("RT", rt)});
 			}
 			else
 			{
 				this->addNodeAttribs(b, DSR::Attribs{ std::pair("parent", 0)});
 				for(auto &r : attrs)
  					edge_attribs.insert(r);
-			}
-
-			std::cout << __FUNCTION__ << "edge  from " << a << " " <<  edgeName  << std::endl;		
+			}	
  			this->addEdgeAttribs(a, b, edge_attribs);
 			
 	//	  this->addEdgeByIdentifiers(a, b, edgeName, attrs);
@@ -264,7 +263,7 @@ std::string Graph::printVisitor(const MTypes &t)
 {			
 	return std::visit(overload
 	{
-		[](RMat::RTMat m) -> std::string										{ return m.asQString("RT").toStdString(); },
+		[](RMat::RTMat m) -> std::string								{ return m.serializeAsString(); },
 		[](std::vector<float> a)-> std::string	
 		{ 
 			std::string str;

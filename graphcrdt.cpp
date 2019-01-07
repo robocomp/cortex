@@ -12,7 +12,6 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
 	qRegisterMetaType<std::string>("std::string");
 	qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
 
-
     // create DataStorm writer
     int argc = 0; char *argv[0];
     node = DataStorm::Node(argc, argv);
@@ -22,16 +21,20 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
     topic->setUpdater<RoboCompDSR::Content>("node", 
                     [this](G &g, const RoboCompDSR::Content &node){ g[node.id] = node; this->id_updating_node = node.id;});
     topic->setUpdater<RoboCompDSR::EdgeAttribs>("edge_attribs", 
-                    [this](G &g, const RoboCompDSR::EdgeAttribs &eattrs){ g.at(eattrs.from).fano.at(eattrs.to) = eattrs; 
-                                                                          this->id_updating_node = eattrs.from;
-                                                                          this->id_updating_edge = eattrs.to;
-                                                                        });
+                    [this](G &g, const RoboCompDSR::EdgeAttribs &eattrs){ 
+                                                        try
+                                                        {
+                                                            g[eattrs.from].fano[eattrs.to] = eattrs; 
+                                                            this->id_updating_node = eattrs.from;
+                                                            this->id_updating_edge = eattrs.to;
+                                                        }
+                                                        catch(const std::exception &e){ std::cout << e.what() << std::endl;}
+                                                        });
     
     writer = std::make_shared<DataStorm::SingleKeyWriter<std::string, G>>(*topic.get(), agent_name, agent_name + " Writer");
 
     // we create Ice_graph from graph
     this->createIceGraphFromDSRGraph();
-    this->printIceGraph();
 }
 
 GraphCRDT::~GraphCRDT()
@@ -86,14 +89,14 @@ void GraphCRDT::subscribeThread()
     topic.setUpdater<RoboCompDSR::Content>("node", 
                     [this](G &g, const RoboCompDSR::Content &node) { g[node.id] = node; this->id_updating_node = node.id ;});
     topic.setUpdater<RoboCompDSR::EdgeAttribs>("edge_attribs", 
-                    [this](G &g, const RoboCompDSR::EdgeAttribs &eattrs){ g.at(eattrs.from).fano.at(eattrs.to) = eattrs; 
-                                                                          this->id_updating_node = eattrs.from;
-                                                                          this->id_updating_edge = eattrs.to;
-                                                                        });
-
-    // topic for graph request when an agent incorportates
-    DataStorm::Topic<std::string, RoboCompDSR::GraphRequest> graph_request_topic(node, "DSR_GRAPH_REQUEST");
-    //topic.setReaderDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate });
+                    [this](G &g, const RoboCompDSR::EdgeAttribs &eattrs){ 
+                                            try
+                                            {
+                                                g[eattrs.from].fano[eattrs.to] = eattrs; 
+                                                this->id_updating_node = eattrs.from;
+                                                this->id_updating_edge = eattrs.to;
+                                            }
+                                            catch(const std::exception &e){ std::cout << e.what() << std::endl;}});
 
     // regex to filter out myself as publisher. Filters must be declared in the writer and in the reader
     std::string f = "^(?!" + agent_name + "$).*$";
@@ -122,7 +125,7 @@ void GraphCRDT::subscribeThread()
     
     reader->onSamples([processSample](const auto &samples){ for(const auto &s : samples) processSample(s);}, processSample);
     
-    std::cout << __FILE__ << " " << __FUNCTION__ << " Initiating SUBSCRIPTION thread" << std::endl;
+    std::cout << __FILE__ << " " << __FUNCTION__ << " SUBSCRIPTION thread running..." << std::endl;
    
     node.waitForShutdown();
 }
@@ -165,7 +168,7 @@ void GraphCRDT::updateDSRNode(const RoboCompDSR::DSRGraph &new_ice_graph, const 
 
 void GraphCRDT::updateDSREdgeAttribs(const RoboCompDSR::DSRGraph &new_ice_graph, const DSR::IDType &from, const DSR::IDType &to )
 {
-    std::cout << __FILE__ << " " << __FUNCTION__ << " updated edge attributes " << from << " " << to << std::endl;
+    //std::cout << __FILE__ << " " << __FUNCTION__ << " updating DSRGraph edge attributes " << from << " " << to << std::endl;
     DSR::Attribs attribs;
     for(const auto &[ka, va] : new_ice_graph.at(from).fano.at(to).attrs)
         attribs.insert_or_assign(ka, translateIceElementToDSRGraph(ka, va));  
@@ -194,8 +197,8 @@ void GraphCRDT::copyIceGraphToDSRGraph(const RoboCompDSR::DSRGraph &new_ice_grap
             {
                 //std::cout << __FUNCTION__ << " key:" << edge_attr_key << " from " << node_key << " to "  << to << " " << edge_attr_content << std::endl;
                 eattrs.attrs.insert_or_assign(edge_attr_key, translateIceElementToDSRGraph(edge_attr_key, edge_attr_content));
-                if(edge_attr_key == "RT") 
-                    std::get<RTMat>(translateIceElementToDSRGraph(edge_attr_key, edge_attr_content)).print("rt");
+                // if(edge_attr_key == "RT") 
+                //     std::get<RTMat>(translateIceElementToDSRGraph(edge_attr_key, edge_attr_content)).print("rt");
             }
             node_fano.insert_or_assign(to, eattrs);
         }
@@ -223,44 +226,31 @@ DSR::MTypes GraphCRDT::translateIceElementToDSRGraph(const std::string &name, co
         std::vector<float> numbers;
         std::istringstream iss(val);
         std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), 
-                        std::back_inserter(numbers), [](const std::string &s){ return (float)std::stod(s);});
+                        std::back_inserter(numbers), [](const std::string &s){ return (float)std::stof(s);});
         res = numbers;
     }
     // instantiate a QMat from string marshalling
     else if(std::find(RT_types.begin(), RT_types.end(), name) != RT_types.end())
     {
-        std::vector<float> numbers;
+        std::vector<float> ns;
         std::istringstream iss(val);
-        for(auto it = std::istream_iterator<std::string>(iss); it != std::istream_iterator<std::string>(); it++) 
-        {
-            auto &s = *it;
-            if(s.find("RT(4") == std::string::npos and
-               s.find("4)") == std::string::npos and
-               s.find("]") == std::string::npos and
-               s.find(";") == std::string::npos and
-               s.find("[") == std::string::npos)  
-               { 
-                   numbers.push_back(QString::fromStdString(s).toFloat());
-               }
-        }
-        // std::cout << "Vector: ";
-        // for(auto n:numbers) std::cout << n << " " ;
-        // std::cout << std::endl;
+        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), 
+                        std::back_inserter(ns), [](const std::string &s){ return QString::fromStdString(s).toFloat();});
         RMat::RTMat rt;
-        int k=0;
-        for(auto i : iter::range(4))
-            for(auto j : iter::range(4))
-                rt(i,j) = numbers[k++];
-
-    	// rt.setTr( QVec::vec3(numbers[0], numbers[1], numbers[2]));
-		// rt.setRX(numbers[3]);
-		// rt.setRY(numbers[4]);
-		// rt.setRZ(numbers[5]);
-        rt.print("rt2");
-        res = rt;
-        std::cout <<  graph->printVisitor(res) << std::endl;
-        //std::get<RTMat>().print("vrt");
-        return(rt);
+        // std::cout << "------ in translating ------";
+        // for(auto n:ns) std::cout << n << " ";
+        // std::cout << std::endl;
+        if(ns.size() == 6)
+        {
+            rt.set(ns[3],ns[4],ns[5],ns[0],ns[1],ns[2]);
+            //rt.print("in translate");
+        }
+        else
+        {
+            std::cout << __FILE__ << __FUNCTION__ << "Error reading RTMat. Initializing with identity";
+            rt = QMat::identity(4);
+        }
+    	return(rt);
     }
 	else 
     {   
@@ -325,18 +315,21 @@ void GraphCRDT::NodeAttrsChangedSLOT(const std::int32_t id, const DSR::Attribs& 
     catch(const std::exception &e) { std::cout << e.what() << std::endl;}  
 }
 
-void GraphCRDT::EdgeAttrsChangedSLOT(const DSR::IDType &from, const DSR::IDType &to, const DSR::Attribs &edge_attrs)
+void GraphCRDT::EdgeAttrsChangedSLOT(const DSR::IDType &from, const DSR::IDType &to)
 {
     //std::cout << __FILE__ << " " << __FUNCTION__ << " Attribute change in edge from " << from << " to " << to << std::endl;
     try
     {
         auto eattrs = ice_graph.at(from).fano.at(to);
-        for(const auto &[k,v] : edge_attrs)
+        for(const auto &[k,v] : graph->getEdgeAttrs(from,to))
             eattrs.attrs.insert_or_assign(k, graph->printVisitor(v));  
         if( writer->hasReaders()) 
+        {
+            //std::cout << "before sending " << eattrs.attrs.at("RT") << std::endl;
             writer->partialUpdate<RoboCompDSR::EdgeAttribs>("edge_attribs")(eattrs);
+        }
     }  
-    catch(const std::exception &e) { std::cout << e.what() << std::endl;}  
+    catch(const std::exception &e) { std::cout << "Exception at " << __FUNCTION__ << ": " << e.what() << std::endl;}  
 }
 
 void GraphCRDT::addNodeSLOT(std::int32_t id, const std::string &type)

@@ -37,10 +37,10 @@ class DoRTStuff : public  QTableWidget
     DoRTStuff(std::shared_ptr<DSR::Graph> graph_, const DSR::IDType &from_, const DSR::IDType &to_, const std::string &label_) : 
         graph(graph_), from(from_), to(to_), label(label_)
     {
-      qRegisterMetaType<std::int32_t>("std::int32_t");
+      qRegisterMetaType<DSR::IDType>("DSR::IDType");
 	    qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
 
-      setWindowModality(Qt::ApplicationModal);
+      //setWindowModality(Qt::ApplicationModal);
       setWindowTitle("RT: " + QString::fromStdString(graph->getNodeType(from)) + " to " + QString::fromStdString(graph->getNodeType(to)));
       setColumnCount(4);
       setRowCount(4);
@@ -49,8 +49,8 @@ class DoRTStuff : public  QTableWidget
       horizontalHeader()->setStretchLastSection(true);
       resizeRowsToContents();
       resizeColumnsToContents();      
-      drawSLOT(from, to, graph->getEdgeAttrs(from, to));	
-      connect(graph.get(), &DSR::Graph::EdgeAttrsChangedSIGNAL, this, &DoRTStuff::drawSLOT);      
+      drawSLOT(from, to);	
+      QObject::connect(graph.get(), &DSR::Graph::EdgeAttrsChangedSIGNAL, this, &DoRTStuff::drawSLOT);      
       show();
       std::cout << __FILE__ << " " << __FUNCTION__ << " End ofDoRTStuff Constructor "  << std::endl;
     };
@@ -62,12 +62,13 @@ class DoRTStuff : public  QTableWidget
   };
 
   public slots:
-    void drawSLOT(const DSR::IDType &from_, const DSR::IDType &to_, const DSR::Attribs &attribs)
+    void drawSLOT(const DSR::IDType &from_, const DSR::IDType &to_)
     {
+      std::cout << __FILE__ << " " << __FUNCTION__ << std::endl;
       if( from == from_ and to == to_)     //ADD LABEL 
         try
         {
-          auto mat = std::get<RTMat>(attribs.at("RT"));
+          auto mat = std::get<RTMat>(graph->getEdgeAttrs(from, to).at("RT"));
           //mat.print("mat");
           for(auto i : iter::range(mat.nRows()))
             for(auto j : iter::range(mat.nCols()))

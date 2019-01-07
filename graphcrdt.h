@@ -53,7 +53,7 @@ namespace DSR
     
         public slots:
             void NodeAttrsChangedSLOT(const std::int32_t, const DSR::Attribs&);
-            void EdgeAttrsChangedSLOT(const DSR::IDType&, const DSR::IDType&, const DSR::Attribs&);
+            void EdgeAttrsChangedSLOT(const DSR::IDType&, const DSR::IDType&);
             void addNodeSLOT(std::int32_t id, const std::string &type);
             void addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string&);
 
