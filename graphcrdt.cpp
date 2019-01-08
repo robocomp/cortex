@@ -28,7 +28,7 @@ GraphCRDT::GraphCRDT(std::shared_ptr<DSR::Graph> graph_, const std::string &agen
                                                             this->id_updating_node = eattrs.from;
                                                             this->id_updating_edge = eattrs.to;
                                                         }
-                                                        catch(const std::exception &e){ std::cout << e.what() << std::endl;}
+                                                        catch(const std::exception &e){ std::cout << __FILE__ << " " << __FUNCTION__ << " "<<e.what() << std::endl;}
                                                         });
     
     writer = std::make_shared<DataStorm::SingleKeyWriter<std::string, G>>(*topic.get(), agent_name, agent_name + " Writer");
@@ -85,7 +85,7 @@ void GraphCRDT::subscribeThread()
     std::cout  << __FILE__ << " " << __FUNCTION__ << " Entering thread to attend graph changes" << std::endl;
     // topic for graph changes distribution
     DataStorm::Topic<std::string, G> topic(node, "DSR");
-    topic.setReaderDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate });
+//    topic.setReaderDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate });
     topic.setUpdater<RoboCompDSR::Content>("node", 
                     [this](G &g, const RoboCompDSR::Content &node) { g[node.id] = node; this->id_updating_node = node.id ;});
     topic.setUpdater<RoboCompDSR::EdgeAttribs>("edge_attribs", 
@@ -96,15 +96,13 @@ void GraphCRDT::subscribeThread()
                                                 this->id_updating_node = eattrs.from;
                                                 this->id_updating_edge = eattrs.to;
                                             }
-                                            catch(const std::exception &e){ std::cout << e.what() << std::endl;}});
+                                            catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;}});
 
     // regex to filter out myself as publisher. Filters must be declared in the writer and in the reader
     std::string f = "^(?!" + agent_name + "$).*$";
     
     // create filtered reader for graph changes
     auto reader = std::make_shared<DataStorm::FilteredKeyReader<std::string, G>>(topic, DataStorm::Filter<std::string>("_regex", f.c_str()));
-    // create filtered reader for new graph requests
-    auto new_connection_reader = std::make_shared<DataStorm::FilteredKeyReader<std::string, G>>(topic, DataStorm::Filter<std::string>("_regex", f.c_str()));
 
     std::cout << __FILE__ << " " << __FUNCTION__ << " Waiting for a writer to connect..." << std::endl;
     reader->waitForWriters();
@@ -122,7 +120,8 @@ void GraphCRDT::subscribeThread()
                             else if(sample.getEvent() == DataStorm::SampleEvent::Add || sample.getEvent() == DataStorm::SampleEvent::Update)
                             { this->copyIceGraphToDSRGraph(sample.getValue()); }
                         };
-    
+
+
     reader->onSamples([processSample](const auto &samples){ for(const auto &s : samples) processSample(s);}, processSample);
     
     std::cout << __FILE__ << " " << __FUNCTION__ << " SUBSCRIPTION thread running..." << std::endl;
@@ -141,9 +140,10 @@ void GraphCRDT::serveFullGraphThread()
     DataStorm::FilteredKeyReader<std::string, RoboCompDSR::GraphRequest> new_graph_reader(topic_graph_request, DataStorm::Filter<std::string>("_regex", f.c_str()));
     
     auto processSample = [this](auto sample)
-                         {  std::cout << sample.getValue().from << " asked for full graph" << std::endl; 
+                         {
+                            std::cout << sample.getValue().from << " asked for full graph"<< std::endl;
                             DataStorm::Topic<std::string, RoboCompDSR::DSRGraph> topic_answer(node, "DSR_GRAPH_ANSWER");
-                            topic_answer.setWriterDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAdd });
+//                            topic_answer.setWriterDefaultConfig({ Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAdd });
                             DataStorm::SingleKeyWriter<std::string, RoboCompDSR::DSRGraph> writer(topic_answer, agent_name, agent_name + " Full Graph Answer");
                             // printIceGraph();
                             writer.add(this->ice_graph);
@@ -288,7 +288,9 @@ void GraphCRDT::newGraphRequestAndWait()
     //     std::cout << __FILE__ << __FUNCTION__ << " Waiting for a writer to come up..." << std::endl;
     //     std::this_thread::sleep_for(100ms);
     // }
+    std::cout << __FILE__ << " " << __FUNCTION__ << " Wait for writers " << std::endl;
     auto sample = reader.getNextUnread();
+    std::cout << __FILE__ << " " << __FUNCTION__ << " Samples received " << std::endl;
     this->ice_graph = sample.getValue();
     copyIceGraphToDSRGraph(this->ice_graph);
     std::cout << __FILE__ << " " << __FUNCTION__ << " Finished uploading full graph" << std::endl;
@@ -312,7 +314,7 @@ void GraphCRDT::NodeAttrsChangedSLOT(const std::int32_t id, const DSR::Attribs& 
         if( writer->hasReaders()) 
             writer->partialUpdate<RoboCompDSR::Content>("node")(node);
     }  
-    catch(const std::exception &e) { std::cout << e.what() << std::endl;}  
+    catch(const std::exception &e) { std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;}
 }
 
 void GraphCRDT::EdgeAttrsChangedSLOT(const DSR::IDType &from, const DSR::IDType &to)
