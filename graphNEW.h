@@ -31,10 +31,10 @@ namespace DSR
     // Proxy pattern
 
     template<typename T>
-    struct NodePrx 
+    class NodePrx 
     {
         public:
-            NodePrx(T *obj) : prx(obj) 		
+            NodePrx(T *obj) : prx(obj)
 			{ 
 				mutex.lock(); 
 				std::cout << " in constructor " << prx->id << std::endl; 
@@ -55,10 +55,11 @@ namespace DSR
 			////////////////////////////////////////////////////////////////////////////////////////////
 			///// Node access methods
 			////////////////////////////////////////////////////////////////////////////////////////////
-            auto getNodePtr(IDType id) 
+            NodePrx<RoboCompDSR::Content>* getNodePtr(IDType id) 
             { 
                 try
                 {
+					//NodePrx<RoboCompDSR::Content> *prx = new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
                     return new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
