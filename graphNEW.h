@@ -29,14 +29,18 @@ namespace DSR
     // }
 
     // Proxy pattern
+
     template<typename T>
-    class NodePrx : public T
+    struct NodePrx 
     {
         public:
-            NodePrx(T *obj) : prx(obj) { mutex.lock(); }
-            ~NodePrx()                 { std::cout << "outside" << std::endl; mutex.unlock(); }
-            T* operator->()            { std::cout << "operator" << prx->id << std::endl; return prx;};
-			//IDType id() const{ return prx->id();};
+            NodePrx(T *obj) : prx(obj) 		
+			{ 
+				mutex.lock(); 
+				std::cout << " in constructor " << prx->id << std::endl; 
+			}
+            ~NodePrx()                 		{ std::cout << "destructor" << std::endl; mutex.unlock(); }
+            T* operator->()           		{ return prx;};
         private:
             T *prx;
             mutable std::recursive_mutex mutex;
@@ -51,11 +55,11 @@ namespace DSR
 			////////////////////////////////////////////////////////////////////////////////////////////
 			///// Node access methods
 			////////////////////////////////////////////////////////////////////////////////////////////
-            std::unique_ptr<NodePrx<RoboCompDSR::Content>> getNodePtr(IDType id) 
+            auto getNodePtr(IDType id) 
             { 
                 try
                 {
-                    return std::unique_ptr<NodePrx<RoboCompDSR::Content>>(new NodePrx<RoboCompDSR::Content>(&nodes.at(id)));
+                    return new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
@@ -67,18 +71,18 @@ namespace DSR
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
-            void replaceNode(IDType id, const RoboCompDSR::Content &node)      
-            { 
-                try
-                {
-                    auto n = getNodePtr(id);
-                    n->type = node.type;
-                    n->id = id;
-                    n->attrs = node.attrs;
-                    n->fano = node.fano;
-                }
-                catch(const std::exception &e){ std::cout << "Graph::replaceNode Exception - id "<< id << " not found " << std::endl; throw e; };
-            };
+            // void replaceNode(IDType id, const RoboCompDSR::Content &node)      
+            // { 
+            //     try
+            //     {
+            //         auto n = getNodePtr(id);
+            //         n->type = node.type;
+            //         n->id = id;
+            //         n->attrs = node.attrs;
+            //         n->fano = node.fano;
+            //     }
+            //     catch(const std::exception &e){ std::cout << "Graph::replaceNode Exception - id "<< id << " not found " << std::endl; throw e; };
+            // };
 			void clear()                                            { nodes.clear();		}
             size_t size() const 								    { return nodes.size();  };
 
