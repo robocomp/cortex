@@ -34,34 +34,43 @@ namespace DSR
     class NodePrx 
     {
         public:
-            NodePrx(T *obj, std::shared_ptr<std::mutex> mutex_) : prx(obj), mutex(mutex_)	
-											{ mutex->lock(); }
-            ~NodePrx()                 		{ /*std::cout << " destructor " << std::endl; */ mutex->unlock(); }
+            NodePrx(T *obj, std::shared_ptr<std::map<IDType, std::shared_ptr<std::mutex>>> mutexes_) : prx(obj), mutexes(mutexes_)	
+			{ mutexes->at(prx->id)->lock(); }
+            ~NodePrx()                 		
+			{ 
+				//std::cout << " destructor size " << mutexes->size() << std::endl;  
+				mutexes->at(prx->id)->unlock(); mutexes->erase(prx->id); 
+				//std::cout << "size in destructor " << mutexes->size() << std::endl;
+			}
             T* operator->()           		{ return prx;};
+			void deepCopy(const RoboCompDSR::Content &content)
+			{  *prx = content;	}
 
         private:
             T *prx;
-			std::shared_ptr<std::mutex> mutex;
+			std::shared_ptr<std::map<IDType, std::shared_ptr<std::mutex>>> mutexes;
     };
 
 	class Graph : public QObject
 	{
 		Q_OBJECT
 		public:		 
+			Graph() { mutexes = std::make_shared<std::map<IDType, std::shared_ptr<std::mutex>>>();}
 			////////////////////////////////////////////////////////////////////////////////////////////
 			//									Thread safe graph API 
 			////////////////////////////////////////////////////////////////////////////////////////////
 			///// Node access methods
 			////////////////////////////////////////////////////////////////////////////////////////////
-			std::shared_ptr<std::mutex> local_mutex;
-            std::unique_ptr<NodePrx<RoboCompDSR::Content>> getNodePtr(IDType id) 
+            std::shared_ptr<NodePrx<RoboCompDSR::Content>> getNodePtr(IDType id) 
             { 
                 try
                 {
 					//NodePrx<RoboCompDSR::Content> *prx = new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
                     //return new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
-					if (mutexes.count(id) == 0) mutexes[id] = std::make_shared<std::mutex>();
-					return std::make_unique<NodePrx<RoboCompDSR::Content>>(&nodes.at(id), mutexes[id]);
+					if (mutexes->count(id) == 0) 
+						mutexes->insert(std::make_pair(id, std::make_shared<std::mutex>()));
+					//std::cout << "size in getNodePtr " << mutexes->size() << std::endl;
+					return std::make_shared<NodePrx<RoboCompDSR::Content>>(&nodes.at(id), mutexes);
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
@@ -69,22 +78,22 @@ namespace DSR
             { 
                 try
                 {
+					//std::cout << "size in getNode " << mutexes->size() << std::endl;
                     return nodes.at(id);
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
-            // void replaceNode(IDType id, const RoboCompDSR::Content &node)      
-            // { 
-            //     try
-            //     {
-            //         auto n = getNodePtr(id);
-            //         n->type = node.type;
-            //         n->id = id;
-            //         n->attrs = node.attrs;
-            //         n->fano = node.fano;
-            //     }
-            //     catch(const std::exception &e){ std::cout << "Graph::replaceNode Exception - id "<< id << " not found " << std::endl; throw e; };
-            // };
+            void replaceNode(IDType id, const RoboCompDSR::Content &node)      
+            { 
+				Lock l(mutex);
+                try
+                {
+                    auto ptr = getNodePtr(id);
+					auto &n = *(ptr.get());
+					n.deepCopy(node);
+                }
+                catch(const std::exception &e){ std::cout << "Graph::replaceNode Exception - id "<< id << " not found " << std::endl; throw e; };
+            };
 			void clear()                                            { nodes.clear();		}
             size_t size() const 								    { return nodes.size();  };
 
@@ -126,7 +135,9 @@ namespace DSR
 			};
 		//private:
             G nodes;    // Ice defined graph
-			std::map<IDType, std::shared_ptr<std::mutex>> mutexes;
+			std::shared_ptr<std::map<IDType, std::shared_ptr<std::mutex>>> mutexes;
+			std::recursive_mutex mutex;
+
 
             /// iterator so the class works in range loops only for private use
 			typename G::iterator begin() 					{ return nodes.begin(); };
