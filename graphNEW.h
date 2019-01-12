@@ -36,8 +36,9 @@ namespace DSR
         public:
             NodePrx(T *obj, std::shared_ptr<std::mutex> mutex_) : prx(obj), mutex(mutex_)	
 											{ mutex->lock(); }
-            ~NodePrx()                 		{ std::cout << " destructor " << std::endl; mutex->unlock(); }
+            ~NodePrx()                 		{ /*std::cout << " destructor " << std::endl; */ mutex->unlock(); }
             T* operator->()           		{ return prx;};
+
         private:
             T *prx;
 			std::shared_ptr<std::mutex> mutex;
@@ -59,8 +60,8 @@ namespace DSR
                 {
 					//NodePrx<RoboCompDSR::Content> *prx = new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
                     //return new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
-					local_mutex = std::make_shared<std::mutex>();
-					return std::make_unique<NodePrx<RoboCompDSR::Content>>(&nodes.at(id), local_mutex);
+					if (mutexes.count(id) == 0) mutexes[id] = std::make_shared<std::mutex>();
+					return std::make_unique<NodePrx<RoboCompDSR::Content>>(&nodes.at(id), mutexes[id]);
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
@@ -125,7 +126,7 @@ namespace DSR
 			};
 		//private:
             G nodes;    // Ice defined graph
-			//std::map<std::un
+			std::map<IDType, std::shared_ptr<std::mutex>> mutexes;
 
             /// iterator so the class works in range loops only for private use
 			typename G::iterator begin() 					{ return nodes.begin(); };
