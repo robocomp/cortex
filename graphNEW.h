@@ -34,16 +34,13 @@ namespace DSR
     class NodePrx 
     {
         public:
-            NodePrx(T *obj) : prx(obj)
-			{ 
-				mutex.lock(); 
-				std::cout << " in constructor " << prx->id << std::endl; 
-			}
-            ~NodePrx()                 		{ std::cout << "destructor" << std::endl; mutex.unlock(); }
+            NodePrx(T *obj, std::shared_ptr<std::mutex> mutex_) : prx(obj), mutex(mutex_)	
+											{ mutex->lock(); }
+            ~NodePrx()                 		{ std::cout << " destructor " << std::endl; mutex->unlock(); }
             T* operator->()           		{ return prx;};
         private:
             T *prx;
-            mutable std::recursive_mutex mutex;
+			std::shared_ptr<std::mutex> mutex;
     };
 
 	class Graph : public QObject
@@ -55,12 +52,15 @@ namespace DSR
 			////////////////////////////////////////////////////////////////////////////////////////////
 			///// Node access methods
 			////////////////////////////////////////////////////////////////////////////////////////////
-            NodePrx<RoboCompDSR::Content>* getNodePtr(IDType id) 
+			std::shared_ptr<std::mutex> local_mutex;
+            std::unique_ptr<NodePrx<RoboCompDSR::Content>> getNodePtr(IDType id) 
             { 
                 try
                 {
 					//NodePrx<RoboCompDSR::Content> *prx = new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
-                    return new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
+                    //return new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
+					local_mutex = std::make_shared<std::mutex>();
+					return std::make_unique<NodePrx<RoboCompDSR::Content>>(&nodes.at(id), local_mutex);
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
@@ -125,6 +125,7 @@ namespace DSR
 			};
 		//private:
             G nodes;    // Ice defined graph
+			//std::map<std::un
 
             /// iterator so the class works in range loops only for private use
 			typename G::iterator begin() 					{ return nodes.begin(); };
