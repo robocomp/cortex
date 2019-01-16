@@ -45,6 +45,8 @@ namespace DSR
             T* operator->()           		{ return prx;};
 			void deepCopy(const RoboCompDSR::Content &content)
 			{  *prx = content;	}
+			void swap(RoboCompDSR::Content &content)
+			{  std::swap(*prx, content);	}
 
         private:
             T *prx;
@@ -83,20 +85,50 @@ namespace DSR
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
-            void replaceNode(IDType id, const RoboCompDSR::Content &node)      
+            void replaceNode(IDType id, RoboCompDSR::Content &node)      
             { 
-				Lock l(mutex);
+				//Lock l(mutex);
                 try
                 {
-                    auto ptr = getNodePtr(id);
-					auto &n = *(ptr.get());
-					n.deepCopy(node);
+                    auto &n = *(getNodePtr(id).get());
+					//n.deepCopy(node);  
+					n.swap(node);
+
                 }
                 catch(const std::exception &e){ std::cout << "Graph::replaceNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
 			void clear()                                            { nodes.clear();		}
             size_t size() const 								    { return nodes.size();  };
 
+			///////////////////////////////////////////////////////////////////////////////////////////	
+			/// Type conversors for lazy evaluation
+			///////////////////////////////////////////////////////////////////////////////////////////
+			MTypes typeConvertor(const std::string &type, const std::string &value)
+			{
+				if( type == "RTMat")
+				{
+					std::vector<float> ns;
+        			std::istringstream iss(value);
+        			std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(), 
+                        std::back_inserter(ns), [](const std::string &s){ return QString::fromStdString(s).toFloat();});
+        			RMat::RTMat rt;
+        			if(ns.size() == 6)
+					{
+        				rt.set(ns[3],ns[4],ns[5],ns[0],ns[1],ns[2]);
+						return rt;
+					}
+			        else
+        			{
+            			std::cout << __FILE__ << __FUNCTION__ << "Error reading RTMat. Initializing with identity";
+            			rt = QMat::identity(4);
+						return rt;
+					}
+				 }			
+				else if( type == "float")
+					return std::stof(value);
+			};
+
+			
 			///////////////////////////////////////////////////////////////////////////////////////////
 			/// Printing and visitors
 			///////////////////////////////////////////////////////////////////////////////////////////
