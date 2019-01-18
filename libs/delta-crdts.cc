@@ -1508,6 +1508,10 @@ public:
         return c;
     }
 
+    //// CRISTIAN
+
+    map<N,V> get() { return m; }
+
     pair<K,pair<map<N,V>,dotcontext<K>>> getFullOrMap() {
         return pair<K,pair<map<N,V>,dotcontext<K>>>(id,getOrMap());
     }
