@@ -7,19 +7,9 @@
 
 #include <iostream>
 #include "DSRGraph.h"
-
+#include <map>
 namespace CRDT {
-    using N = RoboCompDSR::Content;
-
-    struct Node {
-        N node;
-
-        friend std::ostream &operator<<(std::ostream &output, const Node &n_) {
-            output << n_;
-            return output;
-        };
-
-    };
+    using N = RoboCompDSR::Node;
 
     class CRDTNodes {
         public:
@@ -38,14 +28,14 @@ namespace CRDT {
     //            emit addNodeSIGNAL(id, type_);
             };
 
-            void addNode(int id, N &content) {
-                nodes[id].add(content, id);
+            void addNode(int id, N &node) {
+                nodes[id].add(node, id);
     //            emit addNodeSIGNAL(id, content.type);
             };
 
-            void replaceNode(int id, const N &content) {
+            void replaceNode(int id, const N &node) {
                 nodes.erase(id);
-                nodes[id].add(content, id);
+                nodes[id].add(node, id);
             };
 
             void addEdge(int from, int to, const std::string &label_) {
@@ -82,6 +72,33 @@ namespace CRDT {
                 std::cout << "------------------------- \nNodes:" << std::endl;
                 std::cout << nodes << endl;
             };
+
+            int id() { return nodes.getId(); };
+
+            RoboCompDSR::MapAworSet map() {
+                RoboCompDSR::MapAworSet m;
+                for (auto & kv : nodes.getMap()) { // Map of Aworset to ICE
+                    RoboCompDSR::AworSet aworSet;
+                    aworSet.id = kv.second.getId();
+                    for (auto & kv : kv.second.dots().ds)
+                        aworSet.dk.ds[RoboCompDSR::PairInt{kv.first.first, kv.first.second}] = kv.second;
+                    for (auto & kv : kv.second.dots().cbase.getCcDc().first)
+                        aworSet.dk.cbase.cc[kv.first] = kv.second;
+                    for (auto & kv : kv.second.dots().cbase.getCcDc().second)
+                        aworSet.dk.cbase.dc.insert(RoboCompDSR::PairInt{kv.first, kv.second});
+                    m[kv.first] = aworSet;
+                }
+                return m;
+            };
+
+            RoboCompDSR::DotContext context() { // Context to ICE
+                RoboCompDSR::DotContext om_dotcontext;
+                for (auto & kv : nodes.context().getCcDc().first)
+                    om_dotcontext.cc[kv.first] = kv.second;
+                for (auto & kv : nodes.context().getCcDc().second)
+                    om_dotcontext.dc.insert(RoboCompDSR::PairInt{kv.first, kv.second});
+                return om_dotcontext;
+            }
 
         private:
             Nodes nodes;

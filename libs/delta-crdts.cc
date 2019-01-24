@@ -960,6 +960,8 @@ public:
         return dk;
     }
 
+    K getId() { return id; }
+
     friend ostream &operator<<( ostream &output, const aworset<E,K>& o)
     {
         output << "AWORSet:" << o.dk;
@@ -1476,7 +1478,7 @@ public:
     }
 };
 
-template<typename N, typename V, typename K=string>
+template<typename N, typename V, typename K=N>
 class ormap
 {
     map<N,V> m;
@@ -1510,7 +1512,15 @@ public:
 
     //// CRISTIAN
 
-    map<N,V> get() { return m; }
+    std::map<N,V> getMap() const
+    {
+        return m;
+    }
+
+    K getId() const
+    {
+        return id;
+    }
 
     pair<K,pair<map<N,V>,dotcontext<K>>> getFullOrMap() {
         return pair<K,pair<map<N,V>,dotcontext<K>>>(id,getOrMap());
