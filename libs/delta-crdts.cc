@@ -1032,7 +1032,7 @@ public:
 
     aworset<E,K> add(const E& val, const K& uid)
     {
-        aworset<E,K> r;
+        aworset<E,K> r(uid);
         r.dk=dk.rmv(val); // optimization that first deletes val
         r.dk.join(dk.add(uid,val));
         return r;
