@@ -8,6 +8,7 @@
 #include <iostream>
 #include "DSRGraph.h"
 #include <map>
+#include <typeinfo>
 
 namespace CRDT {
     using N = RoboCompDSR::Node;
@@ -44,10 +45,9 @@ namespace CRDT {
             }
 
             void joinDeltaNode(RoboCompDSR::AworSet aworSet) {
-                //TODO
-//                auto aw = aworset<N, int> (aworSet.id, aworSet.dk.cbase);
-                cout << "dk " << aworSet.dk.ds << endl;
-//                nodes[aworSet.id].join();
+                aworset<N, int> aw = translateAwICEtoCRDT(aworSet);
+                cout << aw << endl;
+                nodes[aworSet.id].join(aw);
             };
 
             void replaceNode(int id, const N &node) {
@@ -111,7 +111,7 @@ namespace CRDT {
         private:
             Nodes nodes;
 
-            RoboCompDSR::AworSet translateAwCRDTtoICE(aworset<N, int> data) {
+            RoboCompDSR::AworSet translateAwCRDTtoICE(aworset<N, int> &data) {
                 RoboCompDSR::AworSet delta_crdt;
                 delta_crdt.id = data.getId();
                 for (auto &kv_dots : data.dots().ds)
@@ -121,6 +121,24 @@ namespace CRDT {
                 for (auto &kv_dc : data.context().getCcDc().second)
                     delta_crdt.dk.cbase.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
                 return delta_crdt;
+            }
+
+            aworset<N, int> translateAwICEtoCRDT(RoboCompDSR::AworSet &data){
+                dotcontext<int> dc;
+                auto m = static_cast<std::map<int,int>>(data.dk.cbase.cc);
+                set<pair<int,int>> s;
+                for (auto &v : data.dk.cbase.dc)
+                    s.insert(std::make_pair(v.first,v.second));
+
+                dc.setContext(m, s);
+                cout << "Contexto generado: " << dc << endl;
+//                aworset<N, int> aw = aworset<N, int> (data.id, dc);
+                aworset<N, int> aw = aworset<N, int>(data.id);
+                cout << "AW vacio : " << aw << endl;
+                aw.setContext(dc);
+                aw.add(data.dk.ds.at((*(data.dk.ds.rbegin())).first));
+                cout << "AW lleno: "<< aw << endl;
+                return aw;
             }
 
 

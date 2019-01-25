@@ -235,21 +235,10 @@ public:
         return l;
     }
 
-    void setContext(K uid, int _cc, int _dc)
+    void setContext(map<K,int> &cc_, set<pair<K,int> > &dc_)
     {
-        if (_cc > 0)
-        {
-            for (auto & ki : cc)
-                if (ki.first == uid)
-                    ki.second = _cc;
-//TODO:
-//         for (auto & ki : dc)
-//             if (ki.first == uid) {
-//                 cout << "Asigno _dc:"<<_cc<<" a "<<uid<<endl;
-//                 ki.second = _dc;
-//             }
-        }
-
+        cc = cc_;
+        dc = dc_;
     }
 
     bool dotin (const pair<K,int> & d) const
@@ -956,11 +945,16 @@ public:
         return dk.c;
     }
 
-    dotkernel<E,K> & dots() {
+    void setContext(dotcontext<K> &cbase) {
+        dk.c = cbase;
+    }
+
+    dotkernel<E,K> & dots()
+    {
         return dk;
     }
 
-    K getId() { return id; }
+    K getId() const { return id; }
 
     friend ostream &operator<<( ostream &output, const aworset<E,K>& o)
     {
