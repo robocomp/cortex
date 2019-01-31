@@ -257,13 +257,16 @@ public:
         bool flag; // may need to compact several times if ordering not best
         do
         {
+            //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
             flag=false;
             for(auto sit = dc.begin(); sit != dc.end();)
             {
+                //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ <<*(sit)<<" "<<sit->first<<" "<<sit->second<<endl;
                 auto mit=cc.find(sit->first);
                 if (mit==cc.end()) // No CC entry
                     if (sit->second == 1) // Can compact
                     {
+                        //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << " " << *(sit)<< endl;
                         cc.insert(*sit);
                         dc.erase(sit++);
                         flag=true;
@@ -272,12 +275,14 @@ public:
                 else // there is a CC entry already
                 if (sit->second == cc.at(sit->first) + 1) // Contiguous, can compact
                 {
+                    //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << " " << endl;
                     cc.at(sit->first)++;
                     dc.erase(sit++);
                     flag=true;
                 }
                 else if (sit->second <= cc.at(sit->first)) // dominated, so prune
                 {
+                    //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << " " <<  endl;
                     dc.erase(sit++);
                     // no extra compaction oportunities so flag untouched
                 }
@@ -309,6 +314,7 @@ public:
 
     void join (const dotcontext<K> & o)
     {
+        //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << endl;
         if (this == &o) return; // Join is idempotent, but just dont do it.
         // CC
         //typename  map<K,int>::iterator mit;
@@ -339,12 +345,15 @@ public:
                 ++mito;
             }
         } while (mit != cc.end() || mito != o.cc.end());
+
         // DC
         // Set
         for (const auto & e : o.dc)
             insertdot(e,false);
 
+        //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << " " << o.dc << endl;
         compact();
+        //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << " " << o.dc << endl;
 
     }
 
@@ -401,27 +410,35 @@ public:
         {
             if ( it != ds.end() && ( ito == o.ds.end() || it->first < ito->first))
             {
+                //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << endl;
                 // dot only at this
-                if (o.c.dotin(it->first)) // other knows dot, must delete here
+                if (o.c.dotin(it->first)) { // other knows dot, must delete here
                     ds.erase(it++);
+                    //cout <<__FUNCTION__<<":"<<__LINE__ << endl;
+                }
                 else // keep it
                     ++it;
             }
             else if ( ito != o.ds.end() && ( it == ds.end() || ito->first < it->first))
             {
+                //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
                 // dot only at other
-                if(! c.dotin(ito->first)) // If I dont know, import
+                if(! c.dotin(ito->first)) { // If I dont know, import
                     ds.insert(*ito);
+                    //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
+                }
                 ++ito;
             }
             else if ( it != ds.end() && ito != o.ds.end() )
             {
+                //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << " " << o << endl;
                 // dot in both
                 ++it;
                 ++ito;
             }
         } while (it != ds.end() || ito != o.ds.end() );
         // CC
+        //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ <<" " <<o.c <<endl;
         c.join(o.c);
     }
 
@@ -479,7 +496,9 @@ public:
         ds.insert(pair<pair<K,int>,T>(dot,val));
         // make delta
         res.ds.insert(pair<pair<K,int>,T>(dot,val));
+        cout << __FUNCTION__ <<" RES: "<< res << endl;
         res.c.insertdot(dot);
+        cout << __FUNCTION__ <<" RES: "<< res << endl;
         return res;
     }
 
@@ -507,6 +526,7 @@ public:
             else
                 ++dsit;
         }
+        ////cout <<__PRETTY_FUNCTION__ <<":"<<__LINE__<< " " << res << endl;
         res.c.compact(); // Maybe several dots there, so atempt compactation
         return res;
     }
@@ -520,6 +540,7 @@ public:
             res.c.insertdot(dsit->first,false); // result knows removed dots
             ds.erase(dsit++);
         }
+        ////cout <<__PRETTY_FUNCTION__ <<":"<<__LINE__<< " " << res << endl;
         res.c.compact(); // Atempt compactation
         return res;
     }
@@ -1028,7 +1049,8 @@ public:
     {
         aworset<E,K> r(uid);
         r.dk=dk.rmv(val); // optimization that first deletes val
-        r.dk.join(dk.add(uid,val));
+        r.dk.join(dk.add(uid, val));
+        ////cout <<__PRETTY_FUNCTION__ <<" "<< r << endl;
         return r;
     }
 
@@ -1048,6 +1070,7 @@ public:
 
     void join (aworset<E,K> o)
     {
+        ////cout <<__PRETTY_FUNCTION__ <<" o: "<< o << endl;
         dk.join(o.dk);
         // Further optimization can be done by keeping for val x and id A
         // only the highest dot from A supporting x.

@@ -28,15 +28,18 @@ namespace CRDT {
                 new_node.type = type_;
                 new_node.id = id;
                 new_node.attrs.insert(std::make_pair("name", std::string("unknown")));
-                auto delta = nodes[id].add(new_node, id);
+                auto delta = nodes[id].add(new_node);
 
                 //            emit addNodeSIGNAL(id, type_);
                 return translateAwCRDTtoICE(delta);
             };
 
             RoboCompDSR::AworSet addNode(int id, N &node) {
+                cout << __PRETTY_FUNCTION__ <<" "<<node<<endl;
                 auto delta = nodes[id].add(node, id);
+
                 //            emit addNodeSIGNAL(id, content.type);
+                cout << __FUNCTION__ << " Delta: "<<delta<< " \nNodes: " << nodes << endl;
                 return translateAwCRDTtoICE(delta);
             };
 
@@ -46,8 +49,8 @@ namespace CRDT {
 
             void joinDeltaNode(RoboCompDSR::AworSet aworSet) {
                 aworset<N, int> aw = translateAwICEtoCRDT(aworSet);
-                cout << aw << endl;
-                nodes[aworSet.id].join(aw);
+                nodes[aw.getId()].join(aw);
+                cout << __FUNCTION__ << " " << aw << "\n" << nodes << endl;
             };
 
             void replaceNode(int id, const N &node) {
@@ -112,6 +115,7 @@ namespace CRDT {
             Nodes nodes;
 
             RoboCompDSR::AworSet translateAwCRDTtoICE(aworset<N, int> &data) {
+                cout << __FUNCTION__ << " Me llega: " << data << endl;
                 RoboCompDSR::AworSet delta_crdt;
                 delta_crdt.id = data.getId();
                 for (auto &kv_dots : data.dots().ds)
@@ -120,24 +124,26 @@ namespace CRDT {
                     delta_crdt.dk.cbase.cc[kv_cc.first] = kv_cc.second;
                 for (auto &kv_dc : data.context().getCcDc().second)
                     delta_crdt.dk.cbase.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
+                cout << __FUNCTION__ << " Devuelvo: " << delta_crdt << endl;
                 return delta_crdt;
             }
 
             aworset<N, int> translateAwICEtoCRDT(RoboCompDSR::AworSet &data){
-                dotcontext<int> dc;
+                cout << __FUNCTION__ << " Me llega: " << data << endl;
+                dotcontext<int> dotcontext_aux;
                 auto m = static_cast<std::map<int,int>>(data.dk.cbase.cc);
                 set<pair<int,int>> s;
                 for (auto &v : data.dk.cbase.dc)
                     s.insert(std::make_pair(v.first,v.second));
-
-                dc.setContext(m, s);
-                cout << "Contexto generado: " << dc << endl;
-//                aworset<N, int> aw = aworset<N, int> (data.id, dc);
+                dotcontext_aux.setContext(m, s);
+                cout << "Contexto generado: " << dotcontext_aux << endl;
+//                aworset<N, int> aw = aworset<N, int> (data.id, dotcontext_aux);
                 aworset<N, int> aw = aworset<N, int>(data.id);
-                cout << "AW vacio : " << aw << endl;
-                aw.setContext(dc);
+                aw.setContext(dotcontext_aux);
                 aw.add(data.dk.ds.at((*(data.dk.ds.rbegin())).first));
-                cout << "AW lleno: "<< aw << endl;
+//                cout << "AW lleno: "<< aw << endl;
+
+                cout << __FUNCTION__ << " Devuelvo: " << aw << endl;
                 return aw;
             }
 
