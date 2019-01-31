@@ -30,16 +30,17 @@ namespace CRDT {
                 new_node.attrs.insert(std::make_pair("name", std::string("unknown")));
                 auto delta = nodes[id].add(new_node);
 
+
                 //            emit addNodeSIGNAL(id, type_);
                 return translateAwCRDTtoICE(delta);
             };
 
             RoboCompDSR::AworSet addNode(int id, N &node) {
-                cout << __PRETTY_FUNCTION__ <<" "<<node<<endl;
+                cout << __PRETTY_FUNCTION__ <<" --------> "<<node<<endl;
                 auto delta = nodes[id].add(node, id);
 
                 //            emit addNodeSIGNAL(id, content.type);
-                cout << __FUNCTION__ << " Delta: "<<delta<< " \nNodes: " << nodes << endl;
+                cout << "Delta generado (crdt): " << delta << endl;
                 return translateAwCRDTtoICE(delta);
             };
 
@@ -130,17 +131,33 @@ namespace CRDT {
 
             aworset<N, int> translateAwICEtoCRDT(RoboCompDSR::AworSet &data){
                 cout << __FUNCTION__ << " Me llega: " << data << endl;
+
+                // Context
                 dotcontext<int> dotcontext_aux;
                 auto m = static_cast<std::map<int,int>>(data.dk.cbase.cc);
-                set<pair<int,int>> s;
+                std::set<pair<int,int>> s;
                 for (auto &v : data.dk.cbase.dc)
                     s.insert(std::make_pair(v.first,v.second));
                 dotcontext_aux.setContext(m, s);
                 cout << "Contexto generado: " << dotcontext_aux << endl;
+
+                // Dots
+                std::map<pair<int,int>,N> ds_aux;
+                for (auto &v : data.dk.ds)
+                    ds_aux[pair<int, int>(v.first.first, v.first.second)] = v.second;
+                for (auto &v : ds_aux)
+                    cout << v.first << " -> " << v.second << endl;
+
+
+                // Join
 //                aworset<N, int> aw = aworset<N, int> (data.id, dotcontext_aux);
                 aworset<N, int> aw = aworset<N, int>(data.id);
                 aw.setContext(dotcontext_aux);
-                aw.add(data.dk.ds.at((*(data.dk.ds.rbegin())).first));
+                aw.dots().set(ds_aux);
+
+//                aw.dots().dotadd(data.id, data.dk.ds.at((*(data.dk.ds.rbegin())).first));
+//                aw.add(data.dk.ds.at((*(data.dk.ds.rbegin())).first), data.id);
+//                aw.setContext(dotcontext_aux);
 //                cout << "AW lleno: "<< aw << endl;
 
                 cout << __FUNCTION__ << " Devuelvo: " << aw << endl;

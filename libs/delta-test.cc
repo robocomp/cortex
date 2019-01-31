@@ -1304,7 +1304,7 @@ int main(int argc, char *argv[]) {
 //   example_orseq();
 //    example_mvreg();
 
-    cout << "-------main-------" << endl;
+    cout << "-------MAAAAAAAAAAAAAAAAAAAAAIN-------" << endl;
     static ormap<int, aworset<string, int>, int> nodes(0);
     static ormap<int, aworset<string, int>, int> nodes1(1);
     int id = 1;
@@ -1312,25 +1312,31 @@ int main(int argc, char *argv[]) {
 
     nodes1[id].join(delta);
     cout << "................................."<<endl;
-    cout << nodes << endl;
-    cout << nodes1 << endl;
-    cout << delta << endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
+    delta = nodes[id].add("Bye", id);
+    nodes1[id].join(delta);
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
     cout << "................................."<<endl;
     delta = nodes[id].add("Hi", id);
     nodes1[id].join(delta);
-    cout << nodes << endl;
-    cout << nodes1 << endl;
-    cout << delta << endl;
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
     delta = nodes[id].add("Hi", id);
     nodes1[id].join(delta);
-    cout << nodes << endl;
-    cout << nodes1 << endl;
-    cout << delta << endl;
-    delta = nodes[id].add("Hi", id);
-    nodes1[id].join(delta);
-    cout << nodes << endl;
-    cout << nodes1 << endl;
-    cout << delta << endl;
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
 
 //    ormap<int, aworset<RoboCompDSR::Node, int>, int> graph();
 //    auto test = RoboCompDSR::Node{"test", id};

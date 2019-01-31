@@ -375,6 +375,9 @@ public:
     dotkernel(dotcontext<K> &jointc) : c(jointc) {}
 //  dotkernel(const dotkernel<T,K> &adk) : c(adk.c), ds(adk.ds) {}
 
+
+    void set(map<pair<K,int>,T> &ds_) { ds = ds_;}
+
     dotkernel<T,K> & operator=(const dotkernel<T,K> & adk)
     {
         if (&adk == this) return *this;
@@ -496,9 +499,7 @@ public:
         ds.insert(pair<pair<K,int>,T>(dot,val));
         // make delta
         res.ds.insert(pair<pair<K,int>,T>(dot,val));
-        cout << __FUNCTION__ <<" RES: "<< res << endl;
         res.c.insertdot(dot);
-        cout << __FUNCTION__ <<" RES: "<< res << endl;
         return res;
     }
 
@@ -1050,7 +1051,7 @@ public:
         aworset<E,K> r(uid);
         r.dk=dk.rmv(val); // optimization that first deletes val
         r.dk.join(dk.add(uid, val));
-        ////cout <<__PRETTY_FUNCTION__ <<" "<< r << endl;
+        cout <<__PRETTY_FUNCTION__ <<" "<< r << endl;
         return r;
     }
 
