@@ -1051,7 +1051,6 @@ public:
         aworset<E,K> r(uid);
         r.dk=dk.rmv(val); // optimization that first deletes val
         r.dk.join(dk.add(uid, val));
-        cout <<__PRETTY_FUNCTION__ <<" "<< r << endl;
         return r;
     }
 
@@ -1530,7 +1529,7 @@ public:
 
     //// CRISTIAN
 
-    std::map<N,V> getMap() const
+    std::map<N,V>  getMap() const
     {
         return m;
     }
