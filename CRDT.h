@@ -149,14 +149,12 @@ namespace CRDT {
             std::map <pair<int, int>, N> ds_aux;
             for (auto &v : data.dk.ds)
                 ds_aux[pair<int, int>(v.first.first, v.first.second)] = v.second;
-            for (auto &v : ds_aux)
-                cout << v.first << " -> " << v.second << endl;
 
             // Join
             aworset<N, int> aw = aworset<N, int>(data.id);
             aw.setContext(dotcontext_aux);
             aw.dots().set(ds_aux);
-            cout << "Devuelvo: " << aw << endl;
+//            cout << "Devuelvo: " << aw << endl;
             return aw;
         }
 
