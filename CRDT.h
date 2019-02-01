@@ -30,14 +30,13 @@ namespace CRDT {
             new_node.attrs.insert(std::make_pair("name", std::string("unknown")));
             auto delta = nodes[id].add(new_node);
             //            emit addNodeSIGNAL(id, type_);
-            return translateAwCRDTtoICE(delta);
+            return translateAwCRDTtoICE(id, delta);
         };
 
         RoboCompDSR::AworSet addNode(int id, N &node) {
             auto delta = nodes[id].add(node, id);
-
             //            emit addNodeSIGNAL(id, content.type);
-            return translateAwCRDTtoICE(delta);
+            return translateAwCRDTtoICE(id, delta);
         };
 
         void joinFullGraph(RoboCompDSR::OrMap full_graph) {
@@ -49,18 +48,16 @@ namespace CRDT {
                 s.insert(std::make_pair(v.first, v.second));
             dotcontext_aux.setContext(m, s);
 
-//            ormap<int, aworset<N, int>, int> graph_a = ormap<int, aworset<N, int>, int>(full_graph.id, dotcontext_aux);
-            ormap<int, aworset<N, int>, int> graph_a = ormap<int, aworset<N, int>, int>(full_graph.id);
             //Map
+            //TODO: Improve. It is not the most efficient.
             for (auto &v : full_graph.m)
-                graph_a[v.first].join(translateAwICEtoCRDT(v.second));
+                for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsList())
+                    nodes[v.first].add(awv.second, v.first);
 
-            cout << "graph_a " << graph_a << endl;
-            nodes.join(graph_a);
         }
 
         void joinDeltaNode(RoboCompDSR::AworSet aworSet) {
-            nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet));
+            nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
         };
 
         void replaceNode(int id, const N &node) {
@@ -99,8 +96,8 @@ namespace CRDT {
         };
 
         void print() {
-            std::cout << "------------------------- \nNodes:" << std::endl;
-            std::cout << nodes << endl;
+            std::cout << "----------------------------------------\n" << nodes
+                      << "----------------------------------------" << std::endl;
         };
 
         int id() { return nodes.getId(); };
@@ -108,7 +105,7 @@ namespace CRDT {
         RoboCompDSR::MapAworSet map() {
             RoboCompDSR::MapAworSet m;
             for (auto &kv : nodes.getMap())  // Map of Aworset to ICE
-                m[kv.first] = translateAwCRDTtoICE(kv.second);
+                m[kv.first] = translateAwCRDTtoICE(kv.first, kv.second);
             return m;
         };
 
@@ -124,19 +121,19 @@ namespace CRDT {
     private:
         Nodes nodes;
 
-        RoboCompDSR::AworSet translateAwCRDTtoICE(aworset<N, int> &data) {
+        RoboCompDSR::AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data) {
             RoboCompDSR::AworSet delta_crdt;
-            delta_crdt.id = data.getId();
             for (auto &kv_dots : data.dots().ds)
                 delta_crdt.dk.ds[RoboCompDSR::PairInt{kv_dots.first.first, kv_dots.first.second}] = kv_dots.second;
             for (auto &kv_cc : data.context().getCcDc().first)
                 delta_crdt.dk.cbase.cc[kv_cc.first] = kv_cc.second;
             for (auto &kv_dc : data.context().getCcDc().second)
                 delta_crdt.dk.cbase.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
+            delta_crdt.id = id; //TODO: Check K value of aworset (ID=0)
             return delta_crdt;
         }
 
-        aworset<N, int> translateAwICEtoCRDT(RoboCompDSR::AworSet &data) {
+        aworset<N, int> translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &data) {
             // Context
             dotcontext<int> dotcontext_aux;
             auto m = static_cast<std::map<int, int>>(data.dk.cbase.cc);
@@ -151,10 +148,9 @@ namespace CRDT {
                 ds_aux[pair<int, int>(v.first.first, v.first.second)] = v.second;
 
             // Join
-            aworset<N, int> aw = aworset<N, int>(data.id);
+            aworset<N, int> aw = aworset<N, int>(id);
             aw.setContext(dotcontext_aux);
             aw.dots().set(ds_aux);
-//            cout << "Devuelvo: " << aw << endl;
             return aw;
         }
 

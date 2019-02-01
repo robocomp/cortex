@@ -976,7 +976,7 @@ public:
         return dk;
     }
 
-    K getId() const { return id; }
+    K getId() { return id; }
 
     friend ostream &operator<<( ostream &output, const aworset<E,K>& o)
     {
