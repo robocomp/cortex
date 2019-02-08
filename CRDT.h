@@ -9,6 +9,7 @@
 #include <map>
 #include <chrono>
 #include <thread>
+#include "graph.h"
 #include "libs/DSRGraph.h"
 #include "libs/delta-crdts.cc"
 #include <DataStorm/DataStorm.h>
@@ -26,7 +27,7 @@ namespace CRDT {
 
     class CRDTGraph {
         public:
-            CRDTGraph(int root, std::string name);
+            CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_);
             ~CRDTGraph();
 
             void insert_or_assign(int id, const std::string &type_);
@@ -68,6 +69,7 @@ namespace CRDT {
 
             RoboCompDSR::AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
             aworset<N, int> translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &data);
+            void createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph);
 
             void clear();
             int id();

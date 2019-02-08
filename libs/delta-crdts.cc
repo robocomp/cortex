@@ -396,7 +396,7 @@ public:
         }
         output << ") ";
 
-        output<< o.c;
+//        output<< o.c;
         return output;
     }
 

@@ -8,10 +8,9 @@ using namespace CRDT;
 /*
  * Constructor
  */
-CRDTGraph::CRDTGraph(int root, std::string name) {
+CRDTGraph::CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_) : graph_root(root), agent_name(name) {
     graph_root = root;
     nodes = Nodes(graph_root);
-    agent_name = name;
     filter = "^(?!" + name + "$).*$";
 
     int argc = 0;
@@ -26,6 +25,8 @@ CRDTGraph::CRDTGraph(int root, std::string name) {
     // No filter for this topic
     writer = std::make_shared < DataStorm::SingleKeyWriter < std::string, RoboCompDSR::AworSet
             >> (*topic.get(), agent_name);
+
+    createIceGraphFromDSRGraph(graph_);
 }
 
 /*
@@ -42,7 +43,6 @@ void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
     N new_node;
     new_node.type = type_;
     new_node.id = id;
-    new_node.attrs.insert(std::make_pair("name", std::string("unknown")));
     auto delta = nodes[id].add(new_node);
     writer->update(translateAwCRDTtoICE(id, delta));
 }
@@ -116,19 +116,20 @@ void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
     auto n = get(id);
     for (auto &[k, v] : att)
         n.attrs.insert_or_assign(k, v);
-    nodes[id].add(n);
+    insert_or_assign(id, n);
 };
 
 void
 CRDTGraph::add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att)  //HAY QUE METER EL TAG para desambiguar
 {
-    auto n = *(nodes[from].read().rbegin());
-    auto &edgeAtts = n.fano.at(to);
-    for (auto &[k, v] : att)
-        edgeAtts.attrs.insert_or_assign(k, v);
-    nodes[from].add(n);
-    //std::cout << "Emit EdgeAttrsChangedSignal " << from << " to " << to << std::endl;
-    //            emit EdgeAttrsChangedSIGNAL(from, to);
+    try {
+        auto node = get(from);
+        auto &edgeAtts = node.fano.at(to);
+        for (auto &[k, v] : att)
+            edgeAtts.attrs.insert_or_assign(k, v);
+        insert_or_assign(from, node);
+    }
+    catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
 }
 
 
@@ -240,6 +241,7 @@ RoboCompDSR::AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &da
     for (auto &kv_dc : data.context().getCcDc().second)
         delta_crdt.dk.cbase.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
     delta_crdt.id = id; //TODO: Check K value of aworset (ID=0)
+    std::cout << "New update: " << delta_crdt << endl;
     return delta_crdt;
 }
 
@@ -291,4 +293,31 @@ RoboCompDSR::DotContext CRDTGraph::context() { // Context to ICE
     for (auto &kv_dc : nodes.context().getCcDc().second)
         om_dotcontext.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
     return om_dotcontext;
+}
+
+
+void CRDTGraph::createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph)
+{
+    for( const auto &[node_key, node_content] : *graph)
+    {
+        RoboCompDSR::Attribs node_attrs;
+        for(const auto &[attr_key, attr_content] : node_content.attrs) {
+            auto attrContent = graph->printVisitorWithType(attr_content);
+            node_attrs.insert_or_assign(attr_key, RoboCompDSR::AttribValue{attrContent.first, attrContent.second});
+        }
+        RoboCompDSR::FanOut node_fano;
+        for(const auto &[to, edge_content] : node_content.fanout)
+        {
+            RoboCompDSR::EdgeAttribs eattrs;
+            eattrs.label = edge_content.label;
+            eattrs.from = node_key;
+            eattrs.to = to;
+            for(const auto &[edge_attr_key, edge_attr_content] : edge_content.attrs) {
+                auto attrContent = graph->printVisitorWithType(edge_attr_content);
+                eattrs.attrs.insert_or_assign(edge_attr_key, RoboCompDSR::AttribValue{attrContent.first, attrContent.second});
+            }
+            node_fano.insert_or_assign(to, eattrs);
+        }
+        insert_or_assign(node_key, RoboCompDSR::Node{node_content.type, node_key, node_attrs, node_fano});
+    }
 }

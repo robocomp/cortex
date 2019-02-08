@@ -276,6 +276,24 @@ std::string Graph::printVisitor(const MTypes &t)
 	}, t);
 };
 
+std::pair<std::string, std::string> Graph::printVisitorWithType(const MTypes &t)
+{
+	return std::visit(overload
+  {
+		  [](RMat::RTMat m) -> std::pair<std::string, std::string> { return make_pair("RTMat", m.serializeAsString()); },
+		  [](std::vector<float> a)-> std::pair<std::string, std::string>
+		  {
+			  std::string str;
+			  for(auto &f : a)
+				  str += std::to_string(f) + " ";
+			  return make_pair("vector<float>",  str += "\n");
+		  },
+		  [](std::string a) -> std::pair<std::string, std::string>								{ return  make_pair("string", a); },
+		  [](auto a) -> std::pair<std::string, std::string>										{ return make_pair(typeid(a).name(), std::to_string(a));}
+  }, t);
+};
+
+
 void Graph::print()
 {
 	std::cout << "------------Printing Graph: " << nodes.size() << " elements -------------------------" << std::endl;
