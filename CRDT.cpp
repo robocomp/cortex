@@ -9,9 +9,17 @@ using namespace CRDT;
  * Constructor
  */
 CRDTGraph::CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_) : graph_root(root), agent_name(name) {
-    graph_root = root;
+    privateCRDTGraph();
+    createIceGraphFromDSRGraph(graph_);
+}
+
+CRDTGraph::CRDTGraph(int root, std::string name) : graph_root(root), agent_name(name) {
+    privateCRDTGraph();
+}
+
+void CRDTGraph::privateCRDTGraph() {
     nodes = Nodes(graph_root);
-    filter = "^(?!" + name + "$).*$";
+    filter = "^(?!" + agent_name + "$).*$";
 
     int argc = 0;
     char *argv[0];
@@ -25,8 +33,6 @@ CRDTGraph::CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> gra
     // No filter for this topic
     writer = std::make_shared < DataStorm::SingleKeyWriter < std::string, RoboCompDSR::AworSet
             >> (*topic.get(), agent_name);
-
-    createIceGraphFromDSRGraph(graph_);
 }
 
 /*
@@ -34,6 +40,8 @@ CRDTGraph::CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> gra
  */
 CRDTGraph::~CRDTGraph() {
     node.shutdown();
+    writer.reset();
+    topic.reset();
 }
 
 /*
@@ -72,6 +80,9 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
  */
 N CRDTGraph::get(int id) {
     return *(nodes[id].read().rbegin());
+}
+Nodes CRDTGraph::get() {
+    return nodes;
 }
 
 /*
@@ -132,13 +143,23 @@ CRDTGraph::add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att)  
     catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
 }
 
+RoboCompDSR::AttribValue CRDTGraph::getNodeAttribByName(int id, const std::string &key) {
+    try {
+        return get(id).attrs.at(key);
+    }
+    catch(const std::exception &e){
+        std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;
+        return RoboCompDSR::AttribValue{"unknown", "unknown", 0};
+    };
+};
 
-void CRDTGraph::start_subscription_thread() {
-    read_thread = std::thread(&CRDTGraph::subscription_thread, this);
+
+void CRDTGraph::start_subscription_thread(bool showReceived) {
+    read_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
 
 }
 
-void CRDTGraph::subscription_thread() {
+void CRDTGraph::subscription_thread(bool showReceived) {
     DataStorm::Topic <std::string, RoboCompDSR::AworSet> topic(node, "DSR");
     topic.setReaderDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
     auto reader = DataStorm::FilteredKeyReader<std::string, RoboCompDSR::AworSet>(topic, DataStorm::Filter<std::string>(
@@ -149,8 +170,11 @@ void CRDTGraph::subscription_thread() {
         if (work)
             try {
                 auto sample = reader.getNextUnread(); // Get sample
-                std::cout << "Received: node " << sample.getValue() << " from " << sample.getKey() << std::endl;
+                auto id = sample.getValue().id;
+                if (showReceived)
+                    std::cout << "Received: node " << sample.getValue() << " from " << sample.getKey() << std::endl;
                 join_delta_node(sample.getValue());
+                emit updateNodeSIGNAL(id, get(id).type);
             }
             catch (const std::exception &ex) { cerr << ex.what() << endl; }
         usleep(5);
@@ -241,7 +265,6 @@ RoboCompDSR::AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &da
     for (auto &kv_dc : data.context().getCcDc().second)
         delta_crdt.dk.cbase.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
     delta_crdt.id = id; //TODO: Check K value of aworset (ID=0)
-    std::cout << "New update: " << delta_crdt << endl;
     return delta_crdt;
 }
 
@@ -273,6 +296,10 @@ void CRDTGraph::clear() {
 void CRDTGraph::print() {
     std::cout << "----------------------------------------\n" << nodes
               << "----------------------------------------" << std::endl;
+}
+void CRDTGraph::print(int id) {
+    std::cout << "----------------------------------------\n" << nodes[id]
+              << "\n----------------------------------------" << std::endl;
 }
 
 int CRDTGraph::id() {

@@ -98,7 +98,7 @@ struct AttribValue
     }
 
     friend std::ostream &operator<<(std::ostream &output, const AttribValue &av_) {
-        output << "Type: "<<av_.type<<", Value["<<av_.length<<"]: "<<av_.value;
+        output << "Type: "<<av_.type<<", Value["<<av_.length<<"]: "<<av_.value<<", ";
     return output;
     };
 
@@ -230,10 +230,10 @@ struct Node
     friend std::ostream &operator<<(std::ostream &output, const Node &n_) {
         output <<"Node:["<<n_.id<<"," << n_.type <<"], Attribs:[";
         for (auto [k,v] : n_.attrs)
-            output << k <<":"<< v <<" - ";
+            output << k <<":("<< v <<");";
         output<<"], FanOut:[";
         for (auto [k,v] : n_.fano)
-            output << k <<":"<< v;
+            output << k <<":("<< v<<");";
         output << "]";
         return output;
     }

@@ -25,11 +25,18 @@ namespace CRDT {
     /// CRDT API
     /////////////////////////////////////////////////////////////////
 
-    class CRDTGraph {
+    class CRDTGraph : public QObject
+    {
+        Q_OBJECT
         public:
             CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_);
+            CRDTGraph(int root, std::string name); // Empty
             ~CRDTGraph();
 
+            N get(int id);
+            Nodes get();
+
+            // Agents methods
             void insert_or_assign(int id, const std::string &type_);
             void insert_or_assign(int id, const N &node);
             void add_node_attribs(int id, const RoboCompDSR::Attribs &att);
@@ -39,12 +46,13 @@ namespace CRDT {
             void join_full_graph(RoboCompDSR::OrMap full_graph);
             void join_delta_node(RoboCompDSR::AworSet aworSet);
 
-            N get(int id);
+            //Observer methods
+            RoboCompDSR::AttribValue getNodeAttribByName(int id, const std::string &key);
 
             // Tools
             void print();
-
-            void start_subscription_thread();
+            void print(int id);
+            void start_subscription_thread(bool showReceived);
             void start_fullgraph_server_thread();
             void start_fullgraph_request_thread();
 
@@ -63,7 +71,8 @@ namespace CRDT {
             std::shared_ptr<DataStorm::SingleKeyWriter<std::string, RoboCompDSR::AworSet >> writer;
             std::shared_ptr<DataStorm::Topic<std::string, RoboCompDSR::AworSet >> topic;
 
-            void subscription_thread();
+            void privateCRDTGraph();
+            void subscription_thread(bool showReceived);
             void fullgraph_server_thread();
             void fullgraph_request_thread();
 
@@ -76,6 +85,8 @@ namespace CRDT {
             RoboCompDSR::MapAworSet map();
             RoboCompDSR::DotContext context();
 
+        signals:
+            void updateNodeSIGNAL(const std::int32_t, const std::string &type);
     };
 }
 
