@@ -996,16 +996,22 @@ public:
         return res;
     }
 
-    list<pair<int,E>> readAsList()
+    list<E> readAsList()
     {
-        list<pair<int,E>> res;
+        list<E> res;
+        for (const auto &dv : dk.ds)
+            res.push_back(dv.second);
+        return res;
+    }
+
+    list<pair<K,E>> readAsListWithId()
+    {
+        list<pair<K,E>> res;
         for (const auto &dv : dk.ds)
         {
             pair<int,E> p = pair<int,E>(dv.first.second, dv.second);
             res.push_back(p);
         }
-//        for (auto v : res)
-//            std::cout << v << "\n";
         return res;
     }
 

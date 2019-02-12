@@ -71,8 +71,8 @@ GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worke
 
 	this->createGraph();
 
-//	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
-//	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
+	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
+	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
 }
 
 GraphViewer::~GraphViewer()
@@ -119,7 +119,6 @@ void GraphViewer::addNodeSLOT(int id, const std::string &type)
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 	if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
-//		qDebug() << __FUNCTION__ << "node id " << id;
 		gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));  //REEMPLAZAR THIS 
 		gnode->id_in_graph = id;
 		gnode->setType( type );
@@ -171,9 +170,7 @@ void GraphViewer::addNodeSLOT(int id, const std::string &type)
 		try
 		{
 			auto qname = gcrdt->getNodeAttribByName(id, "name").value;
-            cout << qname << endl;
 			gnode->setTag(qname);
-            qDebug() << __FUNCTION__ <<":"<<__LINE__;
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
 
@@ -194,7 +191,6 @@ void GraphViewer::addNodeSLOT(int id, const std::string &type)
         posy = std::stof((std::string)gcrdt->getNodeAttribByName(id, "pos_y").value);
 	}
 	catch(const std::exception &e){ };
-    qDebug() << __FUNCTION__ <<":"<<__LINE__;
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
 	

@@ -39,6 +39,7 @@ namespace CRDT {
             // Agents methods
             void insert_or_assign(int id, const std::string &type_);
             void insert_or_assign(int id, const N &node);
+            bool in(const int &id);
             void add_node_attribs(int id, const RoboCompDSR::Attribs &att);
             void add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att);
             void replace_node(int id, const N &node);

@@ -60,11 +60,17 @@ void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
  *
  */
 void CRDTGraph::insert_or_assign(int id, const N &node) {
-    auto delta = nodes[id].add(node, id);
-    auto returned = translateAwCRDTtoICE(id, delta);
-    writer->update(translateAwCRDTtoICE(id, delta));
+    try {
+        if( !(in(id)) ||  get(id)!= node) {
+            auto delta = nodes[id].add(node, id);
+            writer->update(translateAwCRDTtoICE(id, delta));
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
 }
 
+bool CRDTGraph::in(const int &id) {
+    nodes.in(id);
+}
 /*
  * Add new edge to Node
  */
@@ -79,8 +85,12 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
  *
  */
 N CRDTGraph::get(int id) {
-    return *(nodes[id].read().rbegin());
+    try {
+        return nodes[id].readAsList().back();
+    }
+    catch (const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
 }
+
 Nodes CRDTGraph::get() {
     return nodes;
 }
@@ -100,7 +110,7 @@ void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
     //Map
     //TODO: Improve. It is not the most efficient.
     for (auto &v : full_graph.m)
-        for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsList())
+        for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsListWithId())
             nodes[v.first].add(awv.second, v.first);
 }
 
@@ -148,7 +158,6 @@ RoboCompDSR::AttribValue CRDTGraph::getNodeAttribByName(int id, const std::strin
         return get(id).attrs.at(key);
     }
     catch(const std::exception &e){
-        std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;
         return RoboCompDSR::AttribValue{"unknown", "unknown", 0};
     };
 };
