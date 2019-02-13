@@ -2,6 +2,12 @@
 // Created by crivac on 5/02/19.
 //
 #include "CRDT.h"
+#include <fstream>
+#include <QXmlSimpleReader>
+#include <QXmlInputSource>
+#include <QXmlDefaultHandler>
+#include <libxml2/libxml/parser.h>
+#include <libxml2/libxml/tree.h>
 
 using namespace CRDT;
 
@@ -48,11 +54,10 @@ CRDTGraph::~CRDTGraph() {
  * Add or assign node by id and type
  */
 void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
-    N new_node;
-    new_node.type = type_;
-    new_node.id = id;
+    N new_node; new_node.type = type_; new_node.id = id;
     auto delta = nodes[id].add(new_node);
     writer->update(translateAwCRDTtoICE(id, delta));
+//    emit addNodeSIGNAL(id, type_);
 }
 
 /*
@@ -66,6 +71,7 @@ void CRDTGraph::insert_or_assign(int id, const N &node) {
             writer->update(translateAwCRDTtoICE(id, delta));
         }
     } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+//        emit addNodeSIGNAL(id, type_);
 }
 
 bool CRDTGraph::in(const int &id) {
@@ -121,6 +127,204 @@ void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
     nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
 }
 
+
+void CRDTGraph::read_from_file(const std::string &file_name)
+{
+    std::cout << __FUNCTION__ << "Reading xml file: " << file_name << std::endl;
+
+    // Open file and make initial checks
+    xmlDocPtr doc;
+    if ((doc = xmlParseFile(file_name.c_str())) == NULL)
+    {
+        fprintf(stderr,"Can't read XML file - probably a syntax error. \n");
+        exit(1);
+    }
+    xmlNodePtr root;
+    if ((root = xmlDocGetRootElement(doc)) == NULL)
+    {
+        fprintf(stderr,"Can't read XML file - empty document\n");
+        xmlFreeDoc(doc);
+        exit(1);
+    }
+    if (xmlStrcmp(root->name, (const xmlChar *) "AGMModel"))
+    {
+        fprintf(stderr,"Can't read XML file - root node != AGMModel");
+        xmlFreeDoc(doc);
+        exit(1);
+    }
+
+    // Read symbols (just symbols, then links in other loop)
+    for (xmlNodePtr cur=root->xmlChildrenNode; cur!=NULL; cur=cur->next)
+    {
+        if (xmlStrcmp(cur->name, (const xmlChar *)"symbol") == 0)
+        {
+            xmlChar *stype = xmlGetProp(cur, (const xmlChar *)"type");
+            xmlChar *sid = xmlGetProp(cur, (const xmlChar *)"id");
+
+            //AGMModelSymbol::SPtr s = newSymbol(atoi((char *)sid), (char *)stype);
+            int node_id = std::atoi((char *)sid);
+            std::string node_type((char *)stype);
+            auto rd = QVec::uniformVector(2,-200,200);
+
+            insert_or_assign(node_id, RoboCompDSR::Node{node_type, node_id});
+            add_node_attrib(node_id, "level", typeid(std::int32_t(0)).name(), std::to_string(std::int32_t(0)), 1);
+            add_node_attrib(node_id, "parent", typeid(std::int32_t(0)).name(),std::to_string(std::int32_t(0)), 1);
+
+            // Draw attributes come now
+            RoboCompDSR::Attribs gatts;
+            std::string qname = (char *)stype;
+            std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
+            gatts.insert(std::pair("name", RoboCompDSR::AttribValue{typeid(full_name).name(), full_name,1}));
+
+            // color selection
+            std::string color = "coral";
+            if(qname == "world") color = "SeaGreen";
+            else if(qname == "transform") color = "SteelBlue";
+            else if(qname == "plane") color = "Khaki";
+            else if(qname == "differentialrobot") color = "GoldenRod";
+            else if(qname == "laser") color = "GreenYellow";
+            else if(qname == "mesh") color = "LightBlue";
+            else if(qname == "imu") color = "LightSalmon";
+
+            gatts.insert(std::pair("color", RoboCompDSR::AttribValue{typeid(color).name(), color,1}));
+            add_node_attribs(node_id, gatts);
+
+            std::cout << __FILE__ << " " << __FUNCTION__ << "Node: " << node_id << " " <<  std::string((char *)stype) << std::endl;
+            xmlFree(sid);
+            xmlFree(stype);
+
+            for (xmlNodePtr cur2=cur->xmlChildrenNode; cur2!=NULL; cur2=cur2->next)
+            {
+                if (xmlStrcmp(cur2->name, (const xmlChar *)"attribute") == 0)
+                {
+                    xmlChar *attr_key   = xmlGetProp(cur2, (const xmlChar *)"key");
+                    xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
+                    std::string sk = std::string((char *)attr_key);
+                    if( sk == "level" or sk == "parent")
+                        add_node_attrib(node_id,sk,typeid(std::stoi(std::string((char *)attr_value))).name(),
+                                                    std::string((char *)attr_value), 1);
+                    else if( sk == "pos_x" or sk == "pos_y")
+                        add_node_attrib(node_id,sk,typeid((float)std::stod(std::string((char *)attr_value))).name(),
+                                        std::string((char *)attr_value), 1);
+                    else
+                        add_node_attrib(node_id,sk,typeid(std::string((char *)attr_value)).name(),
+                                        std::string((char *)attr_value), 1);
+
+                    xmlFree(attr_key);
+                    xmlFree(attr_value);
+                }
+                else if (xmlStrcmp(cur2->name, (const xmlChar *)"comment") == 0) { }           // coments are always ignored
+                else if (xmlStrcmp(cur2->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
+                else { printf("unexpected tag inside symbol: %s\n", cur2->name); exit(-1); } // unexpected tags make the program exit
+            }
+        }
+        else if (xmlStrcmp(cur->name, (const xmlChar *)"link") == 0) { }     // we'll ignore links in this first loop
+        else if (xmlStrcmp(cur->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
+        else if (xmlStrcmp(cur->name, (const xmlChar *)"comment") == 0) { }  // coments are always ignored
+        else { printf("unexpected tag #1: %s\n", cur->name); exit(-1); }      // unexpected tags make the program exit
+    }
+
+    // Read links
+    for (xmlNodePtr cur=root->xmlChildrenNode; cur!=NULL; cur=cur->next)
+    {
+        if (xmlStrcmp(cur->name, (const xmlChar *)"link") == 0)
+        {
+            xmlChar *srcn = xmlGetProp(cur, (const xmlChar *)"src");
+            if (srcn == NULL) { printf("Link %s lacks of attribute 'src'.\n", (char *)cur->name); exit(-1); }
+            int a = atoi((char *)srcn);
+            xmlFree(srcn);
+
+            xmlChar *dstn = xmlGetProp(cur, (const xmlChar *)"dst");
+            if (dstn == NULL) { printf("Link %s lacks of attribute 'dst'.\n", (char *)cur->name); exit(-1); }
+            int b = atoi((char *)dstn);
+            xmlFree(dstn);
+
+            xmlChar *label = xmlGetProp(cur, (const xmlChar *)"label");
+            if (label == NULL) { printf("Link %s lacks of attribute 'label'.\n", (char *)cur->name); exit(-1); }
+            std::string edgeName((char *)label);
+            xmlFree(label);
+
+            std::map<std::string, RoboCompDSR::AttribValue> attrs;
+            for (xmlNodePtr cur2=cur->xmlChildrenNode; cur2!=NULL; cur2=cur2->next)
+            {
+                if (xmlStrcmp(cur2->name, (const xmlChar *)"linkAttribute") == 0)
+                {
+                    xmlChar *attr_key   = xmlGetProp(cur2, (const xmlChar *)"key");
+                    xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
+                    attrs[std::string((char *)attr_key)] = RoboCompDSR::AttribValue{"string", std::string((char *)attr_value),1};
+                    xmlFree(attr_key);
+                    xmlFree(attr_value);
+                }
+                else if (xmlStrcmp(cur2->name, (const xmlChar *)"comment") == 0) { }           // coments are always ignored
+                else if (xmlStrcmp(cur2->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
+                else { printf("unexpected tag inside symbol: %s ==> %s\n", cur2->name,xmlGetProp(cur2, (const xmlChar *)"id") ); exit(-1); } // unexpected tags make the program exit
+            }
+
+            std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << a << " to " << b << " label "  << edgeName <<  std::endl;
+            add_edge(a, b, edgeName);
+            add_edge_attrib(a, b, "name", typeid(edgeName).name(), edgeName, 1);
+
+            RoboCompDSR::Attribs edge_attribs;
+            if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
+            {
+                add_node_attribs(b, RoboCompDSR::Attribs{ std::pair("level", this->get_node_level(a)+1), std::pair("parent", a)});
+                RMat::RTMat rt;
+                float tx,ty,tz,rx,ry,rz;
+                for(auto &[k,v] : attrs)
+                {
+                    if(k=="tx")	tx = std::stof(v.value);
+                    if(k=="ty")	ty = std::stof(v.value);
+                    if(k=="tz")	tz = std::stof(v.value);
+                    if(k=="rx")	rx = std::stof(v.value);
+                    if(k=="ry")	ry = std::stof(v.value);
+                    if(k=="rz")	rz = std::stof(v.value);
+                }
+                rt.set(rx, ry, rz, tx, ty, tz);
+                //rt.print("in reader");
+                this->add_edge_attrib(a, b,"RT",rt);
+            }
+            else
+            {
+                this->add_node_attrib(b,"parent",typeid("parent").name(),0,1);
+                for(auto &r : attrs)
+                    edge_attribs.insert(r);
+            }
+            this->add_edge_attribs(a, b, edge_attribs);
+
+            //	  this->addEdgeByIdentifiers(a, b, edgeName, attrs);
+        }
+        else if (xmlStrcmp(cur->name, (const xmlChar *)"symbol") == 0) { }   // symbols are now ignored
+        else if (xmlStrcmp(cur->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
+        else if (xmlStrcmp(cur->name, (const xmlChar *)"comment") == 0) { }  // comments are always ignored
+        else { printf("unexpected tag #2: %s\n", cur->name); exit(-1); }      // unexpected tags make the program exit
+    }
+}
+
+
+std::int32_t CRDTGraph::get_node_level(std::int32_t id){
+    try {
+        if(in(id))
+            return std::stoi(get_node_attrib_by_name(id, "level").value);
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+}
+
+std::int32_t CRDTGraph::get_parent_id(std::int32_t id) {
+    try {
+        if(in(id)) {
+            return std::stoi(get_node_attrib_by_name(id, "parent").value);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+}
+
+
+std::string CRDTGraph::get_node_type(std::int32_t id) {
+    try {
+        if(in(id)) {
+            return get(id).type;
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+}
+
 /*
  * Clean node and add
  */
@@ -129,31 +333,84 @@ void CRDTGraph::replace_node(int id, const N &node) {
     insert_or_assign(id, node);
 }
 
+
 /*
  * Add node attribs
  *
  */
 void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
-    auto n = get(id);
-    for (auto &[k, v] : att)
-        n.attrs.insert_or_assign(k, v);
-    insert_or_assign(id, n);
+    try {
+        if (in(id)) {
+            auto n = get(id);
+            for (auto &[k, v] : att)
+                n.attrs.insert_or_assign(k, v);
+            insert_or_assign(id, n);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+
+};
+
+void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length) {
+    try {
+        if (in(id)) {
+            auto n = get(id);
+            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
+            insert_or_assign(id, n);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+};
+
+
+void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value) {
+    try {
+        if (in(id)) {
+            auto n = get(id);
+            auto v = get_type_mtype(att_value);
+            std::get<0>(v);
+            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
+            insert_or_assign(id, n);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
 };
 
 void
 CRDTGraph::add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att)  //HAY QUE METER EL TAG para desambiguar
 {
     try {
-        auto node = get(from);
-        auto &edgeAtts = node.fano.at(to);
-        for (auto &[k, v] : att)
-            edgeAtts.attrs.insert_or_assign(k, v);
-        insert_or_assign(from, node);
+        if (in(from)  && in(to)) {
+            auto node = get(from);
+            for (auto &[k, v] : att)
+                node.fano.at(to).attrs.insert_or_assign(k, v);
+            insert_or_assign(from, node);
+        }
     }
     catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
 }
 
-RoboCompDSR::AttribValue CRDTGraph::getNodeAttribByName(int id, const std::string &key) {
+void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length) {
+    try {
+        if (in(from) && in(to)) {
+            auto node = get(from);
+            node.fano.at(to).attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
+            insert_or_assign(from, node);
+        }
+    }
+    catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
+}
+
+
+void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value) {
+    try {
+        if (in(from)  && in(to)) {
+            auto node = get(from);
+            auto v = get_type_mtype(att_value);
+            node.fano.at(to).attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
+            insert_or_assign(from, node);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+};
+
+RoboCompDSR::AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::string &key) {
     try {
         return get(id).attrs.at(key);
     }
@@ -183,7 +440,7 @@ void CRDTGraph::subscription_thread(bool showReceived) {
                 if (showReceived)
                     std::cout << "Received: node " << sample.getValue() << " from " << sample.getKey() << std::endl;
                 join_delta_node(sample.getValue());
-                emit updateNodeSIGNAL(id, get(id).type);
+                emit update_node_signal(id, get(id).type);
             }
             catch (const std::exception &ex) { cerr << ex.what() << endl; }
         usleep(5);
@@ -356,4 +613,21 @@ void CRDTGraph::createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph)
         }
         insert_or_assign(node_key, RoboCompDSR::Node{node_content.type, node_key, node_attrs, node_fano});
     }
+}
+
+std::tuple<std::string, std::string, int> CRDTGraph::get_type_mtype(const MTypes &t)
+{
+    return std::visit(overload
+    {
+          [](RMat::RTMat m) -> std::tuple<std::string, std::string, int> { return make_tuple("RTMat", m.serializeAsString(),m.getDataSize()); },
+          [](std::vector<float> a)-> std::tuple<std::string, std::string, int>
+          {
+              std::string str;
+              for(auto &f : a)
+                  str += std::to_string(f) + " ";
+              return make_tuple("vector<float>",  str += "\n",a.size());
+          },
+          [](std::string a) -> std::tuple<std::string, std::string, int>								{ return  make_tuple("string", a,1); },
+          [](auto a) -> std::tuple<std::string, std::string, int>										{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
+    }, t);
 }
