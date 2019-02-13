@@ -11,35 +11,152 @@
 
 using namespace CRDT;
 
-/*
- * Constructor
- */
+
+// PUBLIC METHODS
+
 CRDTGraph::CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_) : graph_root(root), agent_name(name) {
     privateCRDTGraph();
     createIceGraphFromDSRGraph(graph_);
 }
 
+
 CRDTGraph::CRDTGraph(int root, std::string name) : graph_root(root), agent_name(name) {
     privateCRDTGraph();
 }
 
-void CRDTGraph::privateCRDTGraph() {
-    nodes = Nodes(graph_root);
-    filter = "^(?!" + agent_name + "$).*$";
 
-    int argc = 0;
-    char *argv[0];
-    node = DataStorm::Node(argc, argv);
-    work = true;
-
-    // General topic update
-    topic = std::make_shared < DataStorm::Topic < std::string, RoboCompDSR::AworSet >> (node, "DSR");
-    topic->setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAll});
-
-    // No filter for this topic
-    writer = std::make_shared < DataStorm::SingleKeyWriter < std::string, RoboCompDSR::AworSet
-            >> (*topic.get(), agent_name);
+void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
+    auto n = get(from);
+    n.fano.insert(std::pair(to, RoboCompDSR::EdgeAttribs{label_, from, to, RoboCompDSR::Attribs()}));
+    nodes[from].add(n);
 }
+
+
+void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value) {
+    try {
+        if (in(from)  && in(to)) {
+            auto node = get(from);
+            auto v = get_type_mtype(att_value);
+            node.fano.at(to).attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
+            insert_or_assign(from, node);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+};
+
+
+void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length) {
+    try {
+        if (in(from) && in(to)) {
+            auto node = get(from);
+            node.fano.at(to).attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
+            insert_or_assign(from, node);
+        }
+    }
+    catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
+}
+
+
+void CRDTGraph::add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att)  //HAY QUE METER EL TAG para desambiguar
+{
+    try {
+        if (in(from)  && in(to)) {
+            auto node = get(from);
+            for (auto &[k, v] : att)
+                node.fano.at(to).attrs.insert_or_assign(k, v);
+            insert_or_assign(from, node);
+        }
+    }
+    catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
+}
+
+
+/*
+ * NODE METHODS
+ */
+
+void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value) {
+    try {
+        if (in(id)) {
+            auto n = get(id);
+            auto v = get_type_mtype(att_value);
+            std::get<0>(v);
+            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
+            insert_or_assign(id, n);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+};
+
+
+void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length) {
+    try {
+        if (in(id)) {
+            auto n = get(id);
+            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
+            insert_or_assign(id, n);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+};
+
+
+void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
+    try {
+        if (in(id)) {
+            auto n = get(id);
+            for (auto &[k, v] : att)
+                n.attrs.insert_or_assign(k, v);
+            insert_or_assign(id, n);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+
+};
+
+
+Nodes CRDTGraph::get() {
+    return nodes;
+}
+
+N CRDTGraph::get(int id) {
+    try {
+        return nodes[id].readAsList().back();
+    }
+    catch (const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
+}
+
+RoboCompDSR::AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::string &key) {
+    try {
+        return get(id).attrs.at(key);
+    }
+    catch(const std::exception &e){
+        return RoboCompDSR::AttribValue{"unknown", "unknown", 0};
+    };
+};
+
+
+std::int32_t CRDTGraph::get_node_level(std::int32_t id){
+    try {
+        if(in(id))
+            return std::stoi(get_node_attrib_by_name(id, "level").value);
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+}
+
+
+std::string CRDTGraph::get_node_type(std::int32_t id) {
+    try {
+        if(in(id)) {
+            return get(id).type;
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+}
+
+
+std::int32_t CRDTGraph::get_parent_id(std::int32_t id) {
+    try {
+        if(in(id)) {
+            return std::stoi(get_node_attrib_by_name(id, "parent").value);
+        }
+    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
+}
+
 
 /*
  * Destructor
@@ -50,20 +167,13 @@ CRDTGraph::~CRDTGraph() {
     topic.reset();
 }
 
-/*
- * Add or assign node by id and type
- */
-void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
-    N new_node; new_node.type = type_; new_node.id = id;
-    auto delta = nodes[id].add(new_node);
-    writer->update(translateAwCRDTtoICE(id, delta));
-//    emit addNodeSIGNAL(id, type_);
+
+
+bool CRDTGraph::in(const int &id) {
+    nodes.in(id);
 }
 
-/*
- * Add node by content and id
- *
- */
+
 void CRDTGraph::insert_or_assign(int id, const N &node) {
     try {
         if( !(in(id)) ||  get(id)!= node) {
@@ -74,36 +184,20 @@ void CRDTGraph::insert_or_assign(int id, const N &node) {
 //        emit addNodeSIGNAL(id, type_);
 }
 
-bool CRDTGraph::in(const int &id) {
-    nodes.in(id);
-}
-/*
- * Add new edge to Node
- */
-void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
-    auto n = get(from);
-    n.fano.insert(std::pair(to, RoboCompDSR::EdgeAttribs{label_, from, to, RoboCompDSR::Attribs()}));
-    nodes[from].add(n);
+
+void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
+    N new_node; new_node.type = type_; new_node.id = id;
+    auto delta = nodes[id].add(new_node);
+    writer->update(translateAwCRDTtoICE(id, delta));
+//    emit addNodeSIGNAL(id, type_);
 }
 
-/*
- * Get node
- *
- */
-N CRDTGraph::get(int id) {
-    try {
-        return nodes[id].readAsList().back();
-    }
-    catch (const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
+
+void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
+    nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
 }
 
-Nodes CRDTGraph::get() {
-    return nodes;
-}
 
-/*
- *  Join full graph (for initial sync)
- */
 void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
     // Context
     dotcontext<int> dotcontext_aux;
@@ -112,7 +206,6 @@ void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
     for (auto &v : full_graph.cbase.dc)
         s.insert(std::make_pair(v.first, v.second));
     dotcontext_aux.setContext(m, s);
-
     //Map
     //TODO: Improve. It is not the most efficient.
     for (auto &v : full_graph.m)
@@ -120,11 +213,14 @@ void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
             nodes[v.first].add(awv.second, v.first);
 }
 
-/*
- * Join delta
- */
-void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
-    nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
+
+void CRDTGraph::print() {
+    std::cout << "----------------------------------------\n" << nodes
+              << "----------------------------------------" << std::endl;
+}
+void CRDTGraph::print(int id) {
+    std::cout << "----------------------------------------\n" << nodes[id]
+              << "\n----------------------------------------" << std::endl;
 }
 
 
@@ -202,7 +298,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
                     std::string sk = std::string((char *)attr_key);
                     if( sk == "level" or sk == "parent")
                         add_node_attrib(node_id,sk,typeid(std::stoi(std::string((char *)attr_value))).name(),
-                                                    std::string((char *)attr_value), 1);
+                                        std::string((char *)attr_value), 1);
                     else if( sk == "pos_x" or sk == "pos_y")
                         add_node_attrib(node_id,sk,typeid((float)std::stod(std::string((char *)attr_value))).name(),
                                         std::string((char *)attr_value), 1);
@@ -267,7 +363,8 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             RoboCompDSR::Attribs edge_attribs;
             if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
             {
-                add_node_attribs(b, RoboCompDSR::Attribs{ std::pair("level", this->get_node_level(a)+1), std::pair("parent", a)});
+                add_node_attrib(b,"level", get_node_level(a)+1);
+                add_node_attrib(b,"parent", a);
                 RMat::RTMat rt;
                 float tx,ty,tz,rx,ry,rz;
                 for(auto &[k,v] : attrs)
@@ -301,129 +398,78 @@ void CRDTGraph::read_from_file(const std::string &file_name)
 }
 
 
-std::int32_t CRDTGraph::get_node_level(std::int32_t id){
-    try {
-        if(in(id))
-            return std::stoi(get_node_attrib_by_name(id, "level").value);
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-}
-
-std::int32_t CRDTGraph::get_parent_id(std::int32_t id) {
-    try {
-        if(in(id)) {
-            return std::stoi(get_node_attrib_by_name(id, "parent").value);
-        }
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-}
-
-
-std::string CRDTGraph::get_node_type(std::int32_t id) {
-    try {
-        if(in(id)) {
-            return get(id).type;
-        }
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-}
-
-/*
- * Clean node and add
- */
 void CRDTGraph::replace_node(int id, const N &node) {
     nodes.erase(id);
     insert_or_assign(id, node);
 }
 
 
-/*
- * Add node attribs
- *
- */
-void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
-    try {
-        if (in(id)) {
-            auto n = get(id);
-            for (auto &[k, v] : att)
-                n.attrs.insert_or_assign(k, v);
-            insert_or_assign(id, n);
-        }
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-
-};
-
-void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length) {
-    try {
-        if (in(id)) {
-            auto n = get(id);
-            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
-            insert_or_assign(id, n);
-        }
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-};
-
-
-void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value) {
-    try {
-        if (in(id)) {
-            auto n = get(id);
-            auto v = get_type_mtype(att_value);
-            std::get<0>(v);
-            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
-            insert_or_assign(id, n);
-        }
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-};
-
-void
-CRDTGraph::add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att)  //HAY QUE METER EL TAG para desambiguar
-{
-    try {
-        if (in(from)  && in(to)) {
-            auto node = get(from);
-            for (auto &[k, v] : att)
-                node.fano.at(to).attrs.insert_or_assign(k, v);
-            insert_or_assign(from, node);
-        }
-    }
-    catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
-}
-
-void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length) {
-    try {
-        if (in(from) && in(to)) {
-            auto node = get(from);
-            node.fano.at(to).attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
-            insert_or_assign(from, node);
-        }
-    }
-    catch(const std::exception &e){ std::cout <<__FILE__ << " " << __FUNCTION__ << " "<< e.what() << std::endl;};
+void CRDTGraph::start_fullgraph_request_thread() {
+    request_thread = std::thread(&CRDTGraph::fullgraph_request_thread, this);
 }
 
 
-void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value) {
-    try {
-        if (in(from)  && in(to)) {
-            auto node = get(from);
-            auto v = get_type_mtype(att_value);
-            node.fano.at(to).attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
-            insert_or_assign(from, node);
-        }
-    } catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; };
-};
+void CRDTGraph::start_fullgraph_server_thread() {
 
-RoboCompDSR::AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::string &key) {
-    try {
-        return get(id).attrs.at(key);
-    }
-    catch(const std::exception &e){
-        return RoboCompDSR::AttribValue{"unknown", "unknown", 0};
-    };
-};
+    server_thread = std::thread(&CRDTGraph::fullgraph_server_thread, this);
+}
 
 
 void CRDTGraph::start_subscription_thread(bool showReceived) {
     read_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
 
 }
+
+
+// PRIVATE METHODS
+
+
+void CRDTGraph::privateCRDTGraph() {
+    nodes = Nodes(graph_root);
+    filter = "^(?!" + agent_name + "$).*$";
+
+    int argc = 0;
+    char *argv[0];
+    node = DataStorm::Node(argc, argv);
+    work = true;
+
+    // General topic update
+    topic = std::make_shared < DataStorm::Topic < std::string, RoboCompDSR::AworSet >> (node, "DSR");
+    topic->setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAll});
+
+    // No filter for this topic
+    writer = std::make_shared < DataStorm::SingleKeyWriter < std::string, RoboCompDSR::AworSet
+    >> (*topic.get(), agent_name);
+}
+
+
+int CRDTGraph::id() {
+    return nodes.getId();
+}
+
+
+RoboCompDSR::DotContext CRDTGraph::context() { // Context to ICE
+    RoboCompDSR::DotContext om_dotcontext;
+    for (auto &kv_cc : nodes.context().getCcDc().first)
+        om_dotcontext.cc[kv_cc.first] = kv_cc.second;
+    for (auto &kv_dc : nodes.context().getCcDc().second)
+        om_dotcontext.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
+    return om_dotcontext;
+}
+
+
+RoboCompDSR::MapAworSet CRDTGraph::map() {
+    RoboCompDSR::MapAworSet m;
+    for (auto &kv : nodes.getMap())  // Map of Aworset to ICE
+        m[kv.first] = translateAwCRDTtoICE(kv.first, kv.second);
+    return m;
+}
+
+
+void CRDTGraph::clear() {
+    nodes.reset();
+}
+
 
 void CRDTGraph::subscription_thread(bool showReceived) {
     DataStorm::Topic <std::string, RoboCompDSR::AworSet> topic(node, "DSR");
@@ -447,11 +493,6 @@ void CRDTGraph::subscription_thread(bool showReceived) {
     }
 }
 
-
-void CRDTGraph::start_fullgraph_server_thread() {
-
-    server_thread = std::thread(&CRDTGraph::fullgraph_server_thread, this);
-}
 
 void CRDTGraph::fullgraph_server_thread() {
     std::cout << __FUNCTION__ << "->Entering thread to attend full graph requests" << std::endl;
@@ -486,9 +527,6 @@ void CRDTGraph::fullgraph_server_thread() {
     node.waitForShutdown();
 }
 
-void CRDTGraph::start_fullgraph_request_thread() {
-    request_thread = std::thread(&CRDTGraph::fullgraph_request_thread, this);
-}
 
 
 void CRDTGraph::fullgraph_request_thread() {
@@ -553,39 +591,6 @@ aworset<N, int> CRDTGraph::translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &da
     aw.setContext(dotcontext_aux);
     aw.dots().set(ds_aux);
     return aw;
-}
-
-void CRDTGraph::clear() {
-    nodes.reset();
-}
-
-void CRDTGraph::print() {
-    std::cout << "----------------------------------------\n" << nodes
-              << "----------------------------------------" << std::endl;
-}
-void CRDTGraph::print(int id) {
-    std::cout << "----------------------------------------\n" << nodes[id]
-              << "\n----------------------------------------" << std::endl;
-}
-
-int CRDTGraph::id() {
-    return nodes.getId();
-}
-
-RoboCompDSR::MapAworSet CRDTGraph::map() {
-    RoboCompDSR::MapAworSet m;
-    for (auto &kv : nodes.getMap())  // Map of Aworset to ICE
-        m[kv.first] = translateAwCRDTtoICE(kv.first, kv.second);
-    return m;
-}
-
-RoboCompDSR::DotContext CRDTGraph::context() { // Context to ICE
-    RoboCompDSR::DotContext om_dotcontext;
-    for (auto &kv_cc : nodes.context().getCcDc().first)
-        om_dotcontext.cc[kv_cc.first] = kv_cc.second;
-    for (auto &kv_dc : nodes.context().getCcDc().second)
-        om_dotcontext.dc.push_back(RoboCompDSR::PairInt{kv_dc.first, kv_dc.second});
-    return om_dotcontext;
 }
 
 

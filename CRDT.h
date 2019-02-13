@@ -42,68 +42,72 @@ namespace CRDT {
             CRDTGraph(int root, std::string name); // Empty
             ~CRDTGraph();
 
-            N get(int id);
-            Nodes get();
+            void add_edge(int from, int to, const std::string &label_);
+            void add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value);
+            void add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length);
+            void add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att);
 
-            // Agents methods
+            void add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value);
+            void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
+            void add_node_attribs(int id, const RoboCompDSR::Attribs &att);
+
+            Nodes get();
+            N get(int id);
+            RoboCompDSR::AttribValue get_node_attrib_by_name(int id, const std::string &key);
+            std::int32_t get_node_level(std::int32_t id);
+            std::string get_node_type(std::int32_t id);
+            std::int32_t get_parent_id(std::int32_t id);
+
+            bool in(const int &id);
+
             void insert_or_assign(int id, const std::string &type_);
             void insert_or_assign(int id, const N &node);
-            bool in(const int &id);
-            void add_edge(int from, int to, const std::string &label_);
-            void add_node_attribs(int id, const RoboCompDSR::Attribs &att);
-            void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
-            void add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value);
-            void add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &att);
-            void add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length);
-            void add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value);
-            void replace_node(int id, const N &node);
-            RoboCompDSR::AttribValue get_node_attrib_by_name(int id, const std::string &key);
-            void join_full_graph(RoboCompDSR::OrMap full_graph);
+
             void join_delta_node(RoboCompDSR::AworSet aworSet);
+            void join_full_graph(RoboCompDSR::OrMap full_graph);
 
-            //Initial method
-            void read_from_file(const std::string &xml_file_path);
-
-            std::int32_t get_node_level(std::int32_t id);
-            std::int32_t get_parent_id(std::int32_t id);
-            std::string get_node_type(std::int32_t id);
-
-            // Tools
             void print();
             void print(int id);
-            void start_subscription_thread(bool showReceived);
-            void start_fullgraph_server_thread();
+
+            void read_from_file(const std::string &xml_file_path);
+            void replace_node(int id, const N &node);
+
             void start_fullgraph_request_thread();
+            void start_fullgraph_server_thread();
+            void start_subscription_thread(bool showReceived);
 
 
         private:
-            Nodes nodes; // Main data
+            Nodes nodes;
             int graph_root;
             bool work;
 
             std::thread read_thread, request_thread, server_thread; // Threads
 
-            DataStorm::Node node; // Main datastorm node
-
             std::string agent_name, filter;
 
+            DataStorm::Node node; // Main datastorm node
             std::shared_ptr<DataStorm::SingleKeyWriter<std::string, RoboCompDSR::AworSet >> writer;
             std::shared_ptr<DataStorm::Topic<std::string, RoboCompDSR::AworSet >> topic;
 
-            void privateCRDTGraph();
+            void privateCRDTGraph(); // Private constructor
+
+            int id();
+            RoboCompDSR::DotContext context();
+            RoboCompDSR::MapAworSet map();
+
+            void clear();
+
+            // Threads handlers
             void subscription_thread(bool showReceived);
             void fullgraph_server_thread();
             void fullgraph_request_thread();
 
+
+            // Translators
             RoboCompDSR::AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
             aworset<N, int> translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &data);
             void createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph);
-
-            void clear();
-            int id();
-            RoboCompDSR::MapAworSet map();
-            RoboCompDSR::DotContext context();
-
             std::tuple<std::string, std::string, int>  get_type_mtype(const MTypes &t);
 
         signals:
