@@ -88,8 +88,25 @@ void GraphViewer::createGraph()
 {
 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
 	try {
-        for(const auto &[id, content] : gcrdt->get().getMap())
-            cout << id <<" "<<content<< endl;
+		for(auto node : gcrdt->get().getMap())
+		{
+			try
+			{
+				addNodeSLOT(node.first,  gcrdt->get_node_type(node.first));
+			}
+			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first << std::endl;}
+
+		}
+		// add edges after all nodes have been created
+		for(auto node : gcrdt->get().getMap())
+		{
+			try
+			{
+				for( auto &[to, edge_atts] : node.second.readAsList().back().fano)
+					addEdgeSLOT(node.first, to, edge_atts.label);
+			}
+			catch(const std::exception &e) { std::cout << e.what() << " Error accessing " << node.first << std::endl;}
+		}
 	}catch(const std::exception &e) { std::cout << e.what() << " Error accessing " << std::endl;}
 
 }

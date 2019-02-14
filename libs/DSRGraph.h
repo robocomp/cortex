@@ -162,9 +162,10 @@ struct EdgeAttribs
     }
 
     friend std::ostream &operator<<(std::ostream &output, const EdgeAttribs &ea_) {
-        output << "EdgeAttribs["<<ea_.label<<": from:" << ea_.from << ", to:"<<ea_.to<<std::endl<<" Attribs:";
+        output << "EdgeAttribs["<<ea_.label<<", from:" << ea_.from << "-> to:"<<ea_.to<<" Attribs:[";
         for (auto [k,v] : ea_.attrs)
             output << k <<":"<<v <<" - ";
+        output<<"]]";
         return output;
     };
 
