@@ -45,9 +45,11 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
 
 void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value) {
     try {
+        std::cout << "New edge from: "<<from<<" to: "<<to<<", with name: "<<att_name << std::endl;
         if (in(from)  && in(to)) {
             auto node = get(from);
             auto v = get_type_mtype(att_value);
+            std::cout << "Edge: "<<std::get<0>(v) << ", "<< std::get<1>(v) <<","<<std::get<2>(v)<<std::endl;
             node.fano.at(to).attrs.insert(std::pair(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)}));
             insert_or_assign(from, node);
         }
@@ -200,6 +202,7 @@ void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
 
 
 void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
+    std::cout<<"Me llega:"<<full_graph<<std::endl;
     // Context
     dotcontext<int> dotcontext_aux;
     auto m = static_cast<std::map<int, int>>(full_graph.cbase.cc);
@@ -557,6 +560,7 @@ void CRDTGraph::fullgraph_request_thread() {
     if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start_clock).count() <
         TIMEOUT) {
         join_full_graph(full_graph.getValue());
+
         std::cout << __FUNCTION__ << " Finished uploading full graph" << std::endl;
     }
 }

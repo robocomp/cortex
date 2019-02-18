@@ -87,27 +87,38 @@ GraphViewer::~GraphViewer()
 void GraphViewer::createGraph()
 {
 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
+	std::cout << "MAPA:" << std::endl;
 	try {
-		for(auto node : gcrdt->get().getMap())
+		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
 			try
 			{
 				addNodeSLOT(node.first,  gcrdt->get_node_type(node.first));
 			}
-			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first << std::endl;}
+			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
 
 		}
 		// add edges after all nodes have been created
-		for(auto node : gcrdt->get().getMap())
+		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
+			std::cout << "Edges from "<<node.second.readAsList().back().id<<std::endl;
+			std::list<RoboCompDSR::Node> ns;
 			try
 			{
-				for( auto &[to, edge_atts] : node.second.readAsList().back().fano)
-					addEdgeSLOT(node.first, to, edge_atts.label);
+				ns = node.second.readAsList();
 			}
-			catch(const std::exception &e) { std::cout << e.what() << " Error accessing " << node.first << std::endl;}
+			catch(const std::exception &e) { std::cout << e.what() <<" Error accessing edge" << node.second.readAsList().back() <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+			for( auto edge :ns.back().fano)
+			{
+				try{
+					auto f = edge.second.from;
+					auto t = edge.second.to;
+					auto l = edge.second.label;
+					addEdgeSLOT(edge.second.from, edge.second.to, edge.second.label);
+				} catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+			}
 		}
-	}catch(const std::exception &e) { std::cout << e.what() << " Error accessing " << std::endl;}
+	}catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
 
 }
 
@@ -215,37 +226,38 @@ void GraphViewer::addNodeSLOT(int id, const std::string &type)
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
-	//qDebug() << "edge id " << QString::fromStdString(edge_tag);
-	std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
-	// check if edge already exists
-	if( gmap_edges.count(key) == 0)
-	{
-		auto node_origen = gmap.at(from);
-		auto node_dest = gmap.at(to);
-		auto item = new GraphEdge(node_origen, node_dest, edge_tag.c_str());
-		scene.addItem(item);
-		gmap_edges.insert(std::make_pair(key, item));
-		// side table filling
-		worker->tableWidgetEdges->setColumnCount(1);
-		worker->tableWidgetEdges->setHorizontalHeaderLabels(QStringList{"label"}); 
-		worker->tableWidgetNodes->verticalHeader()->setVisible(false);
-		worker->tableWidgetNodes->setShowGrid(false);
-		edges_types_list << QString::fromStdString(edge_tag);
-		edges_types_list.removeDuplicates();
-		int i = 0;
-		worker->tableWidgetEdges->clearContents();
-		worker->tableWidgetEdges->setRowCount(edges_types_list.size());
-		for( auto &s : edges_types_list)
-		{
-			worker->tableWidgetEdges->setItem(i,0, new QTableWidgetItem(s));
-			worker->tableWidgetEdges->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
-			i++;
+	try {
+		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
+		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
+		// check if edge already exists
+		if(gmap_edges.count(key) == 0) {
+			auto node_origen = gmap.at(from);
+			auto node_dest = gmap.at(to);
+			auto item = new GraphEdge(node_origen, node_dest, edge_tag.c_str());
+			scene.addItem(item);
+			gmap_edges.insert(std::make_pair(key, item));
+			// side table filling
+			worker->tableWidgetEdges->setColumnCount(1);
+			worker->tableWidgetEdges->setHorizontalHeaderLabels(QStringList{"label"});
+			worker->tableWidgetNodes->verticalHeader()->setVisible(false);
+			worker->tableWidgetNodes->setShowGrid(false);
+			edges_types_list << QString::fromStdString(edge_tag);
+			edges_types_list.removeDuplicates();
+			int i = 0;
+			worker->tableWidgetEdges->clearContents();
+			worker->tableWidgetEdges->setRowCount(edges_types_list.size());
+			for (auto &s : edges_types_list) {
+				worker->tableWidgetEdges->setItem(i, 0, new QTableWidgetItem(s));
+				worker->tableWidgetEdges->item(i, 0)->setIcon(
+						QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+				i++;
+			}
+			worker->tableWidgetEdges->horizontalHeader()->setStretchLastSection(true);
+			worker->tableWidgetEdges->resizeRowsToContents();
+			worker->tableWidgetEdges->resizeColumnsToContents();
+			worker->tableWidgetEdges->show();
 		}
-		worker->tableWidgetEdges->horizontalHeader()->setStretchLastSection(true);
-		worker->tableWidgetEdges->resizeRowsToContents();
-		worker->tableWidgetEdges->resizeColumnsToContents();
-		worker->tableWidgetEdges->show();
-	}
+	}catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 }
 
  void GraphViewer::NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs)
