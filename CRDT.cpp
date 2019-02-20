@@ -144,6 +144,23 @@ RoboCompDSR::AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::s
     };
 };
 
+RoboCompDSR::Attribs CRDTGraph::get_node_attribs_crdt(int id) {
+    return(get(id).attrs);
+}
+
+std::map<std::string, MTypes> CRDTGraph::get_node_attribs(int id) {
+    std::map<std::string, MTypes> m;
+    for (const auto &[k,v]: get(id).attrs)
+        m.insert_or_assign(std::make_pair(k, get_type_string(v.type, v.value))); //TODO
+    return m;
+
+}
+
+template<typename Ta>
+Ta CRDTGraph::get_node_attrib_by_name(int id, const std::string &key){
+    RoboCompDSR::AttribValue av = get_node_attrib_by_name(id, key);
+    return get_type_string<Ta>(av.type, av.value);
+}
 
 std::int32_t CRDTGraph::get_node_level(std::int32_t id){
     try {
@@ -170,7 +187,13 @@ std::int32_t CRDTGraph::get_parent_id(std::int32_t id) {
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
-
+RoboCompDSR::EdgeAttribs CRDTGraph::get_edge_attrib(int from, int to) {
+    try {
+        if(in(from) && in(to)) {
+            return get(from).fano.at(to);
+        }
+    } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+}
 
 bool CRDTGraph::in(const int &id) {
     nodes.in(id);
@@ -625,19 +648,92 @@ void CRDTGraph::createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph)
     }
 }
 
+// Converts Ice string values into DSRGraph native types
+template<typename Ta>
+Ta CRDTGraph::get_type_string(const std::string &name, const std::string &val)
+{
+    // WE NEED TO ADD A TYPE field to the Attribute values and get rid of this shit
+    static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render", "color", "name"};
+    static const std::list<std::string> bool_types{ "collidable", "collide"};
+    static const std::list<std::string> RT_types{ "RT"};
+    static const std::list<std::string> vector_float_types{ "laser_data_dists", "laser_data_angles"};
+
+    DSR::MTypes res;
+    if(std::find(string_types.begin(), string_types.end(), name) != string_types.end())
+        res = val;
+    else if(std::find(bool_types.begin(), bool_types.end(), name) != bool_types.end())
+    { if( val == "true") res = true; else res = false; }
+    else if(std::find(vector_float_types.begin(), vector_float_types.end(), name) != vector_float_types.end())
+    {
+        std::vector<float> numbers;
+        std::istringstream iss(val);
+        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
+                       std::back_inserter(numbers), [](const std::string &s){ return (float)std::stof(s);});
+        res = numbers;
+    }
+        // instantiate a QMat from string marshalling
+    else if(std::find(RT_types.begin(), RT_types.end(), name) != RT_types.end())
+    {
+        std::vector<float> ns;
+        std::istringstream iss(val);
+        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
+                       std::back_inserter(ns), [](const std::string &s){ return QString::fromStdString(s).toFloat();});
+        RMat::RTMat rt;
+        // std::cout << "------ in translating ------";
+        // for(auto n:ns) std::cout << n << " ";
+        // std::cout << std::endl;
+        if(ns.size() == 6)
+        {
+            rt.set(ns[3],ns[4],ns[5],ns[0],ns[1],ns[2]);
+            //rt.print("in translate");
+        }
+        else
+        {
+            std::cout << __FILE__ << __FUNCTION__ << "Error reading RTMat. Initializing with identity";
+            rt = QMat::identity(4);
+        }
+        return(rt);
+    }
+    else
+    {
+        try
+        { res = (float)std::stod(val); }
+        catch(const std::exception &e)
+        { std::cout << __FUNCTION__ << "catch: " << name << " " << val << std::endl; res = std::string{""}; }
+    }
+    return std::get<Ta>(res);
+};
+
 std::tuple<std::string, std::string, int> CRDTGraph::get_type_mtype(const MTypes &t)
 {
     return std::visit(overload
-    {
-          [](RMat::RTMat m) -> std::tuple<std::string, std::string, int> { return make_tuple("RTMat", m.serializeAsString(),m.getDataSize()); },
-          [](std::vector<float> a)-> std::tuple<std::string, std::string, int>
-          {
-              std::string str;
-              for(auto &f : a)
-                  str += std::to_string(f) + " ";
-              return make_tuple("vector<float>",  str += "\n",a.size());
-          },
-          [](std::string a) -> std::tuple<std::string, std::string, int>								{ return  make_tuple("string", a,1); },
-          [](auto a) -> std::tuple<std::string, std::string, int>										{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
-    }, t);
+      {
+              [](RMat::RTMat m) -> std::tuple<std::string, std::string, int> { return make_tuple("RTMat", m.serializeAsString(),m.getDataSize()); },
+              [](std::vector<float> a)-> std::tuple<std::string, std::string, int>
+              {
+                  std::string str;
+                  for(auto &f : a)
+                      str += std::to_string(f) + " ";
+                  return make_tuple("vector<float>",  str += "\n",a.size());
+              },
+              [](std::string a) -> std::tuple<std::string, std::string, int>								{ return  make_tuple("string", a,1); },
+              [](auto a) -> std::tuple<std::string, std::string, int>										{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
+      }, t);
 }
+
+std::string CRDTGraph::printVisitor(const MTypes &t)
+{
+    return std::visit(overload
+      {
+              [](RMat::RTMat m) -> std::string								{ return m.serializeAsString(); },
+              [](std::vector<float> a)-> std::string
+              {
+                  std::string str;
+                  for(auto &f : a)
+                      str += std::to_string(f) + " ";
+                  return  str += "\n";
+              },
+              [](std::string a) -> std::string								{ return  a; },
+              [](auto a) -> std::string										{ return std::to_string(a);}
+      }, t);
+};

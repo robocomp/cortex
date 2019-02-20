@@ -53,7 +53,17 @@ namespace CRDT {
 
             Nodes get();
             N get(int id);
+            RoboCompDSR::Attribs  get_node_attribs_crdt(int id);
+            std::map<std::string, MTypes> get_node_attribs(int id);
             RoboCompDSR::AttribValue get_node_attrib_by_name(int id, const std::string &key);
+            template<typename Ta>
+            Ta get_node_attrib_by_name(int id, const std::string &key);
+            RoboCompDSR::EdgeAttribs get_edge_attrib(int from, int to);
+
+            std::tuple<std::string, std::string, int>  get_type_mtype(const MTypes &t);
+            template<typename Ta>
+            Ta get_type_string(const std::string &name, const std::string &val);
+
             std::int32_t get_node_level(std::int32_t id);
             std::string get_node_type(std::int32_t id);
             std::int32_t get_parent_id(std::int32_t id);
@@ -68,6 +78,7 @@ namespace CRDT {
 
             void print();
             void print(int id);
+            std::string printVisitor(const MTypes &t);
 
             void read_from_file(const std::string &xml_file_path);
             void replace_node(int id, const N &node);
@@ -108,12 +119,14 @@ namespace CRDT {
             RoboCompDSR::AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
             aworset<N, int> translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &data);
             void createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph);
-            std::tuple<std::string, std::string, int>  get_type_mtype(const MTypes &t);
+
 
         signals:
             void update_node_signal(const std::int32_t, const std::string &type);
             void update_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
             void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs);
+            void update_edge_attrs_signal(const std::int32_t &id, const std::int32_t);
+
 
     };
 }

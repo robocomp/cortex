@@ -21,8 +21,8 @@
 #include <QGLViewer/qglviewer.h>
 #include <QApplication>
 #include <QTableWidget>
-#include "graphnode.h"
-#include "graphedge.h"
+#include "CRDT_graphnode.h"
+#include "CRDT_graphedge.h"
 #include "specificworker.h"
 
 using namespace DSR;
@@ -111,9 +111,6 @@ void GraphViewer::createGraph()
 			for( auto edge :ns.back().fano)
 			{
 				try{
-					auto f = edge.second.from;
-					auto t = edge.second.to;
-					auto l = edge.second.label;
 					addEdgeSLOT(edge.second.from, edge.second.to, edge.second.label);
 				} catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 			}
