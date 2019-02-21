@@ -56,14 +56,23 @@ namespace CRDT {
             RoboCompDSR::Attribs  get_node_attribs_crdt(int id);
             std::map<std::string, MTypes> get_node_attribs(int id);
             RoboCompDSR::AttribValue get_node_attrib_by_name(int id, const std::string &key);
+
             template<typename Ta>
-            Ta get_node_attrib_by_name(int id, const std::string &key);
+            Ta get_node_attrib_by_name(int id, const std::string &key){
+                RoboCompDSR::AttribValue av = get_node_attrib_by_name(id, key);
+                return icevalue_to_nativetype<Ta>(av.type, av.value);
+            }
             RoboCompDSR::EdgeAttribs get_edge_attrib(int from, int to);
 
-            std::tuple<std::string, std::string, int>  get_type_mtype(const MTypes &t);
-            template<typename Ta>
-            Ta get_type_string(const std::string &name, const std::string &val);
+            std::tuple<std::string, std::string, int>  mtype_to_icevalue(const MTypes &t);
 
+            // Converts Ice string values into DSRGraph native types
+            template<typename Ta>
+            Ta icevalue_to_nativetype(const std::string &name, const std::string &val)
+            {
+                return std::get<Ta>(icevalue_to_mtypes(name,val));
+            };
+            MTypes icevalue_to_mtypes(const std::string &name, const std::string &val);
             std::int32_t get_node_level(std::int32_t id);
             std::string get_node_type(std::int32_t id);
             std::int32_t get_parent_id(std::int32_t id);

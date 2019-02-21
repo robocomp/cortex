@@ -20,9 +20,21 @@
 #include <QGraphicsItem>
 #include <QTableWidget>
 #include <QGraphicsScene>
-#include <cppitertools/zip.hpp>
+#include <QGraphicsSceneMouseEvent>
+#include <QPainter>
+#include <QStyleOption>
+#include <QDebug>
+#include <QDialog>
+#include <QHeaderView>
 #include <QLabel>
+
+#include <cppitertools/zip.hpp>
+
+#include "CRDT.h"
+#include "CRDT_graphedge.h"
 #include "CRDT_graphviewer.h"
+
+
 
 class GraphEdge;
 class QGraphicsSceneMouseEvent;
@@ -33,7 +45,7 @@ class DoLaserStuff : public QGraphicsView
 {
   Q_OBJECT
   public:
-    DoLaserStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, DSR::IDType node_id_) : graph(graph_), node_id(node_id_)
+    DoLaserStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, std::int32_t node_id_) : graph(graph_), node_id(node_id_)
     {
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       resize(400,400);
@@ -73,7 +85,7 @@ class DoLaserStuff : public QGraphicsView
   private:
     QGraphicsScene scene;
     std::shared_ptr<CRDT::CRDTGraph> graph;
-    DSR::IDType node_id;
+    std::int32_t node_id;
 };
 
 class DoRGBDStuff : public  QLabel
@@ -87,7 +99,7 @@ class DoRGBDStuff : public  QLabel
       resize(640,480);
       setWindowTitle("RGBD");
       setParent(this);
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const DSR::IDType &id, const DSR::Attribs &attrs){
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const RoboCompDSR::Attribs &attrs){
                             const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(node_id, "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
@@ -127,13 +139,13 @@ class DoTableStuff : public  QTableWidget
     };
     
   public slots:
-    void drawSLOT(const DSR::IDType &id, const DSR::Attribs &attribs)
+    void drawSLOT(const std::int32_t &id, const RoboCompDSR::Attribs &attribs)
     {
       int i= 0; 
       for(auto &[k,v]: attribs)
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET 
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(graph->printVisitor(v))));
+        setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value))));
         i++;
       }
     }

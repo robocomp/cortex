@@ -48,7 +48,7 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MT
         std::cout << "New edge from: "<<from<<" to: "<<to<<", with name: "<<att_name << std::endl;
         if (in(from)  && in(to)) {
             auto node = get(from);
-            auto v = get_type_mtype(att_value);
+            auto v = mtype_to_icevalue(att_value);
             std::cout << "Edge: "<<std::get<0>(v) << ", "<< std::get<1>(v) <<","<<std::get<2>(v)<<std::endl;
             node.fano.at(to).attrs.insert(std::pair(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)}));
             insert_or_assign(from, node);
@@ -91,7 +91,7 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_v
     try {
         if (in(id)) {
             auto n = get(id);
-            auto v = get_type_mtype(att_value);
+            auto v = mtype_to_icevalue(att_value);
             n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
             insert_or_assign(id, n);
         }
@@ -151,16 +151,11 @@ RoboCompDSR::Attribs CRDTGraph::get_node_attribs_crdt(int id) {
 std::map<std::string, MTypes> CRDTGraph::get_node_attribs(int id) {
     std::map<std::string, MTypes> m;
     for (const auto &[k,v]: get(id).attrs)
-        m.insert_or_assign(std::make_pair(k, get_type_string(v.type, v.value))); //TODO
+        m.insert(std::make_pair(k, icevalue_to_mtypes(v.type, v.value)));
     return m;
 
 }
 
-template<typename Ta>
-Ta CRDTGraph::get_node_attrib_by_name(int id, const std::string &key){
-    RoboCompDSR::AttribValue av = get_node_attrib_by_name(id, key);
-    return get_type_string<Ta>(av.type, av.value);
-}
 
 std::int32_t CRDTGraph::get_node_level(std::int32_t id){
     try {
@@ -298,7 +293,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             RoboCompDSR::Attribs gatts;
             std::string qname = (char *)stype;
             std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
-            std::tuple<std::string, std::string, int> val = get_type_mtype(full_name);
+            std::tuple<std::string, std::string, int> val = mtype_to_icevalue(full_name);
             gatts.insert(std::pair("name", RoboCompDSR::AttribValue{std::get<0>(val), std::get<1>(val), std::get<2>(val)}));
 
             // color selection
@@ -311,7 +306,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             else if(qname == "mesh") color = "LightBlue";
             else if(qname == "imu") color = "LightSalmon";
 
-            val = get_type_mtype(color);
+            val = mtype_to_icevalue(color);
             gatts.insert(std::pair("color", RoboCompDSR::AttribValue{std::get<0>(val), std::get<1>(val), std::get<2>(val)}));
 
             add_node_attribs(node_id, gatts);
@@ -648,9 +643,10 @@ void CRDTGraph::createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph)
     }
 }
 
-// Converts Ice string values into DSRGraph native types
-template<typename Ta>
-Ta CRDTGraph::get_type_string(const std::string &name, const std::string &val)
+
+
+// Converts Ice string values into Mtypes
+CRDT::MTypes CRDTGraph::icevalue_to_mtypes(const std::string &name, const std::string &val)
 {
     // WE NEED TO ADD A TYPE field to the Attribute values and get rid of this shit
     static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render", "color", "name"};
@@ -701,10 +697,10 @@ Ta CRDTGraph::get_type_string(const std::string &name, const std::string &val)
         catch(const std::exception &e)
         { std::cout << __FUNCTION__ << "catch: " << name << " " << val << std::endl; res = std::string{""}; }
     }
-    return std::get<Ta>(res);
+    return res;
 };
 
-std::tuple<std::string, std::string, int> CRDTGraph::get_type_mtype(const MTypes &t)
+std::tuple<std::string, std::string, int> CRDTGraph::mtype_to_icevalue(const MTypes &t)
 {
     return std::visit(overload
       {

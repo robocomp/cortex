@@ -14,16 +14,7 @@
  * limitations under the License.
  */
 
-#include "CRDT.h"
 #include "CRDT_graphnode.h"
-#include "CRDT_graphedge.h"
-#include <QGraphicsScene>
-#include <QGraphicsSceneMouseEvent>
-#include <QPainter>
-#include <QStyleOption>
-#include <QDebug>
-#include <QDialog>
-#include <QHeaderView>
 
 
 GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_viewer(graph_viewer_)
