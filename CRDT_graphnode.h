@@ -53,8 +53,8 @@ class DoLaserStuff : public QGraphicsView
       scene.setSceneRect(-5000, -100, 10000, 5000);
       setScene(&scene);
       //setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
-	    setRenderHint(QPainter::Antialiasing);
-	    fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
+      setRenderHint(QPainter::Antialiasing);
+      fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
       scale(1, -1);
       QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoLaserStuff::drawLaserSLOT);
       show();
@@ -72,9 +72,13 @@ class DoLaserStuff : public QGraphicsView
       {
         const auto &lDists = graph->get_node_attrib_by_name<vector<float>>(node_id, "laser_data_dists");
         const auto &lAngles = graph->get_node_attrib_by_name<vector<float>>(node_id, "laser_data_angles");
+
         QPolygonF polig;
         for(const auto &[dist, angle] : iter::zip(lDists, lAngles))
-            polig << QPointF(dist*sin(angle), dist*cos(angle));
+        {
+          std::cout << dist<< ","<<angle<<std::endl;
+          polig << QPointF(dist*sin(angle), dist*cos(angle));
+        }
         scene.clear();
         QPolygonF robot; robot << QPointF(-200, 0) << QPointF(-100,150) << QPointF(0,200) << QPointF(100,150) << QPointF(200,0);
         scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));

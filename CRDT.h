@@ -57,6 +57,8 @@ namespace CRDT {
             std::map<std::string, MTypes> get_node_attribs(int id);
             RoboCompDSR::AttribValue get_node_attrib_by_name(int id, const std::string &key);
 
+            int get_id_from_name(const std::string &tag);
+
             template<typename Ta>
             Ta get_node_attrib_by_name(int id, const std::string &key){
                 RoboCompDSR::AttribValue av = get_node_attrib_by_name(id, key);
@@ -132,8 +134,8 @@ namespace CRDT {
 
         signals:
             void update_node_signal(const std::int32_t, const std::string &type);
-            void update_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
             void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs);
+            void update_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
             void update_edge_attrs_signal(const std::int32_t &id, const std::int32_t);
 
 

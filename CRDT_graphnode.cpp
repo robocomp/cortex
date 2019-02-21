@@ -202,7 +202,7 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     if( event->button()== Qt::LeftButton)
     {
         auto g = graph_viewer->getGraph();
-        std::cout << __FILE__ << __FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
+        std::cout << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
         g->add_node_attrib(id_in_graph,"pos_x",(float)event->scenePos().x());
         g->add_node_attrib(id_in_graph,"pos_y",(float)event->scenePos().y());
     }
