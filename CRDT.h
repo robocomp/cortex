@@ -62,7 +62,7 @@ namespace CRDT {
             template<typename Ta>
             Ta get_node_attrib_by_name(int id, const std::string &key){
                 RoboCompDSR::AttribValue av = get_node_attrib_by_name(id, key);
-                return icevalue_to_nativetype<Ta>(av.type, av.value);
+                return icevalue_to_nativetype<Ta>(key, av.value);
             }
             RoboCompDSR::EdgeAttribs get_edge_attrib(int from, int to);
 

@@ -47,6 +47,7 @@ class DoLaserStuff : public QGraphicsView
   public:
     DoLaserStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, std::int32_t node_id_) : graph(graph_), node_id(node_id_)
     {
+      std::cout << __FUNCTION__ << std::endl;
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       resize(400,400);
       setWindowTitle("Laser");
@@ -56,6 +57,7 @@ class DoLaserStuff : public QGraphicsView
       setRenderHint(QPainter::Antialiasing);
       fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
       scale(1, -1);
+      drawLaserSLOT(node_id_);
       QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoLaserStuff::drawLaserSLOT);
       show();
     };
@@ -70,10 +72,18 @@ class DoLaserStuff : public QGraphicsView
     {
       try
       {
-        const auto &lDists = graph->get_node_attrib_by_name<vector<float>>(node_id, "laser_data_dists");
-        const auto &lAngles = graph->get_node_attrib_by_name<vector<float>>(node_id, "laser_data_angles");
+        std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
+        const vector<float> lAngles = graph->get_node_attrib_by_name<vector<float>>(id, "laser_data_angles");
+        std::cout << __FUNCTION__ <<std::endl;
+        const vector<float> lDists = graph->get_node_attrib_by_name<vector<float>>(id, "laser_data_dists");
 
         QPolygonF polig;
+        for(const auto v : lAngles)
+            std::cout <<v;
+          cout<<std::endl;
+          for(const auto v : lDists)
+              std::cout << v;
+        cout<<std::endl;
         for(const auto &[dist, angle] : iter::zip(lDists, lAngles))
         {
           std::cout << dist<< ","<<angle<<std::endl;
@@ -84,7 +94,7 @@ class DoLaserStuff : public QGraphicsView
         scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
         scene.addPolygon(polig, QPen(QColor("LightPink"), 8), QBrush(QColor("LightPink")));
       }
-      catch(const std::exception &e){ std::cout << "Node " << node_id << " not found" << std::endl;};
+      catch(const std::exception &e){ std::cout << "Node " << node_id << " problem. "<<e.what() << std::endl;};
     };
   private:
     QGraphicsScene scene;
@@ -120,19 +130,19 @@ class DoTableStuff : public  QTableWidget
     DoTableStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, DSR::IDType node_id_) : graph(graph_), node_id(node_id_)
     {
       qRegisterMetaType<std::int32_t>("std::int32_t");
-	    qRegisterMetaType<std::string>("std::string");
-	    qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
+      qRegisterMetaType<std::string>("std::string");
+      qRegisterMetaType<RoboCompDSR::Attribs>("RoboCompDSR::Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       setWindowTitle("Node " + QString::fromStdString(graph->get_node_type(node_id)) + " [" + QString::number(node_id) + "]");
       setColumnCount(2);
-      setRowCount(graph->get_node_attribs(node_id).size() );
+      setRowCount(graph->get_node_attribs_crdt(node_id).size() );
       setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
       int i=0;
-      for( auto &[k, v] : graph->get_node_attribs(node_id) )
+      for( auto &[k, v] : graph->get_node_attribs_crdt(node_id) )
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(graph->printVisitor(v))));
+        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value)));
         i++;
       }
       horizontalHeader()->setStretchLastSection(true);
@@ -179,7 +189,7 @@ class GraphNode : public QObject, public QGraphicsItem
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
-		void setColor(const std::string &plain);
+    void setColor(const std::string &plain);
     std::shared_ptr<DSR::GraphViewer> getGraphViewer() const { return graph_viewer;};
 
 	protected:

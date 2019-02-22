@@ -46,7 +46,7 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
 
 void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value) {
     try {
-        std::cout << "New edge from: "<<from<<" to: "<<to<<", with name: "<<att_name << std::endl;
+//        std::cout << "New edge from: "<<from<<" to: "<<to<<", with name: "<<att_name << std::endl;
         if (in(from)  && in(to)) {
             auto node = get(from);
             auto v = mtype_to_icevalue(att_value);
@@ -123,6 +123,7 @@ void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
             for (auto &[k, v] : att)
                 n.attrs.insert_or_assign(k, v);
             insert_or_assign(id, n);
+            std::cout << "Emitiendo update_attrs_signal " <<id<<std::endl;
             emit update_attrs_signal(id, n.attrs);
         }
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
@@ -685,6 +686,7 @@ CRDT::MTypes CRDTGraph::icevalue_to_mtypes(const std::string &type, const std::s
         std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
                        std::back_inserter(numbers), [](const std::string &s){ return (float)std::stof(s);});
         res = numbers;
+
     }
         // instantiate a QMat from string marshalling
     else if(std::find(RT_types.begin(), RT_types.end(), type) != RT_types.end())

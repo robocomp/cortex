@@ -87,7 +87,6 @@ GraphViewer::~GraphViewer()
 void GraphViewer::createGraph()
 {
 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
-	std::cout << "MAPA:" << std::endl;
 	try {
 		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
@@ -96,7 +95,6 @@ void GraphViewer::createGraph()
 				addNodeSLOT(node.first,  gcrdt->get_node_type(node.first));
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
-
 		}
 		// add edges after all nodes have been created
 		for(auto node : gcrdt->get().getMap()) // Aworset
