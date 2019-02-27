@@ -38,8 +38,8 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
             auto n = get(from);
             n.fano.insert(std::pair(to, RoboCompDSR::EdgeAttribs{label_, from, to, RoboCompDSR::Attribs()}));
             insert_or_assign(from, n);
-            emit update_edge_signal(from, to, label_);
-        }
+            std::cout << "//emitiendo update_edge_signal:"<<__LINE__ <<", From: "<<from<<", to: "<<to<<std::endl;
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
@@ -53,8 +53,9 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MT
             std::cout << "Edge: "<<std::get<0>(v) << ", "<< std::get<1>(v) <<","<<std::get<2>(v)<<std::endl;
             node.fano.at(to).attrs.insert(std::pair(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)}));
             insert_or_assign(from, node);
-            emit update_edge_attrs_signal(from, to);
-        }
+            std::cout << "//emitiendo update_edge_attrs_signal:"<<__LINE__ <<", From: "<<from<<", to: "<<to<<std::endl;
+            //emit update_edge_attrs_signal(from, to);
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 };
 
@@ -65,8 +66,9 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, std::str
             auto node = get(from);
             node.fano.at(to).attrs.insert(std::pair(att_name, RoboCompDSR::AttribValue{att_type, att_value, length}));
             insert_or_assign(from, node);
-            emit update_edge_attrs_signal(from, to);
-        }
+            std::cout << "//emitiendo update_edge_attrs_signal:"<<__LINE__ <<", From: "<<from<<", to: "<<to<<std::endl;
+            //emit update_edge_attrs_signal(from, to);
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID not found. Cant update. "<< std::endl;
     }
     catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
@@ -80,8 +82,9 @@ void CRDTGraph::add_edge_attribs(int from, int to, const RoboCompDSR::Attribs &a
             for (auto &[k, v] : att)
                 node.fano.at(to).attrs.insert_or_assign(k, v);
             insert_or_assign(from, node);
-            emit update_edge_attrs_signal(from, to);
-        }
+            std::cout << "//emitiendo update_edge_attrs_signal:"<<__LINE__ <<", From: "<<from<<", to: "<<to<<std::endl;
+            //emit update_edge_attrs_signal(from, to);
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID not found. Cant update. "<< std::endl;
     }
     catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
@@ -98,8 +101,9 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_v
             auto v = mtype_to_icevalue(att_value);
             n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
             insert_or_assign(id, n);
-            emit update_attrs_signal(id,  n.attrs);
-        }
+            std::cout << "//emitiendo update_attrs_signal:"<<__LINE__ <<", ID: "<<id<<std::endl;
+            //emit update_attrs_signal(id,  n.attrs);
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 };
 
@@ -110,8 +114,9 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_ty
             auto n = get(id);
             n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
             insert_or_assign(id, n);
-            emit update_attrs_signal(id, n.attrs);
-        }
+            std::cout << "//emitiendo update_attrs_signal:"<<__LINE__ <<", ID: "<<id<<std::endl;
+            //emit update_attrs_signal(id, n.attrs);
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 };
 
@@ -123,26 +128,37 @@ void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
             for (auto &[k, v] : att)
                 n.attrs.insert_or_assign(k, v);
             insert_or_assign(id, n);
-            std::cout << "Emitiendo update_attrs_signal " <<id<<std::endl;
-            emit update_attrs_signal(id, n.attrs);
-        }
+            std::cout << "//emitiendo update_attrs_signal:"<<__LINE__ <<", ID: "<<id<<std::endl;
+//            //emit update_attrs_signal(id, n.attrs);
+        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 
 };
+
+std::map<int, RoboCompDSR::EdgeAttribs> CRDTGraph::getEdges(int id) {
+    if (in(id)) {
+        auto n = get(id);
+        return n.fano;
+    } else return std::map<int,RoboCompDSR::EdgeAttribs>();
+}
 
 
 Nodes CRDTGraph::get() {
     return nodes;
 }
 
+list<N> CRDTGraph::get_list() {
+    list<N> mList;
+    for (auto & [k, v] : nodes.getMap())
+        mList.push_back(v.readAsList().back());
+    return mList;
+}
+
 
 N CRDTGraph::get(int id) {
     try {
-        if (in(id))
-            return nodes[id].readAsList().back();
-        else
-            std::cout << __FUNCTION__<<"-> "<<id<<" not in graph." << std::endl;
-    } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+        return nodes[id].readAsList().back();
+    } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;}
 }
 
 
@@ -170,46 +186,38 @@ std::map<std::string, MTypes> CRDTGraph::get_node_attribs(int id) {
 
 std::int32_t CRDTGraph::get_node_level(std::int32_t id){
     try {
-        if(in(id))
-            return std::stoi(get_node_attrib_by_name(id, "level").value);
+        if(in(id)) return std::stoi(get_node_attrib_by_name(id, "level").value);
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 
 std::string CRDTGraph::get_node_type(std::int32_t id) {
     try {
-        if(in(id)) {
-            return get(id).type;
-        }
+        if(in(id)) return get(id).type;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 
 std::int32_t CRDTGraph::get_parent_id(std::int32_t id) {
     try {
-        if(in(id)) {
-            return std::stoi(get_node_attrib_by_name(id, "parent").value);
-        }
+        if(in(id)) return std::stoi(get_node_attrib_by_name(id, "parent").value);
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 int CRDTGraph::get_id_from_name(const std::string &tag) {
-    if(tag == std::string())
-        return -1;
+    if(tag == std::string()) return -1;
     for (auto &[k, v] : nodes.getMap())
     {
         auto n = v.readAsList().back();
-        if (n.attrs.at("imName").value == tag)
-            return n.id;
+        if (n.attrs.at("imName").value == tag) return n.id;
     }
     return -1;
 };
 
 RoboCompDSR::EdgeAttribs CRDTGraph::get_edge_attrib(int from, int to) {
     try {
-        if(in(from) && in(to)) {
-            return get(from).fano.at(to);
-        }
+        if(in(from) && in(to)) return get(from).fano.at(to);
+
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
@@ -222,22 +230,30 @@ void CRDTGraph::insert_or_assign(int id, const N &node) {
     try {
         auto delta = nodes[id].add(node, id);
         writer->update(translateAwCRDTtoICE(id, delta));
-        emit update_node_signal(id, node.type);
+        //emit update_node_signal(id, node.type);
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
+void CRDTGraph::insert_or_assign(const N &node) {
+    try {
+        auto delta = nodes[node.id].add(node, node.id);
+        writer->update(translateAwCRDTtoICE(node.id, delta));
+        //emit update_node_signal(node.id, node.type);
+    } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+}
 
 void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
     N new_node; new_node.type = type_; new_node.id = id;
     auto delta = nodes[id].add(new_node);
     writer->update(translateAwCRDTtoICE(id, delta));
-    emit update_node_signal(id, new_node.type);
+    //emit update_node_signal(id, new_node.type);
 }
 
 
 void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
+    std::cout<<__FUNCTION__<<": "<< aworSet.id<<endl;
     nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
-    emit update_node_signal(aworSet.id,get(aworSet.id).type);
+    //emit update_node_signal(aworSet.id,get(aworSet.id).type);
 }
 
 void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
@@ -254,7 +270,7 @@ void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
     for (auto &v : full_graph.m)
         for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsListWithId()) {
             nodes[v.first].add(awv.second, v.first);
-            emit update_node_signal(v.first,get(v.first).type);
+            //emit update_node_signal(v.first,get(v.first).type);
         }
 }
 
@@ -476,7 +492,6 @@ void CRDTGraph::privateCRDTGraph() {
     char *argv[0];
     node = DataStorm::Node(argc, argv);
     work = true;
-
     // General topic update
     topic = std::make_shared < DataStorm::Topic < std::string, RoboCompDSR::AworSet >> (node, "DSR");
     topic->setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAll});
@@ -520,8 +535,12 @@ void CRDTGraph::subscription_thread(bool showReceived) {
     topic.setReaderDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
     auto reader = DataStorm::FilteredKeyReader<std::string, RoboCompDSR::AworSet>(topic, DataStorm::Filter<std::string>(
             "_regex", filter.c_str())); // Reader excluded self agent
-    std::cout << "Starting reader" << std::endl;
-    reader.waitForWriters();
+    if (work)
+    {
+        std::cout << "Starting reader" << std::endl;
+        reader.waitForWriters();
+    }
+
     while (true) {
         if (work)
             try {
@@ -560,6 +579,8 @@ void CRDTGraph::fullgraph_server_thread() {
             topic_answer.setReaderDefaultConfig(
                     {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
             writer.add(RoboCompDSR::OrMap{id(), map(), context()});
+            for (auto &[k,v] : map())
+                std::cout << k << ","<< v<<std::endl;
             std::cout << "Full graph written from lambda" << std::endl;
             sleep(5);
             work = true;
@@ -573,6 +594,7 @@ void CRDTGraph::fullgraph_server_thread() {
 
 
 void CRDTGraph::fullgraph_request_thread() {
+    work = false;
     std::cout << __FUNCTION__ << ":" << __LINE__ << "-> Initiating request for full graph requests" << std::endl;
     std::chrono::time_point <std::chrono::system_clock> start_clock = std::chrono::system_clock::now();
 
@@ -593,15 +615,19 @@ void CRDTGraph::fullgraph_request_thread() {
     topicR.setReaderDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
     writer.add(RoboCompDSR::GraphRequest{agent_name});
 
-    std::cout << __FUNCTION__ << " Wait for writers: " << reader.hasWriters() << ", " << reader.hasUnread()
-              << std::endl;
+    std::cout << __FUNCTION__ <<":" << __LINE__ << " Wait for writers:[" << reader.hasWriters() << "]. Data unread:[" << reader.hasUnread() << "]. " << std::endl;
     auto full_graph = reader.getNextUnread();
-    if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start_clock).count() <
-        TIMEOUT) {
-        join_full_graph(full_graph.getValue());
+    join_full_graph(full_graph.getValue());
+    std::cout << __FUNCTION__ <<":" << __LINE__ << "Synchronized."<<std::endl;
+//    if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start_clock).count() <
+//        TIMEOUT) {
+//        join_full_graph(full_graph.getValue());
+//
+//        std::cout << __FUNCTION__ << " Finished uploading full graph" << std::endl;
+//    }
 
-        std::cout << __FUNCTION__ << " Finished uploading full graph" << std::endl;
-    }
+    work = true;
+
 }
 
 RoboCompDSR::AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {

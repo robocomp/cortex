@@ -73,6 +73,7 @@ GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worke
 
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
+    connect(gcrdt.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addNodeSLOT);
 }
 
 GraphViewer::~GraphViewer()
@@ -216,7 +217,14 @@ void GraphViewer::addNodeSLOT(int id, const std::string &type)
 	catch(const std::exception &e){ };
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
-	
+
+	auto e = gcrdt->getEdges(id);
+	if (!e.empty())
+	{
+		for (auto &[k,v] : e)
+			addEdgeSLOT(id, k, v.label);
+	}
+
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)

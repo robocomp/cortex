@@ -24,11 +24,13 @@
 #define NO_PARENT -1
 #define TIMEOUT 5
 
+
 namespace CRDT {
 
     using N = RoboCompDSR::Node;
     using Nodes = ormap<int, aworset<N, int>, int>;
     using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
+
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
@@ -38,6 +40,8 @@ namespace CRDT {
     {
         Q_OBJECT
         public:
+            size_t size() const 								{ return nodes.getMap().size();  };
+
             CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_);
             CRDTGraph(int root, std::string name); // Empty
             ~CRDTGraph();
@@ -51,7 +55,9 @@ namespace CRDT {
             void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
             void add_node_attribs(int id, const RoboCompDSR::Attribs &att);
 
+            std::map<int, RoboCompDSR::EdgeAttribs> getEdges(int id);
             Nodes get();
+            list<N> get_list();
             N get(int id);
             RoboCompDSR::Attribs  get_node_attribs_crdt(int id);
             std::map<std::string, MTypes> get_node_attribs(int id);
@@ -83,6 +89,7 @@ namespace CRDT {
 
             void insert_or_assign(int id, const std::string &type_);
             void insert_or_assign(int id, const N &node);
+            void insert_or_assign(const N &node);
 
             void join_delta_node(RoboCompDSR::AworSet aworSet);
             void join_full_graph(RoboCompDSR::OrMap full_graph);
@@ -103,7 +110,7 @@ namespace CRDT {
             Nodes nodes;
             int graph_root;
             bool work;
-
+            mutable std::mutex _mutex;
             std::thread read_thread, request_thread, server_thread; // Threads
 
             std::string agent_name, filter;
@@ -134,9 +141,9 @@ namespace CRDT {
 
         signals:
             void update_node_signal(const std::int32_t, const std::string &type);
-            void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs);
-            void update_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
-            void update_edge_attrs_signal(const std::int32_t &id, const std::int32_t);
+//            void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs);
+//            void update_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
+//            void update_edge_attrs_signal(const std::int32_t &id, const std::int32_t);
 
 
     };

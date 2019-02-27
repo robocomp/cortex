@@ -1511,6 +1511,7 @@ class ormap
     K id;
 
 public:
+
     // if no causal context supplied, use base one
     ormap() : c(cbase) {}
     ormap(K i) : id(i), c(cbase) {}
@@ -1533,12 +1534,11 @@ public:
         return c;
     }
 
-    //// CRISTIAN
-
     std::map<N,V>  getMap() const
     {
         return m;
     }
+
 
     K getId() const
     {
