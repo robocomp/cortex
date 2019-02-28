@@ -543,7 +543,6 @@ void CRDTGraph::subscription_thread(bool showReceived) {
             }
             catch (const std::exception &ex) { cerr << ex.what() << endl; }
         }
-        usleep(5);
     }
 }
 
@@ -574,7 +573,6 @@ void CRDTGraph::fullgraph_server_thread() {
             for (auto &[k,v] : map())
                 std::cout << k << ","<< v<<std::endl;
             std::cout << "Full graph written from lambda" << std::endl;
-            sleep(1);
             work = true;
         }
     };

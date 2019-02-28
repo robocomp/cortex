@@ -86,7 +86,7 @@ GraphViewer::~GraphViewer()
 
 void GraphViewer::createGraph()
 {
-	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
+// 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
 	try {
 		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
@@ -99,7 +99,7 @@ void GraphViewer::createGraph()
 		// add edges after all nodes have been created
 		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
-			std::cout << "Edges from "<<node.second.readAsList().back().id<<std::endl;
+//			std::cout << "Edges from "<<node.second.readAsList().back().id<<std::endl;
 			std::list<RoboCompDSR::Node> ns;
 			try
 			{
@@ -138,7 +138,7 @@ void GraphViewer::toggleSimulationSLOT()
 
 void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 {	
-	qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
+	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 	if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
@@ -229,7 +229,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
 	try {
-		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
+// 		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
 		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
 		// check if edge already exists
 		if(gmap_edges.count(key) == 0) {
