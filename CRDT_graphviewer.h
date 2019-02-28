@@ -61,10 +61,10 @@ namespace DSR
             std::map<std::int32_t, GraphNode*> gmap;
 			std::map<std::tuple<std::int32_t, std::int32_t, std::string>, GraphEdge*> gmap_edges;
 			QGraphicsEllipseItem *central_point;
+            void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
 
 		public slots:
-			void addNodeSLOT(const std::int32_t id, const std::string &type);
-			void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
+			void addOrAssignNodeSLOT(const std::int32_t id, const std::string &type);
 			void saveGraphSLOT();		
 			void toggleSimulationSLOT();
 			void NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs);

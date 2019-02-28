@@ -31,7 +31,6 @@ GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worke
 {
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
-    qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
 
 	scene.setItemIndexMethod(QGraphicsScene::NoIndex);
 	scene.setSceneRect(-200, -200, 400, 400);
@@ -73,7 +72,7 @@ GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worke
 
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
-    connect(gcrdt.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addNodeSLOT);
+    connect(gcrdt.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
 }
 
 GraphViewer::~GraphViewer()
@@ -93,7 +92,7 @@ void GraphViewer::createGraph()
 		{
 			try
 			{
-				addNodeSLOT(node.first,  gcrdt->get_node_type(node.first));
+				addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.first));
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
 		}
@@ -137,7 +136,7 @@ void GraphViewer::toggleSimulationSLOT()
 /// update slots
 ////////////////////////////////////////
 
-void GraphViewer::addNodeSLOT(int id, const std::string &type)
+void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 {	
 	qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr

@@ -49,7 +49,7 @@ class DoRTStuff : public  QTableWidget
       resizeRowsToContents();
       resizeColumnsToContents();      
       drawSLOT(from, to);	
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_edge_attrs_signal, this, &DoRTStuff::drawSLOT);
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DoRTStuff::drawSLOT);
       show();
       std::cout << __FILE__ << " " << __FUNCTION__ << " End ofDoRTStuff Constructor "  << std::endl;
     };
@@ -64,7 +64,7 @@ class DoRTStuff : public  QTableWidget
     void drawSLOT(const std::int32_t &from_, const std::int32_t &to_)
     {
       std::cout << __FILE__ << " " << __FUNCTION__ << std::endl;
-      if( from == from_ and to == to_)     //ADD LABEL 
+      if( from == from_ and to == to_)     //ADD LABEL
         try
         {
           auto rtvalue = graph->get_edge_attrib(from, to).attrs.at("RT").value;

@@ -42,8 +42,7 @@ namespace CRDT {
         public:
             size_t size() const 								{ return nodes.getMap().size();  };
 
-            CRDTGraph(int root, std::string name, std::shared_ptr<DSR::Graph> graph_);
-            CRDTGraph(int root, std::string name); // Empty
+            CRDTGraph(int root, std::string name);
             ~CRDTGraph();
 
             void add_edge(int from, int to, const std::string &label_);
@@ -119,8 +118,6 @@ namespace CRDT {
             std::shared_ptr<DataStorm::SingleKeyWriter<std::string, RoboCompDSR::AworSet >> writer;
             std::shared_ptr<DataStorm::Topic<std::string, RoboCompDSR::AworSet >> topic;
 
-            void privateCRDTGraph(); // Private constructor
-
             int id();
             RoboCompDSR::DotContext context();
             RoboCompDSR::MapAworSet map();
@@ -136,15 +133,13 @@ namespace CRDT {
             // Translators
             RoboCompDSR::AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
             aworset<N, int> translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &data);
-            void createIceGraphFromDSRGraph(std::shared_ptr<DSR::Graph> graph);
 
 
         signals:
-            void update_node_signal(const std::int32_t, const std::string &type);
-//            void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs);
-//            void update_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
-//            void update_edge_attrs_signal(const std::int32_t &id, const std::int32_t);
+            void update_node_signal(const std::int32_t, const std::string &type); // Signal for data update CRDT
 
+            void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs); //Signal for show node attribs.
+            void update_edge_signal(const std::int32_t from, const std::int32_t to); // Signal for show edge attribs.
 
     };
 }
