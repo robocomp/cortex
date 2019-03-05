@@ -73,6 +73,9 @@ GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worke
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
     connect(gcrdt.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
+	connect(gcrdt.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
+	connect(gcrdt.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
+
 }
 
 GraphViewer::~GraphViewer()
@@ -231,8 +234,8 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 	try {
 // 		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
 		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
-		// check if edge already exists
-		if(gmap_edges.count(key) == 0) {
+
+		if(gmap_edges.count(key) == 0) { 		// check if edge already exists
 			auto node_origen = gmap.at(from);
 			auto node_dest = gmap.at(to);
 			auto item = new GraphEdge(node_origen, node_dest, edge_tag.c_str());
@@ -261,6 +264,32 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 		}
 	}catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 }
+
+void GraphViewer::delEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &edge_tag)
+{
+    std::cout<<__FUNCTION__<<":"<<__LINE__<< std::endl;
+	try {
+		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
+		while (gmap_edges.count(key) > 0) {
+            scene.removeItem(gmap_edges.at(key));
+		    gmap_edges.erase(key);
+		}
+	} catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+
+}
+
+void GraphViewer::delNodeSLOT(int id)
+{
+    std::cout<<__FUNCTION__<<":"<<__LINE__<< std::endl;
+    try {
+        while (gmap.count(id) > 0) {
+            scene.removeItem(gmap.at(id));
+            gmap.erase(id);
+        }
+    } catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+
+}
+
 
  void GraphViewer::NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs)
  {

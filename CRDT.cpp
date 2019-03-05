@@ -137,6 +137,49 @@ void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
 
 }
 
+void CRDTGraph::delete_node(int id) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    std::cout << __FUNCTION__ <<". Node: "<<id<<std::endl;
+    try {
+        if (in(id)) {
+            auto n = nodes[id].readAsList().back();
+
+            for (auto &[k, v] : n.fano) { // Iterating over edge to this node
+                std::cout << id << " -> " << k << std::endl;
+                emit del_edge_signal(id,k,v.label);
+            }
+
+            auto map = nodes.getMap();
+            for (auto &[k,v] : map) { // Iterating over edge from
+                auto node_to_delete_edge = v.readAsList().back();
+                if (node_to_delete_edge.fano.count(id) > 0) {
+                    auto l =  node_to_delete_edge.fano.at(id).label;
+                    node_to_delete_edge.fano.erase(id);
+                    auto delta = nodes[node_to_delete_edge.id].add(node_to_delete_edge, node_to_delete_edge.id);
+                    writer->update(translateAwCRDTtoICE(node_to_delete_edge.id, delta));
+                    emit del_edge_signal(node_to_delete_edge.id, id, l);
+                }
+            }
+            auto delta = nodes[id].rmv(n); // If we compare only with ID (same)
+//            auto delta = nodes[id].reset();
+            std::cout<<"ID borrado: "<<nodes[id]<<std::endl;
+            std::cout<<"Delta: "<<delta<<std::endl;
+            emit del_node_signal(id);
+            writer->update(translateAwCRDTtoICE(id, delta));
+
+        }
+    }
+    catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+}
+
+
+void CRDTGraph::delete_node(string name) {
+    std::cout << __FUNCTION__ <<":" << __LINE__<<std::endl;
+
+}
+
+
+
 std::map<int, RoboCompDSR::EdgeAttribs> CRDTGraph::getEdges(int id) {
     if (in(id)) {
         auto n = get(id);
@@ -146,10 +189,12 @@ std::map<int, RoboCompDSR::EdgeAttribs> CRDTGraph::getEdges(int id) {
 
 
 Nodes CRDTGraph::get() {
+    std::lock_guard<std::mutex> lock(_mutex);
     return nodes;
 }
 
 list<N> CRDTGraph::get_list() {
+    std::lock_guard<std::mutex> lock(_mutex);
     list<N> mList;
     for (auto & kv : nodes.getMap())
         mList.push_back(kv.second.readAsList().back());
@@ -158,6 +203,7 @@ list<N> CRDTGraph::get_list() {
 
 
 N CRDTGraph::get(int id) {
+    std::lock_guard<std::mutex> lock(_mutex);
     try {
         return nodes[id].readAsList().back();
     } catch(const std::exception &e){
@@ -511,6 +557,7 @@ RoboCompDSR::DotContext CRDTGraph::context() { // Context to ICE
 
 
 RoboCompDSR::MapAworSet CRDTGraph::map() {
+    std::lock_guard<std::mutex> lock(_mutex);
     RoboCompDSR::MapAworSet m;
     for (auto &kv : nodes.getMap())  // Map of Aworset to ICE
         m[kv.first] = translateAwCRDTtoICE(kv.first, kv.second);

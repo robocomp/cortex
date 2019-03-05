@@ -62,6 +62,8 @@ namespace DSR
 			std::map<std::tuple<std::int32_t, std::int32_t, std::string>, GraphEdge*> gmap_edges;
 			QGraphicsEllipseItem *central_point;
             void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
+            void delEdgeSLOT(const std::int32_t from, const std::int32_t to,  const std::string &edge_tag);
+			void delNodeSLOT(int id);
 
 		public slots:
 			void addOrAssignNodeSLOT(const std::int32_t id, const std::string &type);

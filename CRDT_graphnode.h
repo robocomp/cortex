@@ -203,8 +203,8 @@ class GraphNode : public QObject, public QGraphicsItem
 
 	private:
     QPointF newPos;
-		QGraphicsSimpleTextItem *tag;
-		QString dark_color = "darkyello", plain_color = "yellow";
+    QGraphicsSimpleTextItem *tag;
+    QString dark_color = "darkyello", plain_color = "yellow";
     std::string type;
     std::shared_ptr<DSR::GraphViewer> graph_viewer;
 };

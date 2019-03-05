@@ -193,7 +193,10 @@ struct Node
         if (this == &n_) {
             return true;
         }
-        if (id != n_.id || type != n_.type || attrs != n_.attrs || fano != n_.fano) {
+//        if (id != n_.id || type != n_.type || attrs != n_.attrs || fano != n_.fano) {
+//            return false;
+//        }
+        if (id != n_.id) {
             return false;
         }
         return true;

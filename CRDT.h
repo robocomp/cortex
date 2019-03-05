@@ -54,6 +54,9 @@ namespace CRDT {
             void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
             void add_node_attribs(int id, const RoboCompDSR::Attribs &att);
 
+            void delete_node(int id);
+            void delete_node(string name);
+
             std::map<int, RoboCompDSR::EdgeAttribs> getEdges(int id);
             Nodes get();
             list<N> get_list();
@@ -140,6 +143,9 @@ namespace CRDT {
 
             void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs); //Signal for show node attribs.
             void update_edge_signal(const std::int32_t from, const std::int32_t to); // Signal for show edge attribs.
+
+            void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal for del edge.
+            void del_node_signal(const std::int32_t from); // Signal for del node.
 
     };
 }
