@@ -205,10 +205,10 @@ list<N> CRDTGraph::get_list() {
 N CRDTGraph::get(int id) {
     std::lock_guard<std::mutex> lock(_mutex);
     try {
-        return nodes[id].readAsList().back();
+        if (in(id))
+            return nodes[id].readAsList().back();
     } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
-        return (N{"error",-1});
+        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<id<<std::endl;
     }
 }
 
@@ -311,8 +311,11 @@ void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
 
 void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
 //    std::cout<<__FUNCTION__<<": "<< aworSet.id<<endl;
-    nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
-    emit update_node_signal(aworSet.id,get(aworSet.id).type);
+    try{
+        nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
+        emit update_node_signal(aworSet.id,get(aworSet.id).type);
+    } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+    
 }
 
 void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
@@ -684,12 +687,10 @@ aworset<N, int> CRDTGraph::translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &da
     for (auto &v : data.dk.cbase.dc)
         s.insert(std::make_pair(v.first, v.second));
     dotcontext_aux.setContext(m, s);
-
     // Dots
     std::map <pair<int, int>, N> ds_aux;
     for (auto &v : data.dk.ds)
         ds_aux[pair<int, int>(v.first.first, v.first.second)] = v.second;
-
     // Join
     aworset<N, int> aw = aworset<N, int>(id);
     aw.setContext(dotcontext_aux);
