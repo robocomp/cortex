@@ -103,10 +103,12 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_v
     try {
         if (in(id)) {
             auto n = get(id);
-            auto v = mtype_to_icevalue(att_value);
-            n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
-            insert_or_assign(id, n);
-            emit update_attrs_signal(id,  n.attrs); // Viewer
+            if (n.id > 0) {
+                auto v = mtype_to_icevalue(att_value);
+                n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)});
+                insert_or_assign(id, n);
+                emit update_attrs_signal(id,  n.attrs); // Viewer
+            }
         } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
@@ -114,13 +116,13 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_v
 
 void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length) {
     try {
-        if (in(id)) {
-            auto n = get(id);
+        auto n = get(id);
+        if (n.id > 0) {
             n.attrs.insert_or_assign(att_name, RoboCompDSR::AttribValue{att_type, att_value, length});
             insert_or_assign(id, n);
             emit update_attrs_signal(id, n.attrs); // Viewer
-        } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
-    } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+        }
+} catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 
@@ -128,10 +130,12 @@ void CRDTGraph::add_node_attribs(int id, const RoboCompDSR::Attribs &att) {
     try {
         if (in(id)) {
             auto n = get(id);
-            for (auto &[k, v] : att)
-                n.attrs.insert_or_assign(k, v);
-            insert_or_assign(id, n);
-            emit update_attrs_signal(id, n.attrs); // Viewer
+            if (n.id > 0) {
+                for (auto &[k, v] : att)
+                    n.attrs.insert_or_assign(k, v);
+                insert_or_assign(id, n);
+                emit update_attrs_signal(id, n.attrs); // Viewer
+            }
         } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID "<<id<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 
@@ -183,7 +187,8 @@ void CRDTGraph::delete_node(string name) {
 std::map<int, RoboCompDSR::EdgeAttribs> CRDTGraph::getEdges(int id) {
     if (in(id)) {
         auto n = get(id);
-        return n.fano;
+        if (n.id > 0) return n.fano;
+        else return std::map<int,RoboCompDSR::EdgeAttribs>();
     } else return std::map<int,RoboCompDSR::EdgeAttribs>();
 }
 
@@ -205,10 +210,14 @@ list<N> CRDTGraph::get_list() {
 N CRDTGraph::get(int id) {
     std::lock_guard<std::mutex> lock(_mutex);
     try {
-        if (in(id))
-            return nodes[id].readAsList().back();
+        if (in(id)) {
+            list<N> node_list = nodes[id].readAsList();
+            if (!node_list.empty()) return nodes[id].readAsList().back();
+            else return RoboCompDSR::Node{"empty",-1};
+        }
     } catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<id<<std::endl;
+        return RoboCompDSR::Node{"error",-1};
     }
 }
 
@@ -218,6 +227,7 @@ RoboCompDSR::AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::s
         return get(id).attrs.at(key);
     }
     catch(const std::exception &e){
+        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<id<<std::endl;
         return RoboCompDSR::AttribValue{"unknown", "unknown", 0};
     };
 }
@@ -281,7 +291,26 @@ RoboCompDSR::EdgeAttribs CRDTGraph::get_edge_attrib(int from, int to) {
 
 
 bool CRDTGraph::in(const int &id) {
-   return nodes.in(id);
+    return nodes.in(id);
+//    if (nodes.in(id)) {
+//        list<N> l = nodes[id].readAsList();
+//        if(nodes[id].readAsList().empty())
+//            return true;
+//        else
+//            return false;
+//    } else
+//        return false;
+}
+
+bool CRDTGraph::empty(const int &id) {
+    if (nodes.in(id)) {
+        list<N> l = nodes[id].readAsList();
+        if(nodes[id].readAsList().empty())
+            return true;
+        else
+            return false;
+    } else
+        return false;
 }
 
 
@@ -310,12 +339,13 @@ void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
 
 
 void CRDTGraph::join_delta_node(RoboCompDSR::AworSet aworSet) {
-//    std::cout<<__FUNCTION__<<": "<< aworSet.id<<endl;
     try{
-        nodes[aworSet.id].join(translateAwICEtoCRDT(aworSet.id, aworSet));
-        emit update_node_signal(aworSet.id,get(aworSet.id).type);
+        auto d = translateAwICEtoCRDT(aworSet.id, aworSet);
+//        std::lock_guard<std::mutex> lock(_mutex);
+        nodes[aworSet.id].join(d);
+        emit update_node_signal(aworSet.id,d.readAsList().back().type);
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
-    
+
 }
 
 void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
@@ -330,6 +360,7 @@ void CRDTGraph::join_full_graph(RoboCompDSR::OrMap full_graph) {
     //TODO: Improve. It is not the most efficient.
     for (auto &v : full_graph.m)
         for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsListWithId()) {
+//            std::lock_guard<std::mutex> lock(_mutex);
             nodes[v.first].add(awv.second, v.first);
             emit update_node_signal(v.first,get(v.first).type);
         }

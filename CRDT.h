@@ -56,6 +56,7 @@ namespace CRDT {
 
             void delete_node(int id);
             void delete_node(string name);
+            bool empty(const int & id);
 
             std::map<int, RoboCompDSR::EdgeAttribs> getEdges(int id);
             Nodes get();
@@ -69,6 +70,7 @@ namespace CRDT {
 
             template<typename Ta>
             Ta get_node_attrib_by_name(int id, const std::string &key){
+                std::cout<<__FUNCTION__<<"_Ta ID: "<<id<<", key:"<<key<<std::endl;
                 RoboCompDSR::AttribValue av = get_node_attrib_by_name(id, key);
                 return icevalue_to_nativetype<Ta>(key, av.value);
             }
