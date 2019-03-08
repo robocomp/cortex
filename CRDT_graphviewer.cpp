@@ -141,7 +141,7 @@ void GraphViewer::toggleSimulationSLOT()
 
 void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 {	
-	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
+	qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 	if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
@@ -150,7 +150,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 		gnode->setType( type );
 		scene.addItem(gnode);
 		gmap.insert(std::pair(id, gnode));
-	
+
 		// left table filling only if it is new
 		worker->tableWidgetNodes->setColumnCount(1);
 		worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"type"}); 
@@ -221,18 +221,18 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 		gnode->setPos(posx, posy);
 
 	auto e = gcrdt->getEdges(id);
-	if (!e.empty())
-	{
-		for (auto &[k,v] : e)
-			addEdgeSLOT(id, k, v.label);
-	}
+//	if (!e.empty())
+//	{
+//		for (auto &[k,v] : e)
+//			addEdgeSLOT(id, k, v.label);
+//	}
 
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
 	try {
-// 		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
+ 		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
 		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
 
 		if(gmap_edges.count(key) == 0) { 		// check if edge already exists
@@ -262,7 +262,8 @@ void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::str
 			worker->tableWidgetEdges->resizeColumnsToContents();
 			worker->tableWidgetEdges->show();
 		}
-	}catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+	}catch(const std::exception &e) {
+		std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<<" "<<e.what()<< std::endl;}
 }
 
 void GraphViewer::delEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &edge_tag)
