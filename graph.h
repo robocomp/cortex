@@ -24,6 +24,7 @@
 #include <vector>
 #include <variant>
 #include <qmat/QMatAll>
+#include <typeinfo>
 
 #define NO_PARENT -1
 
@@ -117,6 +118,7 @@ namespace DSR
 			/// Printing and visitors
 			///////////////////////////////////////////////////////////////////////////////////////////
 			std::string printVisitor(const MTypes &t);
+			std::pair<std::string, std::string> printVisitorWithType(const MTypes &t);
 			void print();
 			void saveToFile(const std::string &xml_file_path);
 			void readFromFile(const std::string &xml_file_path);

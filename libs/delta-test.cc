@@ -39,6 +39,7 @@
 #include <assert.h>
 #include "delta-crdts.cc"
 #include <time.h>
+#include "../../components/crdt_comp/src/DSRGraph.h"
 
 using namespace std;
 
@@ -736,9 +737,9 @@ void test_ormap() {
 
     cout << "--- Map F ---" << endl;
 
-    ormap<int, ormap<string, aworset<string>>> m7("x");
-    m7[2]["color"].add("red");
-    cout << m7 << endl;
+//    ormap<int, ormap<string, aworset<string>>> m7("x");
+//    m7[2]["color"].add("red");
+//    cout << m7 << endl;
 
 
 }
@@ -961,16 +962,16 @@ void example_ormap() {
 
     cout << my << endl; // in the "paint" key there is only "green"
 
-    ormap<int, ormap<string, aworset<string>>> ma("alice"), mb("bob");
-
-    ma[23]["color"].add("red at 23");
-    ma[44]["color"].add("blue at 44");
-    mb[44]["sound"].add("soft at 44");
-
-
-    ma.join(mb);
-
-    cout << ma << endl; // Map with two map entries, "44" with two entries
+//    ormap<int, ormap<string, aworset<string>>> ma("alice"), mb("bob");
+//
+//    ma[23]["color"].add("red at 23");
+//    ma[44]["color"].add("blue at 44");
+//    mb[44]["sound"].add("soft at 44");
+//
+//
+//    ma.join(mb);
+//
+//    cout << ma << endl; // Map with two map entries, "44" with two entries
 }
 
 void example_gmap() {
@@ -1302,8 +1303,46 @@ int main(int argc, char *argv[]) {
 //   example_bcounter();
 //   example_orseq();
 //    example_mvreg();
-    cout << "-------main-------" << endl;
-    ormap<int, aworset<string, int>, int> m1(0);
+
+    cout << "-------MAAAAAAAAAAAAAAAAAAAAAIN-------" << endl;
+    static ormap<int, aworset<string, int>, int> nodes(0);
+    static ormap<int, aworset<string, int>, int> nodes1(1);
+    int id = 1;
+    aworset<string, int> delta = nodes[id].add("Hi", id);
+
+    nodes1[id].join(delta);
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
+    delta = nodes[id].add("Bye", id);
+    nodes1[id].join(delta);
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
+    delta = nodes[id].add("Hi", id);
+    nodes1[id].join(delta);
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
+    delta = nodes[id].add("Hi", id);
+    nodes1[id].join(delta);
+    cout << "................................."<<endl;
+    cout << "Nodes " << nodes << endl;
+    cout << "Nodes1 " << nodes1 << endl;
+    cout << "Delta " <<  delta << endl;
+    cout << "................................."<<endl;
+
+//    ormap<int, aworset<RoboCompDSR::Node, int>, int> graph();
+//    auto test = RoboCompDSR::Node{"test", id};
+//    auto delta1 = graph[id].add(test, id);
+//    cout << graph << endl;
+//    cout << delta1 << endl;
 
 //    ormap<string,aworset<string,string>> aux("hola");
 //    aux["hola"].add("contenidocualquiera");
@@ -1324,15 +1363,15 @@ int main(int argc, char *argv[]) {
 //    aw4.add("hola2");
 //    m1["test4"] = aw4;
 //    m1["test4"].add("funciona?");
-    m1[1].add("hol",1);
-    m1[1].add("hola",1);
-    m1[2].add("adios",2);
+//    m1[1].add("hol",1);
+//    m1[1].add("hola",1);
+//    m1[2].add("adios",2);
 //        m1[2].add("paco");
 //        m1[2].add("juan");
 //        m1[2].add("antonio");
 //        m1[1].add("bob");
 //        m1[3].add("juana");
-    cout << m1 << endl;
+//    cout << m1 << endl;
 //        m1[4].add("funciona?");
 
 
