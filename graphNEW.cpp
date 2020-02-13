@@ -89,7 +89,10 @@ void Graph::readFromFile(const std::string &file_name)
 			else if(qname == "imu") color = "LightSalmon";
 			
 			gatts.insert(std::pair("color", color));
+			
 			this->addNodeAttribs(node_id, gatts);
+			
+
 			std::cout << __FILE__ << " " << __FUNCTION__ << "Node: " << node_id << " " <<  std::string((char *)stype) << std::endl;
 			
 			xmlFree(sid);

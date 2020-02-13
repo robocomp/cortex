@@ -39,7 +39,8 @@ namespace DSR
             ~NodePrx()                 		
 			{ 
 				//std::cout << " destructor size " << mutexes->size() << std::endl;  
-				mutexes->at(prx->id)->unlock(); mutexes->erase(prx->id); 
+				//std::cout << "unblocked " << prx->id << std::endl;
+				mutexes->at(prx->id)->unlock(); 
 				//std::cout << "size in destructor " << mutexes->size() << std::endl;
 			}
             T* operator->()           		{ return prx;};
@@ -65,6 +66,7 @@ namespace DSR
 			////////////////////////////////////////////////////////////////////////////////////////////
             std::shared_ptr<NodePrx<RoboCompDSR::Content>> getNodePtr(IDType id) 
             { 
+				Lock l(mutex);
                 try
                 {
 					//NodePrx<RoboCompDSR::Content> *prx = new NodePrx<RoboCompDSR::Content>(&nodes.at(id));
@@ -78,16 +80,16 @@ namespace DSR
             };
             RoboCompDSR::Content getNode(IDType id) const 
             { 
+				Lock l(mutex);
                 try
                 {
-					//std::cout << "size in getNode " << mutexes->size() << std::endl;
-                    return nodes.at(id);
+	                return nodes.at(id);
                 }
                 catch(const std::exception &e){ std::cout << "Graph::getNode Exception - id "<< id << " not found " << std::endl; throw e; };
             };
             void replaceNode(IDType id, RoboCompDSR::Content &node)      
             { 
-				//Lock l(mutex);
+				Lock l(mutex);
                 try
                 {
                     auto &n = *(getNodePtr(id).get());
@@ -168,7 +170,7 @@ namespace DSR
 		//private:
             G nodes;    // Ice defined graph
 			std::shared_ptr<std::map<IDType, std::shared_ptr<std::mutex>>> mutexes;
-			std::recursive_mutex mutex;
+			mutable std::recursive_mutex mutex;
 
 
             /// iterator so the class works in range loops only for private use
