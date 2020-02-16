@@ -296,7 +296,7 @@ void GraphViewer::delNodeSLOT(int id)
  {
 	try 
 	{
-		//std::cout << graph->getNodeType(id) << std::endl;
+		std::cout << __FUNCTION__ << id << std::endl;
 		float posx = std::get<float>(attribs.at("pos_x"));
 		float posy = std::get<float>(attribs.at("pos_y"));
 		auto &gnode = gmap.at(id);

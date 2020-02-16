@@ -57,8 +57,9 @@ class DoLaserStuff : public QGraphicsView
       setRenderHint(QPainter::Antialiasing);
       fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
       scale(1, -1);
-      drawLaserSLOT(node_id_);
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoLaserStuff::drawLaserSLOT);
+      //drawLaserSLOT(node_id_, );
+      //QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoLaserStuff::drawLaserSLOT);
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_node_signal, this, &DoLaserStuff::drawLaserSLOT);
       show();
     };
 
@@ -68,13 +69,15 @@ class DoLaserStuff : public QGraphicsView
   };
 
   public slots:
-    void drawLaserSLOT(const std::int32_t &id)
+    //void drawLaserSLOT(const std::int32_t &id, const RoboCompDSR::Attribs &attribs)
+    void drawLaserSLOT( int id, const std::string &type )
     {
+      if( type != "laser")
+        return;
       try
       {
         std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
         const vector<float> lAngles = graph->get_node_attrib_by_name<vector<float>>(id, "laser_data_angles");
-        std::cout << __FUNCTION__ <<std::endl;
         const vector<float> lDists = graph->get_node_attrib_by_name<vector<float>>(id, "laser_data_dists");
 
         QPolygonF polig;

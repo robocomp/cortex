@@ -182,8 +182,6 @@ void CRDTGraph::delete_node(string name) {
 
 }
 
-
-
 std::map<int, RoboCompDSR::EdgeAttribs> CRDTGraph::getEdges(int id) {
     if (in(id)) {
         auto n = get(id);
@@ -620,6 +618,7 @@ void CRDTGraph::subscription_thread(bool showReceived) {
                 auto sample = reader.getNextUnread(); // Get sample
                 if(showReceived)
                     std::cout << "Received: node " << sample.getValue() << " from " << sample.getKey() << std::endl;
+                std::cout << sample.getValue() << std::endl;
                 join_delta_node(sample.getValue());
             }
             catch (const std::exception &ex) { cerr << ex.what() << endl; }
