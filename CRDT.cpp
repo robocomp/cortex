@@ -23,6 +23,7 @@ CRDTGraph::CRDTGraph(int root, std::string name) : graph_root(root), agent_name(
     char *argv[0];
     node = DataStorm::Node(argc, argv);
     work = true;
+    
     // General topic update
     topic = std::make_shared < DataStorm::Topic < std::string, RoboCompDSR::AworSet >> (node, "DSR");
     topic->setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAll});

@@ -140,13 +140,13 @@ namespace CRDT {
 
 
         signals:
-            void update_node_signal(const std::int32_t, const std::string &type); // Signal for data update CRDT
+            void update_node_signal(const std::int32_t, const std::string &type); // Signal to update CRDT
 
-            void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs); //Signal for show node attribs.
-            void update_edge_signal(const std::int32_t from, const std::int32_t to); // Signal for show edge attribs.
+            void update_attrs_signal(const std::int32_t &id, const RoboCompDSR::Attribs &attribs); //Signal to show node attribs.
+            void update_edge_signal(const std::int32_t from, const std::int32_t to); // Signal to show edge attribs.
 
-            void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal for del edge.
-            void del_node_signal(const std::int32_t from); // Signal for del node.
+            void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal to del edge.
+            void del_node_signal(const std::int32_t from); // Signal to del node.
 
     };
 }
