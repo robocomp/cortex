@@ -63,7 +63,8 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MT
             node.fano.at(to).attrs.insert(std::pair(att_name, RoboCompDSR::AttribValue{std::get<0>(v), std::get<1>(v), std::get<2>(v)}));
             insert_or_assign(from, node);
             emit update_edge_signal(from, to);
-        }  else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
+        }  
+        else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
@@ -313,7 +314,8 @@ bool CRDTGraph::empty(const int &id) {
 }
 
 
-void CRDTGraph::insert_or_assign(int id, const N &node) {
+void CRDTGraph::insert_or_assign(int id, const N &node) 
+{
     try {
         auto delta = nodes[id].add(node, id);
         writer->update(translateAwCRDTtoICE(id, delta));
@@ -627,40 +629,53 @@ void CRDTGraph::subscription_thread(bool showReceived) {
     }
 }
 
+// Data Storm based
+// void CRDTGraph::fullgraph_server_thread() {
+//     std::cout << __FUNCTION__ << "->Entering thread to attend full graph requests" << std::endl;
+//     // create topic and filtered reader for new graph requests
+//     DataStorm::Topic <std::string, RoboCompDSR::GraphRequest> topic_graph_request(node, "DSR_GRAPH_REQUEST");
+//     DataStorm::FilteredKeyReader <std::string, RoboCompDSR::GraphRequest> new_graph_reader(topic_graph_request,
+//                                                                                            DataStorm::Filter<std::string>(
+//                                                                                                    "_regex",
+//                                                                                                    filter.c_str()));
+//     topic_graph_request.setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
+//     topic_graph_request.setReaderDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
+//     auto processSample = [this](auto sample) {
+//         if (work) {
+//             work = false;
+//             std::cout << sample.getValue().from << " asked for full graph" << std::endl;
+//             DataStorm::Topic <std::string, RoboCompDSR::OrMap> topic_answer(node, "DSR_GRAPH_ANSWER");
+//             DataStorm::SingleKeyWriter <std::string, RoboCompDSR::OrMap> writer(topic_answer, agent_name,
+//                                                                                 agent_name + " Full Graph Answer");
 
-void CRDTGraph::fullgraph_server_thread() {
+//             topic_answer.setWriterDefaultConfig(
+//                     {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
+//             topic_answer.setReaderDefaultConfig(
+//                     {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
+//             writer.add(RoboCompDSR::OrMap{id(), map(), context()});
+//             for (auto &[k,v] : map())
+//                 std::cout << k << ","<< v<<std::endl;
+//             std::cout << "Full graph written from lambda" << std::endl;
+//             work = true;
+//         }
+//     };
+//     new_graph_reader.onSamples([processSample](const auto &samples) { for (const auto &s : samples) processSample(s); },
+//                                processSample);
+//     node.waitForShutdown();
+// }
+
+void CRDTGraph::fullgraph_server_thread() 
+{
     std::cout << __FUNCTION__ << "->Entering thread to attend full graph requests" << std::endl;
-    // create topic and filtered reader for new graph requests
-    DataStorm::Topic <std::string, RoboCompDSR::GraphRequest> topic_graph_request(node, "DSR_GRAPH_REQUEST");
-    DataStorm::FilteredKeyReader <std::string, RoboCompDSR::GraphRequest> new_graph_reader(topic_graph_request,
-                                                                                           DataStorm::Filter<std::string>(
-                                                                                                   "_regex",
-                                                                                                   filter.c_str()));
-    topic_graph_request.setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
-    topic_graph_request.setReaderDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
-    auto processSample = [this](auto sample) {
-        if (work) {
-            work = false;
-            std::cout << sample.getValue().from << " asked for full graph" << std::endl;
-            DataStorm::Topic <std::string, RoboCompDSR::OrMap> topic_answer(node, "DSR_GRAPH_ANSWER");
-            DataStorm::SingleKeyWriter <std::string, RoboCompDSR::OrMap> writer(topic_answer, agent_name,
-                                                                                agent_name + " Full Graph Answer");
+   
+    //writer.add(RoboCompDSR::OrMap{id(), map(), context()});
+    for (auto &[k,v] : map())
+        std::cout << k << ","<< v<<std::endl;
+    std::cout << "Full graph written from lambda" << std::endl;
+    work = true;
+ };
 
-            topic_answer.setWriterDefaultConfig(
-                    {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
-            topic_answer.setReaderDefaultConfig(
-                    {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
-            writer.add(RoboCompDSR::OrMap{id(), map(), context()});
-            for (auto &[k,v] : map())
-                std::cout << k << ","<< v<<std::endl;
-            std::cout << "Full graph written from lambda" << std::endl;
-            work = true;
-        }
-    };
-    new_graph_reader.onSamples([processSample](const auto &samples) { for (const auto &s : samples) processSample(s); },
-                               processSample);
-    node.waitForShutdown();
-}
+
 
 
 
