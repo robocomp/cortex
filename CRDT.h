@@ -13,6 +13,11 @@
 #include "libs/DSRGraph.h"
 #include "libs/delta-crdts.cc"
 #include <DataStorm/DataStorm.h>
+
+#include "fast_rtps/dsrparticipant.h"
+#include "fast_rtps/dsrpublisher.h"
+#include "fast_rtps/dsrsubscriber.h"
+
 #include <any>
 #include <memory>
 #include <vector>
@@ -112,7 +117,7 @@ namespace CRDT {
             void read_from_file(const std::string &xml_file_path);
             void replace_node(int id, const N &node);
 
-            // Threads
+            // hreads
             void start_fullgraph_request_thread();
             void start_fullgraph_server_thread();
             void start_subscription_thread(bool showReceived);
@@ -146,6 +151,12 @@ namespace CRDT {
             // Translators
             RoboCompDSR::AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
             aworset<N, int> translateAwICEtoCRDT(int id, RoboCompDSR::AworSet &data);
+
+            // RTSP participant
+            DSRParticipant dsrparticipant;
+		    DSRPublisher dsrpub;
+		    DSRSubscriber dsrsub;
+            DSRSubscriber dsrsub_graph_request;
 
 
         signals:  // for graphics update

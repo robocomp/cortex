@@ -24,6 +24,14 @@ CRDTGraph::CRDTGraph(int root, std::string name) : graph_root(root), agent_name(
     node = DataStorm::Node(argc, argv);
     work = true;
     
+    // RTPS Create participant 
+	auto [suc , participant_handle] = dsrparticipant.init();
+	// RTPS Initialize publisher
+	dsrpub.init(participant_handle, "DSRGraphPubSubTopic", dsrparticipant.getDSRTopicName());
+	 // RTPS Initialize subscriptor
+	dsrsub.init(participant_handle, "DSRGraphPubSubTopic", dsrparticipant.getDSRTopicName());
+    dsrsub_graph_request.init(participant_handle, "GraphRequestPubSubTopic", dsrparticipant.getRequestTopicName());
+
     // General topic update
     topic = std::make_shared < DataStorm::Topic < std::string, RoboCompDSR::AworSet >> (node, "DSR");
     topic->setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAll});
@@ -669,6 +677,7 @@ void CRDTGraph::fullgraph_server_thread()
     std::cout << __FUNCTION__ << "->Entering thread to attend full graph requests" << std::endl;
    
     //writer.add(RoboCompDSR::OrMap{id(), map(), context()});
+
     for (auto &[k,v] : map())
         std::cout << k << ","<< v<<std::endl;
     std::cout << "Full graph written from lambda" << std::endl;
