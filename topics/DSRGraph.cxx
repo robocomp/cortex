@@ -332,7 +332,8 @@ size_t EdgeAttribs::getMaxCdrSerializedSize(size_t current_alignment)
 
     for(size_t a = 0; a < 100; ++a)
     {
-        current_alignment += 255 + eprosima::fastcdr::Cdr::alignment(current_alignment, 255);
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
 
         current_alignment += AttribValue::getMaxCdrSerializedSize(current_alignment);
     }
@@ -613,7 +614,8 @@ size_t Node::getMaxCdrSerializedSize(size_t current_alignment)
 
     for(size_t a = 0; a < 100; ++a)
     {
-        current_alignment += 255 + eprosima::fastcdr::Cdr::alignment(current_alignment, 255);
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
 
         current_alignment += AttribValue::getMaxCdrSerializedSize(current_alignment);
     }
@@ -623,6 +625,8 @@ size_t Node::getMaxCdrSerializedSize(size_t current_alignment)
     for(size_t a = 0; a < 100; ++a)
     {
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
 
         current_alignment += EdgeAttribs::getMaxCdrSerializedSize(current_alignment);
     }
@@ -850,7 +854,7 @@ void Node::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DSRGraphTopic::DSRGraphTopic()
 {
-    // m_DSRGraph com.eprosima.idl.parser.typecode.MapTypeCode@365c30cc
+    // m_DSRGraph com.eprosima.idl.parser.typecode.MapTypeCode@4148db48
 
 
 }
@@ -895,6 +899,8 @@ size_t DSRGraphTopic::getMaxCdrSerializedSize(size_t current_alignment)
     for(size_t a = 0; a < 100; ++a)
     {
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
 
         current_alignment += AttribValue::getMaxCdrSerializedSize(current_alignment);
     }
@@ -1286,9 +1292,9 @@ void PairInt::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotContext::DotContext()
 {
-    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@5d20e46
+    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@ba8d91c
 
-    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@709ba3fb
+    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@7364985f
 
 
 }
@@ -1339,6 +1345,8 @@ size_t DotContext::getMaxCdrSerializedSize(size_t current_alignment)
     for(size_t a = 0; a < 100; ++a)
     {
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
 
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
@@ -1498,9 +1506,9 @@ void DotContext::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotKernel::DotKernel()
 {
-    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@7ff2a664
+    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@3d36e4cd
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@525b461a
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@6a472554
 
 
 }
@@ -1550,7 +1558,7 @@ size_t DotKernel::getMaxCdrSerializedSize(size_t current_alignment)
 
     for(size_t a = 0; a < 100; ++a)
     {
-        current_alignment += 0 + eprosima::fastcdr::Cdr::alignment(current_alignment, 0);
+        current_alignment += PairInt::getMaxCdrSerializedSize(current_alignment);
 
         current_alignment += Node::getMaxCdrSerializedSize(current_alignment);
     }
@@ -1692,9 +1700,9 @@ void DotKernel::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 AworSet::AworSet()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6591f517
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@f0f2775
     m_id = 0;
-    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@345965f2
+    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@5a4aa2f2
 
 
 }
@@ -1864,11 +1872,11 @@ void AworSet::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 OrMap::OrMap()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@279ad2e3
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@429bd883
     m_id = 0;
-    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@58134517
+    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@4d49af10
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@525b461a
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@6a472554
 
 
 }
@@ -1927,6 +1935,8 @@ size_t OrMap::getMaxCdrSerializedSize(size_t current_alignment)
     for(size_t a = 0; a < 100; ++a)
     {
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
 
         current_alignment += AworSet::getMaxCdrSerializedSize(current_alignment);
     }
