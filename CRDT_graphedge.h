@@ -67,7 +67,7 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          auto rtvalue = graph->get_edge_attrib(from, to).attrs.at("RT").value;
+          auto rtvalue = graph->get_edge_attrib(from, to).attrs().at("RT").value();
           auto mat = graph->icevalue_to_nativetype<RTMat>("RT", rtvalue);
 
           //mat.print("mat");

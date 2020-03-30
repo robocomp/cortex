@@ -103,16 +103,16 @@ void GraphViewer::createGraph()
 		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
 //			std::cout << "Edges from "<<node.second.readAsList().back().id<<std::endl;
-			std::list<RoboCompDSR::Node> ns;
+			std::list<Node> ns;
 			try
 			{
 				ns = node.second.readAsList();
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<" Error accessing edge" << node.second.readAsList().back() <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
-			for( auto edge :ns.back().fano)
+			for( auto edge :ns.back().fano())
 			{
 				try{
-					addEdgeSLOT(edge.second.from, edge.second.to, edge.second.label);
+					addEdgeSLOT(edge.second.from(), edge.second.to(), edge.second.label());
 				} catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 			}
 		}
@@ -195,14 +195,14 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 
 		try
 		{
-			auto qname = gcrdt->get_node_attrib_by_name(id, "name").value;
+			auto qname = gcrdt->get_node_attrib_by_name(id, "name").value();
 			gnode->setTag(qname);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
 
 		try
 		{
-			auto color = gcrdt->get_node_attrib_by_name(id, "color").value;
+			auto color = gcrdt->get_node_attrib_by_name(id, "color").value();
 			gnode->setColor(color);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;};
@@ -213,8 +213,8 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
     float posx = 10; float posy = 10;
 	try
 	{
-        posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(id, "pos_x").value);
-        posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(id, "pos_y").value);
+        posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(id, "pos_x").value());
+        posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(id, "pos_y").value());
 	}
 	catch(const std::exception &e){ };
 	if(posx != gnode->x() or posy != gnode->y())

@@ -69,7 +69,7 @@ class DoLaserStuff : public QGraphicsView
   };
 
   public slots:
-    //void drawLaserSLOT(const std::int32_t &id, const RoboCompDSR::Attribs &attribs)
+    //void drawLaserSLOT(const std::int32_t &id, const Attribs &attribs)
     void drawLaserSLOT( int id, const std::string &type )
     {
       if( type != "laser")
@@ -116,7 +116,7 @@ class DoRGBDStuff : public  QLabel
       resize(640,480);
       setWindowTitle("RGBD");
       setParent(this);
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const RoboCompDSR::Attribs &attrs){
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const map<string, AttribValue> &attrs){
                             const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(node_id, "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
@@ -134,7 +134,7 @@ class DoTableStuff : public  QTableWidget
     {
       qRegisterMetaType<std::int32_t>("std::int32_t");
       qRegisterMetaType<std::string>("std::string");
-      qRegisterMetaType<RoboCompDSR::Attribs>("RoboCompDSR::Attribs");
+      qRegisterMetaType<map<string, AttribValue>>("Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       setWindowTitle("Node " + QString::fromStdString(graph->get_node_type(node_id)) + " [" + QString::number(node_id) + "]");
@@ -145,7 +145,7 @@ class DoTableStuff : public  QTableWidget
       for( auto &[k, v] : graph->get_node_attribs_crdt(node_id) )
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value)));
+        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value())));
         i++;
       }
       horizontalHeader()->setStretchLastSection(true);
@@ -156,13 +156,13 @@ class DoTableStuff : public  QTableWidget
     };
     
   public slots:
-    void drawSLOT(const std::int32_t &id, const RoboCompDSR::Attribs &attribs)
+    void drawSLOT(const std::int32_t &id, const map<string, AttribValue> &attribs)
     {
       int i= 0; 
       for(auto &[k,v]: attribs)
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET 
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value))));
+        setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value()))));
         i++;
       }
     }

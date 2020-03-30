@@ -1,0 +1,69 @@
+
+    struct AttribValue
+    {
+        string type;
+        string value;
+        long length;
+    };
+
+
+
+    struct EdgeAttribs { 
+		string label;
+		long from;
+        long to;
+		map<string, AttribValue>    attrs; 
+	};
+
+
+    struct Node { 
+        string type;
+        long id;
+		map<string, AttribValue>   attrs; 
+        map<unsigned long, EdgeAttribs> fano;
+    };
+
+    struct DSRGraphTopic
+    {  
+        map<unsigned long, AttribValue> DSRGraph;
+    };
+
+
+    // Topic for full graph requests
+    struct GraphRequest
+    {
+        string from;
+    };
+
+    // --- Test: OrMap with AworSet
+
+    struct PairInt {
+        long first;
+        long second;
+    };
+    
+
+    struct DotContext {
+        map<long, long> cc;
+        sequence<PairInt> dc;
+    };
+
+
+    struct DotKernel {
+        map<PairInt, Node> ds;
+        DotContext cbase;
+    };
+
+    struct AworSet {
+        long id;
+        DotKernel dk; // Dot kernel
+    };
+
+    struct OrMap {
+        long id;
+        map<unsigned long, AworSet> m;
+        DotContext cbase;
+    };
+
+
+
