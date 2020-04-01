@@ -1,8 +1,12 @@
 //
 // Created by crivac on 5/02/19.
 //
+
+
+
 #include "CRDT.h"
 #include <fstream>
+#include <unistd.h>
 #include <QXmlSimpleReader>
 #include <QXmlInputSource>
 #include <QXmlDefaultHandler>
@@ -32,93 +36,17 @@ CRDTGraph::CRDTGraph(int root, std::string name) {
     //node = DataStorm::Node(argc, argv);
     work = true;
 
-    std::cout << "Aqui llega" << std::endl;
     // RTPS Create participant 
 	auto [suc , participant_handle] = dsrparticipant.init();
-
-    //no se necesita capturar variables, creo
-    auto lambda_general_topic = [] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
-
-
-
-        if (*work) {
-                try {
-                    eprosima::fastrtps::SampleInfo_t m_info;
-                    AworSet sample;
-                    if (sub->takeNextData(&sample, &m_info)) { // Get sample
-                        if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
-                            if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
-                                std::cout << "Received: node " << sample << " from " << m_info.sample_identity.writer_guid() << std::endl;
-                                graph->join_delta_node(sample);
-                            }
-                        }
-                    }
-                }
-                catch (const std::exception &ex) { cerr << ex.what() << endl; }
-            }
-
-    };
 
     // General Topic
 	// RTPS Initialize publisher
 	dsrpub.init(participant_handle, "DSR", dsrparticipant.getDSRTopicName());
-	 // RTPS Initialize subscriptor
-	dsrsub.init(participant_handle, "DSR", dsrparticipant.getDSRTopicName(), Functor(this, &work, lambda_general_topic));
-    
-    auto lambda_graph_request = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
-        
-        eprosima::fastrtps::SampleInfo_t m_info;
-        GraphRequest sample;
-        if (sub->takeNextData(&sample, &m_info)) { // Get sample
-                if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
-                    if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
-                    std::cout << "Received Full Graph request: from " << m_info.sample_identity.writer_guid() << std::endl;
-                }
-            }
-        }
-        if (*work) {
-            *work = false;
-            OrMap mp;
-            mp.id(graph->id());
-            mp.m(graph->Map());
-            mp.cbase(graph->context());
-            dsrpub_request_answer.write(&mp);
-            //writer.add(OrMap{id(), map(), context()});
-            for (auto &[k,v] : Map())
-                std::cout << k << ","<< v<<std::endl;
-            std::cout << "Full graph written from lambda" << std::endl;
-            *work = true;
-        }
-    };
-    // Request Topic
     dsrpub_graph_request.init(participant_handle, "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName());
-    dsrsub_graph_request.init(participant_handle, "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName(), Functor(this, &work, lambda_graph_request));
-
-
-    auto lambda_request_answer = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
-                                                                                            
-   
-        
-        GraphRequest gr;
-        gr.from(graph->agent_name);
-        dsrpub_graph_request.write(&gr);
-
-        eprosima::fastrtps::SampleInfo_t m_info;
-        OrMap sample;
-        if (sub->takeNextData(&sample, &m_info)) { // Get sample
-                    if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
-                        if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
-                        std::cout << "Received Full Graph from " << m_info.sample_identity.writer_guid() << std::endl;
-                    }
-                }
-        }
-        graph->join_full_graph(sample);
-        std::cout << "Synchronized." <<std::endl;
-
-    };
-    // Answer Topic
     dsrpub_request_answer.init(participant_handle, "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName());
-    dsrsub_request_answer.init(participant_handle, "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(), Functor(this, &work, lambda_request_answer));
+
+
+
 
 
     // General topic update
@@ -294,6 +222,7 @@ void CRDTGraph::delete_node(int id) {
                     auto delta = nodes[node_to_delete_edge.id()].add(node_to_delete_edge, node_to_delete_edge.id());
                     //writer->update(translateAwCRDTtoICE(node_to_delete_edge.id(), delta));
                     auto val = translateAwCRDTtoICE(node_to_delete_edge.id(), delta);
+
                     dsrpub.write(&val);
                     //TODO: writer
                     emit del_edge_signal(node_to_delete_edge.id(), id, l);
@@ -510,6 +439,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
     try{
         auto d = translateAwICEtoCRDT(aworSet.id(), aworSet);
 //        std::lock_guard<std::mutex> lock(_mutex);
+        //std::cout << aworSet.id() << std::endl;
         nodes[aworSet.id()].join(d);
         emit update_node_signal(aworSet.id(),d.readAsList().back().type());
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
@@ -517,21 +447,34 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) {
+
     // Context
     dotcontext<int> dotcontext_aux;
     auto m = static_cast<std::map<int, int>>(full_graph.cbase().cc());
     std::set <pair<int, int>> s;
     for (auto &v : full_graph.cbase().dc())
         s.insert(std::make_pair(v.first(), v.second()));
-    dotcontext_aux.setContext(m, s);
+    //dotcontext_aux.setContext(m, s);
+    nodes.context().setContext(m, s);
+
+    for (auto &val : full_graph.m())
+    {
+        auto awor = translateAwICEtoCRDT(val.first, val.second);
+        nodes[val.first] = awor;
+        emit update_node_signal(val.first, get(val.first).type());
+
+    }
+
     //Map
     //TODO: Improve. It is not the most efficient.
-    for (auto &v : full_graph.m())
+    /*for (auto &v : full_graph.m())
         for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsListWithId()) {
 //            std::lock_guard<std::mutex> lock(_mutex);
             nodes[v.first].add(awv.second, v.first);
+            //nodes[awv.first].add(awv.second, awv.first);
             emit update_node_signal(v.first,get(v.first).type());
         }
+    */
 }
 
 
@@ -752,18 +695,20 @@ void CRDTGraph::replace_node(int id, const N &node) {
 
 
 void CRDTGraph::start_fullgraph_request_thread() {
-    request_thread = std::thread(&CRDTGraph::fullgraph_request_thread, this);
+    //request_thread = std::thread(&CRDTGraph::fullgraph_request_thread, this);
+    fullgraph_request_thread();
 }
 
 
 void CRDTGraph::start_fullgraph_server_thread() {
-    server_thread = std::thread(&CRDTGraph::fullgraph_server_thread, this);
+    //server_thread = std::thread(&CRDTGraph::fullgraph_server_thread, this);
+    fullgraph_server_thread();
 }
 
 
 void CRDTGraph::start_subscription_thread(bool showReceived) {
-    read_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
-
+    //read_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
+    subscription_thread(showReceived);
 }
 
 
@@ -828,6 +773,34 @@ void CRDTGraph::subscription_thread(bool showReceived) {
         }
     }
     */
+
+
+	 // RTPS Initialize subscriptor
+    auto lambda_general_topic = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
+        if (*work) {
+            try {
+                eprosima::fastrtps::SampleInfo_t m_info;
+                AworSet sample;
+                //read or take
+                if (sub->takeNextData(&sample, &m_info)) { // Get sample
+                    if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
+                        if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
+                            //std::cout << " Received: node " << sample << " from " << m_info.sample_identity.writer_guid() << std::endl;
+                            std::cout << " Received: node from: " << m_info.sample_identity.writer_guid() << std::endl;
+                            graph->join_delta_node(sample);
+                        } /*else {
+                                std::cout << "filtered" << std::endl;
+                            }*/
+                    }
+                }
+            }
+            catch (const std::exception &ex) { cerr << ex.what() << endl; }
+        }
+
+    };
+    dsrpub_call = NewMessageFunctor(this, &work, lambda_general_topic);
+	auto res = dsrsub.init(dsrparticipant.getParticipant(), "DSR", dsrparticipant.getDSRTopicName(), dsrpub_call);
+    std::cout << (res == true ? "Ok" : "Error") << std::endl;
 }
 
 // Data Storm based
@@ -868,29 +841,83 @@ void CRDTGraph::subscription_thread(bool showReceived) {
 void CRDTGraph::fullgraph_server_thread() 
 {
     std::cout << __FUNCTION__ << "->Entering thread to attend full graph requests" << std::endl;
-   
-    //DSRSubscriber new_graph_reader;
-    //new_graph_reader.init(participant_handle, "GraphRequestPubSubTopic", dsrparticipant.getRequestTopicName());
+    // Request Topic
 
-    //OrMap omp;
-    //omp.id(id());
-    //omp.map(map());
-    //omp.context(context());
+    auto lambda_graph_request = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
 
-    //dsrpub.write((void *) omp);
-    //writer.add(OrMap{id(), map(), context()});
-    /*
-    for (auto &[k,v] : Map())
-        std::cout << k << ","<< v<<std::endl;
-    std::cout << "Full graph written from lambda" << std::endl;
-    work = true;*/
- };
+        eprosima::fastrtps::SampleInfo_t m_info;
+        GraphRequest sample;
+        //readNextData o takeNextData
+        if (sub->takeNextData(&sample, &m_info)) { // Get sample
+            if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
+                if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
+                    std::cout << " Received Full Graph request: from " << m_info.sample_identity.writer_guid()
+                              << std::endl;
+                    //if (*work) {
+                    *work = false;
+                    OrMap mp;
+                    mp.id(graph->id());
+                    mp.m(graph->Map());
+                    mp.cbase(graph->context());
+                    std::cout << "nodos enviados: " << mp.m().size()  << std::endl;
+
+                    auto res_write = dsrpub_request_answer.write(&mp);
+                    //std::cout << (res_write == true ? "Ok" : "Error") << std::endl;
+
+                    //writer.add(OrMap{id(), map(), context()});
+                    for (auto &[k, v] : Map())
+                        std::cout << k << "," << v << std::endl;
+                    std::cout << "Full graph written" << std::endl;
+                    *work = true;
+                    //}
+                }
+            }
+        }
+
+    };
+    dsrpub_graph_request_call = NewMessageFunctor(this, &work, lambda_graph_request);
+
+    auto res = dsrsub_graph_request.init(dsrparticipant.getParticipant(), "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName(), dsrpub_graph_request_call);
+
+
+};
 
 
 
 
 
 void CRDTGraph::fullgraph_request_thread() {
+    
+
+    // Answer Topic
+    auto lambda_request_answer = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
+
+        eprosima::fastrtps::SampleInfo_t m_info;
+        OrMap sample;
+        if (sub->takeNextData(&sample, &m_info)) { // Get sample
+            if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
+                if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
+                    std::cout << " Received Full Graph from " << m_info.sample_identity.writer_guid() << " whith " << sample.m().size() << " elements" << std::endl;
+                    graph->join_full_graph(sample);
+                    std::cout << "Synchronized." <<std::endl;
+                }
+            }
+        }
+    };
+
+    dsrpub_request_answer_call = NewMessageFunctor(this, &work, lambda_request_answer);
+    auto res = dsrsub_request_answer.init(dsrparticipant.getParticipant(), "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(),dsrpub_request_answer_call);
+
+    //Si no pongo esto no funciona
+    sleep(1);
+
+    std::cout << " Requesting the complete graph " << std::endl;
+    GraphRequest gr;
+    gr.from(agent_name);
+    dsrpub_graph_request.write(&gr);
+
+    //TODO: Eliminar la suscripción después de terminar?.
+    
     /*
     std::cout << __FUNCTION__ << ":" << __LINE__ << "-> Initiating request for full graph requests" << std::endl;
 //    std::chrono::time_point <std::chrono::system_clock> start_clock = std::chrono::system_clock::now();

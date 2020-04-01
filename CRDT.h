@@ -14,9 +14,9 @@
 #include "libs/delta-crdts.cc"
 //#include <DataStorm/DataStorm.h>
 
-#include "../components/crdt_rtps_dsr/src/fast_rtps/dsrparticipant.h"
-#include "../components/crdt_rtps_dsr/src/fast_rtps/dsrpublisher.h"
-#include "../components/crdt_rtps_dsr/src/fast_rtps/dsrsubscriber.h"
+#include "fast_rtps/dsrparticipant.h"
+#include "fast_rtps/dsrpublisher.h"
+#include "fast_rtps/dsrsubscriber.h"
 
 #include "topics/DSRGraphPubSubTypes.h"
 
@@ -45,16 +45,19 @@ class CRDTGraph : public QObject
 {
     Q_OBJECT
 public:
-    class Functor
+    class NewMessageFunctor
     {
     public:
         CRDTGraph *graph;
         bool *work;
         std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f;
 
-        Functor(CRDTGraph *graph_, bool *work_,
+        NewMessageFunctor(CRDTGraph *graph_, bool *work_,
                 std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f_)
-            : graph(graph_), work(work_), f(f_){};
+            : graph(graph_), work(work_), f(std::move(f_)){}
+
+        NewMessageFunctor() {};
+
 
         void operator()(eprosima::fastrtps::Subscriber *sub) { f(sub, work, graph); };
     };
@@ -174,12 +177,15 @@ private:
     DSRParticipant dsrparticipant;
     DSRPublisher dsrpub;
     DSRSubscriber dsrsub;
+    NewMessageFunctor dsrpub_call;
 
     DSRSubscriber dsrsub_graph_request;
     DSRPublisher dsrpub_graph_request;
+    NewMessageFunctor dsrpub_graph_request_call;
 
     DSRSubscriber dsrsub_request_answer;
     DSRPublisher dsrpub_request_answer;
+    NewMessageFunctor dsrpub_request_answer_call;
 
 signals:                                                                  // for graphics update
     void update_node_signal(const std::int32_t, const std::string &type); // Signal to update CRDT
