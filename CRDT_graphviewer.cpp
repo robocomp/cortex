@@ -112,7 +112,7 @@ void GraphViewer::createGraph()
 			for( auto edge :ns.back().fano())
 			{
 				try{
-					addEdgeSLOT(edge.second.from(), edge.second.to(), edge.second.label());
+					addEdgeSLOT(edge.from(), edge.to(), edge.label());
 				} catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 			}
 		}

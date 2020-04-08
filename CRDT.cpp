@@ -7,6 +7,7 @@
 #include "CRDT.h"
 #include <fstream>
 #include <unistd.h>
+#include <algorithm>
 #include <QXmlSimpleReader>
 #include <QXmlInputSource>
 #include <QXmlDefaultHandler>
@@ -77,9 +78,9 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
             ea.label(label_);
             ea.from(from);
             ea.to(to);
-            ea.attrs(map<std::string, AttribValue>());
+            ea.attrs(vector<AttribValue>());
             
-            n.fano().insert(std::pair(to, ea));
+            n.fano().push_back(ea);
             insert_or_assign(from, n);
             emit update_edge_signal(from, to);
         } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
@@ -99,10 +100,14 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MT
             av.type(std::get<0>(v));
             av.value( std::get<1>(v));
             av.length(std::get<2>(v));
+            av.key(att_name);
 
-            node.fano().at(to).attrs().insert(std::pair(att_name, av));
-            insert_or_assign(from, node);
-            emit update_edge_signal(from, to);
+            auto fano_at = std::find_if( node.fano().begin(),  node.fano().end(), [&to](const auto val) { return val.to() == to;});
+            if (fano_at != node.fano().end()) {
+                fano_at->attrs().push_back(av);
+                insert_or_assign(from, node);
+                emit update_edge_signal(from, to);
+            } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
         }  
         else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
@@ -118,25 +123,44 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, std::str
             av.type(att_type);
             av.value( att_value);
             av.length(length);
+            av.key(att_name);
 
-            node.fano().at(to).attrs().insert(std::pair(att_name, av));
-            insert_or_assign(from, node);
-            emit update_edge_signal(from, to);
+            auto fano_at = std::find_if( node.fano().begin(),  node.fano().end(), [&to](const auto val) { return val.to() == to;});
+            if (fano_at != node.fano().end()) {
+                fano_at->attrs().push_back(av);
+                insert_or_assign(from, node);
+                emit update_edge_signal(from, to);
+            } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
         }  else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
     }
     catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 
-void CRDTGraph::add_edge_attribs(int from, int to, const map<std::string, AttribValue> &att)
+void CRDTGraph::add_edge_attribs(int from, int to, const std::vector<AttribValue> &att)
 {
     try {
         if (in(from)  && in(to)) {
             auto node = get(from);
-            for (auto &[k, v] : att)
-                node.fano().at(to).attrs().insert_or_assign(k, v);
-            insert_or_assign(from, node);
-            emit update_edge_signal(from, to);
+            for (auto v : att) {
+
+                auto fano_at = std::find_if(node.fano().begin(), node.fano().end(),
+                                            [&to](const auto val) { return val.to() == to; });
+                if (fano_at != node.fano().end()) {
+                    std::string key = v.key();
+                    auto value = std::find_if(fano_at->attrs().begin(), fano_at->attrs().end(),
+                                              [&key](const auto value) { return key == value.key(); });
+                    if (value == fano_at->attrs().end())
+                        fano_at->attrs().push_back(v);
+                    else {
+                        *value = v;
+                    }
+                    //node.fano().at(to).attrs().insert_or_assign(v);
+                    insert_or_assign(from, node);
+                    emit update_edge_signal(from, to);
+                }
+
+            }
         } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
     }
     catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
@@ -158,8 +182,15 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_v
                 av.type(std::get<0>(v));
                 av.value( std::get<1>(v));
                 av.length(std::get<2>(v));
-                
-                n.attrs().insert_or_assign(att_name, av);
+                av.key(att_name);
+
+                auto value  = std::find_if(n.attrs().begin(), n.attrs().end(), [&att_name](const auto value) { return att_name == value.key(); });
+                if (value == n.attrs().end())
+                    n.attrs().push_back(av);
+                else {
+                    *value = av;
+                }
+                //n.attrs().insert_or_assign(att_name, av);
                 insert_or_assign(id, n);
                 emit update_attrs_signal(id,  n.attrs()); // Viewer
             }
@@ -177,8 +208,15 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_ty
             av.type(att_type);
             av.value( att_value);
             av.length(length);
-            
-            n.attrs().insert_or_assign(att_name, av);
+            av.key(att_name);
+
+            auto value  = std::find_if(n.attrs().begin(), n.attrs().end(), [&att_name](const auto value) { return att_name == value.key(); });
+            if (value == n.attrs().end())
+                n.attrs().push_back(av);
+            else {
+                *value = av;
+            }
+
             insert_or_assign(id, n);
             emit update_attrs_signal(id, n.attrs()); // Viewer
         }
@@ -186,13 +224,21 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_ty
 }
 
 
-void CRDTGraph::add_node_attribs(int id, const map<std::string, AttribValue> &att) {
+void CRDTGraph::add_node_attribs(int id, const vector<AttribValue> &att) {
     try {
         if (in(id)) {
             auto n = get(id);
             if (n.id() > 0) {
-                for (auto &[k, v] : att)
-                    n.attrs().insert_or_assign(k, v);
+                for (auto &v : att) {
+                    std::string key = v.key();
+                    auto value  = std::find_if(n.attrs().begin(), n.attrs().end(), [&key](const auto value) { return key == value.key(); });
+                    if (value == n.attrs().end())
+                        n.attrs().push_back(v);
+                    else {
+                        *value = v;
+                    }
+                    //n.attrs().insert_or_assign(k, v);
+                }
                 insert_or_assign(id, n);
                 emit update_attrs_signal(id, n.attrs()); // Viewer
             }
@@ -208,17 +254,18 @@ void CRDTGraph::delete_node(int id) {
         if (in(id)) {
             auto n = nodes[id].readAsList().back();
 
-            for (auto &[k, v] : n.fano()) { // Iterating over edge to this node
-                std::cout << id << " -> " << k << std::endl;
-                emit del_edge_signal(id,k,v.label());
+            for (auto v : n.fano()) { // Iterating over edge to this node
+                std::cout << id << " -> " << v.to() << std::endl;
+                emit del_edge_signal(id,v.to(),v.label());
             }
 
             auto map = nodes.getMap();
             for (auto &[k,v] : map) { // Iterating over edge from
                 auto node_to_delete_edge = v.readAsList().back();
-                if (node_to_delete_edge.fano().count(id) > 0) {
-                    auto l =  node_to_delete_edge.fano().at(id).label();
-                    node_to_delete_edge.fano().erase(id);
+                auto value  = std::find_if(node_to_delete_edge.fano().begin(), node_to_delete_edge.fano().end(), [&id](const auto value) { return id == value.to(); });
+                if (value != node_to_delete_edge.fano().end()) {
+                    auto l =  value->label();
+                    node_to_delete_edge.fano().erase(value);
                     auto delta = nodes[node_to_delete_edge.id()].add(node_to_delete_edge, node_to_delete_edge.id());
                     //writer->update(translateAwCRDTtoICE(node_to_delete_edge.id(), delta));
                     auto val = translateAwCRDTtoICE(node_to_delete_edge.id(), delta);
@@ -248,12 +295,12 @@ void CRDTGraph::delete_node(string name) {
 
 }
 
-std::map<unsigned int, EdgeAttribs> CRDTGraph::getEdges(int id) {
+std::vector<EdgeAttribs> CRDTGraph::getEdges(int id) {
     if (in(id)) {
         auto n = get(id);
         if (n.id() > 0) return n.fano();
-        else return std::map<unsigned int ,EdgeAttribs>();
-    } else return std::map<unsigned int,EdgeAttribs>();
+        else return std::vector<EdgeAttribs>();
+    } else return std::vector<EdgeAttribs>();
 }
 
 
@@ -296,7 +343,19 @@ N CRDTGraph::get(int id) {
 
 AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::string &key) {
     try {
-        return get(id).attrs().at(key);
+        auto attrs = get(id).attrs();
+        auto value  = std::find_if(attrs.begin(), attrs.end(), [key](const auto value) { return key == value.key(); });
+        if (value != attrs.end()) {
+            return *value;
+        }
+
+        AttribValue av;
+        av.type("unknown");
+        av.value("unknow");
+        av.key(key);
+        av.length(0);
+
+        return av;
     }
     catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<id<<std::endl;
@@ -310,14 +369,14 @@ AttribValue CRDTGraph::get_node_attrib_by_name(int id, const std::string &key) {
     };
 }
 
-std::map<std::string, AttribValue> CRDTGraph::get_node_attribs_crdt(int id) {
+std::vector<AttribValue> CRDTGraph::get_node_attribs_crdt(int id) {
     return(get(id).attrs());
 }
 
 std::map<std::string, MTypes> CRDTGraph::get_node_attribs(int id) {
     std::map<std::string, MTypes> m;
-    for (const auto &[k,v]: get(id).attrs())
-        m.insert(std::make_pair(k, icevalue_to_mtypes(v.type(), v.value())));
+    for (const auto v: get(id).attrs())
+        m.insert(std::make_pair(v.key(), icevalue_to_mtypes(v.type(), v.value())));
     return m;
 
 }
@@ -355,14 +414,27 @@ int CRDTGraph::get_id_from_name(const std::string &tag) {
     for (auto & kv : nodes.getMap())
     {
         auto n = kv.second.readAsList().back();
-        if (n.attrs().at("imName").value() == tag) return n.id();
+        auto value = std::find_if(n.attrs().begin(), n.attrs().end(), [&tag](const auto value) {return value.key() == "imName"  && value.value() == tag;});
+        if (value != n.attrs().end()) return n.id();
     }
     return -1;
 }
 
 EdgeAttribs CRDTGraph::get_edge_attrib(int from, int to) {
-    try { if(in(from) && in(to)) return get(from).fano().at(to);
-    } catch(const std::exception &e){
+    try { if(in(from) && in(to)) {
+            auto fano_at = std::find_if(get(from).fano().begin(), get(from).fano().end(),
+                                        [&to](const auto val) { return val.to() == to; });
+            if (fano_at != get(from).fano().end()) {
+                return *fano_at;
+            }
+            else {
+                EdgeAttribs ea;
+                ea.label("error");
+                return ea;
+            }
+        }
+    }
+     catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
     EdgeAttribs ea;
     ea.label("error");
@@ -437,7 +509,7 @@ void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
 
 void CRDTGraph::join_delta_node(AworSet aworSet) {
     try{
-        auto d = translateAwICEtoCRDT(aworSet.id(), aworSet);
+        auto d = translateAwICEtoCRDT(aworSet);
 //        std::lock_guard<std::mutex> lock(_mutex);
         //std::cout << aworSet.id() << std::endl;
         nodes[aworSet.id()].join(d);
@@ -450,31 +522,35 @@ void CRDTGraph::join_full_graph(OrMap full_graph) {
 
     // Context
     dotcontext<int> dotcontext_aux;
-    auto m = static_cast<std::map<int, int>>(full_graph.cbase().cc());
+    //auto m = static_cast<std::map<int, int>>(full_graph.cbase().cc());
+    std::map<int, int> m;
+    for (auto &v : full_graph.cbase().cc())
+        m.insert(std::make_pair(v.first(), v.second()));
     std::set <pair<int, int>> s;
     for (auto &v : full_graph.cbase().dc())
         s.insert(std::make_pair(v.first(), v.second()));
     //dotcontext_aux.setContext(m, s);
     nodes.context().setContext(m, s);
 
+    /*
+     * Esto así no funciona
     for (auto &val : full_graph.m())
     {
-        auto awor = translateAwICEtoCRDT(val.first, val.second);
-        nodes[val.first] = awor;
-        emit update_node_signal(val.first, get(val.first).type());
+        auto awor = translateAwICEtoCRDT(val);
+        nodes[val.id()] = awor;
+        emit update_node_signal(val.id(), get(val.id()).type());
 
     }
-
+    */
     //Map
     //TODO: Improve. It is not the most efficient.
-    /*for (auto &v : full_graph.m())
-        for (auto &awv : translateAwICEtoCRDT(v.first, v.second).readAsListWithId()) {
+    for (auto &v : full_graph.m())
+        for (auto &awv : translateAwICEtoCRDT(v).readAsListWithId()) {
 //            std::lock_guard<std::mutex> lock(_mutex);
-            nodes[v.first].add(awv.second, v.first);
-            //nodes[awv.first].add(awv.second, awv.first);
-            emit update_node_signal(v.first,get(v.first).type());
+            nodes[v.id()].add(awv.second, v.id());
+            emit update_node_signal(v.id(),get(v.id()).type());
         }
-    */
+
 }
 
 
@@ -539,7 +615,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
 
 
             // Draw attributes come now
-            map<string, AttribValue> gatts;
+            vector<AttribValue> gatts;
             std::string qname = (char *)stype;
             std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
             std::tuple<std::string, std::string, int> val = mtype_to_icevalue(full_name);
@@ -548,8 +624,8 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             av.type(std::get<0>(val));
             av.value(std::get<1>(val));
             av.length(std::get<2>(val));
-
-            gatts.insert(std::pair("name", av));
+            av.key("name");
+            gatts.push_back(av);
 
             // color selection
             std::string color = "coral";
@@ -567,8 +643,8 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             av2.type(std::get<0>(val));
             av2.value(std::get<1>(val));
             av2.length(std::get<2>(val));
-
-            gatts.insert(std::pair("color", av2));
+            av2.key("color");
+            gatts.push_back(av2);
 
 
             add_node_attribs(node_id, gatts);
@@ -623,8 +699,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             if (label == NULL) { printf("Link %s lacks of attribute 'label'.\n", (char *)cur->name); exit(-1); }
             std::string edgeName((char *)label);
             xmlFree(label);
-
-            std::map<std::string, AttribValue> attrs;
+            vector<AttribValue> attrs;
             for (xmlNodePtr cur2=cur->xmlChildrenNode; cur2!=NULL; cur2=cur2->next)
             {
                 if (xmlStrcmp(cur2->name, (const xmlChar *)"linkAttribute") == 0)
@@ -636,8 +711,10 @@ void CRDTGraph::read_from_file(const std::string &file_name)
                     av.type("string");
                     av.value(std::string((char *)attr_value));
                     av.length(1);
+                    av.key(std::string((char *)attr_key));
+
                     
-                    attrs[std::string((char *)attr_key)] = av;
+                    attrs.push_back(av);
                     xmlFree(attr_key);
                     xmlFree(attr_value);
                 }
@@ -650,21 +727,21 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             add_edge(a, b, edgeName);
             add_edge_attrib(a, b, "name", edgeName);
 
-            std::map<std::string, AttribValue> edge_attribs;
+            std::vector<AttribValue> edge_attribs;
             if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
             {
                 add_node_attrib(b,"level", get_node_level(a)+1);
                 add_node_attrib(b,"parent", a);
                 RMat::RTMat rt;
                 float tx,ty,tz,rx,ry,rz;
-                for(auto &[k,v] : attrs)
+                for(auto &v : attrs)
                 {
-                    if(k=="tx")	tx = std::stof(v.value());
-                    if(k=="ty")	ty = std::stof(v.value());
-                    if(k=="tz")	tz = std::stof(v.value());
-                    if(k=="rx")	rx = std::stof(v.value());
-                    if(k=="ry")	ry = std::stof(v.value());
-                    if(k=="rz")	rz = std::stof(v.value());
+                    if(v.key()=="tx")	tx = std::stof(v.value());
+                    if(v.key()=="ty")	ty = std::stof(v.value());
+                    if(v.key()=="tz")	tz = std::stof(v.value());
+                    if(v.key()=="rx")	rx = std::stof(v.value());
+                    if(v.key()=="ry")	ry = std::stof(v.value());
+                    if(v.key()=="rz")	rz = std::stof(v.value());
                 }
                 rt.set(rx, ry, rz, tx, ty, tz);
                 //rt.print("in reader");
@@ -674,7 +751,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             {
                 this->add_node_attrib(b,"parent",0);
                 for(auto &r : attrs)
-                    edge_attribs.insert(r);
+                    edge_attribs.push_back(r);
             }
             this->add_edge_attribs(a, b, edge_attribs);
 
@@ -720,7 +797,10 @@ int CRDTGraph::id() {
 DotContext CRDTGraph::context() { // Context to ICE
     DotContext om_dotcontext;
     for (auto &kv_cc : nodes.context().getCcDc().first) {
-        om_dotcontext.cc()[kv_cc.first] = kv_cc.second;
+        PairInt p_i;
+        p_i.first(kv_cc.first);
+        p_i.second(kv_cc.second);
+        om_dotcontext.cc().push_back(p_i);
     }
     for (auto &kv_dc : nodes.context().getCcDc().second){
         PairInt p_i;
@@ -732,11 +812,11 @@ DotContext CRDTGraph::context() { // Context to ICE
 }
 
 
-map<unsigned int, AworSet> CRDTGraph::Map() {
+vector<AworSet> CRDTGraph::Map() {
     std::lock_guard<std::mutex> lock(_mutex);
-    map<unsigned int, AworSet> m;
+    vector<AworSet> m;
     for (auto &kv : nodes.getMap())  // Map of Aworset to ICE
-        m[kv.first] = translateAwCRDTtoICE(kv.first, kv.second);
+        m.push_back(translateAwCRDTtoICE(kv.first, kv.second));
     return m;
 }
 
@@ -865,8 +945,8 @@ void CRDTGraph::fullgraph_server_thread()
                     //std::cout << (res_write == true ? "Ok" : "Error") << std::endl;
 
                     //writer.add(OrMap{id(), map(), context()});
-                    for (auto &[k, v] : Map())
-                        std::cout << k << "," << v << std::endl;
+                    for (auto &k : Map())
+                        std::cout << k.id() << "," << k.dk() << std::endl;
                     std::cout << "Full graph written" << std::endl;
                     *work = true;
                     //}
@@ -894,6 +974,7 @@ void CRDTGraph::fullgraph_request_thread() {
 
         eprosima::fastrtps::SampleInfo_t m_info;
         OrMap sample;
+        std::cout << "Mensajes sin leer " << sub->get_unread_count() << std::endl;
         if (sub->takeNextData(&sample, &m_info)) { // Get sample
             if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
                 if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
@@ -959,10 +1040,16 @@ AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {
         pi.first(kv_dots.first.first);
         pi.second(kv_dots.first.second);
 
-        delta_crdt.dk().ds()[pi] = kv_dots.second;
+        dsValue ds;
+        ds.pi(pi);
+        ds.n(kv_dots.second);
+        delta_crdt.dk().ds().push_back(ds);
     }
     for (auto &kv_cc : data.context().getCcDc().first){
-        delta_crdt.dk().cbase().cc()[kv_cc.first] = kv_cc.second;
+        PairInt pi;
+        pi.first(kv_cc.first);
+        pi.second(kv_cc.second);
+        delta_crdt.dk().cbase().cc().push_back(pi);
     }
     for (auto &kv_dc : data.context().getCcDc().second){
         PairInt pi;
@@ -975,10 +1062,13 @@ AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {
     return delta_crdt;
 }
 
-aworset<N, int> CRDTGraph::translateAwICEtoCRDT(int id, AworSet &data) {
+aworset<N, int> CRDTGraph::translateAwICEtoCRDT(AworSet &data) {
     // Context
     dotcontext<int> dotcontext_aux;
-    auto m = static_cast<std::map<int, int>>(data.dk().cbase().cc());
+    //auto m = static_cast<std::map<int, int>>(data.dk().cbase().cc());
+    std::map<int, int> m;
+    for (auto &v : data.dk().cbase().cc())
+        m.insert(std::make_pair(v.first(), v.second()));
     std::set <pair<int, int>> s;
     for (auto &v : data.dk().cbase().dc())
         s.insert(std::make_pair(v.first(), v.second()));
@@ -986,9 +1076,9 @@ aworset<N, int> CRDTGraph::translateAwICEtoCRDT(int id, AworSet &data) {
     // Dots
     std::map <pair<int, int>, N> ds_aux;
     for (auto &v : data.dk().ds())
-        ds_aux[pair<int, int>(v.first.first(), v.first.second())] = v.second;
+        ds_aux[pair<int, int>(v.pi().first(), v.pi().second())] = v.n();
     // Join
-    aworset<N, int> aw = aworset<N, int>(id);
+    aworset<N, int> aw = aworset<N, int>(data.id());
     aw.setContext(dotcontext_aux);
     aw.dots().set(ds_aux);
     return aw;

@@ -96,27 +96,6 @@ public:
     unsigned char* m_keyBuffer;
 };
 /*!
- * @brief This class represents the TopicDataType of the type DSRGraphTopic defined by the user in the IDL file.
- * @ingroup DSRGRAPH
- */
-class DSRGraphTopicPubSubType : public eprosima::fastrtps::TopicDataType {
-public:
-    typedef DSRGraphTopic type;
-
-    eProsima_user_DllExport DSRGraphTopicPubSubType();
-
-    eProsima_user_DllExport virtual ~DSRGraphTopicPubSubType();
-    eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
-    eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
-    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
-    eProsima_user_DllExport virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
-        bool force_md5 = false) override;
-    eProsima_user_DllExport virtual void* createData() override;
-    eProsima_user_DllExport virtual void deleteData(void * data) override;
-    MD5 m_md5;
-    unsigned char* m_keyBuffer;
-};
-/*!
  * @brief This class represents the TopicDataType of the type GraphRequest defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
@@ -169,6 +148,27 @@ public:
     eProsima_user_DllExport DotContextPubSubType();
 
     eProsima_user_DllExport virtual ~DotContextPubSubType();
+    eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
+    eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
+    eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
+    eProsima_user_DllExport virtual bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *ihandle,
+        bool force_md5 = false) override;
+    eProsima_user_DllExport virtual void* createData() override;
+    eProsima_user_DllExport virtual void deleteData(void * data) override;
+    MD5 m_md5;
+    unsigned char* m_keyBuffer;
+};
+/*!
+ * @brief This class represents the TopicDataType of the type dsValue defined by the user in the IDL file.
+ * @ingroup DSRGRAPH
+ */
+class dsValuePubSubType : public eprosima::fastrtps::TopicDataType {
+public:
+    typedef dsValue type;
+
+    eProsima_user_DllExport dsValuePubSubType();
+
+    eProsima_user_DllExport virtual ~dsValuePubSubType();
     eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
     eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
     eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;

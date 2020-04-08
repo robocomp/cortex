@@ -116,7 +116,7 @@ class DoRGBDStuff : public  QLabel
       resize(640,480);
       setWindowTitle("RGBD");
       setParent(this);
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const map<string, AttribValue> &attrs){
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::vector<AttribValue> &attrs){
                             const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(node_id, "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
@@ -142,9 +142,9 @@ class DoTableStuff : public  QTableWidget
       setRowCount(graph->get_node_attribs_crdt(node_id).size() );
       setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
       int i=0;
-      for( auto &[k, v] : graph->get_node_attribs_crdt(node_id) )
+      for( auto &v : graph->get_node_attribs_crdt(node_id) )
       {
-        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));
         setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value())));
         i++;
       }
@@ -156,12 +156,12 @@ class DoTableStuff : public  QTableWidget
     };
     
   public slots:
-    void drawSLOT(const std::int32_t &id, const map<string, AttribValue> &attribs)
+    void drawSLOT(const std::int32_t &id, const std::vector<AttribValue> &attribs)
     {
       int i= 0; 
-      for(auto &[k,v]: attribs)
+      for(auto &v: attribs)
       {
-        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET 
+        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));   //CHANGE TO SET
         setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value()))));
         i++;
       }

@@ -67,16 +67,19 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          auto rtvalue = graph->get_edge_attrib(from, to).attrs().at("RT").value();
-          auto mat = graph->icevalue_to_nativetype<RTMat>("RT", rtvalue);
+          auto value = std::find_if(graph->get_edge_attrib(from, to).attrs().begin(), graph->get_edge_attrib(from, to).attrs().end(), [](const auto value) { return value.key() == "RT";});
+          if (value != graph->get_edge_attrib(from, to).attrs().end()) {
+              auto rtvalue = value->value();
+              auto mat = graph->icevalue_to_nativetype<RTMat>("RT", rtvalue);
 
-          //mat.print("mat");
-          for(auto i : iter::range(mat.nRows()))
-            for(auto j : iter::range(mat.nCols()))
-              if( item(i,j) == 0 ) 
-                this->setItem(i, j, new QTableWidgetItem(QString::number(mat(i,j))));
-              else 
-                this->item(i, j)->setText(QString::number(mat(i,j)));
+              //mat.print("mat");
+              for (auto i : iter::range(mat.nRows()))
+                  for (auto j : iter::range(mat.nCols()))
+                      if (item(i, j) == 0)
+                          this->setItem(i, j, new QTableWidgetItem(QString::number(mat(i, j))));
+                      else
+                          this->item(i, j)->setText(QString::number(mat(i, j)));
+          }
         }
         catch (const std::exception &e)
         { std::cout << "Exception: " << e.what() << " Cannot find attribute named RT in edge going " << from << " to " << to << std::endl;}

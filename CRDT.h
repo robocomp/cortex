@@ -78,11 +78,11 @@ public:
     void add_edge(int from, int to, const std::string &label_);
     void add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value);
     void add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length);
-    void add_edge_attribs(int from, int to, const map<string, AttribValue> &att);
+    void add_edge_attribs(int from, int to, const vector<AttribValue> &att);
 
     void add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value);
     void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
-    void add_node_attribs(int id, const map<string, AttribValue> &att);
+    void add_node_attribs(int id, const vector<AttribValue> &att);
 
     void delete_node(int id);
     void delete_node(string name);
@@ -90,11 +90,11 @@ public:
 
     //////////////////////////////////////////////////////////
 
-    std::map<unsigned int, EdgeAttribs> getEdges(int id);
+    std::vector<EdgeAttribs> getEdges(int id);
     Nodes get();
     list<N> get_list();
     N get(int id);
-    map<string, AttribValue> get_node_attribs_crdt(int id);
+    vector<AttribValue> get_node_attribs_crdt(int id);
     std::map<std::string, MTypes> get_node_attribs(int id);
     AttribValue get_node_attrib_by_name(int id, const std::string &key);
 
@@ -139,9 +139,9 @@ public:
     void start_fullgraph_server_thread();
     void start_subscription_thread(bool showReceived);
 
-    int getId();
-    DotContext getContext();
-    std::map<unsigned int, AworSet> getMap();
+    //int getId();
+    //DotContext getContext();
+    //std::map< int, AworSet> getMap();
 
     std::string agent_name;
 
@@ -160,7 +160,7 @@ private:
 
     int id();
     DotContext context();
-    std::map<unsigned int, AworSet> Map();
+    std::vector<AworSet> Map();
 
     void clear();
 
@@ -171,7 +171,7 @@ private:
 
     // Translators
     AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
-    aworset<N, int> translateAwICEtoCRDT(int id, AworSet &data);
+    aworset<N, int> translateAwICEtoCRDT(AworSet &data);
 
     // RTSP participant
     DSRParticipant dsrparticipant;
@@ -190,7 +190,7 @@ private:
 signals:                                                                  // for graphics update
     void update_node_signal(const std::int32_t, const std::string &type); // Signal to update CRDT
 
-    void update_attrs_signal(const std::int32_t &id, const map<string, AttribValue> &attribs); //Signal to show node attribs.
+    void update_attrs_signal(const std::int32_t &id, const vector<AttribValue> &attribs); //Signal to show node attribs.
     void update_edge_signal(const std::int32_t from, const std::int32_t to);                   // Signal to show edge attribs.
 
     void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal to del edge.

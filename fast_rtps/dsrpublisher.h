@@ -51,7 +51,7 @@ private:
 		void onPublicationMatched(eprosima::fastrtps::Publisher* pub,eprosima::fastrtps::rtps::MatchingInfo& info);
 		int n_matched;
 	} m_listener;
-	DSRGraphTopicPubSubType dsrgraphType;
+	//DSRGraphTopicPubSubType dsrgraphType;
 };
 
 #endif // _CADENA_PUBLISHER_H_

@@ -107,7 +107,7 @@ void DSRPublisher::run()
     std::cout << __FUNCTION__ << " HOLA" << std::endl;
     
     // Publication code
-    DSRGraphTopic st;
+    //DSRGraphTopic st;
 
     int msgsent = 0;  
     do
