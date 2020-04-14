@@ -20,6 +20,7 @@
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
+#include <fastrtps/Domain.h>
 
 using namespace CRDT;
 
@@ -269,9 +270,8 @@ void CRDTGraph::delete_node(int id) {
                     auto delta = nodes[node_to_delete_edge.id()].add(node_to_delete_edge, node_to_delete_edge.id());
                     //writer->update(translateAwCRDTtoICE(node_to_delete_edge.id(), delta));
                     auto val = translateAwCRDTtoICE(node_to_delete_edge.id(), delta);
-
                     dsrpub.write(&val);
-                    //TODO: writer
+
                     emit del_edge_signal(node_to_delete_edge.id(), id, l);
                 }
             }
@@ -469,6 +469,13 @@ bool CRDTGraph::empty(const int &id) {
 void CRDTGraph::insert_or_assign(int id, const N &node) 
 {
     try {
+        if (nodes[id].getNodes(id).first == node) {
+            count++;
+            std::cout << "Skip node insertion: " << id << " skipped: " << count << std::endl;
+            return;
+        }
+        count = 0;
+
         auto delta = nodes[id].add(node, id);
         //writer->update(translateAwCRDTtoICE(id, delta));
         auto val = translateAwCRDTtoICE(id, delta);
@@ -480,6 +487,14 @@ void CRDTGraph::insert_or_assign(int id, const N &node)
 
 void CRDTGraph::insert_or_assign(const N &node) {
     try {
+
+        if (nodes[node.id()].getNodes(node.id()).first == node) {
+            count++;
+            std::cout << "Skip node insertion: " << node.id() << " skipped: " << count << std::endl;
+            return;
+        }
+        count = 0;
+
         auto delta = nodes[node.id()].add(node, node.id());
         //writer->update(translateAwCRDTtoICE(node.id, delta));
         auto val = translateAwCRDTtoICE(node.id(), delta);
@@ -519,7 +534,6 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) {
-
     // Context
     dotcontext<int> dotcontext_aux;
     //auto m = static_cast<std::map<int, int>>(full_graph.cbase().cc());
@@ -530,7 +544,6 @@ void CRDTGraph::join_full_graph(OrMap full_graph) {
     for (auto &v : full_graph.cbase().dc())
         s.insert(std::make_pair(v.first(), v.second()));
     //dotcontext_aux.setContext(m, s);
-    nodes.context().setContext(m, s);
 
     /*
      * Esto así no funciona
@@ -544,6 +557,8 @@ void CRDTGraph::join_full_graph(OrMap full_graph) {
     */
     //Map
     //TODO: Improve. It is not the most efficient.
+    nodes.context().setContext(m, s);
+
     for (auto &v : full_graph.m())
         for (auto &awv : translateAwICEtoCRDT(v).readAsListWithId()) {
 //            std::lock_guard<std::mutex> lock(_mutex);
@@ -815,8 +830,14 @@ DotContext CRDTGraph::context() { // Context to ICE
 vector<AworSet> CRDTGraph::Map() {
     std::lock_guard<std::mutex> lock(_mutex);
     vector<AworSet> m;
-    for (auto &kv : nodes.getMap())  // Map of Aworset to ICE
-        m.push_back(translateAwCRDTtoICE(kv.first, kv.second));
+    for (auto &kv : nodes.getMap()) { // Map of Aworset to ICE
+        aworset<Node, int> n;
+        //TODO: Esto.
+        auto last = *(--(kv.second.dots().ds.end()));
+        n.dots().ds.insert(last);
+        n.dots().c = kv.second.dots().c;
+        m.push_back(translateAwCRDTtoICE(kv.first, n));
+    }
     return m;
 }
 
@@ -861,6 +882,9 @@ void CRDTGraph::subscription_thread(bool showReceived) {
             try {
                 eprosima::fastrtps::SampleInfo_t m_info;
                 AworSet sample;
+
+
+                std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
                 //read or take
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
                     if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
@@ -881,6 +905,7 @@ void CRDTGraph::subscription_thread(bool showReceived) {
     dsrpub_call = NewMessageFunctor(this, &work, lambda_general_topic);
 	auto res = dsrsub.init(dsrparticipant.getParticipant(), "DSR", dsrparticipant.getDSRTopicName(), dsrpub_call);
     std::cout << (res == true ? "Ok" : "Error") << std::endl;
+
 }
 
 // Data Storm based
@@ -967,10 +992,11 @@ void CRDTGraph::fullgraph_server_thread()
 
 
 void CRDTGraph::fullgraph_request_thread() {
-    
+
+    bool sync = false;
 
     // Answer Topic
-    auto lambda_request_answer = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
+    auto lambda_request_answer = [&sync] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
 
         eprosima::fastrtps::SampleInfo_t m_info;
         OrMap sample;
@@ -981,6 +1007,7 @@ void CRDTGraph::fullgraph_request_thread() {
                     std::cout << " Received Full Graph from " << m_info.sample_identity.writer_guid() << " whith " << sample.m().size() << " elements" << std::endl;
                     graph->join_full_graph(sample);
                     std::cout << "Synchronized." <<std::endl;
+                    sync = true;
                 }
             }
         }
@@ -997,8 +1024,12 @@ void CRDTGraph::fullgraph_request_thread() {
     gr.from(agent_name);
     dsrpub_graph_request.write(&gr);
 
+    while (!sync) {
+        sleep(5);
+    }
     //TODO: Eliminar la suscripción después de terminar?.
-    
+    eprosima::fastrtps::Domain::removeSubscriber(dsrsub_request_answer.getSubscriber());
+    start_subscription_thread(true);
     /*
     std::cout << __FUNCTION__ << ":" << __LINE__ << "-> Initiating request for full graph requests" << std::endl;
 //    std::chrono::time_point <std::chrono::system_clock> start_clock = std::chrono::system_clock::now();

@@ -66,6 +66,9 @@ bool DSRSubscriber::init(eprosima::fastrtps::Participant *mp_participant_,
 }
 
 
+eprosima::fastrtps::Subscriber * DSRSubscriber::getSubscriber(){
+    return mp_subscriber;
+}
 
 
 ///////////////////////////////////////////

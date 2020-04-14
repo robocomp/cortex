@@ -145,6 +145,8 @@ public:
 
     std::string agent_name;
 
+    //For debug
+    int count = 0;
 private:
     Nodes nodes;
     int graph_root;

@@ -44,6 +44,7 @@ public:
 				const char* topicName, const char* topicDataType, 
 				std::function<void(eprosima::fastrtps::Subscriber* sub)>  f_);
 	void run();
+    eprosima::fastrtps::Subscriber * getSubscriber();
 
 private:
 	eprosima::fastrtps::Participant *mp_participant;
