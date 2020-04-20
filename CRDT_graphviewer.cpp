@@ -220,6 +220,9 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
 
+    emit gcrdt->update_attrs_signal(id,gcrdt->get_node_attribs_crdt(id) );
+
+
 	auto e = gcrdt->getEdges(id);
 //	if (!e.empty())
 //	{

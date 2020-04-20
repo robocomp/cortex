@@ -253,16 +253,20 @@ void CRDTGraph::delete_node(int id) {
     std::cout << __FUNCTION__ <<". Node: "<<id<<std::endl;
     try {
         if (in(id)) {
-            auto n = nodes[id].readAsList().back();
+
+            //auto n = nodes[id].readAsList().back();
+            //TODO: horrible.
+            auto n = (--( nodes[id].dots().ds.end()))->second;
 
             for (auto v : n.fano()) { // Iterating over edge to this node
                 std::cout << id << " -> " << v.to() << std::endl;
                 emit del_edge_signal(id,v.to(),v.label());
             }
 
-            auto map = nodes.getMap();
+            auto map = nodes.getMapRef();
             for (auto &[k,v] : map) { // Iterating over edge from
-                auto node_to_delete_edge = v.readAsList().back();
+                auto node_to_delete_edge = (--( v.dots().ds.end()))->second;
+                //auto node_to_delete_edge = v.readAsList().back();
                 auto value  = std::find_if(node_to_delete_edge.fano().begin(), node_to_delete_edge.fano().end(), [&id](const auto value) { return id == value.to(); });
                 if (value != node_to_delete_edge.fano().end()) {
                     auto l =  value->label();
@@ -313,7 +317,8 @@ list<N> CRDTGraph::get_list() {
     std::lock_guard<std::mutex> lock(_mutex);
     list<N> mList;
     for (auto & kv : nodes.getMap())
-        mList.push_back(kv.second.readAsList().back());
+        //.readAsList();
+        mList.push_back((--kv.second.dots().ds.end())->second);
     return mList;
 }
 
@@ -322,8 +327,8 @@ N CRDTGraph::get(int id) {
     std::lock_guard<std::mutex> lock(_mutex);
     try {
         if (in(id)) {
-            list<N> node_list = nodes[id].readAsList();
-            if (!node_list.empty()) return nodes[id].readAsList().back();
+            //list<N> node_list = nodes[id].readAsList();
+            if (!nodes[id].dots().ds.empty()) return (--nodes[id].dots().ds.end())->second;
             else {
                 Node n;
                 n.type("empty");
@@ -411,9 +416,11 @@ std::int32_t CRDTGraph::get_parent_id(std::int32_t id) {
 
 int CRDTGraph::get_id_from_name(const std::string &tag) {
     if(tag == std::string()) return -1;
-    for (auto & kv : nodes.getMap())
+    for (auto & kv : nodes.getMapRef())
     {
-        auto n = kv.second.readAsList().back();
+        //auto n = kv.second.readAsList().back();
+        //usar la referencia?
+        auto n = (--(kv.second.dots().ds.end()))->second;
         auto value = std::find_if(n.attrs().begin(), n.attrs().end(), [&tag](const auto value) {return value.key() == "imName"  && value.value() == tag;});
         if (value != n.attrs().end()) return n.id();
     }
@@ -456,8 +463,8 @@ bool CRDTGraph::in(const int &id) {
 
 bool CRDTGraph::empty(const int &id) {
     if (nodes.in(id)) {
-        list<N> l = nodes[id].readAsList();
-        if(nodes[id].readAsList().empty())
+        //list<N> l = nodes[id].readAsList();
+        if(nodes[id].dots().ds.empty())
             return true;
         else
             return false;
@@ -469,7 +476,7 @@ bool CRDTGraph::empty(const int &id) {
 void CRDTGraph::insert_or_assign(int id, const N &node) 
 {
     try {
-        if (nodes[id].getNodes(id).first == node) {
+        if (nodes[id].getNodesSimple(id).first == node) {
             count++;
             std::cout << "Skip node insertion: " << id << " skipped: " << count << std::endl;
             return;
@@ -479,6 +486,8 @@ void CRDTGraph::insert_or_assign(int id, const N &node)
         auto delta = nodes[id].add(node, id);
         //writer->update(translateAwCRDTtoICE(id, delta));
         auto val = translateAwCRDTtoICE(id, delta);
+        //join_delta_node(val);
+
         dsrpub.write(&val);
         //TODO: writer
         emit update_node_signal(id, node.type());
@@ -488,12 +497,13 @@ void CRDTGraph::insert_or_assign(int id, const N &node)
 void CRDTGraph::insert_or_assign(const N &node) {
     try {
 
-        if (nodes[node.id()].getNodes(node.id()).first == node) {
+        if (nodes[node.id()].getNodesSimple(node.id()).first == node) {
             count++;
             std::cout << "Skip node insertion: " << node.id() << " skipped: " << count << std::endl;
             return;
         }
         count = 0;
+
 
         auto delta = nodes[node.id()].add(node, node.id());
         //writer->update(translateAwCRDTtoICE(node.id, delta));
@@ -527,13 +537,21 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
         auto d = translateAwICEtoCRDT(aworSet);
 //        std::lock_guard<std::mutex> lock(_mutex);
         //std::cout << aworSet.id() << std::endl;
+
+        //TODO: Aquí no se limpian los valores viejos.
         nodes[aworSet.id()].join(d);
-        emit update_node_signal(aworSet.id(),d.readAsList().back().type());
+
+        //emit update_attrs_signal(aworSet.id(), (--(d.dots().ds.end()))->second.attrs()); // Viewer
+        //d.readAsList().back()
+        emit update_node_signal(aworSet.id(), (--(d.dots().ds.end()))->second.type());
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) {
+
+    //TODO: no se puede hacer nodes.join(full_graph) ?
+
     // Context
     dotcontext<int> dotcontext_aux;
     //auto m = static_cast<std::map<int, int>>(full_graph.cbase().cc());
@@ -544,28 +562,27 @@ void CRDTGraph::join_full_graph(OrMap full_graph) {
     for (auto &v : full_graph.cbase().dc())
         s.insert(std::make_pair(v.first(), v.second()));
     //dotcontext_aux.setContext(m, s);
+    nodes.context().setContext(m, s);
 
-    /*
-     * Esto así no funciona
+
+    //si se cambia el envío hay que cambiarlo
     for (auto &val : full_graph.m())
     {
         auto awor = translateAwICEtoCRDT(val);
-        nodes[val.id()] = awor;
+        nodes[val.id()].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
         emit update_node_signal(val.id(), get(val.id()).type());
 
     }
-    */
+
     //Map
     //TODO: Improve. It is not the most efficient.
-    nodes.context().setContext(m, s);
-
-    for (auto &v : full_graph.m())
+    /*for (auto &v : full_graph.m())
         for (auto &awv : translateAwICEtoCRDT(v).readAsListWithId()) {
 //            std::lock_guard<std::mutex> lock(_mutex);
             nodes[v.id()].add(awv.second, v.id());
             emit update_node_signal(v.id(),get(v.id()).type());
         }
-
+*/
 }
 
 
@@ -830,7 +847,7 @@ DotContext CRDTGraph::context() { // Context to ICE
 vector<AworSet> CRDTGraph::Map() {
     std::lock_guard<std::mutex> lock(_mutex);
     vector<AworSet> m;
-    for (auto &kv : nodes.getMap()) { // Map of Aworset to ICE
+    for (auto kv : nodes.getMapRef()) { // Map of Aworset to ICE
         aworset<Node, int> n;
         //TODO: Esto.
         auto last = *(--(kv.second.dots().ds.end()));

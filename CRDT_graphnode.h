@@ -154,17 +154,18 @@ class DoTableStuff : public  QTableWidget
       QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoTableStuff::drawSLOT);
       show();
     };
-    
+
   public slots:
-    void drawSLOT(const std::int32_t &id, const std::vector<AttribValue> &attribs)
-    {
-      int i= 0; 
-      for(auto &v: attribs)
-      {
-        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));   //CHANGE TO SET
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value()))));
-        i++;
-      }
+    void drawSLOT(const std::int32_t &id, const std::vector<AttribValue> &attribs) {
+        //std::cout << " Window " << this->window()->windowTitle().toStdString() << " id " << QString::number(id).toStdString() << " contains? " << this->window()->windowTitle().contains(QString::number(id)) << std::endl;
+        if (this->window()->windowTitle().contains(QString::number(id))) {
+        int i = 0;
+            for (auto &v: attribs) {
+                setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));   //CHANGE TO SET
+                setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value()))));
+                i++;
+            }
+        }
     }
   private:
     std::shared_ptr<CRDT::CRDTGraph> graph;
@@ -194,13 +195,11 @@ class GraphNode : public QObject, public QGraphicsItem
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     void setColor(const std::string &plain);
     std::shared_ptr<DSR::GraphViewer> getGraphViewer() const { return graph_viewer;};
-
 	protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;  
     void keyPressEvent(QKeyEvent *event) override;
-
   public slots:
     void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
 

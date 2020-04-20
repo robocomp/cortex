@@ -36,6 +36,7 @@
 #include <string>
 #include <iostream>
 #include <type_traits>
+#include "../topics/DSRGraph.h"
 
 using namespace std;
 
@@ -402,7 +403,10 @@ public:
 
     void join (const dotkernel<T,K> & o)
     {
+
+
         if (this == &o) return; // Join is idempotent, but just dont do it.
+
         // DS
         // will iterate over the two sorted sets to compute join
         //typename  map<pair<K,int>,T>::iterator it;
@@ -511,6 +515,26 @@ public:
         // add under new dot
         ds.insert(pair<pair<K,int>,T>(dot,val));
         return dot;
+    }
+
+    //Fast
+    dotkernel<T,K> rmvFast (const T& val)  // remove all dots matching value
+    {
+        dotkernel<T,K> res;
+        //typename  map<pair<K,int>,T>::iterator dsit;
+        for(auto dsit=ds.begin(); dsit != ds.end();)
+        {
+            if (dsit->second.id() == val.id() && dsit->second.type() == val.type()) // match
+            {
+                res.c.insertdot(dsit->first,false); // result knows removed dots
+                ds.erase(dsit++);
+            }
+            else
+                ++dsit;
+        }
+        ////cout <<__PRETTY_FUNCTION__ <<":"<<__LINE__<< " " << res << endl;
+        res.c.compact(); // Maybe several dots there, so atempt compactation
+        return res;
     }
 
     dotkernel<T,K> rmv (const T& val)  // remove all dots matching value
@@ -1027,6 +1051,8 @@ public:
         return false;
     }
 
+
+    //Nosotros guardamos nodos con la misma clave siempre en un aworset. Se puede usar getNodesSimple.
     pair<E,pair<int, int> > getNodes (const K& uid)
     {
 //        cout << "get" << uid << endl;
@@ -1044,11 +1070,40 @@ public:
         return d;
     }
 
+    pair<E,pair<int, int> > getNodesSimple (const K& uid)
+    {
+        pair<E,pair<int, int> > d;
+        if (dk.ds.empty()) { return d; }
+        auto x = (--dk.ds.end());
+        list<pair<int,int>> lp = dk.c.get(uid);
+        d = pair<E,pair<int, int>> (x->second,lp.back());
+        return d;
+    }
+
+
+
     aworset<E,K> add (const E& val)
     {
         aworset<E,K> r;
         r.dk=dk.rmv(val); // optimization that first deletes val
         r.dk.join(dk.add(id,val));
+        return r;
+    }
+
+    aworset<E,K> addFast(const E& val)
+    {
+        aworset<E,K> r;
+        r.dk=dk.rmvFast(val); // optimization that first deletes val
+        r.dk.join(dk.add(id, val));
+        return r;
+    }
+
+
+    aworset<E,K> addFast(const E& val, const K& uid)
+    {
+        aworset<E,K> r(uid);
+        r.dk=dk.rmvFast(val); // optimization that first deletes val
+        r.dk.join(dk.add(uid, val));
         return r;
     }
 
@@ -1059,6 +1114,8 @@ public:
         r.dk.join(dk.add(uid, val));
         return r;
     }
+
+
 
     aworset<E,K> rmv (const E& val)
     {
@@ -1533,6 +1590,13 @@ public:
     {
         return c;
     }
+
+    //TODO: Aquí puede ser una referencia?
+    std::map<N,V> & getMapRef()
+    {
+        return m;
+    }
+
 
     std::map<N,V>  getMap() const
     {
