@@ -596,13 +596,13 @@ public:
         }
         ////cout <<__PRETTY_FUNCTION__ <<":"<<__LINE__<< " " << res << endl;
 
-        pair<K,int>* last;
+        // pair<K,int>* last;
         for(auto dsit=ds.begin(); dsit != ds.end();)
         {
             if (x[dsit->first.first] != dsit->first.second )
                 ds.erase(dsit++);
             else {
-                last = dsit;
+               // last = dsit->first;
                 ++dsit;
             }
         }
