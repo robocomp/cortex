@@ -299,7 +299,6 @@ private:
 class EdgeAttribs
 {
 public:
-
     bool operator==(const EdgeAttribs &eA_) const {
         if (this == &eA_) {
             return true;
@@ -345,7 +344,6 @@ public:
         output<<"]]";
         return output;
     };
-
     /*!
      * @brief Default constructor.
      */
@@ -526,8 +524,6 @@ private:
 class Node
 {
 public:
-
-
     bool operator==(const Node &n_) const {
         if (this == &n_) {
             return true;
@@ -656,6 +652,24 @@ public:
     eProsima_user_DllExport int32_t& id();
 
     /*!
+     * @brief This function sets a value in member agent_id
+     * @param _agent_id New value for member agent_id
+     */
+    eProsima_user_DllExport void agent_id(int32_t _agent_id);
+
+    /*!
+     * @brief This function returns the value of member agent_id
+     * @return Value of member agent_id
+     */
+    eProsima_user_DllExport int32_t agent_id() const;
+
+    /*!
+     * @brief This function returns a reference to member agent_id
+     * @return Reference to member agent_id
+     */
+    eProsima_user_DllExport int32_t& agent_id();
+
+    /*!
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
@@ -755,6 +769,7 @@ public:
 private:
     std::string m_type;
     int32_t m_id;
+    int32_t m_agent_id;
     std::vector<AttribValue> m_attrs;
     std::vector<EdgeAttribs> m_fano;
 };
@@ -884,7 +899,6 @@ private:
 class PairInt
 {
 public:
-
     bool operator==(const PairInt &pi_) const {
         if (this == &pi_) {
             return true;
@@ -926,7 +940,6 @@ public:
         output <<"("<<pi_.first()<<","<<pi_.second()<<")";
         return output;
     }
-
     /*!
      * @brief Default constructor.
      */
@@ -1360,7 +1373,6 @@ public:
         output <<dk_.cbase();
         return output;
     }
-
     /*!
      * @brief Default constructor.
      */
@@ -1503,7 +1515,6 @@ private:
 class AworSet
 {
 public:
-
     friend std::ostream &operator<<(std::ostream &output, const AworSet &as_) {
         output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
         return output;

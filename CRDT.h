@@ -34,7 +34,7 @@ namespace CRDT
 {
 
 using N = Node;
-using Nodes = ormap<int, aworset<N, int>, int>;
+using Nodes = ormap<int, aworset<N,  int >, int>;
 using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
 
 /////////////////////////////////////////////////////////////////
@@ -64,7 +64,7 @@ public:
 
     size_t size() const { return nodes.getMap().size(); };
 
-    CRDTGraph(int root, std::string name);
+    CRDTGraph(int root, std::string name, int id);
     ~CRDTGraph();
 
     //////////////////////////////////////////////////////
@@ -156,6 +156,7 @@ private:
 
     std::string filter;
 
+    const int agent_id;
     //DataStorm::Node node; // Main datastorm node
     //std::shared_ptr<DataStorm::SingleKeyWriter<std::string, AworSet >> writer;
     //std::shared_ptr<DataStorm::Topic<std::string, AworSet >> topic;

@@ -27,7 +27,7 @@ using namespace CRDT;
 
 // PUBLIC METHODS
 
-CRDTGraph::CRDTGraph(int root, std::string name) {
+CRDTGraph::CRDTGraph(int root, std::string name, int id) : agent_id(id) {
     graph_root = root;
     agent_name = name;
     nodes = Nodes(graph_root);
@@ -82,6 +82,7 @@ void CRDTGraph::add_edge(int from, int to, const std::string &label_) {
             ea.attrs(vector<AttribValue>());
             
             n.fano().push_back(ea);
+            n.agent_id(agent_id);
             insert_or_assign(from, n);
             emit update_edge_signal(from, to);
         } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
@@ -106,6 +107,7 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, CRDT::MT
             auto fano_at = std::find_if( node.fano().begin(),  node.fano().end(), [&to](const auto val) { return val.to() == to;});
             if (fano_at != node.fano().end()) {
                 fano_at->attrs().push_back(av);
+                node.agent_id(agent_id);
                 insert_or_assign(from, node);
                 emit update_edge_signal(from, to);
             } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
@@ -129,6 +131,7 @@ void CRDTGraph::add_edge_attrib(int from, int to, std::string att_name, std::str
             auto fano_at = std::find_if( node.fano().begin(),  node.fano().end(), [&to](const auto val) { return val.to() == to;});
             if (fano_at != node.fano().end()) {
                 fano_at->attrs().push_back(av);
+                node.agent_id(agent_id);
                 insert_or_assign(from, node);
                 emit update_edge_signal(from, to);
             } else std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
@@ -157,6 +160,7 @@ void CRDTGraph::add_edge_attribs(int from, int to, const std::vector<AttribValue
                         *value = v;
                     }
                     //node.fano().at(to).attrs().insert_or_assign(v);
+                    node.agent_id(agent_id);
                     insert_or_assign(from, node);
                     emit update_edge_signal(from, to);
                 }
@@ -192,6 +196,7 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, CRDT::MTypes att_v
                     *value = av;
                 }
                 //n.attrs().insert_or_assign(att_name, av);
+                n.agent_id(agent_id);
                 insert_or_assign(id, n);
                 emit update_attrs_signal(id,  n.attrs()); // Viewer
             }
@@ -217,7 +222,7 @@ void CRDTGraph::add_node_attrib(int id, std::string att_name, std::string att_ty
             else {
                 *value = av;
             }
-
+            n.agent_id(agent_id);
             insert_or_assign(id, n);
             emit update_attrs_signal(id, n.attrs()); // Viewer
         }
@@ -240,6 +245,7 @@ void CRDTGraph::add_node_attribs(int id, const vector<AttribValue> &att) {
                     }
                     //n.attrs().insert_or_assign(k, v);
                 }
+                n.agent_id(agent_id);
                 insert_or_assign(id, n);
                 emit update_attrs_signal(id, n.attrs()); // Viewer
             }
@@ -255,8 +261,7 @@ void CRDTGraph::delete_node(int id) {
         if (in(id)) {
 
             //auto n = nodes[id].readAsList().back();
-            //TODO: horrible.
-            auto n = (--( nodes[id].dots().ds.end()))->second;
+            auto n = nodes[id].dots().ds.rbegin()->second;
 
             for (auto v : n.fano()) { // Iterating over edge to this node
                 std::cout << id << " -> " << v.to() << std::endl;
@@ -265,7 +270,7 @@ void CRDTGraph::delete_node(int id) {
 
             auto map = nodes.getMapRef();
             for (auto &[k,v] : map) { // Iterating over edge from
-                auto node_to_delete_edge = (--( v.dots().ds.end()))->second;
+                auto node_to_delete_edge =  v.dots().ds.rbegin()->second;
                 //auto node_to_delete_edge = v.readAsList().back();
                 auto value  = std::find_if(node_to_delete_edge.fano().begin(), node_to_delete_edge.fano().end(), [&id](const auto value) { return id == value.to(); });
                 if (value != node_to_delete_edge.fano().end()) {
@@ -287,7 +292,6 @@ void CRDTGraph::delete_node(int id) {
             //writer->update(translateAwCRDTtoICE(id, delta));
             auto val = translateAwCRDTtoICE(id, delta);
             dsrpub.write(&val);
-            //TODO: writer
         }
     }
     catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
@@ -318,7 +322,7 @@ list<N> CRDTGraph::get_list() {
     list<N> mList;
     for (auto & kv : nodes.getMap())
         //.readAsList();
-        mList.push_back((--kv.second.dots().ds.end())->second);
+        mList.push_back(kv.second.dots().ds.rbegin()->second);
     return mList;
 }
 
@@ -328,7 +332,10 @@ N CRDTGraph::get(int id) {
     try {
         if (in(id)) {
             //list<N> node_list = nodes[id].readAsList();
-            if (!nodes[id].dots().ds.empty()) return (--nodes[id].dots().ds.end())->second;
+            if (!nodes[id].dots().ds.empty()) {
+                cout <<  nodes[id].dots().ds.size() << "   " << nodes[id].dots().ds.rbegin()->first << endl;
+                return nodes[id].dots().ds.rbegin()->second;
+            }
             else {
                 Node n;
                 n.type("empty");
@@ -420,7 +427,7 @@ int CRDTGraph::get_id_from_name(const std::string &tag) {
     {
         //auto n = kv.second.readAsList().back();
         //usar la referencia?
-        auto n = (--(kv.second.dots().ds.end()))->second;
+        auto n = kv.second.dots().ds.rbegin()->second;
         auto value = std::find_if(n.attrs().begin(), n.attrs().end(), [&tag](const auto value) {return value.key() == "imName"  && value.value() == tag;});
         if (value != n.attrs().end()) return n.id();
     }
@@ -482,14 +489,14 @@ void CRDTGraph::insert_or_assign(int id, const N &node)
             return;
         }
         count = 0;
-
-        auto delta = nodes[id].add(node, id);
-        //writer->update(translateAwCRDTtoICE(id, delta));
+        aworset<Node, int> delta;
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            delta = nodes[id].add(node, id);
+        }
         auto val = translateAwCRDTtoICE(id, delta);
-        //join_delta_node(val);
-
         dsrpub.write(&val);
-        //TODO: writer
+
         emit update_node_signal(id, node.type());
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
@@ -504,29 +511,34 @@ void CRDTGraph::insert_or_assign(const N &node) {
         }
         count = 0;
 
+        aworset<Node, int> delta;
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            delta = nodes[node.id()].add(node, node.id());
+        }
 
-        auto delta = nodes[node.id()].add(node, node.id());
-        //writer->update(translateAwCRDTtoICE(node.id, delta));
         auto val = translateAwCRDTtoICE(node.id(), delta);
         dsrpub.write(&val);
 
-        //TODO: writer
 
         emit update_node_signal(node.id(), node.type());
     } catch(const std::exception &e){ std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
-    //N new_node; new_node.type = type_; new_node.id = id;
-    N new_node; 
+    N new_node;
     new_node.type(type_); 
     new_node.id(id);
-    auto delta = nodes[id].add(new_node);
-    //writer->update(translateAwCRDTtoICE(id, delta));
+    new_node.agent_id(agent_id);
+
+    aworset<Node, int> delta;
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        delta = nodes[id].add(new_node);
+    }
+
     auto val = translateAwCRDTtoICE(id, delta);
     dsrpub.write(&val);
-
-    //TODO: writer
 
     emit update_node_signal(id, new_node.type());
 }
@@ -535,15 +547,14 @@ void CRDTGraph::insert_or_assign(int id, const std::string &type_) {
 void CRDTGraph::join_delta_node(AworSet aworSet) {
     try{
         auto d = translateAwICEtoCRDT(aworSet);
-//        std::lock_guard<std::mutex> lock(_mutex);
         //std::cout << aworSet.id() << std::endl;
 
-        //TODO: Aquí no se limpian los valores viejos.
-        nodes[aworSet.id()].join(d);
-
-        //emit update_attrs_signal(aworSet.id(), (--(d.dots().ds.end()))->second.attrs()); // Viewer
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            nodes[aworSet.id()].join_replace(d);
+        }
         //d.readAsList().back()
-        emit update_node_signal(aworSet.id(), (--(d.dots().ds.end()))->second.type());
+        emit update_node_signal(aworSet.id(), d.dots().ds.rbegin()->second.type());
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 
 }
@@ -569,20 +580,14 @@ void CRDTGraph::join_full_graph(OrMap full_graph) {
     for (auto &val : full_graph.m())
     {
         auto awor = translateAwICEtoCRDT(val);
-        nodes[val.id()].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            nodes[val.id()].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
+        }
         emit update_node_signal(val.id(), get(val.id()).type());
 
     }
 
-    //Map
-    //TODO: Improve. It is not the most efficient.
-    /*for (auto &v : full_graph.m())
-        for (auto &awv : translateAwICEtoCRDT(v).readAsListWithId()) {
-//            std::lock_guard<std::mutex> lock(_mutex);
-            nodes[v.id()].add(awv.second, v.id());
-            emit update_node_signal(v.id(),get(v.id()).type());
-        }
-*/
 }
 
 
@@ -641,6 +646,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             Node n;
             n.type(node_type);
             n.id(node_id);
+            n.agent_id(agent_id);
             insert_or_assign(node_id, n);
             add_node_attrib(node_id, "level", std::int32_t(0));
             add_node_attrib(node_id, "parent", std::int32_t(0));
@@ -849,8 +855,8 @@ vector<AworSet> CRDTGraph::Map() {
     vector<AworSet> m;
     for (auto kv : nodes.getMapRef()) { // Map of Aworset to ICE
         aworset<Node, int> n;
-        //TODO: Esto.
-        auto last = *(--(kv.second.dots().ds.end()));
+
+        auto last = *kv.second.dots().ds.rbegin();
         n.dots().ds.insert(last);
         n.dots().c = kv.second.dots().c;
         m.push_back(translateAwCRDTtoICE(kv.first, n));
@@ -1033,7 +1039,6 @@ void CRDTGraph::fullgraph_request_thread() {
     dsrpub_request_answer_call = NewMessageFunctor(this, &work, lambda_request_answer);
     auto res = dsrsub_request_answer.init(dsrparticipant.getParticipant(), "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(),dsrpub_request_answer_call);
 
-    //Si no pongo esto no funciona
     sleep(1);
 
     std::cout << " Requesting the complete graph " << std::endl;
@@ -1042,43 +1047,11 @@ void CRDTGraph::fullgraph_request_thread() {
     dsrpub_graph_request.write(&gr);
 
     while (!sync) {
-        sleep(5);
+        sleep(1);
     }
-    //TODO: Eliminar la suscripción después de terminar?.
     eprosima::fastrtps::Domain::removeSubscriber(dsrsub_request_answer.getSubscriber());
     start_subscription_thread(true);
-    /*
-    std::cout << __FUNCTION__ << ":" << __LINE__ << "-> Initiating request for full graph requests" << std::endl;
-//    std::chrono::time_point <std::chrono::system_clock> start_clock = std::chrono::system_clock::now();
 
-    DataStorm::Topic <std::string, OrMap> topic_answer(node, "DSR_GRAPH_ANSWER");
-    DataStorm::FilteredKeyReader <std::string, OrMap> reader(topic_answer,
-                                                                          DataStorm::Filter<std::string>("_regex",
-                                                                                                         filter.c_str()));
-    topic_answer.setWriterDefaultConfig(
-            {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
-    topic_answer.setReaderDefaultConfig(
-            {Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::OnAllExceptPartialUpdate});
-
-    DataStorm::Topic <std::string, GraphRequest> topicR(node, "DSR_GRAPH_REQUEST");
-    DataStorm::SingleKeyWriter <std::string, GraphRequest> writer(topicR, agent_name,
-                                                                               agent_name + " Full Graph Request");
-
-    topicR.setWriterDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
-    topicR.setReaderDefaultConfig({Ice::nullopt, Ice::nullopt, DataStorm::ClearHistoryPolicy::Never});
-    writer.add(GraphRequest{agent_name});
-
-    std::cout << __FUNCTION__ <<":" << __LINE__ << " Wait for writers:[" << reader.hasWriters() << "]. Data unread:[" << reader.hasUnread() << "]. " << std::endl;
-    auto full_graph = reader.getNextUnread();
-    join_full_graph(full_graph.getValue());
-    std::cout << __FUNCTION__ <<":" << __LINE__ << "Synchronized."<<std::endl;
-//    if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start_clock).count() <
-//        TIMEOUT) {
-//        join_full_graph(full_graph.getValue());
-//
-//        std::cout << __FUNCTION__ << " Finished uploading full graph" << std::endl;
-//    }
-    */
 }
 
 AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {
@@ -1106,6 +1079,7 @@ AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {
 
         delta_crdt.dk().cbase().dc().push_back(pi);
     }
+    //delta_crdt.agent_id(data.agent());
     delta_crdt.id(id); //TODO: Check K value of aworset (ID=0)
     return delta_crdt;
 }

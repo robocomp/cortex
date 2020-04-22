@@ -34,13 +34,13 @@ using namespace eprosima::fastcdr::exception;
 
 AttribValue::AttribValue()
 {
-    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@8646db9
+    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@66d1af89
     m_key ="";
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@37374a5e
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@8646db9
     m_type ="";
-    // m_value com.eprosima.idl.parser.typecode.StringTypeCode@4671e53b
+    // m_value com.eprosima.idl.parser.typecode.StringTypeCode@37374a5e
     m_value ="";
-    // m_length com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2db7a79b
+    // m_length com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4671e53b
     m_length = 0;
 
 }
@@ -308,13 +308,13 @@ void AttribValue::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 EdgeAttribs::EdgeAttribs()
 {
-    // m_label com.eprosima.idl.parser.typecode.StringTypeCode@23bb8443
+    // m_label com.eprosima.idl.parser.typecode.StringTypeCode@3ffcd140
     m_label ="";
-    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1176dcec
+    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@23bb8443
     m_from = 0;
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@120d6fe6
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@1176dcec
     m_to = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.SequenceTypeCode@4ba2ca36
+    // m_attrs com.eprosima.idl.parser.typecode.SequenceTypeCode@120d6fe6
 
 
 }
@@ -586,10 +586,12 @@ void EdgeAttribs::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Node::Node()
 {
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@641147d0
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@3d3fcdb0
     m_type ="";
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6e38921c
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@641147d0
     m_id = 0;
+    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6e38921c
+    m_agent_id = 0;
     // m_attrs com.eprosima.idl.parser.typecode.SequenceTypeCode@64d7f7e0
 
     // m_fano com.eprosima.idl.parser.typecode.SequenceTypeCode@27c6e487
@@ -603,12 +605,14 @@ Node::~Node()
 
 
 
+
 }
 
 Node::Node(const Node &x)
 {
     m_type = x.m_type;
     m_id = x.m_id;
+    m_agent_id = x.m_agent_id;
     m_attrs = x.m_attrs;
     m_fano = x.m_fano;
 }
@@ -617,6 +621,7 @@ Node::Node(Node &&x)
 {
     m_type = std::move(x.m_type);
     m_id = x.m_id;
+    m_agent_id = x.m_agent_id;
     m_attrs = std::move(x.m_attrs);
     m_fano = std::move(x.m_fano);
 }
@@ -626,6 +631,7 @@ Node& Node::operator=(const Node &x)
 
     m_type = x.m_type;
     m_id = x.m_id;
+    m_agent_id = x.m_agent_id;
     m_attrs = x.m_attrs;
     m_fano = x.m_fano;
 
@@ -637,6 +643,7 @@ Node& Node::operator=(Node &&x)
 
     m_type = std::move(x.m_type);
     m_id = x.m_id;
+    m_agent_id = x.m_agent_id;
     m_attrs = std::move(x.m_attrs);
     m_fano = std::move(x.m_fano);
 
@@ -649,6 +656,9 @@ size_t Node::getMaxCdrSerializedSize(size_t current_alignment)
 
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
@@ -685,6 +695,9 @@ size_t Node::getCdrSerializedSize(const Node& data, size_t current_alignment)
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
 
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
     for(size_t a = 0; a < data.attrs().size(); ++a)
     {
         current_alignment += AttribValue::getCdrSerializedSize(data.attrs().at(a), current_alignment);}
@@ -705,6 +718,7 @@ void Node::serialize(eprosima::fastcdr::Cdr &scdr) const
 
     scdr << m_type;
     scdr << m_id;
+    scdr << m_agent_id;
     scdr << m_attrs;
     scdr << m_fano;
 }
@@ -714,6 +728,7 @@ void Node::deserialize(eprosima::fastcdr::Cdr &dcdr)
 
     dcdr >> m_type;
     dcdr >> m_id;
+    dcdr >> m_agent_id;
     dcdr >> m_attrs;
     dcdr >> m_fano;
 }
@@ -778,6 +793,33 @@ int32_t Node::id() const
 int32_t& Node::id()
 {
     return m_id;
+}
+
+/*!
+ * @brief This function sets a value in member agent_id
+ * @param _agent_id New value for member agent_id
+ */
+void Node::agent_id(int32_t _agent_id)
+{
+m_agent_id = _agent_id;
+}
+
+/*!
+ * @brief This function returns the value of member agent_id
+ * @return Value of member agent_id
+ */
+int32_t Node::agent_id() const
+{
+    return m_agent_id;
+}
+
+/*!
+ * @brief This function returns a reference to member agent_id
+ * @return Reference to member agent_id
+ */
+int32_t& Node::agent_id()
+{
+    return m_agent_id;
 }
 
 /*!
@@ -861,6 +903,7 @@ size_t Node::getKeyMaxCdrSerializedSize(size_t current_alignment)
 
 
 
+
     return current_align;
 }
 
@@ -872,6 +915,7 @@ bool Node::isKeyDefined()
 void Node::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
     (void) scdr;
+     
      
      
      
@@ -1006,9 +1050,9 @@ void GraphRequest::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 PairInt::PairInt()
 {
-    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@15d9bc04
+    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@516be40f
     m_first = 0;
-    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@473b46c3
+    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@3c0a50da
     m_second = 0;
 
 }
@@ -1174,9 +1218,9 @@ void PairInt::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotContext::DotContext()
 {
-    // m_cc com.eprosima.idl.parser.typecode.SequenceTypeCode@516be40f
+    // m_cc com.eprosima.idl.parser.typecode.SequenceTypeCode@646be2c3
 
-    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@3c0a50da
+    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@797badd3
 
 
 }
@@ -1910,9 +1954,9 @@ void AworSet::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 OrMap::OrMap()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@3f200884
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@f0f2775
     m_id = 0;
-    // m_m com.eprosima.idl.parser.typecode.SequenceTypeCode@4d339552
+    // m_m com.eprosima.idl.parser.typecode.SequenceTypeCode@5a4aa2f2
 
     // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@709ba3fb
 

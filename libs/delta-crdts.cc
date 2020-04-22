@@ -250,6 +250,7 @@ public:
         return false;
     }
 
+    //TODO: debug this
     void compact()
     {
         // Compact DC to CC if possible
@@ -449,6 +450,64 @@ public:
         c.join(o.c);
     }
 
+
+    void join_replace_conflict (const dotkernel<T,K> & o)
+    {
+
+
+        if (this == &o) return; // Join is idempotent, but just dont do it.
+
+        // DS
+        // will iterate over the two sorted sets to compute join
+        //typename  map<pair<K,int>,T>::iterator it;
+        //typename  map<pair<K,int>,T>::const_iterator ito;
+        auto it=ds.begin();
+        auto ito=o.ds.begin();
+        do
+        {
+            if ( it != ds.end() && ( ito == o.ds.end() || it->first < ito->first))
+            {
+                //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << endl;
+                // dot only at this
+                if (o.c.dotin(it->first)) { // other knows dot, must delete here
+                    ds.erase(it++);
+                    //cout <<__FUNCTION__<<":"<<__LINE__ << endl;
+                }
+                else // keep it
+                    ++it;
+            }
+            else if ( ito != o.ds.end() && ( it == ds.end() || ito->first < it->first))
+            {
+                //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
+                // dot only at other
+                if(! c.dotin(ito->first)) { // If I dont know, import
+                    ds.insert(*ito);
+                    //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
+                }
+                ++ito;
+            }
+            else if ( it != ds.end() && ito != o.ds.end() )
+            {
+                //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << " " << o << endl;
+                // dot in both
+
+                if constexpr(is_same<T, Node>::value) {
+                    cout << "CONFLICTO " << endl;
+                    //replace in case of conflict if the agent id has a lower value
+                    if (it->second.agent_id() > ito->second.agent_id() && *it != *ito) {
+                        ds.erase(it);
+                        ds.insert(*ito);
+                    }
+                }
+                ++it;
+                ++ito;
+            }
+        } while (it != ds.end() || ito != o.ds.end() );
+        // CC
+        //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ <<" " <<o.c <<endl;
+        c.join(o.c);
+    }
+
     void deepjoin (const dotkernel<T,K> & o)
     {
         if (this == &o) return; // Join is idempotent, but just dont do it.
@@ -517,25 +576,43 @@ public:
         return dot;
     }
 
-    //Fast
-    dotkernel<T,K> rmvFast (const T& val)  // remove all dots matching value
-    {
-        dotkernel<T,K> res;
+
+    void clean () {
         //typename  map<pair<K,int>,T>::iterator dsit;
-        for(auto dsit=ds.begin(); dsit != ds.end();)
+
+
+        map<K,int> x;
+        for(auto dsit=ds.begin(); dsit != ds.end(); dsit++)
         {
-            if (dsit->second.id() == val.id() && dsit->second.type() == val.type()) // match
+            if ( x.find(dsit->first.first) != x.end()) // match
             {
-                res.c.insertdot(dsit->first,false); // result knows removed dots
-                ds.erase(dsit++);
+                if ( x[dsit->first.first] <  dsit->first.second ) {
+                    x[dsit->first.first] =  dsit->first.second;
+                }
             }
-            else
-                ++dsit;
+            else {
+                x.insert(dsit->first);
+            }
         }
         ////cout <<__PRETTY_FUNCTION__ <<":"<<__LINE__<< " " << res << endl;
-        res.c.compact(); // Maybe several dots there, so atempt compactation
-        return res;
+
+        pair<K,int>* last;
+        for(auto dsit=ds.begin(); dsit != ds.end();)
+        {
+            if (x[dsit->first.first] != dsit->first.second )
+                ds.erase(dsit++);
+            else {
+                last = dsit;
+                ++dsit;
+            }
+        }
+
+        //TODO: comprobar esto
+        //c.insertdot(last);
+        c.compact();
+
     }
+
 
     dotkernel<T,K> rmv (const T& val)  // remove all dots matching value
     {
@@ -555,6 +632,8 @@ public:
         res.c.compact(); // Maybe several dots there, so atempt compactation
         return res;
     }
+
+
 
     dotkernel<T,K> rmv (const pair<K,int>& dot)  // remove a dot
     {
@@ -986,6 +1065,9 @@ public:
     aworset(K k) : id(k) {} // Mutable replicas need a unique id
     aworset(K k, dotcontext<K> &jointc) : id(k), dk(jointc) {}
 //
+
+
+
     dotcontext<K> & context()
     {
         return dk.c;
@@ -1074,7 +1156,7 @@ public:
     {
         pair<E,pair<int, int> > d;
         if (dk.ds.empty()) { return d; }
-        auto x = (--dk.ds.end());
+        auto x = dk.ds.rbegin();
         list<pair<int,int>> lp = dk.c.get(uid);
         d = pair<E,pair<int, int>> (x->second,lp.back());
         return d;
@@ -1090,22 +1172,6 @@ public:
         return r;
     }
 
-    aworset<E,K> addFast(const E& val)
-    {
-        aworset<E,K> r;
-        r.dk=dk.rmvFast(val); // optimization that first deletes val
-        r.dk.join(dk.add(id, val));
-        return r;
-    }
-
-
-    aworset<E,K> addFast(const E& val, const K& uid)
-    {
-        aworset<E,K> r(uid);
-        r.dk=dk.rmvFast(val); // optimization that first deletes val
-        r.dk.join(dk.add(uid, val));
-        return r;
-    }
 
     aworset<E,K> add(const E& val, const K& uid)
     {
@@ -1137,6 +1203,18 @@ public:
         dk.join(o.dk);
         // Further optimization can be done by keeping for val x and id A
         // only the highest dot from A supporting x.
+        dk.clean();
+
+    }
+
+    //Replace on conflict
+    void join_replace (aworset<E,K> o)
+    {
+        ////cout <<__PRETTY_FUNCTION__ <<" o: "<< o << endl;
+        dk.join_replace_conflict(o.dk);
+        // Further optimization can be done by keeping for val x and id A
+        // only the highest dot from A supporting x.
+        dk.clean();
     }
 };
 
@@ -1591,7 +1669,7 @@ public:
         return c;
     }
 
-    //TODO: Aquí puede ser una referencia?
+    //Devuelve una referencia en lugar del mapa
     std::map<N,V> & getMapRef()
     {
         return m;

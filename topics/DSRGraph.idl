@@ -21,6 +21,7 @@
     struct Node { 
         string type;
         long id;
+        long agent_id;
 		//map<string, AttribValue>   attrs;
 		sequence<AttribValue> attrs;
         //map<unsigned long, EdgeAttribs> fano;
@@ -67,6 +68,7 @@
 
     struct AworSet {
         long id;
+        //long agent_id;
         DotKernel dk; // Dot kernel
     };
 

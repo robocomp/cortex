@@ -888,8 +888,6 @@ bool AworSetPubSubType::serialize(void *data, SerializedPayload_t *payload)
     }
 
     payload->length = static_cast<uint32_t>(ser.getSerializedDataLength()); //Get the serialized length
-
-    std::cout << "Serialized size: " <<  payload->length << std::endl;
     return true;
 }
 
