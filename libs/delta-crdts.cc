@@ -596,13 +596,21 @@ public:
         }
         ////cout <<__PRETTY_FUNCTION__ <<":"<<__LINE__<< " " << res << endl;
 
+<<<<<<< HEAD
         //pair<K,int>* last;
+=======
+        // pair<K,int>* last;
+>>>>>>> 2f41eeccc9d971cc0a35a49ce7d2195f33c7f493
         for(auto dsit=ds.begin(); dsit != ds.end();)
         {
             if (x[dsit->first.first] != dsit->first.second )
                 ds.erase(dsit++);
             else {
+<<<<<<< HEAD
                 //last = dsit->first;
+=======
+               // last = dsit->first;
+>>>>>>> 2f41eeccc9d971cc0a35a49ce7d2195f33c7f493
                 ++dsit;
             }
         }
