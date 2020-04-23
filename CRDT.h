@@ -73,6 +73,8 @@ public:
 
     // Nodes
     Node get_node(std::string name);
+    Node get_node(int id);
+
     bool insert_or_assign_node(const N &node);
     bool delete_node(std::string name);
 

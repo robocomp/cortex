@@ -84,6 +84,13 @@ Node CRDTGraph::get_node(std::string name) {
     return n;
 }
 
+
+Node CRDTGraph::get_node(int id) {
+    std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
+    std::shared_lock<std::shared_mutex>  lock(_mutex);
+    return get_(id);
+}
+
 bool CRDTGraph::insert_or_assign_node(const N &node) {
     std::cout << "Tomando lock único para insertar un nodo" << std::endl;
     {
@@ -91,7 +98,7 @@ bool CRDTGraph::insert_or_assign_node(const N &node) {
         auto r = insert_or_assign_node_(node);
     }
     emit update_node_signal(node.id(), node.type());
-
+    return true;
 }
 
 bool CRDTGraph::insert_or_assign_node_(const N &node) {
@@ -119,19 +126,19 @@ bool CRDTGraph::insert_or_assign_node_(const N &node) {
 bool CRDTGraph::delete_node(std::string name) {
     std::cout << "Tomando lock único para borrar un nodo" << std::endl;
     vector<tuple<int,int, std::string>> edges;
+    int id = -1;
     std::unique_lock<std::shared_mutex>  lock(_mutex);
     try {
-        int id = get_id_from_name(name);
+        id = get_id_from_name(name);
+        if(id == -1) return false;
 
         //1. Get and remove node.
         auto node = get_(id);
-        if(node.id() == -1) return false;
         for (auto v : node.fano()) { // Delete all edges from this node.
             std::cout << id << " -> " << v.to() << std::endl;
-            emit del_edge_signal(id,v.to(),v.label());
+            edges.push_back(make_tuple(id, v.to(), v.label()));
         }
-        nodes[id].rmv(node);
-        emit del_node_signal(id);
+        nodes.erase(id);
         //2. search and remove edges.
         //For each node check if there is an edge to remove.
         for (auto [k, v] : nodes.getMapRef()) {
@@ -146,16 +153,19 @@ bool CRDTGraph::delete_node(std::string name) {
             //Necesitamos una copia?
             visited_node.fano().erase(value);
             auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
+            edges.push_back(make_tuple(visited_node.id(), id, value->label()));
 
             // Send changes.
             auto val = translateAwCRDTtoICE(visited_node.id(), delta);
             dsrpub.write(&val);
-            edges.push_back(make_tuple(visited_node.id(), id, value->label()));
         }
         return true;
     } catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;
     };
+
+    emit del_node_signal(id);
+
     for (auto &[id0, id1, label] : edges) {
         emit del_edge_signal(id0, id1, label);
     }
@@ -169,7 +179,7 @@ bool CRDTGraph::delete_node(std::string name) {
  * EDGE METHODS
  */
 EdgeAttribs CRDTGraph::get_edge(std::string from, std::string to) {
-    std::cout << "Tomando lock compartido para obtener una arista" << std::endl;
+    std::cout << "Tomando lock compartido para obtener un edge" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
 
     int id_from = get_id_from_name(from);
@@ -203,7 +213,7 @@ EdgeAttribs CRDTGraph::get_edge(std::string from, std::string to) {
 }
 
 bool CRDTGraph::insert_or_assign_edge(EdgeAttribs& attrs) {
-    std::cout << "Tomando lock para insertar una arista" << std::endl;
+    std::cout << "Tomando lock para insertar un edge" << std::endl;
     std::cout << attrs << std::endl;
 
     std::unique_lock<std::shared_mutex>  lock(_mutex);
@@ -246,7 +256,7 @@ bool CRDTGraph::insert_or_assign_edge(EdgeAttribs& attrs) {
 
 
 bool CRDTGraph::delete_edge(std::string from, std::string to) {
-    std::cout << "Tomando lock para borrar una arista" << std::endl;
+    std::cout << "Tomando lock para borrar un edge" << std::endl;
     //Node updated;
     int id_from = 0;
     int id_to = 0;
@@ -303,7 +313,7 @@ N CRDTGraph::get_(int id) {
         if (in(id)) {
             //list<N> node_list = nodes[id].readAsList();
             if (!nodes[id].dots().ds.empty()) {
-                cout <<  nodes[id].dots().ds.size() << "   " << nodes[id].dots().ds.rbegin()->first << endl;
+                //cout <<  nodes[id].dots().ds.size() << "   " << nodes[id].dots().ds.rbegin()->first << endl;
                 return nodes[id].dots().ds.rbegin()->second;
             }
             else {

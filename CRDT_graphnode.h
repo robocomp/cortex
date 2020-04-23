@@ -39,7 +39,6 @@
 class GraphEdge;
 class QGraphicsSceneMouseEvent;
 
-#include "specificworker.h"
 
 class DoLaserStuff : public QGraphicsView
 {
