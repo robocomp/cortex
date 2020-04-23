@@ -203,8 +203,12 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     {
         auto g = graph_viewer->getGraph();
         std::cout << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
-        g->add_node_attrib(id_in_graph,"pos_x",(float)event->scenePos().x());
-        g->add_node_attrib(id_in_graph,"pos_y",(float)event->scenePos().y());
+        Node n = g->get_node(name_in_graph);
+        g->add_attrib(n.attrs(),"pos_x",(float)event->scenePos().x());
+        g->add_attrib(n.attrs(),"pos_y",(float)event->scenePos().y());
+        g->insert_or_assign_node(n);
+        //g->add_node_attrib(id_in_graph,"pos_x",(float)event->scenePos().x());
+        //g->add_node_attrib(id_in_graph,"pos_y",(float)event->scenePos().y());
     }
     // update();
     // QGraphicsItem::mouseReleaseEvent(event);

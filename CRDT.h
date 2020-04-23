@@ -9,6 +9,10 @@
 #include <map>
 #include <chrono>
 #include <thread>
+
+#include <mutex>
+#include <shared_mutex>
+
 #include "graph.h"
 //#include "libs/DSRGraph.h"
 #include "libs/delta-crdts.cc"
@@ -45,68 +49,79 @@ class CRDTGraph : public QObject
 {
     Q_OBJECT
 public:
-    class NewMessageFunctor
-    {
-    public:
-        CRDTGraph *graph;
-        bool *work;
-        std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f;
 
-        NewMessageFunctor(CRDTGraph *graph_, bool *work_,
-                std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f_)
-            : graph(graph_), work(work_), f(std::move(f_)){}
-
-        NewMessageFunctor() {};
-
-
-        void operator()(eprosima::fastrtps::Subscriber *sub) { f(sub, work, graph); };
-    };
 
     size_t size() const { return nodes.getMap().size(); };
 
     CRDTGraph(int root, std::string name, int id);
     ~CRDTGraph();
 
+
+    // threads
+    void start_fullgraph_request_thread();
+    void start_fullgraph_server_thread();
+    void start_subscription_thread(bool showReceived);
+
     //////////////////////////////////////////////////////
     ///  Graph API
     //////////////////////////////////////////////////////
 
-    void insert_or_assign(int id, const std::string &type_);
-    void insert_or_assign(int id, const N &node);
-    void insert_or_assign(const N &node);
-
-    void add_edge(int from, int to, const std::string &label_);
-    void add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value);
-    void add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length);
-    void add_edge_attribs(int from, int to, const vector<AttribValue> &att);
-
-    void add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value);
-    void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
-    void add_node_attribs(int id, const vector<AttribValue> &att);
-
-    void delete_node(int id);
-    void delete_node(string name);
+    // Utils
+    void read_from_file(const std::string &xml_file_path);
+    //void replace_node(int id, const N &node);
     bool empty(const int &id);
 
-    //////////////////////////////////////////////////////////
 
-    std::vector<EdgeAttribs> getEdges(int id);
+    // Nodes
+    Node get_node(std::string name);
+    bool insert_or_assign_node(const N &node);
+    bool delete_node(std::string name);
+
+    //Edges
+    EdgeAttribs get_edge(std::string from, std::string to);
+    bool insert_or_assign_edge(EdgeAttribs& attrs);
+    bool delete_edge(std::string from, std::string to);
+
+
+
+    //void insert_or_assign(int id, const std::string &type_);
+    //void insert_or_assign(int id, const N &node);
+    //void insert_or_assign(const N &node);
+
+    //void add_edge(int from, int to, const std::string &label_);
+    //void add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value);
+    //void add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length);
+    //void add_edge_attribs(int from, int to, const vector<AttribValue> &att);
+
+    //void add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value);
+    //void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
+    //void add_node_attribs(int id, const vector<AttribValue> &att);
+
+    //void delete_node(int id);
+    //void delete_node(string name);
+
+    //////////////////////////////////////////////////////
+    ///  Viewer
+    //////////////////////////////////////////////////////
     Nodes get();
-    list<N> get_list();
     N get(int id);
-    vector<AttribValue> get_node_attribs_crdt(int id);
-    std::map<std::string, MTypes> get_node_attribs(int id);
-    AttribValue get_node_attrib_by_name(int id, const std::string &key);
 
-    int get_id_from_name(const std::string &tag);
+
+
+
+    //std::vector<EdgeAttribs> getEdges(int id);
+    //vector<AttribValue> get_node_attribs_crdt(int id);
+    //std::map<std::string, MTypes> get_node_attribs(int id);
+    AttribValue get_node_attrib_by_name(Node& n, const std::string &key);
 
     template <typename Ta>
-    Ta get_node_attrib_by_name(int id, const std::string &key)
+    Ta get_node_attrib_by_name(Node& n, const std::string &key)
     {
-        AttribValue av = get_node_attrib_by_name(id, key);
+        AttribValue av = get_node_attrib_by_name(n, key);
         return icevalue_to_nativetype<Ta>(key, av.value());
     }
-    EdgeAttribs get_edge_attrib(int from, int to);
+
+    //EdgeAttribs get_edge_attrib(int from, int to);
 
     std::tuple<std::string, std::string, int> mtype_to_icevalue(const MTypes &t);
 
@@ -117,55 +132,81 @@ public:
         return std::get<Ta>(icevalue_to_mtypes(name, val));
     };
     MTypes icevalue_to_mtypes(const std::string &name, const std::string &val);
-    std::int32_t get_node_level(std::int32_t id);
-    std::string get_node_type(std::int32_t id);
-    std::int32_t get_parent_id(std::int32_t id);
+    std::int32_t get_node_level(Node& n);
+    std::string get_node_type(Node& n);
+    //std::int32_t get_parent_id(std::int32_t id);
+    std::string get_node_name(std::int32_t id);
 
-    bool in(const int &id);
 
-    void join_delta_node(AworSet aworSet);
-    void join_full_graph(OrMap full_graph);
+    void add_attrib(vector<AttribValue> &v, std::string att_name, CRDT::MTypes att_value);
+    void add__edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
 
-    void print();
-    void print(int id);
-    std::string printVisitor(const MTypes &t);
+    //////////////////////////////////////////////////////
 
-    // Utils
-    void read_from_file(const std::string &xml_file_path);
-    void replace_node(int id, const N &node);
 
-    // hreads
-    void start_fullgraph_request_thread();
-    void start_fullgraph_server_thread();
-    void start_subscription_thread(bool showReceived);
 
-    //int getId();
-    //DotContext getContext();
-    //std::map< int, AworSet> getMap();
 
-    std::string agent_name;
 
     //For debug
     int count = 0;
+
 private:
     Nodes nodes;
     int graph_root;
     bool work;
-    mutable std::mutex _mutex;
-    std::thread read_thread, request_thread, server_thread; // Threads
-
+    mutable std::shared_mutex _mutex;
+    //std::thread read_thread, request_thread, server_thread; // Threads
     std::string filter;
-
+    std::string agent_name;
     const int agent_id;
-    //DataStorm::Node node; // Main datastorm node
-    //std::shared_ptr<DataStorm::SingleKeyWriter<std::string, AworSet >> writer;
-    //std::shared_ptr<DataStorm::Topic<std::string, AworSet >> topic;
+
+
+
+    bool insert_or_assign_node_(const N &node);
+
+
+    //list<N> get_list();
+
+
+    bool in(const int &id);
+    N get_(int id);
+
+    int get_id_from_name(const std::string &tag);
+
+
+    //void print();
+    //void print(int id);
+    //std::string printVisitor(const MTypes &t);
+
 
     int id();
     DotContext context();
     std::vector<AworSet> Map();
 
-    void clear();
+    //void clear();
+
+
+    void join_delta_node(AworSet aworSet);
+    void join_full_graph(OrMap full_graph);
+
+
+
+    class NewMessageFunctor
+    {
+    public:
+        CRDTGraph *graph;
+        bool *work;
+        std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f;
+
+        NewMessageFunctor(CRDTGraph *graph_, bool *work_,
+                          std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f_)
+                : graph(graph_), work(work_), f(std::move(f_)){}
+
+        NewMessageFunctor() {};
+
+
+        void operator()(eprosima::fastrtps::Subscriber *sub) { f(sub, work, graph); };
+    };
 
     // Threads handlers
     void subscription_thread(bool showReceived);

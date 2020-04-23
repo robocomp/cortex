@@ -95,7 +95,7 @@ void GraphViewer::createGraph()
 		{
 			try
 			{
-				addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.first));
+				addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.second.dots().ds.rbegin()->second));
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
 		}
@@ -143,10 +143,15 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 {	
 	qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
-	if( gmap.count(id) == 0)	// if node does not exist, create it
+
+    std::string name = gcrdt->get_node_name(id);
+	Node n = gcrdt->get_node(name);
+
+    if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
 		gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));  //REEMPLAZAR THIS 
 		gnode->id_in_graph = id;
+		gnode->name_in_graph = name;
 		gnode->setType( type );
 		scene.addItem(gnode);
 		gmap.insert(std::pair(id, gnode));
@@ -193,16 +198,17 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 								worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/redBall.png")));
 						} , Qt::UniqueConnection);
 
+
 		try
 		{
-			auto qname = gcrdt->get_node_attrib_by_name(id, "name").value();
+			auto qname = gcrdt->get_node_attrib_by_name(n, "name").value();
 			gnode->setTag(qname);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
 
 		try
 		{
-			auto color = gcrdt->get_node_attrib_by_name(id, "color").value();
+			auto color = gcrdt->get_node_attrib_by_name(n, "color").value();
 			gnode->setColor(color);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;};
@@ -213,22 +219,21 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
     float posx = 10; float posy = 10;
 	try
 	{
-        posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(id, "pos_x").value());
-        posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(id, "pos_y").value());
+        posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_x").value());
+        posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_y").value());
 	}
 	catch(const std::exception &e){ };
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
 
-    emit gcrdt->update_attrs_signal(id,gcrdt->get_node_attribs_crdt(id) );
+    emit gcrdt->update_attrs_signal(id,n.attrs() );
 
-
-	auto e = gcrdt->getEdges(id);
-//	if (!e.empty())
-//	{
-//		for (auto &[k,v] : e)
-//			addEdgeSLOT(id, k, v.label);
-//	}
+    //auto e = gcrdt->getEdges(id);
+    //	if (!e.empty())
+    //	{
+    //		for (auto &[k,v] : e)
+    //			addEdgeSLOT(id, k, v.label);
+    //	}
 
 }
 

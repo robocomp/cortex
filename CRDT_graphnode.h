@@ -77,8 +77,9 @@ class DoLaserStuff : public QGraphicsView
       try
       {
         std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
-        const vector<float> lAngles = graph->get_node_attrib_by_name<vector<float>>(id, "laser_data_angles");
-        const vector<float> lDists = graph->get_node_attrib_by_name<vector<float>>(id, "laser_data_dists");
+        Node n = graph->get_node(graph->get_node_name(id));
+        const vector<float> lAngles = graph->get_node_attrib_by_name<vector<float>>(n, "laser_data_angles");
+        const vector<float> lDists = graph->get_node_attrib_by_name<vector<float>>(n, "laser_data_dists");
 
         QPolygonF polig;
         for(const auto v : lAngles)
@@ -117,7 +118,8 @@ class DoRGBDStuff : public  QLabel
       setWindowTitle("RGBD");
       setParent(this);
       QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::vector<AttribValue> &attrs){
-                            const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(node_id, "rgbd_data");
+                        Node n = graph->get_node(graph->get_node_name(node_id));
+                        const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(n, "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
       show();
@@ -137,12 +139,13 @@ class DoTableStuff : public  QTableWidget
       qRegisterMetaType<map<string, AttribValue>>("Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
-      setWindowTitle("Node " + QString::fromStdString(graph->get_node_type(node_id)) + " [" + QString::number(node_id) + "]");
+        Node n = graph->get_node(graph->get_node_name(node_id));
+        setWindowTitle("Node " + QString::fromStdString(graph->get_node_type(n)) + " [" + QString::number(node_id) + "]");
       setColumnCount(2);
-      setRowCount(graph->get_node_attribs_crdt(node_id).size() );
+      setRowCount(n.attrs().size() );
       setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
       int i=0;
-      for( auto &v : graph->get_node_attribs_crdt(node_id) )
+      for( auto &v : n.attrs() )
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));
         setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value())));
@@ -177,7 +180,8 @@ class GraphNode : public QObject, public QGraphicsItem
   Q_OBJECT
 	public:
     GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_);
-    
+
+    std::string name_in_graph;
     std::int32_t id_in_graph;
     QList<GraphEdge *> edgeList;
     

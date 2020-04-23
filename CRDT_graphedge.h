@@ -38,9 +38,11 @@ class DoRTStuff : public  QTableWidget
     {
       qRegisterMetaType<DSR::IDType>("DSR::IDType");
       qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
+      Node n = graph->get_node(graph->get_node_name(from));
+      Node n2 = graph->get_node(graph->get_node_name(to));
 
       //setWindowModality(Qt::ApplicationModal);
-      setWindowTitle("RT: " + QString::fromStdString(graph->get_node_type(from)) + " to " + QString::fromStdString(graph->get_node_type(to)));
+      setWindowTitle("RT: " + QString::fromStdString(graph->get_node_type(n)) + " to " + QString::fromStdString(graph->get_node_type(n2)));
       setColumnCount(4);
       setRowCount(4);
       setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d"}); 
@@ -67,8 +69,13 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          auto value = std::find_if(graph->get_edge_attrib(from, to).attrs().begin(), graph->get_edge_attrib(from, to).attrs().end(), [](const auto value) { return value.key() == "RT";});
-          if (value != graph->get_edge_attrib(from, to).attrs().end()) {
+          std::string n_from = graph->get_node_name(from);
+          std::string n_to = graph->get_node_name(to);
+
+          EdgeAttribs ea = graph->get_edge(n_from, n_to);
+
+          auto value = std::find_if(ea.attrs().begin(), ea.attrs().end(), [](const auto value) { return value.key() == "RT";});
+          if (value != ea.attrs().end()) {
               auto rtvalue = value->value();
               auto mat = graph->icevalue_to_nativetype<RTMat>("RT", rtvalue);
 
