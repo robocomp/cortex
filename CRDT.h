@@ -68,7 +68,6 @@ public:
 
     // Utils
     void read_from_file(const std::string &xml_file_path);
-    //void replace_node(int id, const N &node);
     bool empty(const int &id);
 
 
@@ -83,23 +82,6 @@ public:
     bool delete_edge(std::string from, std::string to);
 
 
-
-    //void insert_or_assign(int id, const std::string &type_);
-    //void insert_or_assign(int id, const N &node);
-    //void insert_or_assign(const N &node);
-
-    //void add_edge(int from, int to, const std::string &label_);
-    //void add_edge_attrib(int from, int to, std::string att_name, CRDT::MTypes att_value);
-    //void add_edge_attrib(int from, int to, std::string att_name, std::string att_type, std::string att_value, int length);
-    //void add_edge_attribs(int from, int to, const vector<AttribValue> &att);
-
-    //void add_node_attrib(int id, std::string att_name, CRDT::MTypes att_value);
-    //void add_node_attrib(int id, std::string att_name, std::string att_type, std::string att_value, int length);
-    //void add_node_attribs(int id, const vector<AttribValue> &att);
-
-    //void delete_node(int id);
-    //void delete_node(string name);
-
     //////////////////////////////////////////////////////
     ///  Viewer
     //////////////////////////////////////////////////////
@@ -109,9 +91,6 @@ public:
 
 
 
-    //std::vector<EdgeAttribs> getEdges(int id);
-    //vector<AttribValue> get_node_attribs_crdt(int id);
-    //std::map<std::string, MTypes> get_node_attribs(int id);
     AttribValue get_node_attrib_by_name(Node& n, const std::string &key);
 
     template <typename Ta>
@@ -121,11 +100,8 @@ public:
         return icevalue_to_nativetype<Ta>(key, av.value());
     }
 
-    //EdgeAttribs get_edge_attrib(int from, int to);
 
     std::tuple<std::string, std::string, int> mtype_to_icevalue(const MTypes &t);
-
-    // Converts Ice string values into DSRGraph native types
     template <typename Ta>
     Ta icevalue_to_nativetype(const std::string &name, const std::string &val)
     {
@@ -134,12 +110,11 @@ public:
     MTypes icevalue_to_mtypes(const std::string &name, const std::string &val);
     std::int32_t get_node_level(Node& n);
     std::string get_node_type(Node& n);
-    //std::int32_t get_parent_id(std::int32_t id);
     std::string get_node_name(std::int32_t id);
 
 
     void add_attrib(vector<AttribValue> &v, std::string att_name, CRDT::MTypes att_value);
-    void add__edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
+    void add_edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
 
     //////////////////////////////////////////////////////
 
@@ -160,32 +135,16 @@ private:
     std::string agent_name;
     const int agent_id;
 
-
-
-    bool insert_or_assign_node_(const N &node);
-
-
-    //list<N> get_list();
-
-
     bool in(const int &id);
     N get_(int id);
+    bool insert_or_assign_node_(const N &node);
 
     int get_id_from_name(const std::string &tag);
-
-
-    //void print();
-    //void print(int id);
-    //std::string printVisitor(const MTypes &t);
-
 
     int id();
     DotContext context();
     std::vector<AworSet> Map();
-
-    //void clear();
-
-
+    
     void join_delta_node(AworSet aworSet);
     void join_full_graph(OrMap full_graph);
 
