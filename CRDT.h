@@ -49,13 +49,9 @@ class CRDTGraph : public QObject
 {
     Q_OBJECT
 public:
-
-
     size_t size() const { return nodes.getMap().size(); };
-
     CRDTGraph(int root, std::string name, int id);
     ~CRDTGraph();
-
 
     // threads
     void start_fullgraph_request_thread();
@@ -74,26 +70,27 @@ public:
     // Nodes
     Node get_node(std::string name);
     Node get_node(int id);
-
     bool insert_or_assign_node(const N &node);
-    bool delete_node(std::string name);
+    bool delete_node(const std::string &name);
+    bool delete_node(int id);
 
     //Edges
     EdgeAttribs get_edge(std::string from, std::string to);
     bool insert_or_assign_edge(EdgeAttribs& attrs);
     bool delete_edge(std::string from, std::string to);
 
+    /// No debería ser privado a partir de aquí?
+    ////////////
 
     //////////////////////////////////////////////////////
     ///  Viewer
     //////////////////////////////////////////////////////
     Nodes get();
     N get(int id);
-
-
-
-
-    AttribValue get_node_attrib_by_name(Node& n, const std::string &key);
+    
+    // gets a const node ref and searches an attrib by name. With a map should be constant time.
+    AttribValue get_node_attrib_by_name(const Node& n, const std::string &key);
+   
 
     template <typename Ta>
     Ta get_node_attrib_by_name(Node& n, const std::string &key)
@@ -101,8 +98,6 @@ public:
         AttribValue av = get_node_attrib_by_name(n, key);
         return icevalue_to_nativetype<Ta>(key, av.value());
     }
-
-
     std::tuple<std::string, std::string, int> mtype_to_icevalue(const MTypes &t);
     template <typename Ta>
     Ta icevalue_to_nativetype(const std::string &name, const std::string &val)
@@ -119,9 +114,6 @@ public:
     void add_edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
 
     //////////////////////////////////////////////////////
-
-
-
 
 
     //For debug

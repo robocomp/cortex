@@ -105,7 +105,7 @@ void DSRSubscriber::SubListener::onNewDataMessage(Subscriber* sub)
     //         }
     // }
     //fps.print(1000, st.load().size() * 4 * 8);
-    std::cout << "New message. "<< participant_ID <<std::endl;
+    //std::cout << "New message. "<< participant_ID <<std::endl;
 
     f(sub);
 }

@@ -1054,10 +1054,9 @@ public:
 template<typename E, typename K=string> // Map embedable datatype
 class aworset    // Add-Wins Observed-Remove Set
 {
-private:
-    dotkernel<E,K> dk; // Dot kernel
     K id;
-
+    dotkernel<E,K> dk; // Dot kernel
+   
 public:
     aworset() {} // Only for deltas and those should not be mutated
     aworset(K k) : id(k) {} // Mutable replicas need a unique id
@@ -1637,12 +1636,11 @@ public:
 template<typename N, typename V, typename K=N>
 class ormap
 {
+    K id;
     map<N,V> m;
-
     dotcontext<K> cbase;
     dotcontext<K> & c;
-    K id;
-
+    
 public:
 
     // if no causal context supplied, use base one

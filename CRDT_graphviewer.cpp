@@ -141,7 +141,7 @@ void GraphViewer::toggleSimulationSLOT()
 
 void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 {	
-	qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
+	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 
     std::string name = gcrdt->get_node_name(id);

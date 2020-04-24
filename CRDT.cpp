@@ -13,9 +13,6 @@
 #include <libxml2/libxml/parser.h>
 #include <libxml2/libxml/tree.h>
 
-
-
-
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
@@ -32,8 +29,8 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id) : agent_id(id) {
     nodes = Nodes(graph_root);
     filter = "^(?!" + agent_name + "$).*$";
 
-    int argc = 0;
-    char *argv[0];
+    //int argc = 0;
+    //char *argv[0];
 
     work = true;
 
@@ -57,7 +54,7 @@ CRDTGraph::~CRDTGraph() {
  */
 
 Node CRDTGraph::get_node(std::string name) {
-    std::cout << "Tomando lock compartido para obtener un nodo" << std::endl;
+    // std::cout << "Tomando lock compartido para obtener un nodo" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     try {
         if (name == std::string()) {
@@ -86,16 +83,17 @@ Node CRDTGraph::get_node(std::string name) {
 
 
 Node CRDTGraph::get_node(int id) {
-    std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
+    // std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
 }
 
-bool CRDTGraph::insert_or_assign_node(const N &node) {
-    std::cout << "Tomando lock único para insertar un nodo" << std::endl;
+bool CRDTGraph::insert_or_assign_node(const N &node) 
+{
+    // std::cout << "Tomando lock único para insertar un nodo" << std::endl;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
-        auto r = insert_or_assign_node_(node);
+        insert_or_assign_node_(node);
     }
     emit update_node_signal(node.id(), node.type());
     return true;
@@ -103,7 +101,6 @@ bool CRDTGraph::insert_or_assign_node(const N &node) {
 
 bool CRDTGraph::insert_or_assign_node_(const N &node) {
     try {
-
         if (nodes[node.id()].getNodesSimple(node.id()).first == node) {
             count++;
             std::cout << "Skip node insertion: " << node.id() << " skipped: " << count << std::endl;
@@ -122,16 +119,23 @@ bool CRDTGraph::insert_or_assign_node_(const N &node) {
     return false;
 }
 
-
-bool CRDTGraph::delete_node(std::string name) {
-    std::cout << "Tomando lock único para borrar un nodo" << std::endl;
-    vector<tuple<int,int, std::string>> edges;
+bool CRDTGraph::delete_node(const std::string &name) 
+{
     int id = -1;
     std::unique_lock<std::shared_mutex>  lock(_mutex);
-    try {
-        id = get_id_from_name(name);
-        if(id == -1) return false;
+    id = get_id_from_name(name);
+    if(id == -1) 
+        return false;
+    return delete_node(id);
+}
 
+bool CRDTGraph::delete_node(int id) 
+{
+    // std::cout << "Tomando lock único para borrar un nodo" << std::endl;
+    vector<tuple<int,int, std::string>> edges;
+    std::unique_lock<std::shared_mutex>  lock(_mutex);
+    try 
+    {
         //1. Get and remove node.
         auto node = get_(id);
         for (auto v : node.fano()) { // Delete all edges from this node.
@@ -179,7 +183,7 @@ bool CRDTGraph::delete_node(std::string name) {
  * EDGE METHODS
  */
 EdgeAttribs CRDTGraph::get_edge(std::string from, std::string to) {
-    std::cout << "Tomando lock compartido para obtener un edge" << std::endl;
+    // std::cout << "Tomando lock compartido para obtener un edge" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
 
     int id_from = get_id_from_name(from);
@@ -213,7 +217,7 @@ EdgeAttribs CRDTGraph::get_edge(std::string from, std::string to) {
 }
 
 bool CRDTGraph::insert_or_assign_edge(EdgeAttribs& attrs) {
-    std::cout << "Tomando lock para insertar un edge" << std::endl;
+    //std::cout << "Tomando lock para insertar un edge" << std::endl;
     std::cout << attrs << std::endl;
 
     std::unique_lock<std::shared_mutex>  lock(_mutex);
@@ -256,7 +260,7 @@ bool CRDTGraph::insert_or_assign_edge(EdgeAttribs& attrs) {
 
 
 bool CRDTGraph::delete_edge(std::string from, std::string to) {
-    std::cout << "Tomando lock para borrar un edge" << std::endl;
+    //std::cout << "Tomando lock para borrar un edge" << std::endl;
     //Node updated;
     int id_from = 0;
     int id_to = 0;
@@ -294,8 +298,11 @@ bool CRDTGraph::delete_edge(std::string from, std::string to) {
 
 }
 
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
 Nodes CRDTGraph::get() {
-    std::cout << "Tomando lock para obtener todo el grafo" << std::endl;
+    //std::cout << "Tomando lock para obtener todo el grafo" << std::endl;
 
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return nodes;
@@ -303,13 +310,14 @@ Nodes CRDTGraph::get() {
 
 
 N CRDTGraph::get(int id) {
-    std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
+    //std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
 }
 
 N CRDTGraph::get_(int id) {
-    try {
+    try 
+    {
         if (in(id)) {
             //list<N> node_list = nodes[id].readAsList();
             if (!nodes[id].dots().ds.empty()) {
@@ -323,20 +331,25 @@ N CRDTGraph::get_(int id) {
                 return n;
             };
         }
-    } catch(const std::exception &e){
+    } catch(const std::exception &e)
+    {
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<id<<std::endl;
         Node n;
         n.type("error");
         n.id(-1);
         return n;
     }
+    Node n;
+    n.type("error");
+    n.id(-1);
+    return n;
 }
 
 
-AttribValue CRDTGraph::get_node_attrib_by_name(Node& n, const std::string &key) {
+AttribValue CRDTGraph::get_node_attrib_by_name(const Node& n, const std::string &key) {
     try {
         auto attrs = n.attrs();
-        auto value  = std::find_if(attrs.begin(), attrs.end(), [key](const auto value) { return key == value.key(); });
+        auto value  = std::find_if(attrs.begin(), attrs.end(), [key](const auto &value) { return key == value.key(); });
         if (value != attrs.end()) {
             return *value;
         }
@@ -419,7 +432,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
         //std::cout << aworSet.id() << std::endl;
 
         {
-            std::cout << "Tomando lock para hacer join" << std::endl;
+            //std::cout << "Tomando lock para hacer join" << std::endl;
 
             std::unique_lock<std::shared_mutex> lock(_mutex);
             nodes[aworSet.id()].join_replace(d);
@@ -431,7 +444,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) {
-    std::cout << "Tomando lock para hacer join (Grafo completo)" << std::endl;
+    //std::cout << "Tomando lock para hacer join (Grafo completo)" << std::endl;
     vector<pair<int, std::string>> updates;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -718,7 +731,7 @@ DotContext CRDTGraph::context() { // Context to ICE
 
 
 vector<AworSet> CRDTGraph::Map() {
-    std::cout << "Tomando lock compartido para Obtener todos los elementos del mapa" << std::endl;
+    //std::cout << "Tomando lock compartido para Obtener todos los elementos del mapa" << std::endl;
 
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     vector<AworSet> m;
@@ -744,7 +757,7 @@ void CRDTGraph::subscription_thread(bool showReceived) {
                 AworSet sample;
 
 
-                std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
+                //std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
                 //read or take
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
                     if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
@@ -791,7 +804,7 @@ void CRDTGraph::fullgraph_server_thread()
                     mp.cbase(graph->context());
                     std::cout << "nodos enviados: " << mp.m().size()  << std::endl;
 
-                    auto res_write = dsrpub_request_answer.write(&mp);
+                    dsrpub_request_answer.write(&mp);
                     //std::cout << (res_write == true ? "Ok" : "Error") << std::endl;
 
                     //writer.add(OrMap{id(), map(), context()});
@@ -807,7 +820,7 @@ void CRDTGraph::fullgraph_server_thread()
     };
     dsrpub_graph_request_call = NewMessageFunctor(this, &work, lambda_graph_request);
 
-    auto res = dsrsub_graph_request.init(dsrparticipant.getParticipant(), "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName(), dsrpub_graph_request_call);
+    dsrsub_graph_request.init(dsrparticipant.getParticipant(), "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName(), dsrpub_graph_request_call);
 
 
 };
@@ -839,7 +852,7 @@ void CRDTGraph::fullgraph_request_thread() {
     };
 
     dsrpub_request_answer_call = NewMessageFunctor(this, &work, lambda_request_answer);
-    auto res = dsrsub_request_answer.init(dsrparticipant.getParticipant(), "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(),dsrpub_request_answer_call);
+    dsrsub_request_answer.init(dsrparticipant.getParticipant(), "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(),dsrpub_request_answer_call);
 
     sleep(1);
 
