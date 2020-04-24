@@ -76,7 +76,7 @@ class DoLaserStuff : public QGraphicsView
       try
       {
         std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
-        Node n = graph->get_node(graph->get_node_name(id));
+        Node n = graph->get_node(graph->get_name_from_id(id));
         const vector<float> lAngles = graph->get_node_attrib_by_name<vector<float>>(n, "laser_data_angles");
         const vector<float> lDists = graph->get_node_attrib_by_name<vector<float>>(n, "laser_data_dists");
 
@@ -108,7 +108,7 @@ class DoLaserStuff : public QGraphicsView
 class DoRGBDStuff : public  QLabel
 {
   public:
-    DoRGBDStuff(std::shared_ptr<CRDT::CRDTGraph> graph, DSR::IDType node_id_)
+    DoRGBDStuff(std::shared_ptr<CRDT::CRDTGraph> graph, CRDT::IDType node_id_)
     {
       auto node_id = node_id_;
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
@@ -116,8 +116,8 @@ class DoRGBDStuff : public  QLabel
       resize(640,480);
       setWindowTitle("RGBD");
       setParent(this);
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::vector<AttribValue> &attrs){
-                        Node n = graph->get_node(graph->get_node_name(node_id));
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::map<string,AttribValue> &attrs){
+                        Node n = graph->get_node(graph->get_name_from_id(node_id));
                         const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(n, "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
@@ -131,22 +131,22 @@ class DoTableStuff : public  QTableWidget
 {
   Q_OBJECT
   public:
-    DoTableStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, DSR::IDType node_id_) : graph(graph_), node_id(node_id_)
+    DoTableStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, CRDT::IDType node_id_) : graph(graph_), node_id(node_id_)
     {
       qRegisterMetaType<std::int32_t>("std::int32_t");
       qRegisterMetaType<std::string>("std::string");
       qRegisterMetaType<map<string, AttribValue>>("Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
-        Node n = graph->get_node(graph->get_node_name(node_id));
+        Node n = graph->get_node(graph->get_name_from_id(node_id));
         setWindowTitle("Node " + QString::fromStdString(graph->get_node_type(n)) + " [" + QString::number(node_id) + "]");
       setColumnCount(2);
       setRowCount(n.attrs().size() );
       setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
       int i=0;
-      for( auto &v : n.attrs() )
+      for( auto &[k, v] : n.attrs() )
       {
-        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));
+        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
         setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value())));
         i++;
       }
@@ -158,12 +158,12 @@ class DoTableStuff : public  QTableWidget
     };
 
   public slots:
-    void drawSLOT(const std::int32_t &id, const std::vector<AttribValue> &attribs) {
+    void drawSLOT(const std::int32_t &id, const std::map<string,AttribValue> &attribs) {
         //std::cout << " Window " << this->window()->windowTitle().toStdString() << " id " << QString::number(id).toStdString() << " contains? " << this->window()->windowTitle().contains(QString::number(id)) << std::endl;
         if (this->window()->windowTitle().contains(QString::number(id))) {
         int i = 0;
-            for (auto &v: attribs) {
-                setItem(i, 0, new QTableWidgetItem(QString::fromStdString(v.key())));   //CHANGE TO SET
+            for (auto &[k,v] : attribs) {
+                setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET
                 setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value()))));
                 i++;
             }
@@ -204,7 +204,7 @@ class GraphNode : public QObject, public QGraphicsItem
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;  
     void keyPressEvent(QKeyEvent *event) override;
   public slots:
-    void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
+    //void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
 
 	private:
     QPointF newPos;

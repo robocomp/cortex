@@ -230,11 +230,11 @@ void GraphNode::keyPressEvent(QKeyEvent *event)
 /////////////////////////////////////////////////////////////////////////////////////////7
 ////
 /////////////////////////////////////////////////////////////////////////////////////////
- void GraphNode::NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs &attr)
+/* void GraphNode::NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs &attr)
  {
 	 std::cout << "do cool stuff" << std::endl;
  }
-
+*/
 // void GraphNode::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
 // {
 //    // label = new QTableWidget(graph);

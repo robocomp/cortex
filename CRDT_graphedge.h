@@ -33,13 +33,13 @@ class DoRTStuff : public  QTableWidget
 {
   Q_OBJECT
   public:
-    DoRTStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, const DSR::IDType &from_, const DSR::IDType &to_, const std::string &label_) :
+    DoRTStuff(std::shared_ptr<CRDT::CRDTGraph> graph_, const CRDT::IDType &from_, const CRDT::IDType &to_, const std::string &label_) :
         graph(graph_), from(from_), to(to_), label(label_)
     {
-      qRegisterMetaType<DSR::IDType>("DSR::IDType");
-      qRegisterMetaType<DSR::Attribs>("DSR::Attribs");
-      Node n = graph->get_node(graph->get_node_name(from));
-      Node n2 = graph->get_node(graph->get_node_name(to));
+      qRegisterMetaType<CRDT::IDType>("DSR::IDType");
+      qRegisterMetaType<CRDT::Attribs>("DSR::Attribs");
+      Node n = graph->get_node(graph->get_name_from_id(from));
+      Node n2 = graph->get_node(graph->get_name_from_id(to));
 
       //setWindowModality(Qt::ApplicationModal);
       setWindowTitle("RT: " + QString::fromStdString(graph->get_node_type(n)) + " to " + QString::fromStdString(graph->get_node_type(n2)));
@@ -69,14 +69,14 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          std::string n_from = graph->get_node_name(from);
-          std::string n_to = graph->get_node_name(to);
+          std::string n_from = graph->get_name_from_id(from);
+          std::string n_to = graph->get_name_from_id(to);
 
           EdgeAttribs ea = graph->get_edge(n_from, n_to);
 
-          auto value = std::find_if(ea.attrs().begin(), ea.attrs().end(), [](const auto value) { return value.key() == "RT";});
+          auto value = ea.attrs().find("RT");
           if (value != ea.attrs().end()) {
-              auto rtvalue = value->value();
+              auto rtvalue = value->second.value();
               auto mat = graph->icevalue_to_nativetype<RTMat>("RT", rtvalue);
 
               //mat.print("mat");

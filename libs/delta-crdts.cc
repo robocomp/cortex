@@ -1175,6 +1175,7 @@ public:
         aworset<E,K> r(uid);
         r.dk=dk.rmv(val); // optimization that first deletes val
         r.dk.join(dk.add(uid, val));
+        dk.clean();
         return r;
     }
 

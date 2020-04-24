@@ -27,7 +27,7 @@
 
 using namespace DSR;
 
-GraphViewer::GraphViewer(std::shared_ptr<SpecificWorker> worker_) : worker(worker_), gcrdt(worker_->getGCRDT())
+GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  gcrdt(worker_->getGCRDT()) , worker(worker_)
 {
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
@@ -109,10 +109,10 @@ void GraphViewer::createGraph()
 				ns = node.second.readAsList();
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<" Error accessing edge" << node.second.readAsList().back() <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
-			for( auto edge :ns.back().fano())
+			for( auto &edge :ns.back().fano())
 			{
 				try{
-					addEdgeSLOT(edge.from(), edge.to(), edge.label());
+					addEdgeSLOT(edge.second.from(), edge.second.to(), edge.second.label());
 				} catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 			}
 		}
@@ -126,7 +126,7 @@ void GraphViewer::createGraph()
 void GraphViewer::saveGraphSLOT()
 { 
 	emit saveGraphSIGNAL(); 
-};
+}
 
 void GraphViewer::toggleSimulationSLOT()
 {
@@ -144,7 +144,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 
-    std::string name = gcrdt->get_node_name(id);
+    std::string name = gcrdt->get_name_from_id(id);
 	Node n = gcrdt->get_node(name);
 
     if( gmap.count(id) == 0)	// if node does not exist, create it
@@ -179,7 +179,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 		worker->tableWidgetNodes->show();
 
 		// connect QTableWidget itemClicked to hide/show nodes of selected type and nodes fanning into it
-		disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, 0, 0);
+		disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, nullptr, nullptr);
 
 		connect(worker->tableWidgetNodes, &QTableWidget::itemClicked, this, [this](const auto &item){ 
 							static bool visible = true;
@@ -204,14 +204,14 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 			auto qname = gcrdt->get_node_attrib_by_name(n, "name").value();
 			gnode->setTag(qname);
 		}
-		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;};
+		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;}
 
 		try
 		{
 			auto color = gcrdt->get_node_attrib_by_name(n, "color").value();
 			gnode->setColor(color);
 		}
-		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;};
+		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;}
 	}
 	else
 		gnode = gmap.at(id);
@@ -222,11 +222,11 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
         posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_x").value());
         posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_y").value());
 	}
-	catch(const std::exception &e){ };
+	catch(const std::exception &e){ }
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
 
-    emit gcrdt->update_attrs_signal(id,n.attrs() );
+    emit gcrdt->update_attrs_signal(id, n.attrs() );
 
     //auto e = gcrdt->getEdges(id);
     //	if (!e.empty())
@@ -299,8 +299,8 @@ void GraphViewer::delNodeSLOT(int id)
 
 }
 
-
- void GraphViewer::NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs)
+/*
+ void GraphViewer::NodeAttrsChangedSLOT(const std::int32_t &id, const DSR::Attribs &attribs)
  {
 	try 
 	{
@@ -313,7 +313,7 @@ void GraphViewer::delNodeSLOT(int id)
 	}
 	catch(const std::exception &e){ std::cout << "Exception: " << e.what() << " pos_x and pos_y attribs not found in node "  << id << std::endl;};
  }
-
+*/
 ///////////////////////////////////////
 
 void GraphViewer::itemMoved()
@@ -326,7 +326,7 @@ void GraphViewer::itemMoved()
 
 void GraphViewer::timerEvent(QTimerEvent *event)
 {
-    Q_UNUSED(event);
+    Q_UNUSED(event)
 
 	for( auto &[k,node] : gmap)
 	{

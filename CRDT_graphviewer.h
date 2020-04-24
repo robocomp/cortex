@@ -22,6 +22,7 @@
 #include <QGraphicsView>
 #include <QListView>
 #include "CRDT.h"
+#include <typeinfo>
 
 class SpecificWorker;
 class GraphNode;
@@ -37,7 +38,7 @@ namespace DSR
 	{
 		Q_OBJECT
 		public:
-			GraphViewer(std::shared_ptr<SpecificWorker> worker_);
+			GraphViewer(const std::shared_ptr<SpecificWorker>& worker_);
 			~GraphViewer();
 			void itemMoved();
 			void createGraph();
@@ -68,7 +69,7 @@ namespace DSR
 			void addOrAssignNodeSLOT(const std::int32_t id, const std::string &type);
 			void saveGraphSLOT();		
 			void toggleSimulationSLOT();
-			void NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs);
+			//void NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs);
 
 		signals:
 			void saveGraphSIGNAL();
@@ -76,4 +77,9 @@ namespace DSR
 
 	};
 }
+
+Q_DECLARE_METATYPE(std::int32_t);
+Q_DECLARE_METATYPE(std::string);
+Q_DECLARE_METATYPE(CRDT::Attribs);
+
 #endif // GRAPHVIEWER_H

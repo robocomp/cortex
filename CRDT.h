@@ -13,10 +13,8 @@
 #include <mutex>
 #include <shared_mutex>
 
-#include "graph.h"
-//#include "libs/DSRGraph.h"
 #include "libs/delta-crdts.cc"
-//#include <DataStorm/DataStorm.h>
+
 
 #include "fast_rtps/dsrparticipant.h"
 #include "fast_rtps/dsrpublisher.h"
@@ -34,12 +32,23 @@
 #define NO_PARENT -1
 #define TIMEOUT 5
 
+// Overload pattern used inprintVisitor
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
+
 namespace CRDT
 {
+
+
 
 using N = Node;
 using Nodes = ormap<int, aworset<N,  int >, int>;
 using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
+using IDType = std::int32_t;
+using Attribs = std::unordered_map<std::string, MTypes>;
+
+
 
 /////////////////////////////////////////////////////////////////
 /// CRDT API
@@ -68,19 +77,19 @@ public:
 
 
     // Nodes
-    Node get_node(std::string name);
+    Node get_node(const std::string& name);
     Node get_node(int id);
     bool insert_or_assign_node(const N &node);
     bool delete_node(const std::string &name);
     bool delete_node(int id);
 
     //Edges
-    EdgeAttribs get_edge(std::string from, std::string to);
-    bool insert_or_assign_edge(EdgeAttribs& attrs);
-    bool delete_edge(std::string from, std::string to);
+    EdgeAttribs get_edge(const std::string& from, const std::string& to);
+    bool insert_or_assign_edge(const EdgeAttribs& attrs);
+    bool delete_edge(const std::string& from, const std::string& t);
 
-    /// No debería ser privado a partir de aquí?
-    ////////////
+    std::string get_name_from_id(std::int32_t id);
+    int get_id_from_name(const std::string &name);
 
     //////////////////////////////////////////////////////
     ///  Viewer
@@ -107,11 +116,10 @@ public:
     MTypes icevalue_to_mtypes(const std::string &name, const std::string &val);
     std::int32_t get_node_level(Node& n);
     std::string get_node_type(Node& n);
-    std::string get_node_name(std::int32_t id);
 
 
-    void add_attrib(vector<AttribValue> &v, std::string att_name, CRDT::MTypes att_value);
-    void add_edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
+    void add_attrib(std::map<string, AttribValue> &v, std::string att_name, CRDT::MTypes att_value);
+    //void add_edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
 
     //////////////////////////////////////////////////////
 
@@ -129,15 +137,17 @@ private:
     std::string agent_name;
     const int agent_id;
 
+    std::map<string, int> name_map;
+    std::map<int, string> id_map;
+
     bool in(const int &id);
     N get_(int id);
     bool insert_or_assign_node_(const N &node);
 
-    int get_id_from_name(const std::string &tag);
 
     int id();
     DotContext context();
-    std::vector<AworSet> Map();
+    std::map<int, AworSet> Map();
     
     void join_delta_node(AworSet aworSet);
     void join_full_graph(OrMap full_graph);
@@ -187,7 +197,7 @@ private:
 signals:                                                                  // for graphics update
     void update_node_signal(const std::int32_t, const std::string &type); // Signal to update CRDT
 
-    void update_attrs_signal(const std::int32_t &id, const vector<AttribValue> &attribs); //Signal to show node attribs.
+    void update_attrs_signal(const std::int32_t &id, const std::map<string, AttribValue> &attribs); //Signal to show node attribs.
     void update_edge_signal(const std::int32_t from, const std::int32_t to);                   // Signal to show edge attribs.
 
     void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal to del edge.

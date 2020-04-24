@@ -9,72 +9,53 @@
 
 
 
-    struct EdgeAttribs { 
+    struct EdgeAttribs {
 		string label;
 		long from;
         long to; //key
-		//map<string, AttribValue>    attrs;
-        sequence<AttribValue> attrs;
+		map<string, AttribValue>    attrs;
 	};
 
 
-    struct Node { 
+    struct Node {
         string type;
+        string name;
         long id;
         long agent_id;
-		//map<string, AttribValue>   attrs;
-		sequence<AttribValue> attrs;
-        //map<unsigned long, EdgeAttribs> fano;
-        sequence<EdgeAttribs> fano;
+		map<string, AttribValue>   attrs;
+		map<long, EdgeAttribs> fano;
     };
 
-    //struct DSRGraphTopic
-    //{
-    //    map<unsigned long, AttribValue> DSRGraph;
-    //};
-
-
-    // Topic for full graph requests
     struct GraphRequest
     {
         string from;
     };
 
-    // --- Test: OrMap with AworSet
 
     struct PairInt {
         long first;
         long second;
     };
-    
+
 
     struct DotContext {
-        //map<long, long> cc;
-        sequence<PairInt> cc;
+        map<long, long> cc;
         sequence<PairInt> dc;
     };
 
-
-    struct dsValue {
-        PairInt pi;
-        Node n;
-    };
-
     struct DotKernel {
-        //map<PairInt, Node> ds;
-        sequence<dsValue> ds;
+        map<PairInt, Node> ds;
         DotContext cbase;
     };
 
     struct AworSet {
         long id;
-        //long agent_id;
-        DotKernel dk; // Dot kernel
+        DotKernel dk;
     };
 
     struct OrMap {
         long id;
-        sequence<AworSet> m;
+        map<long, AworSet> m;
         DotContext cbase;
     };
 
