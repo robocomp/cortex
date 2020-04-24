@@ -72,16 +72,16 @@ public:
 
 
     // Nodes
-    Node get_node(std::string name);
+    Node get_node(const std::string& name);
     Node get_node(int id);
 
-    bool insert_or_assign_node(const N &node);
-    bool delete_node(std::string name);
+    bool insert_or_assign_node(const N& node);
+    bool delete_node(const std::string& name);
 
     //Edges
-    EdgeAttribs get_edge(std::string from, std::string to);
-    bool insert_or_assign_edge(EdgeAttribs& attrs);
-    bool delete_edge(std::string from, std::string to);
+    EdgeAttribs get_edge(const std::string& from, const std::string& to);
+    bool insert_or_assign_edge(const EdgeAttribs& attrs);
+    bool delete_edge(const std::string& from, const std::string& t);
 
 
     //////////////////////////////////////////////////////

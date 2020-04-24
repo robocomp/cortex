@@ -8,8 +8,6 @@
 #include <unistd.h>
 #include <algorithm>
 #include <QXmlSimpleReader>
-#include <QXmlInputSource>
-#include <QXmlDefaultHandler>
 #include <libxml2/libxml/parser.h>
 #include <libxml2/libxml/tree.h>
 
@@ -32,8 +30,8 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id) : agent_id(id) {
     nodes = Nodes(graph_root);
     filter = "^(?!" + agent_name + "$).*$";
 
-    int argc = 0;
-    char *argv[0];
+    //int argc = 0;
+    //char *argv[0];
 
     work = true;
 
@@ -56,11 +54,11 @@ CRDTGraph::~CRDTGraph() {
  * NODE METHODS
  */
 
-Node CRDTGraph::get_node(std::string name) {
-    std::cout << "Tomando lock compartido para obtener un nodo" << std::endl;
+Node CRDTGraph::get_node(const std::string& name) {
+    //std::cout << "Tomando lock compartido para obtener un nodo" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     try {
-        if (name == std::string()) {
+        if (name.empty()) {
             Node n;
             n.type("error");
             n.agent_id(agent_id);
@@ -86,19 +84,20 @@ Node CRDTGraph::get_node(std::string name) {
 
 
 Node CRDTGraph::get_node(int id) {
-    std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
+    //std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
 }
 
 bool CRDTGraph::insert_or_assign_node(const N &node) {
-    std::cout << "Tomando lock único para insertar un nodo" << std::endl;
+    //std::cout << "Tomando lock único para insertar un nodo" << std::endl;
+    bool r;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
-        auto r = insert_or_assign_node_(node);
+        r = insert_or_assign_node_(node);
     }
     emit update_node_signal(node.id(), node.type());
-    return true;
+    return r;
 }
 
 bool CRDTGraph::insert_or_assign_node_(const N &node) {
@@ -123,8 +122,8 @@ bool CRDTGraph::insert_or_assign_node_(const N &node) {
 }
 
 
-bool CRDTGraph::delete_node(std::string name) {
-    std::cout << "Tomando lock único para borrar un nodo" << std::endl;
+bool CRDTGraph::delete_node(const std::string& name) {
+    //std::cout << "Tomando lock único para borrar un nodo" << std::endl;
     vector<tuple<int,int, std::string>> edges;
     int id = -1;
     std::unique_lock<std::shared_mutex>  lock(_mutex);
@@ -136,7 +135,7 @@ bool CRDTGraph::delete_node(std::string name) {
         auto node = get_(id);
         for (auto v : node.fano()) { // Delete all edges from this node.
             std::cout << id << " -> " << v.to() << std::endl;
-            edges.push_back(make_tuple(id, v.to(), v.label()));
+            edges.emplace_back(make_tuple(id, v.to(), v.label()));
         }
         nodes.erase(id);
         //2. search and remove edges.
@@ -153,7 +152,7 @@ bool CRDTGraph::delete_node(std::string name) {
             //Necesitamos una copia?
             visited_node.fano().erase(value);
             auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
-            edges.push_back(make_tuple(visited_node.id(), id, value->label()));
+            edges.emplace_back(make_tuple(visited_node.id(), id, value->label()));
 
             // Send changes.
             auto val = translateAwCRDTtoICE(visited_node.id(), delta);
@@ -178,8 +177,8 @@ bool CRDTGraph::delete_node(std::string name) {
 /*
  * EDGE METHODS
  */
-EdgeAttribs CRDTGraph::get_edge(std::string from, std::string to) {
-    std::cout << "Tomando lock compartido para obtener un edge" << std::endl;
+EdgeAttribs CRDTGraph::get_edge(const std::string& from, const std::string& to) {
+    //std::cout << "Tomando lock compartido para obtener un edge" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
 
     int id_from = get_id_from_name(from);
@@ -212,9 +211,9 @@ EdgeAttribs CRDTGraph::get_edge(std::string from, std::string to) {
     return ea;
 }
 
-bool CRDTGraph::insert_or_assign_edge(EdgeAttribs& attrs) {
-    std::cout << "Tomando lock para insertar un edge" << std::endl;
-    std::cout << attrs << std::endl;
+bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
+    //std::cout << "Tomando lock para insertar un edge" << std::endl;
+    //std::cout << attrs << std::endl;
 
     std::unique_lock<std::shared_mutex>  lock(_mutex);
     int from = attrs.from();
@@ -248,15 +247,15 @@ bool CRDTGraph::insert_or_assign_edge(EdgeAttribs& attrs) {
     catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;
         return false;
-    };
+    }
     emit update_edge_signal( attrs.from(),  attrs.to());
 
     return true;
 }
 
 
-bool CRDTGraph::delete_edge(std::string from, std::string to) {
-    std::cout << "Tomando lock para borrar un edge" << std::endl;
+bool CRDTGraph::delete_edge(const std::string& from, const std::string& to) {
+    //std::cout << "Tomando lock para borrar un edge" << std::endl;
     //Node updated;
     int id_from = 0;
     int id_to = 0;
@@ -295,7 +294,7 @@ bool CRDTGraph::delete_edge(std::string from, std::string to) {
 }
 
 Nodes CRDTGraph::get() {
-    std::cout << "Tomando lock para obtener todo el grafo" << std::endl;
+    //std::cout << "Tomando lock para obtener todo el grafo" << std::endl;
 
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return nodes;
@@ -303,7 +302,7 @@ Nodes CRDTGraph::get() {
 
 
 N CRDTGraph::get(int id) {
-    std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
+    //std::cout << "Tomando lock para obtener un nodo (id)" << std::endl;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
 }
@@ -431,7 +430,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) {
-    std::cout << "Tomando lock para hacer join (Grafo completo)" << std::endl;
+    //std::cout << "Tomando lock para hacer join (Grafo completo)" << std::endl;
     vector<pair<int, std::string>> updates;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -718,7 +717,7 @@ DotContext CRDTGraph::context() { // Context to ICE
 
 
 vector<AworSet> CRDTGraph::Map() {
-    std::cout << "Tomando lock compartido para Obtener todos los elementos del mapa" << std::endl;
+    //std::cout << "Tomando lock compartido para Obtener todos los elementos del mapa" << std::endl;
 
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     vector<AworSet> m;
