@@ -340,7 +340,7 @@ public:
     friend std::ostream &operator<<(std::ostream &output, const EdgeAttribs &ea_) {
         output << "EdgeAttribs["<<ea_.label()<<", from:" << ea_.from() << "-> to:"<<ea_.to()<<" Attribs:[";
         for (auto v : ea_.attrs())
-            output << v.key() <<":"<<v <<" - ";
+            output << v.first <<":"<< v.second <<" - ";
         output<<"]]";
         return output;
     };
@@ -441,25 +441,25 @@ public:
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
-    eProsima_user_DllExport void attrs(const std::vector<AttribValue> &_attrs);
+    eProsima_user_DllExport void attrs(const std::map<std::string, AttribValue> &_attrs);
 
     /*!
      * @brief This function moves the value in member attrs
      * @param _attrs New value to be moved in member attrs
      */
-    eProsima_user_DllExport void attrs(std::vector<AttribValue> &&_attrs);
+    eProsima_user_DllExport void attrs(std::map<std::string, AttribValue> &&_attrs);
 
     /*!
      * @brief This function returns a constant reference to member attrs
      * @return Constant reference to member attrs
      */
-    eProsima_user_DllExport const std::vector<AttribValue>& attrs() const;
+    eProsima_user_DllExport const std::map<std::string, AttribValue>& attrs() const;
 
     /*!
      * @brief This function returns a reference to member attrs
      * @return Reference to member attrs
      */
-    eProsima_user_DllExport std::vector<AttribValue>& attrs();
+    eProsima_user_DllExport std::map<std::string, AttribValue>& attrs();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -515,7 +515,7 @@ private:
     std::string m_label;
     int32_t m_from;
     int32_t m_to;
-    std::vector<AttribValue> m_attrs;
+    std::map<std::string, AttribValue> m_attrs;
 };
 /*!
  * @brief This class represents the structure Node defined by the user in the IDL file.
@@ -567,12 +567,12 @@ public:
     }
 
     friend std::ostream &operator<<(std::ostream &output, const Node &n_) {
-        output <<"Node:["<<n_.id()<<"," << n_.type() <<"], Attribs:[";
+        output <<"Node:["<<n_.id()<<"," << n_.name() <<"," << n_.type() <<"], Attribs:[";
         for (auto v : n_.attrs())
-            output << v.key() <<":("<< v <<");";
+            output << v.first <<":("<< v.second <<");";
         output<<"], FanOut:[";
         for (auto v : n_.fano())
-            output << v.to() <<":("<< v<<");";
+            output << v.first <<":("<< v.second <<");";
         output << "]";
         return output;
     }
@@ -634,6 +634,29 @@ public:
      */
     eProsima_user_DllExport std::string& type();
     /*!
+     * @brief This function copies the value in member name
+     * @param _name New value to be copied in member name
+     */
+    eProsima_user_DllExport void name(const std::string &_name);
+
+    /*!
+     * @brief This function moves the value in member name
+     * @param _name New value to be moved in member name
+     */
+    eProsima_user_DllExport void name(std::string &&_name);
+
+    /*!
+     * @brief This function returns a constant reference to member name
+     * @return Constant reference to member name
+     */
+    eProsima_user_DllExport const std::string& name() const;
+
+    /*!
+     * @brief This function returns a reference to member name
+     * @return Reference to member name
+     */
+    eProsima_user_DllExport std::string& name();
+    /*!
      * @brief This function sets a value in member id
      * @param _id New value for member id
      */
@@ -673,48 +696,48 @@ public:
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
-    eProsima_user_DllExport void attrs(const std::vector<AttribValue> &_attrs);
+    eProsima_user_DllExport void attrs(const std::map<std::string, AttribValue> &_attrs);
 
     /*!
      * @brief This function moves the value in member attrs
      * @param _attrs New value to be moved in member attrs
      */
-    eProsima_user_DllExport void attrs(std::vector<AttribValue> &&_attrs);
+    eProsima_user_DllExport void attrs(std::map<std::string, AttribValue> &&_attrs);
 
     /*!
      * @brief This function returns a constant reference to member attrs
      * @return Constant reference to member attrs
      */
-    eProsima_user_DllExport const std::vector<AttribValue>& attrs() const;
+    eProsima_user_DllExport const std::map<std::string, AttribValue>& attrs() const;
 
     /*!
      * @brief This function returns a reference to member attrs
      * @return Reference to member attrs
      */
-    eProsima_user_DllExport std::vector<AttribValue>& attrs();
+    eProsima_user_DllExport std::map<std::string, AttribValue>& attrs();
     /*!
      * @brief This function copies the value in member fano
      * @param _fano New value to be copied in member fano
      */
-    eProsima_user_DllExport void fano(const std::vector<EdgeAttribs> &_fano);
+    eProsima_user_DllExport void fano(const std::map<int32_t, EdgeAttribs> &_fano);
 
     /*!
      * @brief This function moves the value in member fano
      * @param _fano New value to be moved in member fano
      */
-    eProsima_user_DllExport void fano(std::vector<EdgeAttribs> &&_fano);
+    eProsima_user_DllExport void fano(std::map<int32_t, EdgeAttribs> &&_fano);
 
     /*!
      * @brief This function returns a constant reference to member fano
      * @return Constant reference to member fano
      */
-    eProsima_user_DllExport const std::vector<EdgeAttribs>& fano() const;
+    eProsima_user_DllExport const std::map<int32_t, EdgeAttribs>& fano() const;
 
     /*!
      * @brief This function returns a reference to member fano
      * @return Reference to member fano
      */
-    eProsima_user_DllExport std::vector<EdgeAttribs>& fano();
+    eProsima_user_DllExport std::map<int32_t, EdgeAttribs>& fano();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -768,10 +791,11 @@ public:
 
 private:
     std::string m_type;
+    std::string m_name;
     int32_t m_id;
     int32_t m_agent_id;
-    std::vector<AttribValue> m_attrs;
-    std::vector<EdgeAttribs> m_fano;
+    std::map<std::string, AttribValue> m_attrs;
+    std::map<int32_t, EdgeAttribs> m_fano;
 };
 /*!
  * @brief This class represents the structure GraphRequest defined by the user in the IDL file.
@@ -1075,7 +1099,7 @@ public:
     friend std::ostream &operator<<(std::ostream &output, const DotContext &dc_) {
         output << ", CC: [";
         for (const auto & kv : dc_.cc())
-            output <<" "<< kv.first() << ":" << kv.second();
+            output <<" "<< kv.first << ":" << kv.second;
         output << "] , DC: [";
         for (const auto & kv : dc_.dc())
             output <<" "<< kv.first() << ":" << kv.second();
@@ -1120,25 +1144,25 @@ public:
      * @brief This function copies the value in member cc
      * @param _cc New value to be copied in member cc
      */
-    eProsima_user_DllExport void cc(const std::vector<PairInt> &_cc);
+    eProsima_user_DllExport void cc(const std::map<int32_t, int32_t> &_cc);
 
     /*!
      * @brief This function moves the value in member cc
      * @param _cc New value to be moved in member cc
      */
-    eProsima_user_DllExport void cc(std::vector<PairInt> &&_cc);
+    eProsima_user_DllExport void cc(std::map<int32_t, int32_t> &&_cc);
 
     /*!
      * @brief This function returns a constant reference to member cc
      * @return Constant reference to member cc
      */
-    eProsima_user_DllExport const std::vector<PairInt>& cc() const;
+    eProsima_user_DllExport const std::map<int32_t, int32_t>& cc() const;
 
     /*!
      * @brief This function returns a reference to member cc
      * @return Reference to member cc
      */
-    eProsima_user_DllExport std::vector<PairInt>& cc();
+    eProsima_user_DllExport std::map<int32_t, int32_t>& cc();
     /*!
      * @brief This function copies the value in member dc
      * @param _dc New value to be copied in member dc
@@ -1214,151 +1238,8 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
-    std::vector<PairInt> m_cc;
+    std::map<int32_t, int32_t> m_cc;
     std::vector<PairInt> m_dc;
-};
-/*!
- * @brief This class represents the structure dsValue defined by the user in the IDL file.
- * @ingroup DSRGRAPH
- */
-class dsValue
-{
-public:
-
-    /*!
-     * @brief Default constructor.
-     */
-    eProsima_user_DllExport dsValue();
-
-    /*!
-     * @brief Default destructor.
-     */
-    eProsima_user_DllExport ~dsValue();
-
-    /*!
-     * @brief Copy constructor.
-     * @param x Reference to the object dsValue that will be copied.
-     */
-    eProsima_user_DllExport dsValue(const dsValue &x);
-
-    /*!
-     * @brief Move constructor.
-     * @param x Reference to the object dsValue that will be copied.
-     */
-    eProsima_user_DllExport dsValue(dsValue &&x);
-
-    /*!
-     * @brief Copy assignment.
-     * @param x Reference to the object dsValue that will be copied.
-     */
-    eProsima_user_DllExport dsValue& operator=(const dsValue &x);
-
-    /*!
-     * @brief Move assignment.
-     * @param x Reference to the object dsValue that will be copied.
-     */
-    eProsima_user_DllExport dsValue& operator=(dsValue &&x);
-
-    /*!
-     * @brief This function copies the value in member pi
-     * @param _pi New value to be copied in member pi
-     */
-    eProsima_user_DllExport void pi(const PairInt &_pi);
-
-    /*!
-     * @brief This function moves the value in member pi
-     * @param _pi New value to be moved in member pi
-     */
-    eProsima_user_DllExport void pi(PairInt &&_pi);
-
-    /*!
-     * @brief This function returns a constant reference to member pi
-     * @return Constant reference to member pi
-     */
-    eProsima_user_DllExport const PairInt& pi() const;
-
-    /*!
-     * @brief This function returns a reference to member pi
-     * @return Reference to member pi
-     */
-    eProsima_user_DllExport PairInt& pi();
-    /*!
-     * @brief This function copies the value in member n
-     * @param _n New value to be copied in member n
-     */
-    eProsima_user_DllExport void n(const Node &_n);
-
-    /*!
-     * @brief This function moves the value in member n
-     * @param _n New value to be moved in member n
-     */
-    eProsima_user_DllExport void n(Node &&_n);
-
-    /*!
-     * @brief This function returns a constant reference to member n
-     * @return Constant reference to member n
-     */
-    eProsima_user_DllExport const Node& n() const;
-
-    /*!
-     * @brief This function returns a reference to member n
-     * @return Reference to member n
-     */
-    eProsima_user_DllExport Node& n();
-
-    /*!
-     * @brief This function returns the maximum serialized size of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
-    eProsima_user_DllExport static size_t getMaxCdrSerializedSize(size_t current_alignment = 0);
-
-    /*!
-     * @brief This function returns the serialized size of a data depending on the buffer alignment.
-     * @param data Data which is calculated its serialized size.
-     * @param current_alignment Buffer alignment.
-     * @return Serialized size.
-     */
-    eProsima_user_DllExport static size_t getCdrSerializedSize(const dsValue& data, size_t current_alignment = 0);
-
-
-    /*!
-     * @brief This function serializes an object using CDR serialization.
-     * @param cdr CDR serialization object.
-     */
-    eProsima_user_DllExport void serialize(eprosima::fastcdr::Cdr &cdr) const;
-
-    /*!
-     * @brief This function deserializes an object using CDR serialization.
-     * @param cdr CDR serialization object.
-     */
-    eProsima_user_DllExport void deserialize(eprosima::fastcdr::Cdr &cdr);
-
-
-
-    /*!
-     * @brief This function returns the maximum serialized size of the Key of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
-    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
-
-    /*!
-     * @brief This function tells you if the Key has been defined for this type
-     */
-    eProsima_user_DllExport static bool isKeyDefined();
-
-    /*!
-     * @brief This function serializes the key members of an object using CDR serialization.
-     * @param cdr CDR serialization object.
-     */
-    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-
-private:
-    PairInt m_pi;
-    Node m_n;
 };
 /*!
  * @brief This class represents the structure DotKernel defined by the user in the IDL file.
@@ -1369,7 +1250,7 @@ class DotKernel
 public:
     friend std::ostream &operator<<(std::ostream &output, const DotKernel &dk_) {
         for (const auto & kv : dk_.ds())
-            output << kv.pi() << "-->" << kv.n()<< ", ";
+            output << kv.first << "-->" << kv.second<< ", ";
         output <<dk_.cbase();
         return output;
     }
@@ -1411,25 +1292,25 @@ public:
      * @brief This function copies the value in member ds
      * @param _ds New value to be copied in member ds
      */
-    eProsima_user_DllExport void ds(const std::vector<dsValue> &_ds);
+    eProsima_user_DllExport void ds(const std::map<PairInt, Node> &_ds);
 
     /*!
      * @brief This function moves the value in member ds
      * @param _ds New value to be moved in member ds
      */
-    eProsima_user_DllExport void ds(std::vector<dsValue> &&_ds);
+    eProsima_user_DllExport void ds(std::map<PairInt, Node> &&_ds);
 
     /*!
      * @brief This function returns a constant reference to member ds
      * @return Constant reference to member ds
      */
-    eProsima_user_DllExport const std::vector<dsValue>& ds() const;
+    eProsima_user_DllExport const std::map<PairInt, Node>& ds() const;
 
     /*!
      * @brief This function returns a reference to member ds
      * @return Reference to member ds
      */
-    eProsima_user_DllExport std::vector<dsValue>& ds();
+    eProsima_user_DllExport std::map<PairInt, Node>& ds();
     /*!
      * @brief This function copies the value in member cbase
      * @param _cbase New value to be copied in member cbase
@@ -1505,7 +1386,7 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
-    std::vector<dsValue> m_ds;
+    std::map<PairInt, Node> m_ds;
     DotContext m_cbase;
 };
 /*!
@@ -1519,7 +1400,6 @@ public:
         output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
         return output;
     }
-
     /*!
      * @brief Default constructor.
      */
@@ -1657,10 +1537,11 @@ private:
 class OrMap
 {
 public:
+
     friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
         output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
         for (const auto & kv : om_.m())
-            output << kv.id() << "->" << kv.dk() << "\n";
+            output << kv.first << "->" << kv.second << "\n";
         output << "\nContext: "<<om_.cbase();
         return output;
     }
@@ -1720,25 +1601,25 @@ public:
      * @brief This function copies the value in member m
      * @param _m New value to be copied in member m
      */
-    eProsima_user_DllExport void m(const std::vector<AworSet> &_m);
+    eProsima_user_DllExport void m(const std::map<int32_t, AworSet> &_m);
 
     /*!
      * @brief This function moves the value in member m
      * @param _m New value to be moved in member m
      */
-    eProsima_user_DllExport void m(std::vector<AworSet> &&_m);
+    eProsima_user_DllExport void m(std::map<int32_t, AworSet> &&_m);
 
     /*!
      * @brief This function returns a constant reference to member m
      * @return Constant reference to member m
      */
-    eProsima_user_DllExport const std::vector<AworSet>& m() const;
+    eProsima_user_DllExport const std::map<int32_t, AworSet>& m() const;
 
     /*!
      * @brief This function returns a reference to member m
      * @return Reference to member m
      */
-    eProsima_user_DllExport std::vector<AworSet>& m();
+    eProsima_user_DllExport std::map<int32_t, AworSet>& m();
     /*!
      * @brief This function copies the value in member cbase
      * @param _cbase New value to be copied in member cbase
@@ -1815,7 +1696,7 @@ public:
 
 private:
     int32_t m_id;
-    std::vector<AworSet> m_m;
+    std::map<int32_t, AworSet> m_m;
     DotContext m_cbase;
 };
 
