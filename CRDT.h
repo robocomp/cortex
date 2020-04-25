@@ -137,7 +137,7 @@ private:
     std::string agent_name;
     const int agent_id;
 
-    std::map<string, int> name_map;
+    std::map<string, int> name_map;     // mapping between name and id of nodes
     std::map<int, string> id_map;
 
     bool in(const int &id);

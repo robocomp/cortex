@@ -52,8 +52,8 @@ namespace DSR
 			void timerEvent(QTimerEvent *event) override;
 			
 		private:
+			std::shared_ptr<CRDT::CRDTGraph> gcrdt;
 			std::shared_ptr<SpecificWorker> worker;
-	        std::shared_ptr<CRDT::CRDTGraph> gcrdt;
 			QGraphicsScene scene;
 			int timerId = 0;
 			QStringList nodes_types_list, edges_types_list;

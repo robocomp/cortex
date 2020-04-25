@@ -202,6 +202,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 		try
 		{
 			auto qname = gcrdt->get_node_attrib_by_name(n, "name").value();
+			qDebug() << QString::fromStdString(qname);
 			gnode->setTag(qname);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;}
@@ -222,7 +223,12 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
         posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_x").value());
         posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_y").value());
 	}
-	catch(const std::exception &e){ }
+	catch(const std::exception &e)
+	{
+		auto rd = QVec::uniformVector(2,-200,200);
+		posx = rd.x();
+		posy = rd.y();
+	}
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
 
