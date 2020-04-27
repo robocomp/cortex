@@ -993,3 +993,161 @@ void CRDTGraph::add_attrib(std::map<string, AttribValue> &v, std::string att_nam
 
 
 
+
+
+void CRDTGraph::read_from_json_file(const std::string &json_file_path)
+{
+    std::cout << __FUNCTION__ << "Reading json file: " << json_file_path << std::endl;
+
+    // Open file and make initial checks
+    QFile file;
+    file.setFileName(QString::fromStdString(json_file_path));
+    if (not file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        fprintf(stderr,"Can't open JSON file, check file provided. \n");
+        exit(1);
+    }
+    QString val = file.readAll();
+    file.close();
+    
+    QJsonDocument doc = QJsonDocument::fromJson(val.toUtf8());
+    QJsonObject jObject = doc.object();
+
+    QJsonObject dsrobject = jObject.value("DSRModel").toObject();
+	QJsonArray symbolArray = dsrobject.value("symbol").toArray();
+
+    // Read symbols (just symbols, then links in other loop)
+    foreach (const QJsonValue & symbolValue, symbolArray) 
+    {
+        QJsonObject sym_obj = symbolValue.toObject();
+        int id = sym_obj.value("id").toString().toInt();
+        std::string type = sym_obj.value("type").toString().toStdString();
+        std::string name = sym_obj.value("name").toString().toStdString();
+        //AGMModelSymbol::SPtr s = newSymbol(id), type);
+        std::cout << __FILE__ << " " << __FUNCTION__ << ", Node: " << std::to_string(id) << " " <<  type << std::endl;
+        Node n;
+        n.type(type);
+        n.id(id);
+        n.agent_id(agent_id);
+        n.name(name);
+        name_map[name] = id;
+        id_map[id] = name;
+
+        std::map<string, AttribValue> attrs;
+        add_attrib(attrs, "level",std::int32_t(0));
+        add_attrib(attrs, "parent",std::int32_t(0));
+
+        std::string full_name = type + " [" + std::to_string(id) + "]";
+        add_attrib(attrs, "name",full_name);
+    
+        // color selection
+        std::string color = "coral";
+        if(type == "world") color = "SeaGreen";
+        else if(type == "transform") color = "SteelBlue";
+        else if(type == "plane") color = "Khaki";
+        else if(type == "differentialrobot") color = "GoldenRod";
+        else if(type == "laser") color = "GreenYellow";
+        else if(type == "mesh") color = "LightBlue";
+        else if(type == "imu") color = "LightSalmon";
+
+        add_attrib(attrs, "color", color);
+
+        // node atributes
+        QJsonArray attributesArray =  sym_obj.value("symbol").toArray();
+        foreach (const QJsonValue & attribValue, attributesArray) 
+        {
+            QJsonObject attr_obj = attribValue.toObject();
+            std::string attr_key = attr_obj.value("key").toString().toStdString();
+            QString attr_value = attr_obj.value("value").toString();
+            if( attr_key == "level" or attr_key == "parent")
+                add_attrib(attrs, attr_key, attr_value.toInt());
+            else if( attr_key == "pos_x" or attr_key == "pos_y")
+                add_attrib(attrs, attr_key, attr_value.toFloat());
+            else
+                add_attrib(attrs, attr_key, attr_value.toStdString());
+
+        }
+        n.attrs(attrs);
+        insert_or_assign_node(n);
+    }
+
+    // Read links
+    QJsonArray linkArray = dsrobject.value("link").toArray();
+    foreach (const QJsonValue & linkValue, linkArray) 
+    {
+        QJsonObject link_obj = linkValue.toObject();
+        int srcn = link_obj.value("src").toString().toInt();
+        int dstn = link_obj.value("dst").toString().toInt();
+        std::string edgeName = link_obj.value("label").toString().toStdString();
+
+        std::map<string, AttribValue> attrs;
+        // link atributes
+        QJsonArray attributesArray =  link_obj.value("linkAttribute").toArray();
+        foreach (const QJsonValue & attribValue, attributesArray) 
+        {
+            QJsonObject attr_obj = attribValue.toObject();
+            std::string attr_key = attr_obj.value("key").toString().toStdString();
+            std::string attr_value = attr_obj.value("value").toString().toStdString();
+                    
+            AttribValue av;
+            av.type("string");
+            av.value(attr_value);
+            av.length(1);
+            av.key(attr_key);
+            attrs[attr_key] = av;
+        }
+        std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
+
+        EdgeAttribs ea;
+        ea.from(srcn);
+        ea.to(dstn);
+        ea.label(edgeName);
+        std::map<string, AttribValue> attrs_edge;
+
+        auto val = mtype_to_icevalue(edgeName);
+        AttribValue av = AttribValue();
+
+        av.type(std::get<0>(val));
+        av.value( std::get<1>(val));
+        av.length(std::get<2>(val));
+        av.key("name");
+
+        attrs["name"] = av;
+
+        if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
+        {
+            Node n = get(dstn);
+
+            add_attrib(n.attrs(),"level", get_node_level(n)+1);
+            add_attrib(n.attrs(),"parent", srcn);
+            RMat::RTMat rt;
+            float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
+            for(auto &[key, v] : attrs)
+            {
+                if(key=="tx")	tx = std::stof(v.value());
+                if(key=="ty")	ty = std::stof(v.value());
+                if(key=="tz")	tz = std::stof(v.value());
+                if(key=="rx")	rx = std::stof(v.value());
+                if(key=="ry")	ry = std::stof(v.value());
+                if(key=="rz")	rz = std::stof(v.value());
+            }
+            rt.set(rx, ry, rz, tx, ty, tz);
+            //rt.print("in reader");
+            add_attrib(attrs_edge, "RT", rt);
+            //this->add_edge_attrib(a, dstn,"RT",rt);
+            insert_or_assign_node(n);
+        }
+        else
+        {
+            Node n = get(dstn);
+            add_attrib(n.attrs(),"parent",0);
+            insert_or_assign_node(n);
+            for(auto &[k,v] : attrs)
+                attrs_edge[k] = v;
+        }
+        ea.attrs(attrs_edge);
+        insert_or_assign_edge(ea);
+       
+    } //foreach(links)
+}
+

@@ -73,6 +73,7 @@ public:
 
     // Utils
     void read_from_file(const std::string &xml_file_path);
+	void read_from_json_file(const std::string &json_file_path);
     bool empty(const int &id);
 
 
