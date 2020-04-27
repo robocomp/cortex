@@ -114,20 +114,54 @@ bool CRDTGraph::insert_or_assign_node_(const N &node) {
 
 
 bool CRDTGraph::delete_node(const std::string& name) {
+    bool result;
     vector<tuple<int,int, std::string>> edges;
     int id = -1;
-    std::unique_lock<std::shared_mutex>  lock(_mutex);
-    id = get_id_from_name(name);
-    if(id == -1) 
-        return false;
-    return delete_node(id);
+    {
+        std::unique_lock<std::shared_mutex>  lock(_mutex);
+        id = get_id_from_name(name);
+        if(id == -1)
+            return false;
+        auto [r, e] = delete_node_(id);
+        result = r;
+        edges = e;
+    }
+    if (!result) return false;
+    emit del_node_signal(id);
+
+    for (auto &[id0, id1, label] : edges) {
+        emit del_edge_signal(id0, id1, label);
+    }
+    return true;
+
+
 }
 
-bool CRDTGraph::delete_node(int id) 
+bool CRDTGraph::delete_node(int id) {
+    bool result;
+    vector<tuple<int,int, std::string>> edges;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (id == -1)
+            return false;
+        auto[r, e] = delete_node_(id);
+        result = r;
+        edges = e;
+    }
+    if (!result) return false;
+    emit del_node_signal(id);
+
+    for (auto &[id0, id1, label] : edges) {
+        emit del_edge_signal(id0, id1, label);
+    }
+    return true;
+}
+
+std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(int id)
 {
     // std::cout << "Tomando lock único para borrar un nodo" << std::endl;
     vector<tuple<int,int, std::string>> edges;
-    std::unique_lock<std::shared_mutex>  lock(_mutex);
+    //std::unique_lock<std::shared_mutex>  lock(_mutex);
     try 
     {
         //1. Get and remove node.
@@ -136,8 +170,13 @@ bool CRDTGraph::delete_node(int id)
             std::cout << id << " -> " << v.first << std::endl;
             edges.emplace_back(make_tuple(id, v.first, v.second.label()));
         }
+        // Get remove delta.
+        auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
+        auto val = translateAwCRDTtoICE(id, delta);
+        dsrpub.write(&val);
         nodes.erase(id);
-        //ame_map.erase(name);
+
+        name_map.erase(id_map[id]);
         id_map.erase(id);
         //2. search and remove edges.
         //For each node check if there is an edge to remove.
@@ -157,18 +196,12 @@ bool CRDTGraph::delete_node(int id)
             auto val = translateAwCRDTtoICE(visited_node.id(), delta);
             dsrpub.write(&val);
         }
-        return true;
+        return make_pair(true,  edges);
     } catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;
     };
 
-    emit del_node_signal(id);
-
-    for (auto &[id0, id1, label] : edges) {
-        emit del_edge_signal(id0, id1, label);
-    }
-
-    return false;
+    return make_pair(false, edges);
 }
 
 

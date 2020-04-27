@@ -143,6 +143,7 @@ private:
     bool in(const int &id);
     N get_(int id);
     bool insert_or_assign_node_(const N &node);
+    std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
 
 
     int id();
