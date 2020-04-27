@@ -166,6 +166,8 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
     {
         //1. Get and remove node.
         auto node = get_(id);
+        //Aunque el id no sea -1 el nodo puede no existir.
+        if (node.id() == -1) return make_pair(false, edges);
         for (auto v : node.fano()) { // Delete all edges from this node.
             std::cout << id << " -> " << v.first << std::endl;
             edges.emplace_back(make_tuple(id, v.first, v.second.label()));
@@ -411,6 +413,10 @@ std::string CRDTGraph::get_name_from_id(std::int32_t id) {
     return   "error";
 }
 
+size_t CRDTGraph::size ()  {
+    std::shared_lock<std::shared_mutex>  lock(_mutex);
+    return nodes.getMapRef().size();
+};
 
 bool CRDTGraph::in(const int &id) {
     return nodes.in(id);

@@ -58,7 +58,7 @@ class CRDTGraph : public QObject
 {
     Q_OBJECT
 public:
-    size_t size() const { return nodes.getMap().size(); };
+    size_t size();
     CRDTGraph(int root, std::string name, int id);
     ~CRDTGraph();
 
