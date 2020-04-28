@@ -641,7 +641,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
 
             attrs["name"] = av;
 
-
+    
             if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
             {
 
@@ -997,7 +997,7 @@ void CRDTGraph::add_attrib(std::map<string, AttribValue> &v, std::string att_nam
 
 void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 {
-    std::cout << __FUNCTION__ << "Reading json file: " << json_file_path << std::endl;
+    std::cout << __FUNCTION__ << " Reading json file: " << json_file_path << std::endl;
 
     // Open file and make initial checks
     QFile file;
@@ -1053,7 +1053,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         add_attrib(attrs, "color", color);
 
         // node atributes
-        QJsonArray attributesArray =  sym_obj.value("symbol").toArray();
+        QJsonArray attributesArray =  sym_obj.value("attribute").toArray();
         foreach (const QJsonValue & attribValue, attributesArray) 
         {
             QJsonObject attr_obj = attribValue.toObject();
@@ -1151,3 +1151,58 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
     } //foreach(links)
 }
 
+void CRDTGraph::write_to_json_file(const std::string &json_file_path)
+{
+    //create json object
+    QJsonObject dsrObject;
+    QJsonArray linksArray;
+    QJsonArray symbolsArray;
+    for (auto kv : nodes.getMap()) { 
+        Node node = kv.second.dots().ds.rbegin()->second;
+        // symbol data
+        QJsonObject symbol;
+        symbol["id"] = QString::number(node.id());
+        symbol["type"] = QString::fromStdString(node.type());
+        symbol["name"] = QString::fromStdString(node.name());
+        // symbol attribute
+        QJsonArray attrsArray;
+        for (const auto &[key, value]: node.attrs())
+        {
+            QJsonObject attr;
+            attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+            attrsArray.push_back(attr); 
+        }
+        symbol["attribute"] = attrsArray;
+        symbolsArray.push_back(symbol);
+        //link
+        for (const auto &[key, value]: node.fano()){
+            QJsonObject link;
+            link["src"] = QString::number(value.from());
+            link["dst"] = QString::number(value.to());
+            link["label"] = QString::fromStdString(value.label());
+            // link attribute
+            QJsonArray lattrsArray;
+            for (const auto &[key, value]: value.attrs())
+            {
+                QJsonObject attr;
+                attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+                lattrsArray.push_back(attr); 
+            }
+            link["linkAttribute"] = lattrsArray;
+            linksArray.push_back(link);
+        }
+    }
+    dsrObject["symbol"] = symbolsArray;
+    dsrObject["link"] = linksArray;
+    
+    QJsonObject jsonObject;
+    jsonObject["DSRModel"] = dsrObject;
+    //writable data
+    QJsonDocument jsonDoc(jsonObject);
+	QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
+    //write to file
+    std::ofstream outfile;
+    outfile.open(json_file_path, std::ios_base::out | std::ios_base::trunc); 
+    outfile << strJson.toStdString();
+    outfile.close();
+}
