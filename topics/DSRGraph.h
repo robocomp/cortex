@@ -66,6 +66,316 @@ namespace eprosima
 
 
 /*!
+ * @brief This class represents the union Val defined by the user in the IDL file.
+ * @ingroup DSRGRAPH
+ */
+class Val
+{
+public:
+    bool operator<(const Val &rhs) const {
+        if (m__d < rhs.m__d)
+            return true;
+        if (rhs.m__d < m__d)
+            return false;
+        if (m_str < rhs.m_str)
+            return true;
+        if (rhs.m_str < m_str)
+            return false;
+        if (m_dec < rhs.m_dec)
+            return true;
+        if (rhs.m_dec < m_dec)
+            return false;
+        if (m_fl < rhs.m_fl)
+            return true;
+        if (rhs.m_fl < m_fl)
+            return false;
+        if (m_float_vec < rhs.m_float_vec)
+            return true;
+        if (rhs.m_float_vec < m_float_vec)
+            return false;
+        return m_rtmat < rhs.m_rtmat;
+    }
+
+    bool operator>(const Val &rhs) const {
+        return rhs < *this;
+    }
+
+    bool operator<=(const Val &rhs) const {
+        return !(rhs < *this);
+    }
+
+    bool operator>=(const Val &rhs) const {
+        return !(*this < rhs);
+    }
+
+    bool operator==(const Val &rhs) const {
+        return m__d == rhs.m__d &&
+               m_str == rhs.m_str &&
+               m_dec == rhs.m_dec &&
+               m_fl == rhs.m_fl &&
+               m_float_vec == rhs.m_float_vec &&
+               m_rtmat == rhs.m_rtmat;
+    }
+
+    bool operator!=(const Val &rhs) const {
+        return !(rhs == *this);
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const Val &type) {
+
+        int d = type._d();
+        switch (d) {
+            case 0:
+                os << " str: " << type.m_str;
+                break;
+            case 1:
+                os << " dec: " << type.m_dec;
+                break;
+            case 2:
+                os << " floar: " << type.m_fl;
+                break;
+            case 3:
+                os << " float_vec: [ ";
+                for (auto &k: type.m_float_vec)
+                    os << k << ", ";
+                os << "] ";
+                break;
+            case 4:
+                os << "rtmat: [" ;
+                for (auto &k: type.m_rtmat)
+                    os << k << ", ";
+                os << "] ";
+                break;
+            default:
+                os << "OTRO TIPO";
+                break;
+        }
+        return os;
+    }
+    /*!
+     * @brief Default constructor.
+     */
+    eProsima_user_DllExport Val();
+
+    /*!
+     * @brief Default destructor.
+     */
+    eProsima_user_DllExport ~Val();
+
+    /*!
+     * @brief Copy constructor.
+     * @param x Reference to the object Val that will be copied.
+     */
+    eProsima_user_DllExport Val(const Val &x);
+
+    /*!
+     * @brief Move constructor.
+     * @param x Reference to the object Val that will be copied.
+     */
+    eProsima_user_DllExport Val(Val &&x);
+
+    /*!
+     * @brief Copy assignment.
+     * @param x Reference to the object Val that will be copied.
+     */
+    eProsima_user_DllExport Val& operator=(const Val &x);
+
+    /*!
+     * @brief Move assignment.
+     * @param x Reference to the object Val that will be copied.
+     */
+    eProsima_user_DllExport Val& operator=(Val &&x);
+
+    /*!
+     * @brief This function sets the discriminator value.
+     * @param __d New value for the discriminator.
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the new value doesn't correspond to the selected union member.
+     */
+    eProsima_user_DllExport void _d(int32_t __d);
+
+    /*!
+     * @brief This function returns the value of the discriminator.
+     * @return Value of the discriminator
+     */
+    eProsima_user_DllExport int32_t _d() const;
+
+    /*!
+     * @brief This function returns a reference to the discriminator.
+     * @return Reference to the discriminator.
+     */
+    eProsima_user_DllExport int32_t& _d();
+
+    /*!
+     * @brief This function copies the value in member str
+     * @param _str New value to be copied in member str
+     */
+    eProsima_user_DllExport void str(const std::string &_str);
+
+    /*!
+     * @brief This function moves the value in member str
+     * @param _str New value to be moved in member str
+     */
+    eProsima_user_DllExport void str(std::string &&_str);
+
+    /*!
+     * @brief This function returns a constant reference to member str
+     * @return Constant reference to member str
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport const std::string& str() const;
+
+    /*!
+     * @brief This function returns a reference to member str
+     * @return Reference to member str
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport std::string& str();
+    /*!
+     * @brief This function sets a value in member dec
+     * @param _dec New value for member dec
+     */
+    eProsima_user_DllExport void dec(int32_t _dec);
+
+    /*!
+     * @brief This function returns the value of member dec
+     * @return Value of member dec
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport int32_t dec() const;
+
+    /*!
+     * @brief This function returns a reference to member dec
+     * @return Reference to member dec
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport int32_t& dec();
+
+    /*!
+     * @brief This function sets a value in member fl
+     * @param _fl New value for member fl
+     */
+    eProsima_user_DllExport void fl(float _fl);
+
+    /*!
+     * @brief This function returns the value of member fl
+     * @return Value of member fl
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport float fl() const;
+
+    /*!
+     * @brief This function returns a reference to member fl
+     * @return Reference to member fl
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport float& fl();
+
+    /*!
+     * @brief This function copies the value in member float_vec
+     * @param _float_vec New value to be copied in member float_vec
+     */
+    eProsima_user_DllExport void float_vec(const std::vector<float> &_float_vec);
+
+    /*!
+     * @brief This function moves the value in member float_vec
+     * @param _float_vec New value to be moved in member float_vec
+     */
+    eProsima_user_DllExport void float_vec(std::vector<float> &&_float_vec);
+
+    /*!
+     * @brief This function returns a constant reference to member float_vec
+     * @return Constant reference to member float_vec
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport const std::vector<float>& float_vec() const;
+
+    /*!
+     * @brief This function returns a reference to member float_vec
+     * @return Reference to member float_vec
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport std::vector<float>& float_vec();
+    /*!
+     * @brief This function copies the value in member rtmat
+     * @param _rtmat New value to be copied in member rtmat
+     */
+    eProsima_user_DllExport void rtmat(const std::vector<float> &_rtmat);
+
+    /*!
+     * @brief This function moves the value in member rtmat
+     * @param _rtmat New value to be moved in member rtmat
+     */
+    eProsima_user_DllExport void rtmat(std::vector<float> &&_rtmat);
+
+    /*!
+     * @brief This function returns a constant reference to member rtmat
+     * @return Constant reference to member rtmat
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport const std::vector<float>& rtmat() const;
+
+    /*!
+     * @brief This function returns a reference to member rtmat
+     * @return Reference to member rtmat
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+
+    eProsima_user_DllExport std::vector<float>& rtmat();
+
+    /*!
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function returns the serialized size of a data depending on the buffer alignment.
+     * @param data Data which is calculated its serialized size.
+     * @param current_alignment Buffer alignment.
+     * @return Serialized size.
+     */
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const Val& data, size_t current_alignment = 0);
+
+
+    /*!
+     * @brief This function serializes an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serialize(eprosima::fastcdr::Cdr &cdr) const;
+
+    /*!
+     * @brief This function deserializes an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void deserialize(eprosima::fastcdr::Cdr &cdr);
+
+
+
+
+private:
+    int32_t m__d;
+
+    std::string m_str;
+    int32_t m_dec;
+    float m_fl;
+    std::vector<float> m_float_vec;
+    std::vector<float> m_rtmat;
+};
+/*!
+ * @brief This class represents the enumeration Types defined by the user in the IDL file.
+ * @ingroup DSRGRAPH
+ */
+enum Types : uint32_t
+{
+    STRING,
+    INT,
+    FLOAT,
+    FLOAT_VEC,
+    RT_MAT
+};
+/*!
  * @brief This class represents the structure AttribValue defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
@@ -77,7 +387,7 @@ public:
         if (this == &av_) {
             return true;
         }
-        if (type() != av_.type() || value() != av_.value() || length() != av_.length()) {
+        if (type() != av_.type() || value() != av_.value() ) {
             return false;
         }
         return true;
@@ -111,7 +421,7 @@ public:
     }
 
     friend std::ostream &operator<<(std::ostream &output, const AttribValue &av_) {
-        output << "Type: "<<av_.type()<<", Value["<<av_.length()<<"]: "<<av_.value()<<", ";
+        output << "Type: "<<av_.type()<<", Value["<<av_.value()<<"]: "<<av_.value()<<", ";
         return output;
     };
     /*!
@@ -172,69 +482,46 @@ public:
      */
     eProsima_user_DllExport std::string& key();
     /*!
-     * @brief This function copies the value in member type
-     * @param _type New value to be copied in member type
+     * @brief This function sets a value in member type
+     * @param _type New value for member type
      */
-    eProsima_user_DllExport void type(const std::string &_type);
+    eProsima_user_DllExport void type(int32_t _type);
 
     /*!
-     * @brief This function moves the value in member type
-     * @param _type New value to be moved in member type
+     * @brief This function returns the value of member type
+     * @return Value of member type
      */
-    eProsima_user_DllExport void type(std::string &&_type);
-
-    /*!
-     * @brief This function returns a constant reference to member type
-     * @return Constant reference to member type
-     */
-    eProsima_user_DllExport const std::string& type() const;
+    eProsima_user_DllExport int32_t type() const;
 
     /*!
      * @brief This function returns a reference to member type
      * @return Reference to member type
      */
-    eProsima_user_DllExport std::string& type();
+    eProsima_user_DllExport int32_t& type();
+
     /*!
      * @brief This function copies the value in member value
      * @param _value New value to be copied in member value
      */
-    eProsima_user_DllExport void value(const std::string &_value);
+    eProsima_user_DllExport void value(const Val &_value);
 
     /*!
      * @brief This function moves the value in member value
      * @param _value New value to be moved in member value
      */
-    eProsima_user_DllExport void value(std::string &&_value);
+    eProsima_user_DllExport void value(Val &&_value);
 
     /*!
      * @brief This function returns a constant reference to member value
      * @return Constant reference to member value
      */
-    eProsima_user_DllExport const std::string& value() const;
+    eProsima_user_DllExport const Val& value() const;
 
     /*!
      * @brief This function returns a reference to member value
      * @return Reference to member value
      */
-    eProsima_user_DllExport std::string& value();
-    /*!
-     * @brief This function sets a value in member length
-     * @param _length New value for member length
-     */
-    eProsima_user_DllExport void length(int32_t _length);
-
-    /*!
-     * @brief This function returns the value of member length
-     * @return Value of member length
-     */
-    eProsima_user_DllExport int32_t length() const;
-
-    /*!
-     * @brief This function returns a reference to member length
-     * @return Reference to member length
-     */
-    eProsima_user_DllExport int32_t& length();
-
+    eProsima_user_DllExport Val& value();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -288,9 +575,8 @@ public:
 
 private:
     std::string m_key;
-    std::string m_type;
-    std::string m_value;
-    int32_t m_length;
+    int32_t m_type;
+    Val m_value;
 };
 /*!
  * @brief This class represents the structure EdgeAttribs defined by the user in the IDL file.
@@ -1538,13 +1824,6 @@ class OrMap
 {
 public:
 
-    friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
-        output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
-        for (const auto & kv : om_.m())
-            output << kv.first << "->" << kv.second << "\n";
-        output << "\nContext: "<<om_.cbase();
-        return output;
-    }
     /*!
      * @brief Default constructor.
      */
@@ -1694,6 +1973,13 @@ public:
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
+    friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
+        output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
+        for (const auto & kv : om_.m())
+            output << kv.first << "->" << kv.second << "\n";
+        output << "\nContext: "<<om_.cbase();
+        return output;
+    }
 private:
     int32_t m_id;
     std::map<int32_t, AworSet> m_m;

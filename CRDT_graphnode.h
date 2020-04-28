@@ -77,8 +77,8 @@ class DoLaserStuff : public QGraphicsView
       {
         std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
         Node n = graph->get_node(graph->get_name_from_id(id));
-        const vector<float> lAngles = graph->get_node_attrib_by_name<vector<float>>(n, "laser_data_angles");
-        const vector<float> lDists = graph->get_node_attrib_by_name<vector<float>>(n, "laser_data_dists");
+        const vector<float> lAngles = graph->get_attrib_by_name<vector<float>>(n, "laser_data_angles");
+        const vector<float> lDists = graph->get_attrib_by_name<vector<float>>(n, "laser_data_dists");
 
         QPolygonF polig;
         for(const auto v : lAngles)
@@ -118,7 +118,7 @@ class DoRGBDStuff : public  QLabel
       setParent(this);
       QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::map<string,AttribValue> &attrs){
                         Node n = graph->get_node(graph->get_name_from_id(node_id));
-                        const auto &lDists = graph->get_node_attrib_by_name<std::vector<float>>(n, "rgbd_data");
+                        const auto &lDists = graph->get_attrib_by_name<std::vector<float>>(n, "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
       show();
@@ -147,7 +147,23 @@ class DoTableStuff : public  QTableWidget
       for( auto &[k, v] : n.attrs() )
       {
         setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value())));
+        switch (v.value()._d()) {
+            case 0:
+                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                break;
+            case 1:
+                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().dec())))));
+                break;
+            case 2:
+                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().fl())))));
+                break;
+            case 3:
+                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().float_vec())))));
+                break;
+            case 4:
+                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                break;
+        }
         i++;
       }
       horizontalHeader()->setStretchLastSection(true);
@@ -164,7 +180,23 @@ class DoTableStuff : public  QTableWidget
         int i = 0;
             for (auto &[k,v] : attribs) {
                 setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET
-                setItem(i, 1, new QTableWidgetItem(QString::fromStdString((v.value()))));
+                switch (v.value()._d()) {
+                    case 0:
+                        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                        break;
+                    case 1:
+                        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph->nativetype_to_string(v.value().dec())))));
+                        break;
+                    case 2:
+                        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph->nativetype_to_string(v.value().fl())))));
+                        break;
+                    case 3:
+                        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph->nativetype_to_string(v.value().float_vec())))));
+                        break;
+                    case 4:
+                        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                        break;
+                }
                 i++;
             }
         }

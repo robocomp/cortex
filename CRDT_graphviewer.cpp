@@ -201,7 +201,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 
 		try
 		{
-			auto qname = gcrdt->get_node_attrib_by_name(n, "name").value();
+			auto qname = gcrdt->get_attrib_by_name<std::string>(n, "name");
 			qDebug() << QString::fromStdString(qname);
 			gnode->setTag(qname);
 		}
@@ -209,7 +209,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 
 		try
 		{
-			auto color = gcrdt->get_node_attrib_by_name(n, "color").value();
+			auto color = gcrdt->get_attrib_by_name<std::string>(n, "color");
 			gnode->setColor(color);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;}
@@ -220,8 +220,8 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
     float posx = 10; float posy = 10;
 	try
 	{
-        posx = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_x").value());
-        posy = std::stof((std::string)gcrdt->get_node_attrib_by_name(n, "pos_y").value());
+        posx = gcrdt->get_attrib_by_name<float>(n, "pos_x");
+        posy = gcrdt->get_attrib_by_name<float>(n, "pos_y");
 	}
 	catch(const std::exception &e)
 	{

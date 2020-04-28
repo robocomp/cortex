@@ -348,40 +348,13 @@ N CRDTGraph::get_(int id) {
 }
 
 
-AttribValue CRDTGraph::get_node_attrib_by_name(const Node& n, const std::string &key) {
-    try {
-        auto attrs = n.attrs();
-        auto value  = attrs.find(key);
 
-        if (value != attrs.end()) {
-            return value->second;
-        }
-
-        AttribValue av;
-        av.type("unknown");
-        av.value("unknow");
-        av.key(key);
-        av.length(0);
-
-        return av;
-    }
-    catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<n.id()<<std::endl;
-        
-        AttribValue av;
-        av.type("unknown");
-        av.value("unknow");
-        av.length(0);
-        
-        return av;
-    };
-}
 
 
 
 std::int32_t CRDTGraph::get_node_level(Node& n){
     try {
-        return std::stoi(get_node_attrib_by_name(n, "level").value());
+        return get_attrib_by_name<int32_t >(n, "level");
     } catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
 
@@ -446,27 +419,30 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
 {
-    // vector<pair<int, std::string>> updates;
-    // m.emplace(std::make_pair(v.first, v.second));
-    // std::set<pair<int, int>> s;
-    // for (auto &v : full_graph.cbase().dc())
-    //     s.emplace(std::make_pair(v.first(), v.second()));
-    // //dotcontext_aux.setContext(m, s);
-    // nodes.context().setContext(m, s);
+    vector<pair<int, std::string>> updates;
+
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
+        std::set<pair<int, int>> s;
+        for (auto &v : full_graph.cbase().dc())
+            s.emplace(std::make_pair(v.first(), v.second()));
+        //dotcontext_aux.setContext(m, s);
+        nodes.context().setContext(m, s);
 
 
-    // for (auto &[k,val] : full_graph.m()) 
-    // {
-    //     auto awor = translateAwICEtoCRDT(val);
-    //     {
-    //         nodes[k].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
-    //         name_map[nodes[k].dots().ds.rbegin()->second.name()] = k;
-    //         id_map[k] = nodes[k].dots().ds.rbegin()->second.name();
-    //         updates.emplace_back(make_pair(k, awor.dots().ds.begin()->second.type()));
-    //     }
-    // }
-    // for (auto &[id, type] : updates)
-    //     emit update_node_signal(id, type);
+        for (auto &[k, val] : full_graph.m()) {
+            auto awor = translateAwICEtoCRDT(val);
+            {
+                nodes[k].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
+                name_map[nodes[k].dots().ds.rbegin()->second.name()] = k;
+                id_map[k] = nodes[k].dots().ds.rbegin()->second.name();
+                updates.emplace_back(make_pair(k, awor.dots().ds.begin()->second.type()));
+            }
+        }
+    }
+     for (auto &[id, type] : updates)
+         emit update_node_signal(id, type);
 }
 
 
@@ -606,11 +582,37 @@ void CRDTGraph::read_from_file(const std::string &file_name)
                 {
                     xmlChar *attr_key   = xmlGetProp(cur2, (const xmlChar *)"key");
                     xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
-                    
+
+                    auto val = string_to_mtypes(std::string((char *)attr_key), std::string((char *)attr_value));
+
                     AttribValue av;
-                    av.type("string");
-                    av.value(std::string((char *)attr_value));
-                    av.length(1);
+                    av.type(val.index());
+                    Val value;
+                    switch(val.index()) {
+                        case 0:
+                            value.str(std::get<std::string>(val));
+                            av.value( value);
+                            break;
+                        case 1:
+                            value.dec(std::get<std::int32_t>(val));
+                            av.value( value);
+                            break;
+                        case 2:
+                            value.fl(std::get<float>(val));
+                            av.value( value);
+                            break;
+                        case 3:
+                            value.float_vec(std::get<std::vector<float>>(val));
+                            av.value( value);
+                            break;
+                        case 4:
+                            //TODO: Como representamos rt_map en el idl
+                            value.rtmat( std::get<RTMat>(val).toVector().toStdVector() );
+                            av.value(value);
+                            break;
+                    }
+
+                    //av.value(std::string((char *)attr_value));
                     av.key(std::string((char *)attr_key));
 
                     
@@ -631,12 +633,14 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             ea.label(edgeName);
             std::map<string, AttribValue> attrs_edge;
 
-            auto val = mtype_to_icevalue(edgeName);
+            //auto val = mtype_to_icevalue(edgeName);
+            Val val;
+            val.str(edgeName);
+
             AttribValue av = AttribValue();
 
-            av.type(std::get<0>(val));
-            av.value( std::get<1>(val));
-            av.length(std::get<2>(val));
+            av.type(STRING);
+            av.value( val);
             av.key("name");
 
             attrs["name"] = av;
@@ -654,12 +658,12 @@ void CRDTGraph::read_from_file(const std::string &file_name)
                 float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
                 for(auto &[key, v] : attrs)
                 {
-                    if(key=="tx")	tx = std::stof(v.value());
-                    if(key=="ty")	ty = std::stof(v.value());
-                    if(key=="tz")	tz = std::stof(v.value());
-                    if(key=="rx")	rx = std::stof(v.value());
-                    if(key=="ry")	ry = std::stof(v.value());
-                    if(key=="rz")	rz = std::stof(v.value());
+                    if(key=="tx")	tx = v.value().fl();
+                    if(key=="ty")	ty = v.value().fl();
+                    if(key=="tz")	tz = v.value().fl();
+                    if(key=="rx")	rx = v.value().fl();
+                    if(key=="ry")	ry = v.value().fl();
+                    if(key=="rz")	rz = v.value().fl();
                 }
                 rt.set(rx, ry, rz, tx, ty, tz);
                 //rt.print("in reader");
@@ -909,8 +913,8 @@ aworset<N, int> CRDTGraph::translateAwICEtoCRDT(AworSet &data) {
 }
 
 
-// Converts Ice string values into Mtypes
-CRDT::MTypes CRDTGraph::icevalue_to_mtypes(const std::string &type, const std::string &val)
+// Converts string values into Mtypes
+CRDT::MTypes CRDTGraph::string_to_mtypes(const std::string &type, const std::string &val)
 {
     // WE NEED TO ADD A TYPE field to the Attribute values and get rid of this shit
     static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render", "color", "type"};
@@ -961,7 +965,7 @@ CRDT::MTypes CRDTGraph::icevalue_to_mtypes(const std::string &type, const std::s
     return res;
 }
 
-std::tuple<std::string, std::string, int> CRDTGraph::mtype_to_icevalue(const MTypes &t)
+std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const MTypes &t)
 {
     return std::visit(overload
       {
@@ -980,13 +984,36 @@ std::tuple<std::string, std::string, int> CRDTGraph::mtype_to_icevalue(const MTy
 
 
 void CRDTGraph::add_attrib(std::map<string, AttribValue> &v, std::string att_name, CRDT::MTypes att_value) {
-    auto val = mtype_to_icevalue(att_value);
+    //auto val = mtype_to_icevalue(att_value);
 
     AttribValue av;
-    av.type(std::get<0>(val));
-    av.value( std::get<1>(val));
-    av.length(std::get<2>(val));
+    av.type(att_value.index());
     av.key(att_name);
+
+    Val value;
+    switch(att_value.index()) {
+        case 0:
+            value.str(std::get<std::string>(att_value));
+            av.value( value);
+            break;
+        case 1:
+            value.dec(std::get<std::int32_t>(att_value));
+            av.value( value);
+            break;
+        case 2:
+            value.fl(std::get<float>(att_value));
+            av.value( value);
+            break;
+        case 3:
+            value.float_vec(std::get<std::vector<float>>(att_value));
+            av.value( value);
+            break;
+        case 4:
+            //TODO: Como representamos rt_map en el idl
+            value.rtmat(std::get<RTMat>(att_value).toVector().toStdVector());
+            av.value(value);
+            break;
+    }
 
     v[att_name] = av;
 }

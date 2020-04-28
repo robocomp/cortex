@@ -32,22 +32,621 @@ using namespace eprosima::fastcdr::exception;
 
 #include <utility>
 
+Val::Val()
+{
+    m__d = 0;
+    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@481a15ff
+    m_str ="";
+    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@78186a70
+    m_dec = 0;
+    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@306279ee
+    m_fl = 0.0;
+    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@545997b1
+
+    // m_rtmat com.eprosima.idl.parser.typecode.SequenceTypeCode@4cf4d528
+
+}
+
+Val::~Val()
+{
+}
+
+Val::Val(const Val &x)
+{
+    m__d = x.m__d;
+
+    switch(m__d)
+    {
+        case 0:
+        m_str = x.m_str;
+        break;
+        case 1:
+        m_dec = x.m_dec;
+        break;
+        case 2:
+        m_fl = x.m_fl;
+        break;
+        case 3:
+        m_float_vec = x.m_float_vec;
+        break;
+        case 4:
+        m_rtmat = x.m_rtmat;
+        break;
+        default:
+        break;
+    }
+}
+
+Val::Val(Val &&x)
+{
+    m__d = x.m__d;
+
+    switch(m__d)
+    {
+        case 0:
+        m_str = std::move(x.m_str);
+        break;
+        case 1:
+        m_dec = x.m_dec;
+        break;
+        case 2:
+        m_fl = x.m_fl;
+        break;
+        case 3:
+        m_float_vec = std::move(x.m_float_vec);
+        break;
+        case 4:
+        m_rtmat = std::move(x.m_rtmat);
+        break;
+        default:
+        break;
+    }
+}
+
+Val& Val::operator=(const Val &x)
+{
+    m__d = x.m__d;
+
+    switch(m__d)
+    {
+        case 0:
+        m_str = x.m_str;
+        break;
+        case 1:
+        m_dec = x.m_dec;
+        break;
+        case 2:
+        m_fl = x.m_fl;
+        break;
+        case 3:
+        m_float_vec = x.m_float_vec;
+        break;
+        case 4:
+        m_rtmat = x.m_rtmat;
+        break;
+        default:
+        break;
+    }
+
+    return *this;
+}
+
+Val& Val::operator=(Val &&x)
+{
+    m__d = x.m__d;
+
+    switch(m__d)
+    {
+        case 0:
+        m_str = std::move(x.m_str);
+        break;
+        case 1:
+        m_dec = x.m_dec;
+        break;
+        case 2:
+        m_fl = x.m_fl;
+        break;
+        case 3:
+        m_float_vec = std::move(x.m_float_vec);
+        break;
+        case 4:
+        m_rtmat = std::move(x.m_rtmat);
+        break;
+        default:
+        break;
+    }
+
+    return *this;
+}
+
+void Val::_d(int32_t __d)
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 0:
+        switch(__d)
+        {
+            case 0:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
+        case 1:
+        switch(__d)
+        {
+            case 1:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
+        case 2:
+        switch(__d)
+        {
+            case 2:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
+        case 3:
+        switch(__d)
+        {
+            case 3:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
+        case 4:
+        switch(__d)
+        {
+            case 4:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
+    }
+
+    if(!b)
+    {
+        throw BadParamException("Discriminator doesn't correspond with the selected union member");
+    }
+
+    m__d = __d;
+}
+
+int32_t Val::_d() const
+{
+    return m__d;
+}
+
+int32_t& Val::_d()
+{
+    return m__d;
+}
+
+void Val::str(const std::string &_str)
+{
+    m_str = _str;
+    m__d = 0;
+}
+
+void Val::str(std::string &&_str)
+{
+    m_str = std::move(_str);
+    m__d = 0;
+}
+
+const std::string& Val::str() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 0:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_str;
+}
+
+std::string& Val::str()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 0:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_str;
+}
+void Val::dec(int32_t _dec)
+{
+    m_dec = _dec;
+    m__d = 1;
+}
+
+int32_t Val::dec() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 1:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_dec;
+}
+
+int32_t& Val::dec()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 1:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_dec;
+}
+void Val::fl(float _fl)
+{
+    m_fl = _fl;
+    m__d = 2;
+}
+
+float Val::fl() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 2:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_fl;
+}
+
+float& Val::fl()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 2:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_fl;
+}
+void Val::float_vec(const std::vector<float> &_float_vec)
+{
+    m_float_vec = _float_vec;
+    m__d = 3;
+}
+
+void Val::float_vec(std::vector<float> &&_float_vec)
+{
+    m_float_vec = std::move(_float_vec);
+    m__d = 3;
+}
+
+const std::vector<float>& Val::float_vec() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 3:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_float_vec;
+}
+
+std::vector<float>& Val::float_vec()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 3:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_float_vec;
+}
+void Val::rtmat(const std::vector<float> &_rtmat)
+{
+    m_rtmat = _rtmat;
+    m__d = 4;
+}
+
+void Val::rtmat(std::vector<float> &&_rtmat)
+{
+    m_rtmat = std::move(_rtmat);
+    m__d = 4;
+}
+
+const std::vector<float>& Val::rtmat() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 4:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_rtmat;
+}
+
+std::vector<float>& Val::rtmat()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 4:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_rtmat;
+}
+
+size_t Val::getMaxCdrSerializedSize(size_t current_alignment)
+{
+    size_t initial_alignment = current_alignment;
+    size_t reset_alignment = 0;
+    size_t union_max_size_serialized = 0;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4) + 255 + 1;
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+        reset_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+        reset_alignment += (100 * 4) + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
+
+    return union_max_size_serialized - initial_alignment;
+}
+
+// TODO(Ricardo) Review
+size_t Val::getCdrSerializedSize(const Val& data, size_t current_alignment)
+{
+    (void)data;
+    size_t initial_alignment = current_alignment;
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+    switch(data.m__d)
+    {
+        case 0:
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + data.str().size() + 1;
+        break;
+        case 1:
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+        break;
+        case 2:
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+        break;
+        case 3:
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+        current_alignment += (data.float_vec().size() * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+        break;
+        case 4:
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+        current_alignment += (data.rtmat().size() * 4) + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+        break;
+        default:
+        break;
+    }
+
+    return current_alignment - initial_alignment;
+}
+
+void Val::serialize(eprosima::fastcdr::Cdr &scdr) const
+{
+    scdr << m__d;
+
+    switch(m__d)
+    {
+        case 0:
+        scdr << m_str;
+        break;
+        case 1:
+        scdr << m_dec;
+        break;
+        case 2:
+        scdr << m_fl;
+        break;
+        case 3:
+        scdr << m_float_vec;break;
+        case 4:
+        scdr << m_rtmat;break;
+        default:
+        break;
+    }
+}
+
+void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
+{
+    dcdr >> m__d;
+
+    switch(m__d)
+    {
+        case 0:
+        dcdr >> m_str;
+        break;
+        case 1:
+        dcdr >> m_dec;
+        break;
+        case 2:
+        dcdr >> m_fl;
+        break;
+        case 3:
+        dcdr >> m_float_vec;break;
+        case 4:
+        dcdr >> m_rtmat;break;
+        default:
+        break;
+    }
+}
+
+
+
 AttribValue::AttribValue()
 {
-    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@8646db9
+    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@221af3c0
     m_key ="";
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@37374a5e
-    m_type ="";
-    // m_value com.eprosima.idl.parser.typecode.StringTypeCode@4671e53b
-    m_value ="";
-    // m_length com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2db7a79b
-    m_length = 0;
+    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@62bd765
+    m_type = 0;
+    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@23a5fd2
+
 
 }
 
 AttribValue::~AttribValue()
 {
-
 
 
 
@@ -58,15 +657,13 @@ AttribValue::AttribValue(const AttribValue &x)
     m_key = x.m_key;
     m_type = x.m_type;
     m_value = x.m_value;
-    m_length = x.m_length;
 }
 
 AttribValue::AttribValue(AttribValue &&x)
 {
     m_key = std::move(x.m_key);
-    m_type = std::move(x.m_type);
+    m_type = x.m_type;
     m_value = std::move(x.m_value);
-    m_length = x.m_length;
 }
 
 AttribValue& AttribValue::operator=(const AttribValue &x)
@@ -75,7 +672,6 @@ AttribValue& AttribValue::operator=(const AttribValue &x)
     m_key = x.m_key;
     m_type = x.m_type;
     m_value = x.m_value;
-    m_length = x.m_length;
 
     return *this;
 }
@@ -84,9 +680,8 @@ AttribValue& AttribValue::operator=(AttribValue &&x)
 {
 
     m_key = std::move(x.m_key);
-    m_type = std::move(x.m_type);
+    m_type = x.m_type;
     m_value = std::move(x.m_value);
-    m_length = x.m_length;
 
     return *this;
 }
@@ -98,13 +693,10 @@ size_t AttribValue::getMaxCdrSerializedSize(size_t current_alignment)
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
-
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
-
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
 
+    current_alignment += Val::getMaxCdrSerializedSize(current_alignment);
 
     return current_alignment - initial_alignment;
 }
@@ -117,13 +709,10 @@ size_t AttribValue::getCdrSerializedSize(const AttribValue& data, size_t current
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + data.key().size() + 1;
 
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + data.type().size() + 1;
-
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + data.value().size() + 1;
-
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
 
+    current_alignment += Val::getCdrSerializedSize(data.value(), current_alignment);
 
     return current_alignment - initial_alignment;
 }
@@ -134,7 +723,6 @@ void AttribValue::serialize(eprosima::fastcdr::Cdr &scdr) const
     scdr << m_key;
     scdr << m_type;
     scdr << m_value;
-    scdr << m_length;
 }
 
 void AttribValue::deserialize(eprosima::fastcdr::Cdr &dcdr)
@@ -143,7 +731,6 @@ void AttribValue::deserialize(eprosima::fastcdr::Cdr &dcdr)
     dcdr >> m_key;
     dcdr >> m_type;
     dcdr >> m_value;
-    dcdr >> m_length;
 }
 
 /*!
@@ -182,28 +769,19 @@ std::string& AttribValue::key()
     return m_key;
 }
 /*!
- * @brief This function copies the value in member type
- * @param _type New value to be copied in member type
+ * @brief This function sets a value in member type
+ * @param _type New value for member type
  */
-void AttribValue::type(const std::string &_type)
+void AttribValue::type(int32_t _type)
 {
 m_type = _type;
 }
 
 /*!
- * @brief This function moves the value in member type
- * @param _type New value to be moved in member type
+ * @brief This function returns the value of member type
+ * @return Value of member type
  */
-void AttribValue::type(std::string &&_type)
-{
-m_type = std::move(_type);
-}
-
-/*!
- * @brief This function returns a constant reference to member type
- * @return Constant reference to member type
- */
-const std::string& AttribValue::type() const
+int32_t AttribValue::type() const
 {
     return m_type;
 }
@@ -212,15 +790,16 @@ const std::string& AttribValue::type() const
  * @brief This function returns a reference to member type
  * @return Reference to member type
  */
-std::string& AttribValue::type()
+int32_t& AttribValue::type()
 {
     return m_type;
 }
+
 /*!
  * @brief This function copies the value in member value
  * @param _value New value to be copied in member value
  */
-void AttribValue::value(const std::string &_value)
+void AttribValue::value(const Val &_value)
 {
 m_value = _value;
 }
@@ -229,7 +808,7 @@ m_value = _value;
  * @brief This function moves the value in member value
  * @param _value New value to be moved in member value
  */
-void AttribValue::value(std::string &&_value)
+void AttribValue::value(Val &&_value)
 {
 m_value = std::move(_value);
 }
@@ -238,7 +817,7 @@ m_value = std::move(_value);
  * @brief This function returns a constant reference to member value
  * @return Constant reference to member value
  */
-const std::string& AttribValue::value() const
+const Val& AttribValue::value() const
 {
     return m_value;
 }
@@ -247,42 +826,14 @@ const std::string& AttribValue::value() const
  * @brief This function returns a reference to member value
  * @return Reference to member value
  */
-std::string& AttribValue::value()
+Val& AttribValue::value()
 {
     return m_value;
 }
-/*!
- * @brief This function sets a value in member length
- * @param _length New value for member length
- */
-void AttribValue::length(int32_t _length)
-{
-m_length = _length;
-}
-
-/*!
- * @brief This function returns the value of member length
- * @return Value of member length
- */
-int32_t AttribValue::length() const
-{
-    return m_length;
-}
-
-/*!
- * @brief This function returns a reference to member length
- * @return Reference to member length
- */
-int32_t& AttribValue::length()
-{
-    return m_length;
-}
-
 
 size_t AttribValue::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
-
 
 
 
@@ -303,18 +854,17 @@ void AttribValue::serializeKey(eprosima::fastcdr::Cdr &scdr) const
      
      
      
-     
 }
 
 EdgeAttribs::EdgeAttribs()
 {
-    // m_label com.eprosima.idl.parser.typecode.StringTypeCode@3bd94634
+    // m_label com.eprosima.idl.parser.typecode.StringTypeCode@525b461a
     m_label ="";
-    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@58a90037
+    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@58c1c010
     m_from = 0;
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@74294adb
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@b7f23d9
     m_to = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@70a9f84e
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@3f200884
 
 
 }
@@ -593,17 +1143,17 @@ void EdgeAttribs::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Node::Node()
 {
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@6cc7b4de
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@58134517
     m_type ="";
-    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@32cf48b7
+    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@4450d156
     m_name ="";
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@679b62af
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4461c7e3
     m_id = 0;
-    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5cdd8682
+    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@351d0846
     m_agent_id = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@d6da883
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@77e4c80f
 
-    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@49c43f4e
+    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@35fc6dc4
 
 
 }
@@ -998,7 +1548,7 @@ void Node::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 GraphRequest::GraphRequest()
 {
-    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@701fc37a
+    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@971d0d8
     m_from ="";
 
 }
@@ -1124,9 +1674,9 @@ void GraphRequest::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 PairInt::PairInt()
 {
-    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4148db48
+    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@564718df
     m_first = 0;
-    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@282003e1
+    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@51b7e5df
     m_second = 0;
 
 }
@@ -1292,9 +1842,9 @@ void PairInt::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotContext::DotContext()
 {
-    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@23a5fd2
+    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@18a70f16
 
-    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@78a2da20
+    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@62e136d3
 
 
 }
@@ -1506,9 +2056,9 @@ void DotContext::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotKernel::DotKernel()
 {
-    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@ba8d91c
+    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@c540f5a
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@7364985f
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@770c2e6b
 
 
 }
@@ -1700,9 +2250,9 @@ void DotKernel::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 AworSet::AworSet()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7ff2a664
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7f77e91b
     m_id = 0;
-    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@525b461a
+    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@2357d90a
 
 
 }
@@ -1872,11 +2422,11 @@ void AworSet::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 OrMap::OrMap()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@429bd883
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@15bb6bea
     m_id = 0;
-    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@58134517
+    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@8b96fde
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@7364985f
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@770c2e6b
 
 
 }

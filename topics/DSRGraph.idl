@@ -1,13 +1,32 @@
 
-    struct AttribValue
-    {
-        string key;
-        string type;
-        string value;
-        long length;
+    union Val switch(long) {
+      case 0:
+        string str;
+      case 1:
+        long dec;
+      case 2:
+        float fl;
+      case 3:
+        sequence<float>  float_vec;
+      case 4:
+       sequence<float> rtmat;
     };
 
+    enum Types
+    {
+        _STRING,
+        _INT,
+        _FLOAT,
+        _FLOAT_VEC,
+        _RT_MAT
+    };
 
+    struct AttribValue
+    {
+        string key; //key
+        long type;
+        Val value;
+    };
 
     struct EdgeAttribs {
 		string label;

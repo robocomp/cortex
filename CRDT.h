@@ -44,7 +44,8 @@ namespace CRDT
 
 using N = Node;
 using Nodes = ormap<int, aworset<N,  int >, int>;
-using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
+//using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
+using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, RMat::RTMat>;
 using IDType = std::int32_t;
 using Attribs = std::unordered_map<std::string, MTypes>;
 
@@ -98,22 +99,76 @@ public:
     N get(int id);
     
     // gets a const node ref and searches an attrib by name. With a map should be constant time.
-    AttribValue get_node_attrib_by_name(const Node& n, const std::string &key);
-   
+
+    template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<EdgeAttribs, T>::value ,T >  >
+    AttribValue get_attrib_by_name_(const T& n, const std::string &key) {
+        try {
+            auto attrs = n.attrs();
+            auto value  = attrs.find(key);
+
+            if (value != attrs.end()) {
+                return value->second;
+            }
+
+            AttribValue av;
+            av.type(STRING);
+            Val v;
+            v.str("unkown");
+            av.value(v);
+            av.key(key);
+
+            return av;
+        }
+        catch(const std::exception &e){
+            if constexpr (std::is_same<Node,  T>::value) {
+                std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
+                          << "-> " << n.id() << std::endl;
+            }
+            if constexpr (std::is_same<EdgeAttribs,  T>::value) {
+                std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
+                          << "-> " << n.to() << std::endl;
+            }
+            AttribValue av;
+            av.type(STRING);
+            Val v;
+            v.str("unkown");
+            av.value(v);
+            av.key(key);
+
+            return av;
+        };
+    }
+
+
+
+    template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<EdgeAttribs, Type>::value, Type>>
+    Ta get_attrib_by_name(Type& n, const std::string &key) {
+        AttribValue av = get_attrib_by_name_(n, key);
+        if constexpr (std::is_same<Ta, std::string>::value) return av.value().str();
+        if constexpr (std::is_same<Ta, std::int32_t>::value) return av.value().dec();
+        if constexpr (std::is_same<Ta, float>::value) return av.value().fl();
+        if constexpr (std::is_same<Ta, std::vector<float>>::value)
+        {
+            if (key == "RT" || key == "RTMat") return av.value().rtmat();
+            return av.value().float_vec();
+        }
+        if constexpr (std::is_same<Ta, std::array<float, 16>>::value) return av.value().rtmat();
+        if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
+            return RTMat { QMat{ av.value().rtmat()} } ;
+        }
+
+    }
+
+
 
     template <typename Ta>
-    Ta get_node_attrib_by_name(Node& n, const std::string &key)
+    Ta string_to_nativetype(const std::string &name, const std::string &val)
     {
-        AttribValue av = get_node_attrib_by_name(n, key);
-        return icevalue_to_nativetype<Ta>(key, av.value());
-    }
-    std::tuple<std::string, std::string, int> mtype_to_icevalue(const MTypes &t);
-    template <typename Ta>
-    Ta icevalue_to_nativetype(const std::string &name, const std::string &val)
-    {
-        return std::get<Ta>(icevalue_to_mtypes(name, val));
+        return std::get<Ta>(string_to_mtypes(name, val));
     };
-    MTypes icevalue_to_mtypes(const std::string &name, const std::string &val);
+
+    std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t);
+
     std::int32_t get_node_level(Node& n);
     std::string get_node_type(Node& n);
 
@@ -152,6 +207,8 @@ private:
     
     void join_delta_node(AworSet aworSet);
     void join_full_graph(OrMap full_graph);
+
+    MTypes string_to_mtypes(const std::string &name, const std::string &val);
 
 
 

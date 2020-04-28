@@ -76,8 +76,8 @@ class DoRTStuff : public  QTableWidget
 
           auto value = ea.attrs().find("RT");
           if (value != ea.attrs().end()) {
-              auto rtvalue = value->second.value();
-              auto mat = graph->icevalue_to_nativetype<RTMat>("RT", rtvalue);
+              //auto rtvalue = value->second.value();
+              auto mat = graph->get_attrib_by_name<RMat::RTMat>(ea, "RT");
 
               //mat.print("mat");
               for (auto i : iter::range(mat.nRows()))
