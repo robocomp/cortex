@@ -89,6 +89,7 @@ public:
     EdgeAttribs get_edge(const std::string& from, const std::string& to);
     bool insert_or_assign_edge(const EdgeAttribs& attrs);
     bool delete_edge(const std::string& from, const std::string& t);
+    bool delete_edge(int from, int t);
 
     std::string get_name_from_id(std::int32_t id);
     int get_id_from_name(const std::string &name);
@@ -146,6 +147,7 @@ private:
     N get_(int id);
     bool insert_or_assign_node_(const N &node);
     std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
+    bool delete_edge_(int from, int t);
 
 
     int id();

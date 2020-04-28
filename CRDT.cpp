@@ -247,7 +247,7 @@ bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
     int to = attrs.to();
 
     try {
-        if (in(from)  && in(to)) {
+        if (in(from) && in(to)) {
             auto node = get_(from);
             auto edge = node.fano().find(to);
             if (edge != node.fano().end()) {
@@ -259,9 +259,8 @@ bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
             node.agent_id(agent_id);
             insert_or_assign_node_(node);
 
-        }
-            else {
-                std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
+        } else {
+            //std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
             return false;
         }
     }
@@ -275,35 +274,64 @@ bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
 }
 
 
+bool CRDTGraph::delete_edge(int from, int to) {
+
+    bool result;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (!in(from) || !in(to)) return false;
+        result = delete_edge_(from, to);
+    }
+
+    if (result)
+            emit update_edge_signal(from, to);
+    return result;
+}
+
 bool CRDTGraph::delete_edge(const std::string& from, const std::string& to) {
     int id_from = 0;
     int id_to = 0;
-    try {
+    bool result;
+    {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         id_from = get_id_from_name(from);
         id_to = get_id_from_name(to);
 
-        if (in(id_from) && in(id_to)) {
-            auto node = get_(id_from);
-            auto edge = node.fano().find(id_to);
+        if (id_from == -1 || id_to == -1) return false;
+        result = delete_edge_(id_from, id_to);
+    }
+
+    if (result)
+        emit update_edge_signal(id_from, id_to);
+    return result;
+}
+
+bool CRDTGraph::delete_edge_(int from, int to) {
+
+    try {
+
+            auto node = get_(from);
+            auto edge = node.fano().find(to);
             if (edge == node.fano().end()) { return false; }
             node.fano().erase(edge);
 
             node.agent_id(agent_id);
             insert_or_assign_node_(node);
 
-        } else { return false; }
+
     } catch (const std::exception &e) {
             std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                       << std::endl;
             return false;
-        };
+    };
 
-    emit update_edge_signal(id_from, id_to);
 
     return true;
 
 }
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -312,6 +340,7 @@ Nodes CRDTGraph::get() {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return nodes;
 }
+
 
 
 N CRDTGraph::get(int id) {
