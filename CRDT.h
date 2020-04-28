@@ -84,6 +84,8 @@ public:
     bool insert_or_assign_node(const N &node);
     bool delete_node(const std::string &name);
     bool delete_node(int id);
+    // typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
+	// typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
     //Edges
     EdgeAttribs get_edge(const std::string& from, const std::string& to);
