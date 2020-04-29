@@ -10,11 +10,16 @@
 
 
     struct EdgeAttribs {
-		string label;
+		string label; //key2
 		long from;
-        long to; //key
+        long to; //key1
 		map<string, AttribValue>    attrs;
 	};
+
+    struct edgeKey {
+        long to;
+        string key;
+    };
 
 
     struct Node {
@@ -23,7 +28,7 @@
         long id;
         long agent_id;
 		map<string, AttribValue>   attrs;
-		map<long, EdgeAttribs> fano;
+		map<edgeKey, EdgeAttribs> fano;
     };
 
     struct GraphRequest

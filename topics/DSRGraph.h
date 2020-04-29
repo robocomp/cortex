@@ -299,6 +299,7 @@ private:
 class EdgeAttribs
 {
 public:
+
     bool operator==(const EdgeAttribs &eA_) const {
         if (this == &eA_) {
             return true;
@@ -518,12 +519,180 @@ private:
     std::map<std::string, AttribValue> m_attrs;
 };
 /*!
+ * @brief This class represents the structure edgeKey defined by the user in the IDL file.
+ * @ingroup DSRGRAPH
+ */
+class edgeKey
+{
+public:
+    bool operator==(const edgeKey &rhs) const {
+        return m_to == rhs.m_to &&
+               m_key == rhs.m_key;
+    }
+
+    bool operator!=(const edgeKey &rhs) const {
+        return !(rhs == *this);
+    }
+
+    bool operator<(const edgeKey &rhs) const {
+        if (m_to < rhs.m_to)
+            return true;
+        if (rhs.m_to < m_to)
+            return false;
+        return m_key < rhs.m_key;
+    }
+
+    bool operator>(const edgeKey &rhs) const {
+        return rhs < *this;
+    }
+
+    bool operator<=(const edgeKey &rhs) const {
+        return !(rhs < *this);
+    }
+
+    bool operator>=(const edgeKey &rhs) const {
+        return !(*this < rhs);
+    }
+
+
+    /*!
+     * @brief Default constructor.
+     */
+    eProsima_user_DllExport edgeKey();
+
+    /*!
+     * @brief Default destructor.
+     */
+    eProsima_user_DllExport ~edgeKey();
+
+    /*!
+     * @brief Copy constructor.
+     * @param x Reference to the object edgeKey that will be copied.
+     */
+    eProsima_user_DllExport edgeKey(const edgeKey &x);
+
+    /*!
+     * @brief Move constructor.
+     * @param x Reference to the object edgeKey that will be copied.
+     */
+    eProsima_user_DllExport edgeKey(edgeKey &&x);
+
+    /*!
+     * @brief Copy assignment.
+     * @param x Reference to the object edgeKey that will be copied.
+     */
+    eProsima_user_DllExport edgeKey& operator=(const edgeKey &x);
+
+    /*!
+     * @brief Move assignment.
+     * @param x Reference to the object edgeKey that will be copied.
+     */
+    eProsima_user_DllExport edgeKey& operator=(edgeKey &&x);
+
+    /*!
+     * @brief This function sets a value in member to
+     * @param _to New value for member to
+     */
+    eProsima_user_DllExport void to(int32_t _to);
+
+    /*!
+     * @brief This function returns the value of member to
+     * @return Value of member to
+     */
+    eProsima_user_DllExport int32_t to() const;
+
+    /*!
+     * @brief This function returns a reference to member to
+     * @return Reference to member to
+     */
+    eProsima_user_DllExport int32_t& to();
+
+    /*!
+     * @brief This function copies the value in member key
+     * @param _key New value to be copied in member key
+     */
+    eProsima_user_DllExport void key(const std::string &_key);
+
+    /*!
+     * @brief This function moves the value in member key
+     * @param _key New value to be moved in member key
+     */
+    eProsima_user_DllExport void key(std::string &&_key);
+
+    /*!
+     * @brief This function returns a constant reference to member key
+     * @return Constant reference to member key
+     */
+    eProsima_user_DllExport const std::string& key() const;
+
+    /*!
+     * @brief This function returns a reference to member key
+     * @return Reference to member key
+     */
+    eProsima_user_DllExport std::string& key();
+
+    /*!
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function returns the serialized size of a data depending on the buffer alignment.
+     * @param data Data which is calculated its serialized size.
+     * @param current_alignment Buffer alignment.
+     * @return Serialized size.
+     */
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const edgeKey& data, size_t current_alignment = 0);
+
+
+    /*!
+     * @brief This function serializes an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serialize(eprosima::fastcdr::Cdr &cdr) const;
+
+    /*!
+     * @brief This function deserializes an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void deserialize(eprosima::fastcdr::Cdr &cdr);
+
+
+
+    /*!
+     * @brief This function returns the maximum serialized size of the Key of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function tells you if the Key has been defined for this type
+     */
+    eProsima_user_DllExport static bool isKeyDefined();
+
+    /*!
+     * @brief This function serializes the key members of an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
+
+private:
+    int32_t m_to;
+    std::string m_key;
+};
+/*!
  * @brief This class represents the structure Node defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
 class Node
 {
 public:
+
     bool operator==(const Node &n_) const {
         if (this == &n_) {
             return true;
@@ -572,7 +741,7 @@ public:
             output << v.first <<":("<< v.second <<");";
         output<<"], FanOut:[";
         for (auto v : n_.fano())
-            output << v.first <<":("<< v.second <<");";
+            output << "[ "<< v.first.to() << " "<< v.first.key() << "] " <<":("<< v.second <<");";
         output << "]";
         return output;
     }
@@ -719,25 +888,25 @@ public:
      * @brief This function copies the value in member fano
      * @param _fano New value to be copied in member fano
      */
-    eProsima_user_DllExport void fano(const std::map<int32_t, EdgeAttribs> &_fano);
+    eProsima_user_DllExport void fano(const std::map<edgeKey, EdgeAttribs> &_fano);
 
     /*!
      * @brief This function moves the value in member fano
      * @param _fano New value to be moved in member fano
      */
-    eProsima_user_DllExport void fano(std::map<int32_t, EdgeAttribs> &&_fano);
+    eProsima_user_DllExport void fano(std::map<edgeKey, EdgeAttribs> &&_fano);
 
     /*!
      * @brief This function returns a constant reference to member fano
      * @return Constant reference to member fano
      */
-    eProsima_user_DllExport const std::map<int32_t, EdgeAttribs>& fano() const;
+    eProsima_user_DllExport const std::map<edgeKey, EdgeAttribs>& fano() const;
 
     /*!
      * @brief This function returns a reference to member fano
      * @return Reference to member fano
      */
-    eProsima_user_DllExport std::map<int32_t, EdgeAttribs>& fano();
+    eProsima_user_DllExport std::map<edgeKey, EdgeAttribs>& fano();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -795,7 +964,7 @@ private:
     int32_t m_id;
     int32_t m_agent_id;
     std::map<std::string, AttribValue> m_attrs;
-    std::map<int32_t, EdgeAttribs> m_fano;
+    std::map<edgeKey, EdgeAttribs> m_fano;
 };
 /*!
  * @brief This class represents the structure GraphRequest defined by the user in the IDL file.
@@ -916,6 +1085,7 @@ public:
 private:
     std::string m_from;
 };
+
 /*!
  * @brief This class represents the structure PairInt defined by the user in the IDL file.
  * @ingroup DSRGRAPH
