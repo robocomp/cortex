@@ -475,27 +475,27 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
 {
-    // vector<pair<int, std::string>> updates;
-    // m.emplace(std::make_pair(v.first, v.second));
-    // std::set<pair<int, int>> s;
-    // for (auto &v : full_graph.cbase().dc())
-    //     s.emplace(std::make_pair(v.first(), v.second()));
-    // //dotcontext_aux.setContext(m, s);
-    // nodes.context().setContext(m, s);
+    vector<pair<int, std::string>> updates;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
+        std::set<pair<int, int>> s;
+        for (auto &v : full_graph.cbase().dc())
+            s.emplace(std::make_pair(v.first(), v.second()));
+        nodes.context().setContext(m, s);
 
-
-    // for (auto &[k,val] : full_graph.m()) 
-    // {
-    //     auto awor = translateAwICEtoCRDT(val);
-    //     {
-    //         nodes[k].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
-    //         name_map[nodes[k].dots().ds.rbegin()->second.name()] = k;
-    //         id_map[k] = nodes[k].dots().ds.rbegin()->second.name();
-    //         updates.emplace_back(make_pair(k, awor.dots().ds.begin()->second.type()));
-    //     }
-    // }
-    // for (auto &[id, type] : updates)
-    //     emit update_node_signal(id, type);
+        for (auto &[k, val] : full_graph.m()) {
+            auto awor = translateAwICEtoCRDT(val);
+            {
+                nodes[k].add(awor.dots().ds.begin()->second, awor.dots().ds.begin()->second.id());
+                name_map[nodes[k].dots().ds.rbegin()->second.name()] = k;
+                id_map[k] = nodes[k].dots().ds.rbegin()->second.name();
+                updates.emplace_back(make_pair(k, awor.dots().ds.begin()->second.type()));
+            }
+        }
+    }
+    for (auto &[id, type] : updates)
+            emit update_node_signal(id, type);
 }
 
 
@@ -887,7 +887,7 @@ void CRDTGraph::fullgraph_request_thread() {
         sleep(1);
     }
     eprosima::fastrtps::Domain::removeSubscriber(dsrsub_request_answer.getSubscriber());
-    start_subscription_thread(true);
+    //start_subscription_thread(true);
 
 }
 
