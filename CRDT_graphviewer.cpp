@@ -95,13 +95,15 @@ void GraphViewer::createGraph()
 		{
 			try
 			{
-				addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.second.dots().ds.rbegin()->second));
+			    if (node.second.dots().ds.size() > 0)
+				    addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.second.dots().ds.rbegin()->second));
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
 		}
 		// add edges after all nodes have been created
 		for(auto node : gcrdt->get().getMap()) // Aworset
 		{
+            if (node.second.dots().ds.size() == 0) { continue; }
 //			std::cout << "Edges from "<<node.second.readAsList().back().id<<std::endl;
 			std::list<Node> ns;
 			try
@@ -109,11 +111,12 @@ void GraphViewer::createGraph()
 				ns = node.second.readAsList();
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<" Error accessing edge" << node.second.readAsList().back() <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
-			for( auto &edge :ns.back().fano())
+			for(const auto &[k, edges] :ns.back().fano())
 			{
-				try{
-					addEdgeSLOT(edge.second.from(), edge.second.to(), edge.second.label());
-				} catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+				    try{
+					    addEdgeSLOT(edges.from(), edges.to(), edges.label());
+				    } catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+
 			}
 		}
 	}catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}

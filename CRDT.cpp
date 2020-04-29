@@ -168,9 +168,9 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
         auto node = get_(id);
         //Aunque el id no sea -1 el nodo puede no existir.
         if (node.id() == -1) return make_pair(false, edges);
-        for (auto v : node.fano()) { // Delete all edges from this node.
-            std::cout << id << " -> " << v.first << std::endl;
-            edges.emplace_back(make_tuple(id, v.first, v.second.label()));
+        for (const auto &v : node.fano()) { // Delete all edges from this node.
+            std::cout << id << " -> " << v.first.to() << " " << v.first.key() << std::endl;
+             edges.emplace_back(make_tuple(id, v.first.to(), v.first.key()));
         }
         // Get remove delta.
         auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
@@ -184,19 +184,24 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
         //For each node check if there is an edge to remove.
         for (auto [k, v] : nodes.getMapRef()) {
             //get the actual value of a node.
+
             auto visited_node =  Node(v.dots().ds.rbegin()->second);
-            auto value = visited_node.fano().find(id);
-            //if nodes are not connected continue.
-            if (value == visited_node.fano().end())  continue;
+            for (const auto &[toKey, val] : visited_node.fano()) {
+                if (toKey.to() == id) {
 
-            //Necesitamos una copia?
-            visited_node.fano().erase(value);
-            auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
-            edges.emplace_back(make_tuple(visited_node.id(), id, value->second.label()));
 
-            // Send changes.
-            auto val = translateAwCRDTtoICE(visited_node.id(), delta);
-            dsrpub.write(&val);
+                    //Necesitamos una copia?
+                    visited_node.fano().erase(toKey);
+                    auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
+                    edges.emplace_back(make_tuple(visited_node.id(), id, toKey.key()));
+
+                    //edges.emplace_back(make_tuple(visited_node.id(), id, value->second.label()));
+
+                    // Send changes.
+                    auto val = translateAwCRDTtoICE(visited_node.id(), delta);
+                    dsrpub.write(&val);
+                }
+            }
         }
         return make_pair(true,  edges);
     } catch(const std::exception &e){
@@ -211,25 +216,38 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
 /*
  * EDGE METHODS
  */
-EdgeAttribs CRDTGraph::get_edge(const std::string& from, const std::string& to) {
+EdgeAttribs CRDTGraph::get_edge(const std::string& from, const std::string& to, const std::string& key) {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
-
     int id_from = get_id_from_name(from);
     int id_to = get_id_from_name(to);
+    return get_edge_(id_from, id_to, key);
+}
 
-    try { if(in(id_from) && in(id_to)) {
-            auto n = get(id_from);
-            auto edge = n.fano().find(id_to);
+
+EdgeAttribs CRDTGraph::get_edge(int from, int  to, const std::string& key) {
+    return get_edge_(from, to, key);
+}
+
+
+EdgeAttribs CRDTGraph::get_edge_(int from, int  to, const std::string& key) {
+    std::shared_lock<std::shared_mutex>  lock(_mutex);
+
+    try { if(in(from) && in(to)) {
+            auto n = get(from);
+            edgeKey ek;
+            ek.to(to);
+            ek.key(key);
+            auto edge = n.fano().find(ek);
             if (edge != n.fano().end()) {
                 return EdgeAttribs(edge->second);
             }
-            else {
-                std::cout <<"Error obteniedo edge from: "<< from  << " to: " << to << endl;
 
-                EdgeAttribs ea;
-                ea.label("error");
-                return ea;
-            }
+            std::cout <<"Error obteniedo edge from: "<< from  << " to: " << to <<" key " << key << endl;
+
+            EdgeAttribs ea;
+            ea.label("error");
+            return ea;
+
         }
     }
     catch(const std::exception &e){
@@ -249,12 +267,10 @@ bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
     try {
         if (in(from) && in(to)) {
             auto node = get_(from);
-            auto edge = node.fano().find(to);
-            if (edge != node.fano().end()) {
-                edge->second = attrs;
-            } else {
-                node.fano().insert(make_pair(to, attrs));
-            }
+            edgeKey ek;
+            ek.to(to);
+            ek.key(attrs.label());
+            node.fano().insert_or_assign(ek, attrs);
 
             node.agent_id(agent_id);
             insert_or_assign_node_(node);
@@ -311,14 +327,13 @@ bool CRDTGraph::delete_edge_(int from, int to) {
     try {
 
             auto node = get_(from);
-            auto edge = node.fano().find(to);
-            if (edge == node.fano().end()) { return false; }
-            node.fano().erase(edge);
-
+            for (const auto &[k,v] : node.fano()) {
+                if (k.to() == to) {
+                    node.fano().erase(k);
+                }
+            }
             node.agent_id(agent_id);
             insert_or_assign_node_(node);
-
-
     } catch (const std::exception &e) {
             std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                       << std::endl;
@@ -461,14 +476,26 @@ bool CRDTGraph::empty(const int &id) {
 
 void CRDTGraph::join_delta_node(AworSet aworSet) {
     try{
+        bool signal = false;
         auto d = translateAwICEtoCRDT(aworSet);
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             nodes[aworSet.id()].join_replace(d);
-            name_map[nodes[aworSet.id()].dots().ds.rbegin()->second.name()] = aworSet.id();
-            id_map[aworSet.id()] = nodes[aworSet.id()].dots().ds.rbegin()->second.name();
+            if (nodes[aworSet.id()].dots().ds.size() == 0) {
+                nodes.erase(aworSet.id());
+                name_map.erase(id_map[aworSet.id()]);
+                id_map.erase(aworSet.id());
+            } else {
+                signal = true;
+                name_map[nodes[aworSet.id()].dots().ds.rbegin()->second.name()] = aworSet.id();
+                id_map[aworSet.id()] = nodes[aworSet.id()].dots().ds.rbegin()->second.name();
+            }
         }
-        emit update_node_signal(aworSet.id(), d.dots().ds.rbegin()->second.type());
+        if (signal)
+            emit update_node_signal(aworSet.id(), d.dots().ds.rbegin()->second.type());
+        else
+            emit del_node_signal(aworSet.id());
+
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 
 }
@@ -1205,20 +1232,20 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
         symbolsArray.push_back(symbol);
         //link
         for (const auto &[key, value]: node.fano()){
-            QJsonObject link;
-            link["src"] = QString::number(value.from());
-            link["dst"] = QString::number(value.to());
-            link["label"] = QString::fromStdString(value.label());
-            // link attribute
-            QJsonArray lattrsArray;
-            for (const auto &[key, value]: value.attrs())
-            {
-                QJsonObject attr;
-                attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
-                lattrsArray.push_back(attr); 
-            }
-            link["linkAttribute"] = lattrsArray;
-            linksArray.push_back(link);
+                QJsonObject link;
+                link["src"] = QString::number(value.from());
+                link["dst"] = QString::number(value.to());
+                link["label"] = QString::fromStdString(value.label());
+                // link attribute
+                QJsonArray lattrsArray;
+                for (const auto &[key, value]: value.attrs()) {
+                    QJsonObject attr;
+                    attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+                    lattrsArray.push_back(attr);
+                }
+                link["linkAttribute"] = lattrsArray;
+                linksArray.push_back(link);
+
         }
     }
     dsrObject["symbol"] = symbolsArray;

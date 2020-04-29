@@ -88,7 +88,9 @@ public:
 	// typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
     //Edges
-    EdgeAttribs get_edge(const std::string& from, const std::string& to);
+    EdgeAttribs get_edge(const std::string& from, const std::string& to, const std::string& key);
+    EdgeAttribs get_edge(int from, int to, const std::string& key);
+
     bool insert_or_assign_edge(const EdgeAttribs& attrs);
     bool delete_edge(const std::string& from, const std::string& t);
     bool delete_edge(int from, int t);
@@ -150,6 +152,7 @@ private:
     bool insert_or_assign_node_(const N &node);
     std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
     bool delete_edge_(int from, int t);
+    EdgeAttribs get_edge_(int from, int to, const std::string& key);
 
 
     int id();

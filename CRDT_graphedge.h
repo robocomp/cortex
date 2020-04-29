@@ -72,7 +72,7 @@ class DoRTStuff : public  QTableWidget
           std::string n_from = graph->get_name_from_id(from);
           std::string n_to = graph->get_name_from_id(to);
 
-          EdgeAttribs ea = graph->get_edge(n_from, n_to);
+          EdgeAttribs ea = graph->get_edge(n_from, n_to, "RT");
 
           auto value = ea.attrs().find("RT");
           if (value != ea.attrs().end()) {
