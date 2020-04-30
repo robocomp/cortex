@@ -1169,14 +1169,43 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             std::string attr_key = attr_obj.value("key").toString().toStdString();
             std::string attr_value = attr_obj.value("value").toString().toStdString();
 
+            auto val = string_to_mtypes(attr_key,attr_value);
+
             AttribValue av;
-            av.type("string");
-            av.value(attr_value);
-            av.length(1);
+            av.type(val.index());
+            Val value;
+            switch(val.index()) {
+                case 0:
+                    value.str(std::get<std::string>(val));
+                    av.value( value);
+                    break;
+                case 1:
+                    value.dec(std::get<std::int32_t>(val));
+                    av.value( value);
+                    break;
+                case 2:
+                    value.fl(std::get<float>(val));
+                    av.value( value);
+                    break;
+                case 3:
+                    value.float_vec(std::get<std::vector<float>>(val));
+                    av.value( value);
+                    break;
+                case 4:
+                    value.rtmat( std::get<RTMat>(val).toVector().toStdVector() );
+                    av.value(value);
+                    break;
+            }
+
+            //av.value(std::string((char *)attr_value));
             av.key(attr_key);
             attrs[attr_key] = av;
         }
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
+
+
+
+
 
         EdgeAttribs ea;
         ea.from(srcn);
@@ -1184,15 +1213,17 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         ea.label(edgeName);
         std::map<string, AttribValue> attrs_edge;
 
-        auto val = mtype_to_icevalue(edgeName);
-        AttribValue av = AttribValue();
+        //auto val = mtype_to_icevalue(edgeName);
+        Val val;
+        val.str(edgeName);
 
-        av.type(std::get<0>(val));
-        av.value( std::get<1>(val));
-        av.length(std::get<2>(val));
+        AttribValue av = AttribValue();
+        av.type(STRING);
+        av.value( val);
         av.key("name");
 
         attrs["name"] = av;
+
 
         if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
         {
@@ -1204,12 +1235,12 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
             for(auto &[key, v] : attrs)
             {
-                if(key=="tx")	tx = std::stof(v.value());
-                if(key=="ty")	ty = std::stof(v.value());
-                if(key=="tz")	tz = std::stof(v.value());
-                if(key=="rx")	rx = std::stof(v.value());
-                if(key=="ry")	ry = std::stof(v.value());
-                if(key=="rz")	rz = std::stof(v.value());
+                if(key=="tx")	tx = v.value().fl();
+                if(key=="ty")	ty = v.value().fl();
+                if(key=="tz")	tz = v.value().fl();
+                if(key=="rx")	rx = v.value().fl();
+                if(key=="ry")	ry = v.value().fl();
+                if(key=="rz")	rz = v.value().fl();
             }
             rt.set(rx, ry, rz, tx, ty, tz);
             //rt.print("in reader");
@@ -1248,8 +1279,44 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
         QJsonArray attrsArray;
         for (const auto &[key, value]: node.attrs())
         {
+            std::ostringstream vf;
+
             QJsonObject attr;
-            attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+            std::string val;
+            switch (value.value()._d()) {
+                case 0:
+                    val = value.value().str();
+                    break;
+                case 1:
+                    val = std::to_string(value.value().dec());
+                    break;
+                case 2:
+                    val = std::to_string(value.value().fl());
+                    break;
+                case 3:
+                    if (!value.value().float_vec().empty())
+                    {
+                        std::copy(value.value().float_vec().begin(), value.value().float_vec().end()-1,
+                                  std::ostream_iterator<float>(vf, ", "));
+
+                        vf << value.value().float_vec().back();
+                    }
+                    val = vf.str();
+                    break;
+                case 4:
+                    if (!value.value().rtmat().empty())
+                    {
+                        std::copy(value.value().rtmat().begin(), value.value().rtmat().end()-1,
+                                  std::ostream_iterator<float>(vf, ", "));
+
+                        vf << value.value().rtmat().back();
+                    }
+                    val = vf.str();
+                    break;
+            }
+
+
+            attr[QString::fromStdString(key)] = QString::fromStdString(val);
             attrsArray.push_back(attr);
         }
         symbol["attribute"] = attrsArray;
@@ -1263,8 +1330,42 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                 // link attribute
                 QJsonArray lattrsArray;
                 for (const auto &[key, value]: value.attrs()) {
+                    std::ostringstream vf;
+
                     QJsonObject attr;
-                    attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+                    std::string val;
+                    switch (value.value()._d()) {
+                        case 0:
+                            val = value.value().str();
+                            break;
+                        case 1:
+                            val = std::to_string(value.value().dec());
+                            break;
+                        case 2:
+                            val = std::to_string(value.value().fl());
+                            break;
+                        case 3:
+                            if (!value.value().float_vec().empty())
+                            {
+                                std::copy(value.value().float_vec().begin(), value.value().float_vec().end()-1,
+                                          std::ostream_iterator<float>(vf, ", "));
+
+                                vf << value.value().float_vec().back();
+                            }
+                            val = vf.str();
+                            break;
+                        case 4:
+                            if (!value.value().rtmat().empty())
+                            {
+                                std::copy(value.value().rtmat().begin(), value.value().rtmat().end()-1,
+                                          std::ostream_iterator<float>(vf, ", "));
+
+                                vf << value.value().rtmat().back();
+                            }
+                            val = vf.str();
+                            break;
+                    }
+                    attr[QString::fromStdString(key)] = QString::fromStdString(val);
                     lattrsArray.push_back(attr);
                 }
                 link["linkAttribute"] = lattrsArray;
