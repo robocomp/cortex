@@ -7,6 +7,9 @@
 
 #include <iostream>
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
+
 #include <chrono>
 #include <thread>
 
@@ -49,7 +52,14 @@ using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float
 using IDType = std::int32_t;
 using Attribs = std::unordered_map<std::string, MTypes>;
 
-
+struct pair_hash
+{
+    template <class T1, class T2>
+    std::size_t operator() (const std::pair<T1, T2> &pair) const
+    {
+      return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+    }
+};
 
 /////////////////////////////////////////////////////////////////
 /// CRDT API
@@ -77,7 +87,9 @@ public:
 	void read_from_json_file(const std::string &json_file_path);
     void write_to_json_file(const std::string &json_file_path);
     bool empty(const int &id);
-
+    void print();
+    std::map<long,Node> getCopy() const;
+    std::vector<long> getKeys() const;
 
     // Nodes
     Node get_node(const std::string& name);
@@ -85,16 +97,22 @@ public:
     bool insert_or_assign_node(const N &node);
     bool delete_node(const std::string &name);
     bool delete_node(int id);
-    // typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
-	// typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
+
+    std::vector<Node> get_nodes_by_type(const std::string& type);
+
+    typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
+	typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
     //Edges
     EdgeAttribs get_edge(const std::string& from, const std::string& to, const std::string& key);
     EdgeAttribs get_edge(int from, int to, const std::string& key);
 
     bool insert_or_assign_edge(const EdgeAttribs& attrs);
-    bool delete_edge(const std::string& from, const std::string& t);
-    bool delete_edge(int from, int t);
+    bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
+    bool delete_edge(int from, int t, const std::string& key);
+
+    std::vector<EdgeAttribs> get_edges_by_type(const std::string& type);
+    std::vector<EdgeAttribs> get_edges_to_id(int id);
 
     std::string get_name_from_id(std::int32_t id);
     int get_id_from_name(const std::string &name);
@@ -199,21 +217,32 @@ private:
     std::string agent_name;
     const int agent_id;
 
-    std::map<string, int> name_map;     // mapping between name and id of nodes
-    std::map<int, string> id_map;
+    /**
+     * Indices.
+     * */
+    std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
+    std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
+    std::unordered_map<pair<int, int>, std::unordered_set<std::string>, pair_hash> edges;      // collection with all graph edges. ((from, to), key)
+    std::unordered_map<std::string, std::unordered_set<pair<int, int>, pair_hash>> edgeType;  // collection with all edge types.
+    std::unordered_map<std::string, std::unordered_set<int>> nodeType;  // collection with all node types.
+    void update_maps_node_change(bool insert, int id);
+    void update_maps_edge_change(bool insert, int from, int to, const std::string& key);
 
+    /*
+     * Non-blocking graph operations
+     * */
     bool in(const int &id);
     N get_(int id);
     bool insert_or_assign_node_(const N &node);
     std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
-    bool delete_edge_(int from, int t);
+    bool delete_edge_(int from, int t, const std::string& key);
     EdgeAttribs get_edge_(int from, int to, const std::string& key);
 
 
     int id();
     DotContext context();
     std::map<int, AworSet> Map();
-    
+
     void join_delta_node(AworSet aworSet);
     void join_full_graph(OrMap full_graph);
 

@@ -74,27 +74,22 @@ public:
 
     bool operator<(const Val &rhs) const {
 
-        if (m__d < rhs.m__d)
-            return true;
-        if (rhs.m__d < m__d)
-            return false;
-        if (m_str < rhs.m_str)
-            return true;
-        if (rhs.m_str < m_str)
-            return false;
-        if (m_dec < rhs.m_dec)
-            return true;
-        if (rhs.m_dec < m_dec)
-            return false;
-        if (m_fl < rhs.m_fl)
-            return true;
-        if (rhs.m_fl < m_fl)
-            return false;
-        if (m_float_vec < rhs.m_float_vec)
-            return true;
-        if (rhs.m_float_vec < m_float_vec)
-            return false;
-        return m_rtmat < rhs.m_rtmat;
+        if (m__d != rhs.m__d) return false;
+
+        switch(m__d) {
+            case 0:
+                return m_str < rhs.m_str;
+            case 1:
+                return m_dec < rhs.m_dec;
+            case 2:
+                return m_fl < rhs.m_fl;
+            case 3:
+                return m_float_vec < rhs.m_float_vec;
+            case 4:
+                return m_rtmat < rhs.m_rtmat;
+            default:
+                return false;
+        }
     }
 
     bool operator>(const Val &rhs) const {
@@ -110,13 +105,23 @@ public:
     }
 
     bool operator==(const Val &rhs) const {
-        //TODO:Esto puede jacerse mejor
-        return m__d == rhs.m__d &&
-               m_str == rhs.m_str &&
-               m_dec == rhs.m_dec &&
-               m_fl == rhs.m_fl &&
-               m_float_vec == rhs.m_float_vec &&
-               m_rtmat == rhs.m_rtmat;
+
+        if (m__d != rhs.m__d) return false;
+
+        switch(m__d) {
+            case 0:
+                return m_str == rhs.m_str;
+            case 1:
+                return m_dec == rhs.m_dec;
+            case 2:
+                return m_fl == rhs.m_fl;
+            case 3:
+                return m_float_vec == rhs.m_float_vec;
+            case 4:
+                return m_rtmat == rhs.m_rtmat;
+            default:
+                return false;
+        }
     }
 
     bool operator!=(const Val &rhs) const {
