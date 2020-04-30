@@ -121,7 +121,7 @@ public:
     ///  Viewer
     //////////////////////////////////////////////////////
     Nodes get();
-    N get(int id);
+
     
     // gets a const node ref and searches an attrib by name. With a map should be constant time.
 
@@ -136,7 +136,8 @@ public:
             }
 
             AttribValue av;
-            av.type(STRING);
+            //av.type(STRING);
+            av.type(-1);
             Val v;
             v.str("unkown");
             av.value(v);
@@ -154,7 +155,7 @@ public:
                           << "-> " << n.to() << std::endl;
             }
             AttribValue av;
-            av.type(STRING);
+            av.type(-1);
             Val v;
             v.str("unkown");
             av.value(v);
@@ -169,16 +170,30 @@ public:
     template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<EdgeAttribs, Type>::value, Type>>
     Ta get_attrib_by_name(Type& n, const std::string &key) {
         AttribValue av = get_attrib_by_name_(n, key);
-        if constexpr (std::is_same<Ta, std::string>::value) return av.value().str();
-        if constexpr (std::is_same<Ta, std::int32_t>::value) return av.value().dec();
-        if constexpr (std::is_same<Ta, float>::value) return av.value().fl();
+        bool err = (av.type() == -1);
+        if constexpr (std::is_same<Ta, std::string>::value) {
+            if (err) return "error";
+            return av.value().str();
+        }
+        if constexpr (std::is_same<Ta, std::int32_t>::value){
+            if (err) return -1;
+
+            return av.value().dec();
+        }
+        if constexpr (std::is_same<Ta, float>::value) {
+            if (err) return 0.0;
+
+            return av.value().fl();
+        }
         if constexpr (std::is_same<Ta, std::vector<float>>::value)
         {
+            if (err) return {};
+
             if (key == "RT" || key == "RTMat") return av.value().rtmat();
             return av.value().float_vec();
         }
-        if constexpr (std::is_same<Ta, std::array<float, 16>>::value) return av.value().rtmat();
         if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
+            if (err) return RTMat();
             return RTMat { QMat{ av.value().rtmat()} } ;
         }
 
@@ -225,12 +240,13 @@ private:
     std::unordered_map<pair<int, int>, std::unordered_set<std::string>, pair_hash> edges;      // collection with all graph edges. ((from, to), key)
     std::unordered_map<std::string, std::unordered_set<pair<int, int>, pair_hash>> edgeType;  // collection with all edge types.
     std::unordered_map<std::string, std::unordered_set<int>> nodeType;  // collection with all node types.
-    void update_maps_node_change(bool insert, int id);
+    void update_maps_node_change(bool insert, int id, const Node& n);
     void update_maps_edge_change(bool insert, int from, int to, const std::string& key);
 
     /*
      * Non-blocking graph operations
      * */
+    N get(int id);
     bool in(const int &id);
     N get_(int id);
     bool insert_or_assign_node_(const N &node);

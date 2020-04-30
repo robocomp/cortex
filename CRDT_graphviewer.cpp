@@ -91,27 +91,19 @@ void GraphViewer::createGraph()
 {
 // 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
 	try {
-		for(auto node : gcrdt->get().getMap()) // Aworset
+	    auto map = gcrdt->getCopy();
+		for(auto node : map)
 		{
 			try
 			{
-			    if (node.second.dots().ds.size() > 0)
-				    addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.second.dots().ds.rbegin()->second));
+			   addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.second));
 			}
 			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
 		}
 		// add edges after all nodes have been created
-		for(auto node : gcrdt->get().getMap()) // Aworset
+		for(auto node : map) // Aworset
 		{
-            if (node.second.dots().ds.size() == 0) { continue; }
-//			std::cout << "Edges from "<<node.second.readAsList().back().id<<std::endl;
-			std::list<Node> ns;
-			try
-			{
-				ns = node.second.readAsList();
-			}
-			catch(const std::exception &e) { std::cout << e.what() <<" Error accessing edge" << node.second.readAsList().back() <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
-			for(const auto &[k, edges] :ns.back().fano())
+           	for(const auto &[k, edges] : node.second.fano())
 			{
 				    try{
 					    addEdgeSLOT(edges.from(), edges.to(), edges.label());

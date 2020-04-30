@@ -90,6 +90,7 @@ Node CRDTGraph::get_node(int id)
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
 {
+    if (node.id() == -1) return false;
     bool r;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -103,6 +104,7 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
 bool CRDTGraph::insert_or_assign_node_(const N &node)
 {
     try {
+
         if (nodes[node.id()].getNodesSimple(node.id()).first == node) {
             count++;
             //std::cout << "Skip node insertion: " << node.id() << " skipped: " << count << std::endl;
@@ -110,7 +112,7 @@ bool CRDTGraph::insert_or_assign_node_(const N &node)
         }
         count = 0;
         aworset<Node, int> delta = nodes[node.id()].add(node, node.id());
-        update_maps_node_change(true, node.id());
+        update_maps_node_change(true, node.id(), node);
         //name_map[node.name()] = node.id();
         //id_map[node.id()] = node.name();
 
@@ -193,7 +195,7 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
         auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
         auto val = translateAwCRDTtoICE(id, delta);
         dsrpub.write(&val);
-        update_maps_node_change(false, id);
+        update_maps_node_change(false, id, node);
 
         //2. search and remove edges.
         //For each node check if there is an edge to remove.
@@ -256,7 +258,7 @@ EdgeAttribs CRDTGraph::get_edge_(int from, int  to, const std::string& key)
     std::shared_lock<std::shared_mutex>  lock(_mutex);
 
     try { if(in(from) && in(to)) {
-            auto n = get(from);
+            auto n = get_(from);
             edgeKey ek;
             ek.to(to);
             ek.key(key);
@@ -514,13 +516,13 @@ std::string CRDTGraph::get_node_type(Node& n)
     return "error";
 }
 
-void CRDTGraph::update_maps_node_change(bool insert, int id)
+inline void CRDTGraph::update_maps_node_change(bool insert, int id, const Node& n)
 {
     if (insert) {
         name_map[nodes[id].dots().ds.rbegin()->second.name()] = id;
         id_map[id] = nodes[id].dots().ds.rbegin()->second.name();
-
         nodeType[nodes[id].dots().ds.rbegin()->second.type()].insert(id);
+
         for (const auto &[k,v] : nodes[id].dots().ds.rbegin()->second.fano()) {
             edges[{k.to(), id}].insert(k.key());
             edgeType[k.key()].insert({id, k.to()});
@@ -528,9 +530,10 @@ void CRDTGraph::update_maps_node_change(bool insert, int id)
     } else {
         name_map.erase(id_map[id]);
         id_map.erase(id);
-        nodeType[nodes[id].dots().ds.rbegin()->second.type()].erase(id);
+        if (nodeType.find(n.type()) != nodeType.end())
+            nodeType[n.type()].erase(id);
 
-        for (const auto &[k,v] : nodes[id].dots().ds.rbegin()->second.fano()) {
+        for (const auto &[k,v] : n.fano()) {
             edges[{k.to(), id}].erase(k.key());
             edgeType[k.key()].erase({id, k.to()});
         }
@@ -539,7 +542,7 @@ void CRDTGraph::update_maps_node_change(bool insert, int id)
 }
 
 
-void CRDTGraph::update_maps_edge_change(bool insert, int from, int to, const std::string& key)
+inline void CRDTGraph::update_maps_edge_change(bool insert, int from, int to, const std::string& key)
 {
     if (insert) {
         edges[{from, to}].insert(key);
@@ -598,10 +601,10 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
             std::unique_lock<std::shared_mutex> lock(_mutex);
             nodes[aworSet.id()].join_replace(d);
             if (nodes[aworSet.id()].dots().ds.size() == 0) {
-                update_maps_node_change(false, aworSet.id());
+                update_maps_node_change(false, aworSet.id(), aworSet.dk().ds().rbegin()->second);
             } else {
                 signal = true;
-                update_maps_node_change(true, aworSet.id());
+                update_maps_node_change(true, aworSet.id(), aworSet.dk().ds().rbegin()->second);
             }
         }
         if (signal)
@@ -845,7 +848,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
             {
 
-                Node n = get(b);
+                Node n = get_node(b);
 
 
                 add_attrib(n.attrs(),"level", get_node_level(n)+1);
@@ -870,7 +873,7 @@ void CRDTGraph::read_from_file(const std::string &file_name)
             }
             else
             {
-                Node n = get(b);
+                Node n = get_node(b);
                 add_attrib(n.attrs(),"parent",0);
                 insert_or_assign_node(n);
                 for(auto &[k,v] : attrs)
@@ -1246,6 +1249,10 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         std::string type = sym_obj.value("type").toString().toStdString();
         std::string name = sym_obj.value("name").toString().toStdString();
         //AGMModelSymbol::SPtr s = newSymbol(id), type);
+        if (id == -1) {
+            std::cout << __FILE__ << " " << __FUNCTION__ << " Invalid ID Node: " << std::to_string(id);
+            continue;
+        }
         std::cout << __FILE__ << " " << __FUNCTION__ << ", Node: " << std::to_string(id) << " " <<  type << std::endl;
         Node n;
         n.type(type);
@@ -1254,6 +1261,8 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         n.name(name);
         name_map[name] = id;
         id_map[id] = name;
+
+
 
         std::map<string, AttribValue> attrs;
         add_attrib(attrs, "level",std::int32_t(0));
@@ -1289,9 +1298,9 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
                 n.name(attr_value.toStdString());
                 add_attrib(attrs, attr_key, attr_value.toStdString());
             }
-            else
+            else {
                 add_attrib(attrs, attr_key, attr_value.toStdString());
-
+            }
         }
         n.attrs(attrs);
         insert_or_assign_node(n);
@@ -1373,7 +1382,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 
         if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
         {
-            Node n = get(dstn);
+            Node n = get_node(dstn);
 
             add_attrib(n.attrs(),"level", get_node_level(n)+1);
             add_attrib(n.attrs(),"parent", srcn);
@@ -1396,7 +1405,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         }
         else
         {
-            Node n = get(dstn);
+            Node n = get_node(dstn);
             add_attrib(n.attrs(),"parent",0);
             insert_or_assign_node(n);
             for(auto &[k,v] : attrs)
