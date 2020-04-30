@@ -34,11 +34,16 @@
     };
 
     struct EdgeAttribs {
-		string label;
+		string label; //key2
 		long from;
-        long to; //key
+        long to; //key1
 		map<string, AttribValue>    attrs;
 	};
+
+    struct edgeKey {
+        long to;
+        string key;
+    };
 
 
     struct Node {

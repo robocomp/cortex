@@ -74,6 +74,8 @@ public:
 
     // Utils
     void read_from_file(const std::string &xml_file_path);
+	void read_from_json_file(const std::string &json_file_path);
+    void write_to_json_file(const std::string &json_file_path);
     bool empty(const int &id);
 
 
@@ -83,11 +85,16 @@ public:
     bool insert_or_assign_node(const N &node);
     bool delete_node(const std::string &name);
     bool delete_node(int id);
+    // typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
+	// typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
     //Edges
-    EdgeAttribs get_edge(const std::string& from, const std::string& to);
+    EdgeAttribs get_edge(const std::string& from, const std::string& to, const std::string& key);
+    EdgeAttribs get_edge(int from, int to, const std::string& key);
+
     bool insert_or_assign_edge(const EdgeAttribs& attrs);
     bool delete_edge(const std::string& from, const std::string& t);
+    bool delete_edge(int from, int t);
 
     std::string get_name_from_id(std::int32_t id);
     int get_id_from_name(const std::string &name);
@@ -199,6 +206,8 @@ private:
     N get_(int id);
     bool insert_or_assign_node_(const N &node);
     std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
+    bool delete_edge_(int from, int t);
+    EdgeAttribs get_edge_(int from, int to, const std::string& key);
 
 
     int id();

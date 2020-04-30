@@ -168,9 +168,9 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
         auto node = get_(id);
         //Aunque el id no sea -1 el nodo puede no existir.
         if (node.id() == -1) return make_pair(false, edges);
-        for (auto v : node.fano()) { // Delete all edges from this node.
-            std::cout << id << " -> " << v.first << std::endl;
-            edges.emplace_back(make_tuple(id, v.first, v.second.label()));
+        for (const auto &v : node.fano()) { // Delete all edges from this node.
+            std::cout << id << " -> " << v.first.to() << " " << v.first.key() << std::endl;
+             edges.emplace_back(make_tuple(id, v.first.to(), v.first.key()));
         }
         // Get remove delta.
         auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
@@ -184,19 +184,24 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
         //For each node check if there is an edge to remove.
         for (auto [k, v] : nodes.getMapRef()) {
             //get the actual value of a node.
+
             auto visited_node =  Node(v.dots().ds.rbegin()->second);
-            auto value = visited_node.fano().find(id);
-            //if nodes are not connected continue.
-            if (value == visited_node.fano().end())  continue;
+            for (const auto &[toKey, val] : visited_node.fano()) {
+                if (toKey.to() == id) {
 
-            //Necesitamos una copia?
-            visited_node.fano().erase(value);
-            auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
-            edges.emplace_back(make_tuple(visited_node.id(), id, value->second.label()));
 
-            // Send changes.
-            auto val = translateAwCRDTtoICE(visited_node.id(), delta);
-            dsrpub.write(&val);
+                    //Necesitamos una copia?
+                    visited_node.fano().erase(toKey);
+                    auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
+                    edges.emplace_back(make_tuple(visited_node.id(), id, toKey.key()));
+
+                    //edges.emplace_back(make_tuple(visited_node.id(), id, value->second.label()));
+
+                    // Send changes.
+                    auto val = translateAwCRDTtoICE(visited_node.id(), delta);
+                    dsrpub.write(&val);
+                }
+            }
         }
         return make_pair(true,  edges);
     } catch(const std::exception &e){
@@ -211,25 +216,38 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
 /*
  * EDGE METHODS
  */
-EdgeAttribs CRDTGraph::get_edge(const std::string& from, const std::string& to) {
+EdgeAttribs CRDTGraph::get_edge(const std::string& from, const std::string& to, const std::string& key) {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
-
     int id_from = get_id_from_name(from);
     int id_to = get_id_from_name(to);
+    return get_edge_(id_from, id_to, key);
+}
 
-    try { if(in(id_from) && in(id_to)) {
-            auto n = get(id_from);
-            auto edge = n.fano().find(id_to);
+
+EdgeAttribs CRDTGraph::get_edge(int from, int  to, const std::string& key) {
+    return get_edge_(from, to, key);
+}
+
+
+EdgeAttribs CRDTGraph::get_edge_(int from, int  to, const std::string& key) {
+    std::shared_lock<std::shared_mutex>  lock(_mutex);
+
+    try { if(in(from) && in(to)) {
+            auto n = get(from);
+            edgeKey ek;
+            ek.to(to);
+            ek.key(key);
+            auto edge = n.fano().find(ek);
             if (edge != n.fano().end()) {
                 return EdgeAttribs(edge->second);
             }
-            else {
-                std::cout <<"Error obteniedo edge from: "<< from  << " to: " << to << endl;
 
-                EdgeAttribs ea;
-                ea.label("error");
-                return ea;
-            }
+            std::cout <<"Error obteniedo edge from: "<< from  << " to: " << to <<" key " << key << endl;
+
+            EdgeAttribs ea;
+            ea.label("error");
+            return ea;
+
         }
     }
     catch(const std::exception &e){
@@ -247,21 +265,18 @@ bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
     int to = attrs.to();
 
     try {
-        if (in(from)  && in(to)) {
+        if (in(from) && in(to)) {
             auto node = get_(from);
-            auto edge = node.fano().find(to);
-            if (edge != node.fano().end()) {
-                edge->second = attrs;
-            } else {
-                node.fano().insert(make_pair(to, attrs));
-            }
+            edgeKey ek;
+            ek.to(to);
+            ek.key(attrs.label());
+            node.fano().insert_or_assign(ek, attrs);
 
             node.agent_id(agent_id);
             insert_or_assign_node_(node);
 
-        }
-            else {
-                std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
+        } else {
+            //std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
             return false;
         }
     }
@@ -275,35 +290,63 @@ bool CRDTGraph::insert_or_assign_edge(const EdgeAttribs& attrs) {
 }
 
 
+bool CRDTGraph::delete_edge(int from, int to) {
+
+    bool result;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (!in(from) || !in(to)) return false;
+        result = delete_edge_(from, to);
+    }
+
+    if (result)
+            emit update_edge_signal(from, to);
+    return result;
+}
+
 bool CRDTGraph::delete_edge(const std::string& from, const std::string& to) {
     int id_from = 0;
     int id_to = 0;
-    try {
+    bool result;
+    {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         id_from = get_id_from_name(from);
         id_to = get_id_from_name(to);
 
-        if (in(id_from) && in(id_to)) {
-            auto node = get_(id_from);
-            auto edge = node.fano().find(id_to);
-            if (edge == node.fano().end()) { return false; }
-            node.fano().erase(edge);
+        if (id_from == -1 || id_to == -1) return false;
+        result = delete_edge_(id_from, id_to);
+    }
 
+    if (result)
+        emit update_edge_signal(id_from, id_to);
+    return result;
+}
+
+bool CRDTGraph::delete_edge_(int from, int to) {
+
+    try {
+
+            auto node = get_(from);
+            for (const auto &[k,v] : node.fano()) {
+                if (k.to() == to) {
+                    node.fano().erase(k);
+                }
+            }
             node.agent_id(agent_id);
             insert_or_assign_node_(node);
-
-        } else { return false; }
     } catch (const std::exception &e) {
             std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                       << std::endl;
             return false;
-        };
+    };
 
-    emit update_edge_signal(id_from, id_to);
 
     return true;
 
 }
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -312,6 +355,7 @@ Nodes CRDTGraph::get() {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return nodes;
 }
+
 
 
 N CRDTGraph::get(int id) {
@@ -405,14 +449,26 @@ bool CRDTGraph::empty(const int &id) {
 
 void CRDTGraph::join_delta_node(AworSet aworSet) {
     try{
+        bool signal = false;
         auto d = translateAwICEtoCRDT(aworSet);
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             nodes[aworSet.id()].join_replace(d);
-            name_map[nodes[aworSet.id()].dots().ds.rbegin()->second.name()] = aworSet.id();
-            id_map[aworSet.id()] = nodes[aworSet.id()].dots().ds.rbegin()->second.name();
+            if (nodes[aworSet.id()].dots().ds.size() == 0) {
+                nodes.erase(aworSet.id());
+                name_map.erase(id_map[aworSet.id()]);
+                id_map.erase(aworSet.id());
+            } else {
+                signal = true;
+                name_map[nodes[aworSet.id()].dots().ds.rbegin()->second.name()] = aworSet.id();
+                id_map[aworSet.id()] = nodes[aworSet.id()].dots().ds.rbegin()->second.name();
+            }
         }
-        emit update_node_signal(aworSet.id(), d.dots().ds.rbegin()->second.type());
+        if (signal)
+            emit update_node_signal(aworSet.id(), d.dots().ds.rbegin()->second.type());
+        else
+            emit del_node_signal(aworSet.id());
+
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 
 }
@@ -420,16 +476,13 @@ void CRDTGraph::join_delta_node(AworSet aworSet) {
 void CRDTGraph::join_full_graph(OrMap full_graph) 
 {
     vector<pair<int, std::string>> updates;
-
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
         std::set<pair<int, int>> s;
         for (auto &v : full_graph.cbase().dc())
             s.emplace(std::make_pair(v.first(), v.second()));
-        //dotcontext_aux.setContext(m, s);
         nodes.context().setContext(m, s);
-
 
         for (auto &[k, val] : full_graph.m()) {
             auto awor = translateAwICEtoCRDT(val);
@@ -441,8 +494,8 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             }
         }
     }
-     for (auto &[id, type] : updates)
-         emit update_node_signal(id, type);
+    for (auto &[id, type] : updates)
+            emit update_node_signal(id, type);
 }
 
 
@@ -862,7 +915,7 @@ void CRDTGraph::fullgraph_request_thread() {
         sleep(1);
     }
     eprosima::fastrtps::Domain::removeSubscriber(dsrsub_request_answer.getSubscriber());
-    start_subscription_thread(true);
+    //start_subscription_thread(true);
 
 }
 
@@ -1020,3 +1073,216 @@ void CRDTGraph::add_attrib(std::map<string, AttribValue> &v, std::string att_nam
 
 
 
+
+
+void CRDTGraph::read_from_json_file(const std::string &json_file_path)
+{
+    std::cout << __FUNCTION__ << " Reading json file: " << json_file_path << std::endl;
+
+    // Open file and make initial checks
+    QFile file;
+    file.setFileName(QString::fromStdString(json_file_path));
+    if (not file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        fprintf(stderr,"Can't open JSON file, check file provided. \n");
+        exit(1);
+    }
+    QString val = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(val.toUtf8());
+    QJsonObject jObject = doc.object();
+
+    QJsonObject dsrobject = jObject.value("DSRModel").toObject();
+	QJsonArray symbolArray = dsrobject.value("symbol").toArray();
+
+    // Read symbols (just symbols, then links in other loop)
+    foreach (const QJsonValue & symbolValue, symbolArray)
+    {
+        QJsonObject sym_obj = symbolValue.toObject();
+        int id = sym_obj.value("id").toString().toInt();
+        std::string type = sym_obj.value("type").toString().toStdString();
+        std::string name = sym_obj.value("name").toString().toStdString();
+        //AGMModelSymbol::SPtr s = newSymbol(id), type);
+        std::cout << __FILE__ << " " << __FUNCTION__ << ", Node: " << std::to_string(id) << " " <<  type << std::endl;
+        Node n;
+        n.type(type);
+        n.id(id);
+        n.agent_id(agent_id);
+        n.name(name);
+        name_map[name] = id;
+        id_map[id] = name;
+
+        std::map<string, AttribValue> attrs;
+        add_attrib(attrs, "level",std::int32_t(0));
+        add_attrib(attrs, "parent",std::int32_t(0));
+
+        std::string full_name = type + " [" + std::to_string(id) + "]";
+        add_attrib(attrs, "name",full_name);
+
+        // color selection
+        std::string color = "coral";
+        if(type == "world") color = "SeaGreen";
+        else if(type == "transform") color = "SteelBlue";
+        else if(type == "plane") color = "Khaki";
+        else if(type == "differentialrobot") color = "GoldenRod";
+        else if(type == "laser") color = "GreenYellow";
+        else if(type == "mesh") color = "LightBlue";
+        else if(type == "imu") color = "LightSalmon";
+
+        add_attrib(attrs, "color", color);
+
+        // node atributes
+        QJsonArray attributesArray =  sym_obj.value("attribute").toArray();
+        foreach (const QJsonValue & attribValue, attributesArray)
+        {
+            QJsonObject attr_obj = attribValue.toObject();
+            std::string attr_key = attr_obj.value("key").toString().toStdString();
+            QString attr_value = attr_obj.value("value").toString();
+            if( attr_key == "level" or attr_key == "parent")
+                add_attrib(attrs, attr_key, attr_value.toInt());
+            else if( attr_key == "pos_x" or attr_key == "pos_y")
+                add_attrib(attrs, attr_key, attr_value.toFloat());
+            else
+                add_attrib(attrs, attr_key, attr_value.toStdString());
+
+        }
+        n.attrs(attrs);
+        insert_or_assign_node(n);
+    }
+
+    // Read links
+    QJsonArray linkArray = dsrobject.value("link").toArray();
+    foreach (const QJsonValue & linkValue, linkArray)
+    {
+        QJsonObject link_obj = linkValue.toObject();
+        int srcn = link_obj.value("src").toString().toInt();
+        int dstn = link_obj.value("dst").toString().toInt();
+        std::string edgeName = link_obj.value("label").toString().toStdString();
+
+        std::map<string, AttribValue> attrs;
+        // link atributes
+        QJsonArray attributesArray =  link_obj.value("linkAttribute").toArray();
+        foreach (const QJsonValue & attribValue, attributesArray)
+        {
+            QJsonObject attr_obj = attribValue.toObject();
+            std::string attr_key = attr_obj.value("key").toString().toStdString();
+            std::string attr_value = attr_obj.value("value").toString().toStdString();
+
+            AttribValue av;
+            av.type("string");
+            av.value(attr_value);
+            av.length(1);
+            av.key(attr_key);
+            attrs[attr_key] = av;
+        }
+        std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
+
+        EdgeAttribs ea;
+        ea.from(srcn);
+        ea.to(dstn);
+        ea.label(edgeName);
+        std::map<string, AttribValue> attrs_edge;
+
+        auto val = mtype_to_icevalue(edgeName);
+        AttribValue av = AttribValue();
+
+        av.type(std::get<0>(val));
+        av.value( std::get<1>(val));
+        av.length(std::get<2>(val));
+        av.key("name");
+
+        attrs["name"] = av;
+
+        if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
+        {
+            Node n = get(dstn);
+
+            add_attrib(n.attrs(),"level", get_node_level(n)+1);
+            add_attrib(n.attrs(),"parent", srcn);
+            RMat::RTMat rt;
+            float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
+            for(auto &[key, v] : attrs)
+            {
+                if(key=="tx")	tx = std::stof(v.value());
+                if(key=="ty")	ty = std::stof(v.value());
+                if(key=="tz")	tz = std::stof(v.value());
+                if(key=="rx")	rx = std::stof(v.value());
+                if(key=="ry")	ry = std::stof(v.value());
+                if(key=="rz")	rz = std::stof(v.value());
+            }
+            rt.set(rx, ry, rz, tx, ty, tz);
+            //rt.print("in reader");
+            add_attrib(attrs_edge, "RT", rt);
+            //this->add_edge_attrib(a, dstn,"RT",rt);
+            insert_or_assign_node(n);
+        }
+        else
+        {
+            Node n = get(dstn);
+            add_attrib(n.attrs(),"parent",0);
+            insert_or_assign_node(n);
+            for(auto &[k,v] : attrs)
+                attrs_edge[k] = v;
+        }
+        ea.attrs(attrs_edge);
+        insert_or_assign_edge(ea);
+
+    } //foreach(links)
+}
+
+void CRDTGraph::write_to_json_file(const std::string &json_file_path)
+{
+    //create json object
+    QJsonObject dsrObject;
+    QJsonArray linksArray;
+    QJsonArray symbolsArray;
+    for (auto kv : nodes.getMap()) {
+        Node node = kv.second.dots().ds.rbegin()->second;
+        // symbol data
+        QJsonObject symbol;
+        symbol["id"] = QString::number(node.id());
+        symbol["type"] = QString::fromStdString(node.type());
+        symbol["name"] = QString::fromStdString(node.name());
+        // symbol attribute
+        QJsonArray attrsArray;
+        for (const auto &[key, value]: node.attrs())
+        {
+            QJsonObject attr;
+            attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+            attrsArray.push_back(attr);
+        }
+        symbol["attribute"] = attrsArray;
+        symbolsArray.push_back(symbol);
+        //link
+        for (const auto &[key, value]: node.fano()){
+                QJsonObject link;
+                link["src"] = QString::number(value.from());
+                link["dst"] = QString::number(value.to());
+                link["label"] = QString::fromStdString(value.label());
+                // link attribute
+                QJsonArray lattrsArray;
+                for (const auto &[key, value]: value.attrs()) {
+                    QJsonObject attr;
+                    attr[QString::fromStdString(key)] = QString::fromStdString(value.value());
+                    lattrsArray.push_back(attr);
+                }
+                link["linkAttribute"] = lattrsArray;
+                linksArray.push_back(link);
+
+        }
+    }
+    dsrObject["symbol"] = symbolsArray;
+    dsrObject["link"] = linksArray;
+
+    QJsonObject jsonObject;
+    jsonObject["DSRModel"] = dsrObject;
+    //writable data
+    QJsonDocument jsonDoc(jsonObject);
+	QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
+    //write to file
+    std::ofstream outfile;
+    outfile.open(json_file_path, std::ios_base::out | std::ios_base::trunc);
+    outfile << strJson.toStdString();
+    outfile.close();
+}
