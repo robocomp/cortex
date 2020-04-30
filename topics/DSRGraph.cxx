@@ -35,15 +35,15 @@ using namespace eprosima::fastcdr::exception;
 Val::Val()
 {
     m__d = 0;
-    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@481a15ff
+    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@646007f4
     m_str ="";
-    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@78186a70
+    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@481a15ff
     m_dec = 0;
-    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@306279ee
+    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@78186a70
     m_fl = 0.0;
-    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@545997b1
+    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@306279ee
 
-    // m_rtmat com.eprosima.idl.parser.typecode.SequenceTypeCode@4cf4d528
+    // m_rtmat com.eprosima.idl.parser.typecode.SequenceTypeCode@545997b1
 
 }
 
@@ -636,11 +636,11 @@ void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
 
 AttribValue::AttribValue()
 {
-    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@221af3c0
+    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@19dc67c2
     m_key ="";
-    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@62bd765
+    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@221af3c0
     m_type = 0;
-    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@23a5fd2
+    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@62bd765
 
 
 }
@@ -856,15 +856,189 @@ void AttribValue::serializeKey(eprosima::fastcdr::Cdr &scdr) const
      
 }
 
+edgeKey::edgeKey()
+{
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@3d36e4cd
+    m_to = 0;
+    // m_key com.eprosima.idl.parser.typecode.StringTypeCode@6a472554
+    m_key ="";
+
+}
+
+edgeKey::~edgeKey()
+{
+
+
+}
+
+edgeKey::edgeKey(const edgeKey &x)
+{
+    m_to = x.m_to;
+    m_key = x.m_key;
+}
+
+edgeKey::edgeKey(edgeKey &&x)
+{
+    m_to = x.m_to;
+    m_key = std::move(x.m_key);
+}
+
+edgeKey& edgeKey::operator=(const edgeKey &x)
+{
+
+    m_to = x.m_to;
+    m_key = x.m_key;
+
+    return *this;
+}
+
+edgeKey& edgeKey::operator=(edgeKey &&x)
+{
+
+    m_to = x.m_to;
+    m_key = std::move(x.m_key);
+
+    return *this;
+}
+
+size_t edgeKey::getMaxCdrSerializedSize(size_t current_alignment)
+{
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
+
+
+    return current_alignment - initial_alignment;
+}
+
+size_t edgeKey::getCdrSerializedSize(const edgeKey& data, size_t current_alignment)
+{
+    (void)data;
+    size_t initial_alignment = current_alignment;
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+
+    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + data.key().size() + 1;
+
+
+    return current_alignment - initial_alignment;
+}
+
+void edgeKey::serialize(eprosima::fastcdr::Cdr &scdr) const
+{
+
+    scdr << m_to;
+    scdr << m_key;
+}
+
+void edgeKey::deserialize(eprosima::fastcdr::Cdr &dcdr)
+{
+
+    dcdr >> m_to;
+    dcdr >> m_key;
+}
+
+/*!
+ * @brief This function sets a value in member to
+ * @param _to New value for member to
+ */
+void edgeKey::to(int32_t _to)
+{
+m_to = _to;
+}
+
+/*!
+ * @brief This function returns the value of member to
+ * @return Value of member to
+ */
+int32_t edgeKey::to() const
+{
+    return m_to;
+}
+
+/*!
+ * @brief This function returns a reference to member to
+ * @return Reference to member to
+ */
+int32_t& edgeKey::to()
+{
+    return m_to;
+}
+
+/*!
+ * @brief This function copies the value in member key
+ * @param _key New value to be copied in member key
+ */
+void edgeKey::key(const std::string &_key)
+{
+m_key = _key;
+}
+
+/*!
+ * @brief This function moves the value in member key
+ * @param _key New value to be moved in member key
+ */
+void edgeKey::key(std::string &&_key)
+{
+m_key = std::move(_key);
+}
+
+/*!
+ * @brief This function returns a constant reference to member key
+ * @return Constant reference to member key
+ */
+const std::string& edgeKey::key() const
+{
+    return m_key;
+}
+
+/*!
+ * @brief This function returns a reference to member key
+ * @return Reference to member key
+ */
+std::string& edgeKey::key()
+{
+    return m_key;
+}
+
+size_t edgeKey::getKeyMaxCdrSerializedSize(size_t current_alignment)
+{
+    size_t current_align = current_alignment;
+
+
+
+
+
+    return current_align;
+}
+
+bool edgeKey::isKeyDefined()
+{
+   return false;
+}
+
+void edgeKey::serializeKey(eprosima::fastcdr::Cdr &scdr) const
+{
+    (void) scdr;
+     
+     
+}
+
 EdgeAttribs::EdgeAttribs()
 {
-    // m_label com.eprosima.idl.parser.typecode.StringTypeCode@525b461a
+    // m_label com.eprosima.idl.parser.typecode.StringTypeCode@3f200884
     m_label ="";
-    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@58c1c010
+    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5a4aa2f2
     m_from = 0;
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@b7f23d9
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6591f517
     m_to = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@3f200884
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@345965f2
 
 
 }
@@ -1143,17 +1317,17 @@ void EdgeAttribs::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Node::Node()
 {
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@58134517
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@351d0846
     m_type ="";
-    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@4450d156
+    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@77e4c80f
     m_name ="";
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4461c7e3
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@35fc6dc4
     m_id = 0;
-    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@351d0846
+    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7fe8ea47
     m_agent_id = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@77e4c80f
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@226a82c4
 
-    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@35fc6dc4
+    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@731f8236
 
 
 }
@@ -1243,9 +1417,7 @@ size_t Node::getMaxCdrSerializedSize(size_t current_alignment)
 
     for(size_t a = 0; a < 100; ++a)
     {
-        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
-
-
+        current_alignment += edgeKey::getMaxCdrSerializedSize(current_alignment);
 
         current_alignment += EdgeAttribs::getMaxCdrSerializedSize(current_alignment);
     }
@@ -1286,9 +1458,7 @@ size_t Node::getCdrSerializedSize(const Node& data, size_t current_alignment)
     for(auto a : data.fano())
     {
         (void)a;
-        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
-
-
+        current_alignment += edgeKey::getCdrSerializedSize((a.first), current_alignment);
         current_alignment += EdgeAttribs::getCdrSerializedSize((a.second), current_alignment);
 
     }
@@ -1483,7 +1653,7 @@ std::map<std::string, AttribValue>& Node::attrs()
  * @brief This function copies the value in member fano
  * @param _fano New value to be copied in member fano
  */
-void Node::fano(const std::map<int32_t, EdgeAttribs> &_fano)
+void Node::fano(const std::map<edgeKey, EdgeAttribs> &_fano)
 {
 m_fano = _fano;
 }
@@ -1492,7 +1662,7 @@ m_fano = _fano;
  * @brief This function moves the value in member fano
  * @param _fano New value to be moved in member fano
  */
-void Node::fano(std::map<int32_t, EdgeAttribs> &&_fano)
+void Node::fano(std::map<edgeKey, EdgeAttribs> &&_fano)
 {
 m_fano = std::move(_fano);
 }
@@ -1501,7 +1671,7 @@ m_fano = std::move(_fano);
  * @brief This function returns a constant reference to member fano
  * @return Constant reference to member fano
  */
-const std::map<int32_t, EdgeAttribs>& Node::fano() const
+const std::map<edgeKey, EdgeAttribs>& Node::fano() const
 {
     return m_fano;
 }
@@ -1510,7 +1680,7 @@ const std::map<int32_t, EdgeAttribs>& Node::fano() const
  * @brief This function returns a reference to member fano
  * @return Reference to member fano
  */
-std::map<int32_t, EdgeAttribs>& Node::fano()
+std::map<edgeKey, EdgeAttribs>& Node::fano()
 {
     return m_fano;
 }
@@ -1548,7 +1718,7 @@ void Node::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 GraphRequest::GraphRequest()
 {
-    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@971d0d8
+    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@51931956
     m_from ="";
 
 }
@@ -1674,9 +1844,9 @@ void GraphRequest::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 PairInt::PairInt()
 {
-    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@564718df
+    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2b4a2ec7
     m_first = 0;
-    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@51b7e5df
+    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@18a70f16
     m_second = 0;
 
 }
@@ -1842,9 +2012,9 @@ void PairInt::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotContext::DotContext()
 {
-    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@18a70f16
+    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@6279cee3
 
-    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@62e136d3
+    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@4206a205
 
 
 }
@@ -2056,9 +2226,9 @@ void DotContext::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotKernel::DotKernel()
 {
-    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@c540f5a
+    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@77e9807f
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@770c2e6b
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@448ff1a8
 
 
 }
@@ -2250,9 +2420,9 @@ void DotKernel::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 AworSet::AworSet()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7f77e91b
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2357d90a
     m_id = 0;
-    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@2357d90a
+    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@6328d34a
 
 
 }
@@ -2422,11 +2592,11 @@ void AworSet::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 OrMap::OrMap()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@15bb6bea
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@8b96fde
     m_id = 0;
-    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@8b96fde
+    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@2d2e5f00
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@770c2e6b
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@448ff1a8
 
 
 }

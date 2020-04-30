@@ -28,6 +28,11 @@
         Val value;
     };
 
+    struct edgeKey {
+        long to;
+        string key;
+    };
+
     struct EdgeAttribs {
 		string label;
 		long from;
@@ -42,7 +47,7 @@
         long id;
         long agent_id;
 		map<string, AttribValue>   attrs;
-		map<long, EdgeAttribs> fano;
+		map<edgeKey, EdgeAttribs> fano;
     };
 
     struct GraphRequest
