@@ -80,6 +80,8 @@ GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  gcrd
 
 GraphViewer::~GraphViewer()
 {
+
+
 	QSettings settings("RoboComp", "DSR");
     settings.beginGroup("MainWindow");
 		settings.setValue("size", size());
@@ -92,13 +94,13 @@ void GraphViewer::createGraph()
 // 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
 	try {
 	    auto map = gcrdt->getCopy();
-		for(auto node : map)
+		for(const auto &[k, node] : map)
 		{
 			try
 			{
-			   addOrAssignNodeSLOT(node.first,  gcrdt->get_node_type(node.second));
+			   addOrAssignNodeSLOT(k,  node.type());
 			}
-			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << node.first <<__FUNCTION__<< std::endl;}
+			catch(const std::exception &e) { std::cout << e.what() <<  " Error accessing " << k <<__FUNCTION__<< std::endl;}
 		}
 		// add edges after all nodes have been created
 		for(auto node : map) // Aworset
@@ -106,7 +108,7 @@ void GraphViewer::createGraph()
            	for(const auto &[k, edges] : node.second.fano())
 			{
 				    try{
-					    addEdgeSLOT(edges.from(), edges.to(), edges.label());
+					    addEdgeSLOT(edges.from(), edges.to(), edges.type());
 				    } catch(const std::exception &e) { std::cout << e.what() <<" Error accessing " << node.first <<", "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 
 			}

@@ -31,6 +31,7 @@
 #include <map>
 #include <bitset>
 #include <iostream>
+
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
 #define eProsima_user_DllExport __declspec( dllexport )
@@ -382,14 +383,14 @@ enum Types : uint32_t
     RT_MAT
 };
 /*!
- * @brief This class represents the structure AttribValue defined by the user in the IDL file.
+ * @brief This class represents the structure Attribs defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class AttribValue
+class Attribs
 {
 public:
 
-    bool operator==(const AttribValue &av_) const {
+    bool operator==(const Attribs &av_) const {
         if (this == &av_) {
             return true;
         }
@@ -398,7 +399,7 @@ public:
         }
         return true;
     }
-    bool operator<(const AttribValue &av_) const {
+    bool operator<(const Attribs &av_) const {
         if (this == &av_) {
             return false;
         }
@@ -410,83 +411,60 @@ public:
         return false;
     }
 
-    bool operator!=(const AttribValue &av_) const {
+    bool operator!=(const Attribs &av_) const {
         return !operator==(av_);
     }
 
-    bool operator<=(const AttribValue &av_) const {
+    bool operator<=(const Attribs &av_) const {
         return operator<(av_) || operator==(av_);
     }
 
-    bool operator>(const AttribValue &av_) const {
+    bool operator>(const Attribs &av_) const {
         return !operator<(av_) && !operator==(av_);
     }
 
-    bool operator>=(const AttribValue &av_) const {
+    bool operator>=(const Attribs &av_) const {
         return !operator<(av_);
     }
 
-    friend std::ostream &operator<<(std::ostream &output, const AttribValue &av_) {
+    friend std::ostream &operator<<(std::ostream &output, const Attribs &av_) {
         output << "Type: "<<av_.type()<<", Value["<<av_.value()<<"]: "<<av_.value()<<", ";
         return output;
     };
     /*!
      * @brief Default constructor.
      */
-    eProsima_user_DllExport AttribValue();
+    eProsima_user_DllExport Attribs();
 
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~AttribValue();
+    eProsima_user_DllExport ~Attribs();
 
     /*!
      * @brief Copy constructor.
-     * @param x Reference to the object AttribValue that will be copied.
+     * @param x Reference to the object Attribs that will be copied.
      */
-    eProsima_user_DllExport AttribValue(const AttribValue &x);
+    eProsima_user_DllExport Attribs(const Attribs &x);
 
     /*!
      * @brief Move constructor.
-     * @param x Reference to the object AttribValue that will be copied.
+     * @param x Reference to the object Attribs that will be copied.
      */
-    eProsima_user_DllExport AttribValue(AttribValue &&x);
+    eProsima_user_DllExport Attribs(Attribs &&x);
 
     /*!
      * @brief Copy assignment.
-     * @param x Reference to the object AttribValue that will be copied.
+     * @param x Reference to the object Attribs that will be copied.
      */
-    eProsima_user_DllExport AttribValue& operator=(const AttribValue &x);
+    eProsima_user_DllExport Attribs& operator=(const Attribs &x);
 
     /*!
      * @brief Move assignment.
-     * @param x Reference to the object AttribValue that will be copied.
+     * @param x Reference to the object Attribs that will be copied.
      */
-    eProsima_user_DllExport AttribValue& operator=(AttribValue &&x);
+    eProsima_user_DllExport Attribs& operator=(Attribs &&x);
 
-    /*!
-     * @brief This function copies the value in member key
-     * @param _key New value to be copied in member key
-     */
-    eProsima_user_DllExport void key(const std::string &_key);
-
-    /*!
-     * @brief This function moves the value in member key
-     * @param _key New value to be moved in member key
-     */
-    eProsima_user_DllExport void key(std::string &&_key);
-
-    /*!
-     * @brief This function returns a constant reference to member key
-     * @return Constant reference to member key
-     */
-    eProsima_user_DllExport const std::string& key() const;
-
-    /*!
-     * @brief This function returns a reference to member key
-     * @return Reference to member key
-     */
-    eProsima_user_DllExport std::string& key();
     /*!
      * @brief This function sets a value in member type
      * @param _type New value for member type
@@ -543,7 +521,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    eProsima_user_DllExport static size_t getCdrSerializedSize(const AttribValue& data, size_t current_alignment = 0);
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const Attribs& data, size_t current_alignment = 0);
 
 
     /*!
@@ -580,79 +558,95 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
-    std::string m_key;
     int32_t m_type;
     Val m_value;
 };
 /*!
- * @brief This class represents the structure edgeKey defined by the user in the IDL file.
+ * @brief This class represents the structure Edge defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class edgeKey
+class Edge
 {
 public:
 
-    bool operator==(const edgeKey &rhs) const {
-        return m_to == rhs.m_to &&
-               m_key == rhs.m_key;
-    }
-
-    bool operator!=(const edgeKey &rhs) const {
-        return !(rhs == *this);
-    }
-
-    bool operator<(const edgeKey &rhs) const {
-        if (m_to < rhs.m_to)
+    bool operator==(const Edge &eA_) const {
+        if (this == &eA_) {
             return true;
-        if (rhs.m_to < m_to)
+        }
+        if (m_type != eA_.m_type || from() != eA_.from() || to() != eA_.to() || attrs() != eA_.attrs()) {
             return false;
-        return m_key < rhs.m_key;
+        }
+        return true;
     }
 
-    bool operator>(const edgeKey &rhs) const {
-        return rhs < *this;
+    bool operator<(const Edge &eA_) const {
+        if (this == &eA_) {
+            return false;
+        }
+        if (m_type < eA_.m_type) {
+            return true;
+        } else if (eA_.m_type < m_type) {
+            return false;
+        }
+        return false;
     }
 
-    bool operator<=(const edgeKey &rhs) const {
-        return !(rhs < *this);
+    bool operator!=(const Edge &eA_) const {
+        return !operator==(eA_);
     }
 
-    bool operator>=(const edgeKey &rhs) const {
-        return !(*this < rhs);
+    bool operator<=(const Edge &eA_) const {
+        return operator<(eA_) || operator==(eA_);
     }
+
+    bool operator>(const Edge &eA_) const {
+        return !operator<(eA_) && !operator==(eA_);
+    }
+
+    bool operator>=(const Edge &eA_) const {
+        return !operator<(eA_);
+    }
+
+    friend std::ostream &operator<<(std::ostream &output, const Edge &ea_) {
+        output << "EdgeAttribs["<<ea_.m_type<<", from:" << ea_.from() << "-> to:"<<ea_.to()<<" Attribs:[";
+        for (auto v : ea_.attrs())
+            output << v.first <<":"<< v.second <<" - ";
+        output<<"]]";
+        return output;
+    };
     /*!
      * @brief Default constructor.
      */
-    eProsima_user_DllExport edgeKey();
+    eProsima_user_DllExport Edge();
 
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~edgeKey();
+    eProsima_user_DllExport ~Edge();
 
     /*!
      * @brief Copy constructor.
-     * @param x Reference to the object edgeKey that will be copied.
+     * @param x Reference to the object Edge that will be copied.
      */
-    eProsima_user_DllExport edgeKey(const edgeKey &x);
+    eProsima_user_DllExport Edge(const Edge &x);
 
     /*!
      * @brief Move constructor.
-     * @param x Reference to the object edgeKey that will be copied.
+     * @param x Reference to the object Edge that will be copied.
      */
-    eProsima_user_DllExport edgeKey(edgeKey &&x);
+    eProsima_user_DllExport Edge(Edge &&x);
 
     /*!
      * @brief Copy assignment.
-     * @param x Reference to the object edgeKey that will be copied.
+     * @param x Reference to the object Edge that will be copied.
      */
-    eProsima_user_DllExport edgeKey& operator=(const edgeKey &x);
+    eProsima_user_DllExport Edge& operator=(const Edge &x);
 
     /*!
      * @brief Move assignment.
-     * @param x Reference to the object edgeKey that will be copied.
+     * @param x Reference to the object Edge that will be copied.
      */
-    eProsima_user_DllExport edgeKey& operator=(edgeKey &&x);
+    eProsima_user_DllExport Edge& operator=(Edge &&x);
 
     /*!
      * @brief This function sets a value in member to
@@ -673,193 +667,28 @@ public:
     eProsima_user_DllExport int32_t& to();
 
     /*!
-     * @brief This function copies the value in member key
-     * @param _key New value to be copied in member key
+     * @brief This function copies the value in member type
+     * @param _type New value to be copied in member type
      */
-    eProsima_user_DllExport void key(const std::string &_key);
+    eProsima_user_DllExport void type(const std::string &_type);
 
     /*!
-     * @brief This function moves the value in member key
-     * @param _key New value to be moved in member key
+     * @brief This function moves the value in member type
+     * @param _type New value to be moved in member type
      */
-    eProsima_user_DllExport void key(std::string &&_key);
+    eProsima_user_DllExport void type(std::string &&_type);
 
     /*!
-     * @brief This function returns a constant reference to member key
-     * @return Constant reference to member key
+     * @brief This function returns a constant reference to member type
+     * @return Constant reference to member type
      */
-    eProsima_user_DllExport const std::string& key() const;
+    eProsima_user_DllExport const std::string& type() const;
 
     /*!
-     * @brief This function returns a reference to member key
-     * @return Reference to member key
+     * @brief This function returns a reference to member type
+     * @return Reference to member type
      */
-    eProsima_user_DllExport std::string& key();
-
-    /*!
-     * @brief This function returns the maximum serialized size of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
-    eProsima_user_DllExport static size_t getMaxCdrSerializedSize(size_t current_alignment = 0);
-
-    /*!
-     * @brief This function returns the serialized size of a data depending on the buffer alignment.
-     * @param data Data which is calculated its serialized size.
-     * @param current_alignment Buffer alignment.
-     * @return Serialized size.
-     */
-    eProsima_user_DllExport static size_t getCdrSerializedSize(const edgeKey& data, size_t current_alignment = 0);
-
-
-    /*!
-     * @brief This function serializes an object using CDR serialization.
-     * @param cdr CDR serialization object.
-     */
-    eProsima_user_DllExport void serialize(eprosima::fastcdr::Cdr &cdr) const;
-
-    /*!
-     * @brief This function deserializes an object using CDR serialization.
-     * @param cdr CDR serialization object.
-     */
-    eProsima_user_DllExport void deserialize(eprosima::fastcdr::Cdr &cdr);
-
-
-
-    /*!
-     * @brief This function returns the maximum serialized size of the Key of an object
-     * depending on the buffer alignment.
-     * @param current_alignment Buffer alignment.
-     * @return Maximum serialized size.
-     */
-    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
-
-    /*!
-     * @brief This function tells you if the Key has been defined for this type
-     */
-    eProsima_user_DllExport static bool isKeyDefined();
-
-    /*!
-     * @brief This function serializes the key members of an object using CDR serialization.
-     * @param cdr CDR serialization object.
-     */
-    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-
-private:
-    int32_t m_to;
-    std::string m_key;
-};
-/*!
- * @brief This class represents the structure EdgeAttribs defined by the user in the IDL file.
- * @ingroup DSRGRAPH
- */
-class EdgeAttribs
-{
-public:
-
-    bool operator==(const EdgeAttribs &eA_) const {
-        if (this == &eA_) {
-            return true;
-        }
-        if (label() != eA_.label() || from() != eA_.from() || to() != eA_.to() || attrs() != eA_.attrs()) {
-            return false;
-        }
-        return true;
-    }
-
-    bool operator<(const EdgeAttribs &eA_) const {
-        if (this == &eA_) {
-            return false;
-        }
-        if (label() < eA_.label()) {
-            return true;
-        } else if (eA_.label() < label()) {
-            return false;
-        }
-        return false;
-    }
-
-    bool operator!=(const EdgeAttribs &eA_) const {
-        return !operator==(eA_);
-    }
-
-    bool operator<=(const EdgeAttribs &eA_) const {
-        return operator<(eA_) || operator==(eA_);
-    }
-
-    bool operator>(const EdgeAttribs &eA_) const {
-        return !operator<(eA_) && !operator==(eA_);
-    }
-
-    bool operator>=(const EdgeAttribs &eA_) const {
-        return !operator<(eA_);
-    }
-
-    friend std::ostream &operator<<(std::ostream &output, const EdgeAttribs &ea_) {
-        output << "EdgeAttribs["<<ea_.label()<<", from:" << ea_.from() << "-> to:"<<ea_.to()<<" Attribs:[";
-        for (auto v : ea_.attrs())
-            output << v.first <<":"<< v.second <<" - ";
-        output<<"]]";
-        return output;
-    };
-    /*!
-     * @brief Default constructor.
-     */
-    eProsima_user_DllExport EdgeAttribs();
-
-    /*!
-     * @brief Default destructor.
-     */
-    eProsima_user_DllExport ~EdgeAttribs();
-
-    /*!
-     * @brief Copy constructor.
-     * @param x Reference to the object EdgeAttribs that will be copied.
-     */
-    eProsima_user_DllExport EdgeAttribs(const EdgeAttribs &x);
-
-    /*!
-     * @brief Move constructor.
-     * @param x Reference to the object EdgeAttribs that will be copied.
-     */
-    eProsima_user_DllExport EdgeAttribs(EdgeAttribs &&x);
-
-    /*!
-     * @brief Copy assignment.
-     * @param x Reference to the object EdgeAttribs that will be copied.
-     */
-    eProsima_user_DllExport EdgeAttribs& operator=(const EdgeAttribs &x);
-
-    /*!
-     * @brief Move assignment.
-     * @param x Reference to the object EdgeAttribs that will be copied.
-     */
-    eProsima_user_DllExport EdgeAttribs& operator=(EdgeAttribs &&x);
-
-    /*!
-     * @brief This function copies the value in member label
-     * @param _label New value to be copied in member label
-     */
-    eProsima_user_DllExport void label(const std::string &_label);
-
-    /*!
-     * @brief This function moves the value in member label
-     * @param _label New value to be moved in member label
-     */
-    eProsima_user_DllExport void label(std::string &&_label);
-
-    /*!
-     * @brief This function returns a constant reference to member label
-     * @return Constant reference to member label
-     */
-    eProsima_user_DllExport const std::string& label() const;
-
-    /*!
-     * @brief This function returns a reference to member label
-     * @return Reference to member label
-     */
-    eProsima_user_DllExport std::string& label();
+    eProsima_user_DllExport std::string& type();
     /*!
      * @brief This function sets a value in member from
      * @param _from New value for member from
@@ -879,46 +708,28 @@ public:
     eProsima_user_DllExport int32_t& from();
 
     /*!
-     * @brief This function sets a value in member to
-     * @param _to New value for member to
-     */
-    eProsima_user_DllExport void to(int32_t _to);
-
-    /*!
-     * @brief This function returns the value of member to
-     * @return Value of member to
-     */
-    eProsima_user_DllExport int32_t to() const;
-
-    /*!
-     * @brief This function returns a reference to member to
-     * @return Reference to member to
-     */
-    eProsima_user_DllExport int32_t& to();
-
-    /*!
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
-    eProsima_user_DllExport void attrs(const std::map<std::string, AttribValue> &_attrs);
+    eProsima_user_DllExport void attrs(const std::map<std::string, Attribs> &_attrs);
 
     /*!
      * @brief This function moves the value in member attrs
      * @param _attrs New value to be moved in member attrs
      */
-    eProsima_user_DllExport void attrs(std::map<std::string, AttribValue> &&_attrs);
+    eProsima_user_DllExport void attrs(std::map<std::string, Attribs> &&_attrs);
 
     /*!
      * @brief This function returns a constant reference to member attrs
      * @return Constant reference to member attrs
      */
-    eProsima_user_DllExport const std::map<std::string, AttribValue>& attrs() const;
+    eProsima_user_DllExport const std::map<std::string, Attribs>& attrs() const;
 
     /*!
      * @brief This function returns a reference to member attrs
      * @return Reference to member attrs
      */
-    eProsima_user_DllExport std::map<std::string, AttribValue>& attrs();
+    eProsima_user_DllExport std::map<std::string, Attribs>& attrs();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -934,7 +745,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    eProsima_user_DllExport static size_t getCdrSerializedSize(const EdgeAttribs& data, size_t current_alignment = 0);
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const Edge& data, size_t current_alignment = 0);
 
 
     /*!
@@ -971,10 +782,176 @@ public:
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
 private:
-    std::string m_label;
-    int32_t m_from;
     int32_t m_to;
-    std::map<std::string, AttribValue> m_attrs;
+    std::string m_type;
+    int32_t m_from;
+    std::map<std::string, Attribs> m_attrs;
+};
+/*!
+ * @brief This class represents the structure EdgeKey defined by the user in the IDL file.
+ * @ingroup DSRGRAPH
+ */
+class EdgeKey
+{
+public:
+
+    bool operator==(const EdgeKey &rhs) const {
+        return m_to == rhs.m_to &&
+               m_type == rhs.m_type;
+    }
+
+    bool operator!=(const EdgeKey &rhs) const {
+        return !(rhs == *this);
+    }
+
+    bool operator<(const EdgeKey &rhs) const {
+        if (m_to < rhs.m_to)
+            return true;
+        if (rhs.m_to < m_to)
+            return false;
+        return m_type < rhs.m_type;
+    }
+
+    bool operator>(const EdgeKey &rhs) const {
+        return rhs < *this;
+    }
+
+    bool operator<=(const EdgeKey &rhs) const {
+        return !(rhs < *this);
+    }
+
+    bool operator>=(const EdgeKey &rhs) const {
+        return !(*this < rhs);
+    }
+    /*!
+     * @brief Default constructor.
+     */
+    eProsima_user_DllExport EdgeKey();
+
+    /*!
+     * @brief Default destructor.
+     */
+    eProsima_user_DllExport ~EdgeKey();
+
+    /*!
+     * @brief Copy constructor.
+     * @param x Reference to the object EdgeKey that will be copied.
+     */
+    eProsima_user_DllExport EdgeKey(const EdgeKey &x);
+
+    /*!
+     * @brief Move constructor.
+     * @param x Reference to the object EdgeKey that will be copied.
+     */
+    eProsima_user_DllExport EdgeKey(EdgeKey &&x);
+
+    /*!
+     * @brief Copy assignment.
+     * @param x Reference to the object EdgeKey that will be copied.
+     */
+    eProsima_user_DllExport EdgeKey& operator=(const EdgeKey &x);
+
+    /*!
+     * @brief Move assignment.
+     * @param x Reference to the object EdgeKey that will be copied.
+     */
+    eProsima_user_DllExport EdgeKey& operator=(EdgeKey &&x);
+
+    /*!
+     * @brief This function sets a value in member to
+     * @param _to New value for member to
+     */
+    eProsima_user_DllExport void to(int32_t _to);
+
+    /*!
+     * @brief This function returns the value of member to
+     * @return Value of member to
+     */
+    eProsima_user_DllExport int32_t to() const;
+
+    /*!
+     * @brief This function returns a reference to member to
+     * @return Reference to member to
+     */
+    eProsima_user_DllExport int32_t& to();
+
+    /*!
+     * @brief This function copies the value in member type
+     * @param _type New value to be copied in member type
+     */
+    eProsima_user_DllExport void type(const std::string &_type);
+
+    /*!
+     * @brief This function moves the value in member type
+     * @param _type New value to be moved in member type
+     */
+    eProsima_user_DllExport void type(std::string &&_type);
+
+    /*!
+     * @brief This function returns a constant reference to member type
+     * @return Constant reference to member type
+     */
+    eProsima_user_DllExport const std::string& type() const;
+
+    /*!
+     * @brief This function returns a reference to member type
+     * @return Reference to member type
+     */
+    eProsima_user_DllExport std::string& type();
+
+    /*!
+     * @brief This function returns the maximum serialized size of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function returns the serialized size of a data depending on the buffer alignment.
+     * @param data Data which is calculated its serialized size.
+     * @param current_alignment Buffer alignment.
+     * @return Serialized size.
+     */
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const EdgeKey& data, size_t current_alignment = 0);
+
+
+    /*!
+     * @brief This function serializes an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serialize(eprosima::fastcdr::Cdr &cdr) const;
+
+    /*!
+     * @brief This function deserializes an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void deserialize(eprosima::fastcdr::Cdr &cdr);
+
+
+
+    /*!
+     * @brief This function returns the maximum serialized size of the Key of an object
+     * depending on the buffer alignment.
+     * @param current_alignment Buffer alignment.
+     * @return Maximum serialized size.
+     */
+    eProsima_user_DllExport static size_t getKeyMaxCdrSerializedSize(size_t current_alignment = 0);
+
+    /*!
+     * @brief This function tells you if the Key has been defined for this type
+     */
+    eProsima_user_DllExport static bool isKeyDefined();
+
+    /*!
+     * @brief This function serializes the key members of an object using CDR serialization.
+     * @param cdr CDR serialization object.
+     */
+    eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
+
+private:
+    int32_t m_to;
+    std::string m_type;
 };
 /*!
  * @brief This class represents the structure Node defined by the user in the IDL file.
@@ -991,9 +968,6 @@ public:
         if (id() != n_.id() || type() != n_.type() || attrs() != n_.attrs() || fano() != n_.fano()) {
             return false;
         }
-//        if (id != n_.id) {
-//            return false;
-//        }
         return true;
     }
 
@@ -1032,7 +1006,7 @@ public:
             output << v.first <<":("<< v.second <<");";
         output<<"], FanOut:[";
         for (auto v : n_.fano())
-            output << "[ "<< v.first.to() << " "<< v.first.key() << "] " <<":("<< v.second <<");";
+            output << "[ "<< v.first.to() << " "<< v.first.type() << "] " <<":("<< v.second <<");";
         output << "]";
         return output;
     }
@@ -1156,48 +1130,48 @@ public:
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
-    eProsima_user_DllExport void attrs(const std::map<std::string, AttribValue> &_attrs);
+    eProsima_user_DllExport void attrs(const std::map<std::string, Attribs> &_attrs);
 
     /*!
      * @brief This function moves the value in member attrs
      * @param _attrs New value to be moved in member attrs
      */
-    eProsima_user_DllExport void attrs(std::map<std::string, AttribValue> &&_attrs);
+    eProsima_user_DllExport void attrs(std::map<std::string, Attribs> &&_attrs);
 
     /*!
      * @brief This function returns a constant reference to member attrs
      * @return Constant reference to member attrs
      */
-    eProsima_user_DllExport const std::map<std::string, AttribValue>& attrs() const;
+    eProsima_user_DllExport const std::map<std::string, Attribs>& attrs() const;
 
     /*!
      * @brief This function returns a reference to member attrs
      * @return Reference to member attrs
      */
-    eProsima_user_DllExport std::map<std::string, AttribValue>& attrs();
+    eProsima_user_DllExport std::map<std::string, Attribs>& attrs();
     /*!
      * @brief This function copies the value in member fano
      * @param _fano New value to be copied in member fano
      */
-    eProsima_user_DllExport void fano(const std::map<edgeKey, EdgeAttribs> &_fano);
+    eProsima_user_DllExport void fano(const std::map<EdgeKey, Edge> &_fano);
 
     /*!
      * @brief This function moves the value in member fano
      * @param _fano New value to be moved in member fano
      */
-    eProsima_user_DllExport void fano(std::map<edgeKey, EdgeAttribs> &&_fano);
+    eProsima_user_DllExport void fano(std::map<EdgeKey, Edge> &&_fano);
 
     /*!
      * @brief This function returns a constant reference to member fano
      * @return Constant reference to member fano
      */
-    eProsima_user_DllExport const std::map<edgeKey, EdgeAttribs>& fano() const;
+    eProsima_user_DllExport const std::map<EdgeKey, Edge>& fano() const;
 
     /*!
      * @brief This function returns a reference to member fano
      * @return Reference to member fano
      */
-    eProsima_user_DllExport std::map<edgeKey, EdgeAttribs>& fano();
+    eProsima_user_DllExport std::map<EdgeKey, Edge>& fano();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1254,8 +1228,8 @@ private:
     std::string m_name;
     int32_t m_id;
     int32_t m_agent_id;
-    std::map<std::string, AttribValue> m_attrs;
-    std::map<edgeKey, EdgeAttribs> m_fano;
+    std::map<std::string, Attribs> m_attrs;
+    std::map<EdgeKey, Edge> m_fano;
 };
 /*!
  * @brief This class represents the structure GraphRequest defined by the user in the IDL file.
@@ -1376,7 +1350,6 @@ public:
 private:
     std::string m_from;
 };
-
 /*!
  * @brief This class represents the structure PairInt defined by the user in the IDL file.
  * @ingroup DSRGRAPH
@@ -1559,6 +1532,17 @@ class DotContext
 {
 public:
 
+    friend std::ostream &operator<<(std::ostream &output, const DotContext &dc_) {
+        output << ", CC: [";
+        for (const auto & kv : dc_.cc())
+            output <<" "<< kv.first << ":" << kv.second;
+        output << "] , DC: [";
+        for (const auto & kv : dc_.dc())
+            output <<" "<< kv.first() << ":" << kv.second();
+        output << "] ";
+        return output;
+    }
+
     /*!
      * @brief Default constructor.
      */
@@ -1689,16 +1673,7 @@ public:
      * @param cdr CDR serialization object.
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-    friend std::ostream &operator<<(std::ostream &output, const DotContext &dc_) {
-        output << ", CC: [";
-        for (const auto & kv : dc_.cc())
-            output <<" "<< kv.first << ":" << kv.second;
-        output << "] , DC: [";
-        for (const auto & kv : dc_.dc())
-            output <<" "<< kv.first() << ":" << kv.second();
-        output << "] ";
-        return output;
-    }
+
 private:
     std::map<int32_t, int32_t> m_cc;
     std::vector<PairInt> m_dc;
@@ -1710,6 +1685,13 @@ private:
 class DotKernel
 {
 public:
+
+    friend std::ostream &operator<<(std::ostream &output, const DotKernel &dk_) {
+        for (const auto & kv : dk_.ds())
+            output << kv.first << "-->" << kv.second<< ", ";
+        output <<dk_.cbase();
+        return output;
+    }
 
     /*!
      * @brief Default constructor.
@@ -1841,12 +1823,7 @@ public:
      * @param cdr CDR serialization object.
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-    friend std::ostream &operator<<(std::ostream &output, const DotKernel &dk_) {
-        for (const auto & kv : dk_.ds())
-            output << kv.first << "-->" << kv.second<< ", ";
-        output <<dk_.cbase();
-        return output;
-    }
+
 private:
     std::map<PairInt, Node> m_ds;
     DotContext m_cbase;
@@ -1859,6 +1836,11 @@ class AworSet
 {
 public:
 
+
+    friend std::ostream &operator<<(std::ostream &output, const AworSet &as_) {
+        output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
+        return output;
+    }
     /*!
      * @brief Default constructor.
      */
@@ -1984,10 +1966,7 @@ public:
      * @param cdr CDR serialization object.
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-    friend std::ostream &operator<<(std::ostream &output, const AworSet &as_) {
-        output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
-        return output;
-    }
+
 private:
     int32_t m_id;
     DotKernel m_dk;
@@ -1999,6 +1978,15 @@ private:
 class OrMap
 {
 public:
+
+
+    friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
+        output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
+        for (const auto & kv : om_.m())
+            output << kv.first << "->" << kv.second << "\n";
+        output << "\nContext: "<<om_.cbase();
+        return output;
+    }
 
     /*!
      * @brief Default constructor.
@@ -2148,13 +2136,7 @@ public:
      * @param cdr CDR serialization object.
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-    friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
-        output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
-        for (const auto & kv : om_.m())
-            output << kv.first << "->" << kv.second << "\n";
-        output << "\nContext: "<<om_.cbase();
-        return output;
-    }
+
 private:
     int32_t m_id;
     std::map<int32_t, AworSet> m_m;

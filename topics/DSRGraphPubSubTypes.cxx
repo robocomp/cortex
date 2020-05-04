@@ -30,25 +30,25 @@ using namespace eprosima::fastrtps::rtps;
 
 
 
-AttribValuePubSubType::AttribValuePubSubType()
+AttribsPubSubType::AttribsPubSubType()
 {
-    setName("AttribValue");
-    m_typeSize = static_cast<uint32_t>(AttribValue::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
-    m_isGetKeyDefined = AttribValue::isKeyDefined();
-    size_t keyLength = AttribValue::getKeyMaxCdrSerializedSize()>16 ? AttribValue::getKeyMaxCdrSerializedSize() : 16;
+    setName("Attribs");
+    m_typeSize = static_cast<uint32_t>(Attribs::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
+    m_isGetKeyDefined = Attribs::isKeyDefined();
+    size_t keyLength = Attribs::getKeyMaxCdrSerializedSize()>16 ? Attribs::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));
     memset(m_keyBuffer, 0, keyLength);
 }
 
-AttribValuePubSubType::~AttribValuePubSubType()
+AttribsPubSubType::~AttribsPubSubType()
 {
     if(m_keyBuffer!=nullptr)
         free(m_keyBuffer);
 }
 
-bool AttribValuePubSubType::serialize(void *data, SerializedPayload_t *payload)
+bool AttribsPubSubType::serialize(void *data, SerializedPayload_t *payload)
 {
-    AttribValue *p_type = static_cast<AttribValue*>(data);
+    Attribs *p_type = static_cast<Attribs*>(data);
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->max_size); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
@@ -69,9 +69,9 @@ bool AttribValuePubSubType::serialize(void *data, SerializedPayload_t *payload)
     return true;
 }
 
-bool AttribValuePubSubType::deserialize(SerializedPayload_t* payload, void* data)
+bool AttribsPubSubType::deserialize(SerializedPayload_t* payload, void* data)
 {
-    AttribValue* p_type = static_cast<AttribValue*>(data); //Convert DATA to pointer of your type
+    Attribs* p_type = static_cast<Attribs*>(data); //Convert DATA to pointer of your type
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->length); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
@@ -91,33 +91,33 @@ bool AttribValuePubSubType::deserialize(SerializedPayload_t* payload, void* data
     return true;
 }
 
-std::function<uint32_t()> AttribValuePubSubType::getSerializedSizeProvider(void* data)
+std::function<uint32_t()> AttribsPubSubType::getSerializedSizeProvider(void* data)
 {
     return [data]() -> uint32_t
     {
-        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<AttribValue*>(data))) + 4 /*encapsulation*/;
+        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<Attribs*>(data))) + 4 /*encapsulation*/;
     };
 }
 
-void* AttribValuePubSubType::createData()
+void* AttribsPubSubType::createData()
 {
-    return reinterpret_cast<void*>(new AttribValue());
+    return reinterpret_cast<void*>(new Attribs());
 }
 
-void AttribValuePubSubType::deleteData(void* data)
+void AttribsPubSubType::deleteData(void* data)
 {
-    delete(reinterpret_cast<AttribValue*>(data));
+    delete(reinterpret_cast<Attribs*>(data));
 }
 
-bool AttribValuePubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
+bool AttribsPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
 {
     if(!m_isGetKeyDefined)
         return false;
-    AttribValue* p_type = static_cast<AttribValue*>(data);
-    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),AttribValue::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
+    Attribs* p_type = static_cast<Attribs*>(data);
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),Attribs::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::BIG_ENDIANNESS);     // Object that serializes the data.
     p_type->serializeKey(ser);
-    if(force_md5 || AttribValue::getKeyMaxCdrSerializedSize()>16)    {
+    if(force_md5 || Attribs::getKeyMaxCdrSerializedSize()>16)    {
         m_md5.init();
         m_md5.update(m_keyBuffer, static_cast<unsigned int>(ser.getSerializedDataLength()));
         m_md5.finalize();
@@ -133,25 +133,25 @@ bool AttribValuePubSubType::getKey(void *data, InstanceHandle_t* handle, bool fo
     return true;
 }
 
-edgeKeyPubSubType::edgeKeyPubSubType()
+EdgePubSubType::EdgePubSubType()
 {
-    setName("edgeKey");
-    m_typeSize = static_cast<uint32_t>(edgeKey::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
-    m_isGetKeyDefined = edgeKey::isKeyDefined();
-    size_t keyLength = edgeKey::getKeyMaxCdrSerializedSize()>16 ? edgeKey::getKeyMaxCdrSerializedSize() : 16;
+    setName("Edge");
+    m_typeSize = static_cast<uint32_t>(Edge::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
+    m_isGetKeyDefined = Edge::isKeyDefined();
+    size_t keyLength = Edge::getKeyMaxCdrSerializedSize()>16 ? Edge::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));
     memset(m_keyBuffer, 0, keyLength);
 }
 
-edgeKeyPubSubType::~edgeKeyPubSubType()
+EdgePubSubType::~EdgePubSubType()
 {
     if(m_keyBuffer!=nullptr)
         free(m_keyBuffer);
 }
 
-bool edgeKeyPubSubType::serialize(void *data, SerializedPayload_t *payload)
+bool EdgePubSubType::serialize(void *data, SerializedPayload_t *payload)
 {
-    edgeKey *p_type = static_cast<edgeKey*>(data);
+    Edge *p_type = static_cast<Edge*>(data);
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->max_size); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
@@ -172,9 +172,9 @@ bool edgeKeyPubSubType::serialize(void *data, SerializedPayload_t *payload)
     return true;
 }
 
-bool edgeKeyPubSubType::deserialize(SerializedPayload_t* payload, void* data)
+bool EdgePubSubType::deserialize(SerializedPayload_t* payload, void* data)
 {
-    edgeKey* p_type = static_cast<edgeKey*>(data); //Convert DATA to pointer of your type
+    Edge* p_type = static_cast<Edge*>(data); //Convert DATA to pointer of your type
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->length); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
@@ -194,33 +194,33 @@ bool edgeKeyPubSubType::deserialize(SerializedPayload_t* payload, void* data)
     return true;
 }
 
-std::function<uint32_t()> edgeKeyPubSubType::getSerializedSizeProvider(void* data)
+std::function<uint32_t()> EdgePubSubType::getSerializedSizeProvider(void* data)
 {
     return [data]() -> uint32_t
     {
-        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<edgeKey*>(data))) + 4 /*encapsulation*/;
+        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<Edge*>(data))) + 4 /*encapsulation*/;
     };
 }
 
-void* edgeKeyPubSubType::createData()
+void* EdgePubSubType::createData()
 {
-    return reinterpret_cast<void*>(new edgeKey());
+    return reinterpret_cast<void*>(new Edge());
 }
 
-void edgeKeyPubSubType::deleteData(void* data)
+void EdgePubSubType::deleteData(void* data)
 {
-    delete(reinterpret_cast<edgeKey*>(data));
+    delete(reinterpret_cast<Edge*>(data));
 }
 
-bool edgeKeyPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
+bool EdgePubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
 {
     if(!m_isGetKeyDefined)
         return false;
-    edgeKey* p_type = static_cast<edgeKey*>(data);
-    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),edgeKey::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
+    Edge* p_type = static_cast<Edge*>(data);
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),Edge::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::BIG_ENDIANNESS);     // Object that serializes the data.
     p_type->serializeKey(ser);
-    if(force_md5 || edgeKey::getKeyMaxCdrSerializedSize()>16)    {
+    if(force_md5 || Edge::getKeyMaxCdrSerializedSize()>16)    {
         m_md5.init();
         m_md5.update(m_keyBuffer, static_cast<unsigned int>(ser.getSerializedDataLength()));
         m_md5.finalize();
@@ -236,25 +236,25 @@ bool edgeKeyPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_
     return true;
 }
 
-EdgeAttribsPubSubType::EdgeAttribsPubSubType()
+EdgeKeyPubSubType::EdgeKeyPubSubType()
 {
-    setName("EdgeAttribs");
-    m_typeSize = static_cast<uint32_t>(EdgeAttribs::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
-    m_isGetKeyDefined = EdgeAttribs::isKeyDefined();
-    size_t keyLength = EdgeAttribs::getKeyMaxCdrSerializedSize()>16 ? EdgeAttribs::getKeyMaxCdrSerializedSize() : 16;
+    setName("EdgeKey");
+    m_typeSize = static_cast<uint32_t>(EdgeKey::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
+    m_isGetKeyDefined = EdgeKey::isKeyDefined();
+    size_t keyLength = EdgeKey::getKeyMaxCdrSerializedSize()>16 ? EdgeKey::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));
     memset(m_keyBuffer, 0, keyLength);
 }
 
-EdgeAttribsPubSubType::~EdgeAttribsPubSubType()
+EdgeKeyPubSubType::~EdgeKeyPubSubType()
 {
     if(m_keyBuffer!=nullptr)
         free(m_keyBuffer);
 }
 
-bool EdgeAttribsPubSubType::serialize(void *data, SerializedPayload_t *payload)
+bool EdgeKeyPubSubType::serialize(void *data, SerializedPayload_t *payload)
 {
-    EdgeAttribs *p_type = static_cast<EdgeAttribs*>(data);
+    EdgeKey *p_type = static_cast<EdgeKey*>(data);
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->max_size); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
@@ -275,9 +275,9 @@ bool EdgeAttribsPubSubType::serialize(void *data, SerializedPayload_t *payload)
     return true;
 }
 
-bool EdgeAttribsPubSubType::deserialize(SerializedPayload_t* payload, void* data)
+bool EdgeKeyPubSubType::deserialize(SerializedPayload_t* payload, void* data)
 {
-    EdgeAttribs* p_type = static_cast<EdgeAttribs*>(data); //Convert DATA to pointer of your type
+    EdgeKey* p_type = static_cast<EdgeKey*>(data); //Convert DATA to pointer of your type
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->length); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
@@ -297,33 +297,33 @@ bool EdgeAttribsPubSubType::deserialize(SerializedPayload_t* payload, void* data
     return true;
 }
 
-std::function<uint32_t()> EdgeAttribsPubSubType::getSerializedSizeProvider(void* data)
+std::function<uint32_t()> EdgeKeyPubSubType::getSerializedSizeProvider(void* data)
 {
     return [data]() -> uint32_t
     {
-        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<EdgeAttribs*>(data))) + 4 /*encapsulation*/;
+        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<EdgeKey*>(data))) + 4 /*encapsulation*/;
     };
 }
 
-void* EdgeAttribsPubSubType::createData()
+void* EdgeKeyPubSubType::createData()
 {
-    return reinterpret_cast<void*>(new EdgeAttribs());
+    return reinterpret_cast<void*>(new EdgeKey());
 }
 
-void EdgeAttribsPubSubType::deleteData(void* data)
+void EdgeKeyPubSubType::deleteData(void* data)
 {
-    delete(reinterpret_cast<EdgeAttribs*>(data));
+    delete(reinterpret_cast<EdgeKey*>(data));
 }
 
-bool EdgeAttribsPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
+bool EdgeKeyPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
 {
     if(!m_isGetKeyDefined)
         return false;
-    EdgeAttribs* p_type = static_cast<EdgeAttribs*>(data);
-    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),EdgeAttribs::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
+    EdgeKey* p_type = static_cast<EdgeKey*>(data);
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),EdgeKey::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::BIG_ENDIANNESS);     // Object that serializes the data.
     p_type->serializeKey(ser);
-    if(force_md5 || EdgeAttribs::getKeyMaxCdrSerializedSize()>16)    {
+    if(force_md5 || EdgeKey::getKeyMaxCdrSerializedSize()>16)    {
         m_md5.init();
         m_md5.update(m_keyBuffer, static_cast<unsigned int>(ser.getSerializedDataLength()));
         m_md5.finalize();
@@ -338,7 +338,6 @@ bool EdgeAttribsPubSubType::getKey(void *data, InstanceHandle_t* handle, bool fo
     }
     return true;
 }
-
 
 NodePubSubType::NodePubSubType()
 {

@@ -35,16 +35,16 @@
 
 
 /*!
- * @brief This class represents the TopicDataType of the type AttribValue defined by the user in the IDL file.
+ * @brief This class represents the TopicDataType of the type Attribs defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class AttribValuePubSubType : public eprosima::fastrtps::TopicDataType {
+class AttribsPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
-    typedef AttribValue type;
+    typedef Attribs type;
 
-    eProsima_user_DllExport AttribValuePubSubType();
+    eProsima_user_DllExport AttribsPubSubType();
 
-    eProsima_user_DllExport virtual ~AttribValuePubSubType();
+    eProsima_user_DllExport virtual ~AttribsPubSubType();
     eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
     eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
     eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
@@ -56,16 +56,16 @@ public:
     unsigned char* m_keyBuffer;
 };
 /*!
- * @brief This class represents the TopicDataType of the type edgeKey defined by the user in the IDL file.
+ * @brief This class represents the TopicDataType of the type Edge defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class edgeKeyPubSubType : public eprosima::fastrtps::TopicDataType {
+class EdgePubSubType : public eprosima::fastrtps::TopicDataType {
 public:
-    typedef edgeKey type;
+    typedef Edge type;
 
-    eProsima_user_DllExport edgeKeyPubSubType();
+    eProsima_user_DllExport EdgePubSubType();
 
-    eProsima_user_DllExport virtual ~edgeKeyPubSubType();
+    eProsima_user_DllExport virtual ~EdgePubSubType();
     eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
     eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
     eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;
@@ -77,16 +77,16 @@ public:
     unsigned char* m_keyBuffer;
 };
 /*!
- * @brief This class represents the TopicDataType of the type EdgeAttribs defined by the user in the IDL file.
+ * @brief This class represents the TopicDataType of the type EdgeKey defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class EdgeAttribsPubSubType : public eprosima::fastrtps::TopicDataType {
+class EdgeKeyPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
-    typedef EdgeAttribs type;
+    typedef EdgeKey type;
 
-    eProsima_user_DllExport EdgeAttribsPubSubType();
+    eProsima_user_DllExport EdgeKeyPubSubType();
 
-    eProsima_user_DllExport virtual ~EdgeAttribsPubSubType();
+    eProsima_user_DllExport virtual ~EdgeKeyPubSubType();
     eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
     eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
     eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;

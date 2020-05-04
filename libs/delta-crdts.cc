@@ -1733,6 +1733,7 @@ public:
             r.c=v.context();
             // now erase
             m.erase(n);
+
         }
         return r;
     }

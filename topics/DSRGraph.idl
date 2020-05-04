@@ -21,45 +21,37 @@
         _RT_MAT
     };
 
-    struct AttribValue
+    struct Attribs
     {
-        string key; //key
         long type;
         Val value;
     };
 
-    struct edgeKey {
-        long to;
-        string key;
-    };
-
-    struct EdgeAttribs {
-		string label; //key2
-		long from;
+    struct Edge {
         long to; //key1
-		map<string, AttribValue>    attrs;
+		string type; //key2
+		long from; // Se mantiene para trabajar más fácilmente con los Edges.
+		map<string, Attribs>    attrs;
 	};
 
-    struct edgeKey {
+    struct EdgeKey {
         long to;
-        string key;
+        string type;
     };
-
 
     struct Node {
         string type;
         string name;
         long id;
         long agent_id;
-		map<string, AttribValue>   attrs;
-		map<edgeKey, EdgeAttribs> fano;
+		map<string, Attribs>   attrs;
+		map<EdgeKey, Edge> fano;
     };
 
     struct GraphRequest
     {
         string from;
     };
-
 
     struct PairInt {
         long first;

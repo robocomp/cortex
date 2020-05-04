@@ -50,7 +50,7 @@ using Nodes = ormap<int, aworset<N,  int >, int>;
 //using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
 using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, RMat::RTMat>;
 using IDType = std::int32_t;
-using Attribs = std::unordered_map<std::string, MTypes>;
+using AttribsMap = std::unordered_map<std::string, MTypes>;
 
 struct pair_hash
 {
@@ -89,7 +89,7 @@ public:
     bool empty(const int &id);
     void print();
     std::map<long,Node> getCopy() const;
-    std::vector<long> getKeys() const;
+    std::vector<long> getKeys() const ;
 
     // Nodes
     Node get_node(const std::string& name);
@@ -104,15 +104,15 @@ public:
 	typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
     //Edges
-    EdgeAttribs get_edge(const std::string& from, const std::string& to, const std::string& key);
-    EdgeAttribs get_edge(int from, int to, const std::string& key);
+    Edge get_edge(const std::string& from, const std::string& to, const std::string& key);
+    Edge get_edge(int from, int to, const std::string& key);
 
-    bool insert_or_assign_edge(const EdgeAttribs& attrs);
+    bool insert_or_assign_edge(const Edge& attrs);
     bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
     bool delete_edge(int from, int t, const std::string& key);
 
-    std::vector<EdgeAttribs> get_edges_by_type(const std::string& type);
-    std::vector<EdgeAttribs> get_edges_to_id(int id);
+    std::vector<Edge> get_edges_by_type(const std::string& type);
+    std::vector<Edge> get_edges_to_id(int id);
 
     std::string get_name_from_id(std::int32_t id);
     int get_id_from_name(const std::string &name);
@@ -125,8 +125,8 @@ public:
     
     // gets a const node ref and searches an attrib by name. With a map should be constant time.
 
-    template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<EdgeAttribs, T>::value ,T >  >
-    AttribValue get_attrib_by_name_(const T& n, const std::string &key) {
+    template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
+    Attribs get_attrib_by_name_(const T& n, const std::string &key) {
         try {
             auto attrs = n.attrs();
             auto value  = attrs.find(key);
@@ -134,42 +134,33 @@ public:
             if (value != attrs.end()) {
                 return value->second;
             }
-
-            AttribValue av;
-            //av.type(STRING);
-            av.type(-1);
-            Val v;
-            v.str("unkown");
-            av.value(v);
-            av.key(key);
-
-            return av;
         }
         catch(const std::exception &e){
             if constexpr (std::is_same<Node,  T>::value) {
                 std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                           << "-> " << n.id() << std::endl;
             }
-            if constexpr (std::is_same<EdgeAttribs,  T>::value) {
+            if constexpr (std::is_same<Attribs,  T>::value) {
                 std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                           << "-> " << n.to() << std::endl;
             }
-            AttribValue av;
-            av.type(-1);
-            Val v;
-            v.str("unkown");
-            av.value(v);
-            av.key(key);
-
-            return av;
         };
+        Attribs av;
+        //av.type(STRING);
+        av.type(-1);
+        Val v;
+        v.str("unkown");
+        av.value(v);
+
+
+        return av;
     }
 
 
 
-    template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<EdgeAttribs, Type>::value, Type>>
+    template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
     Ta get_attrib_by_name(Type& n, const std::string &key) {
-        AttribValue av = get_attrib_by_name_(n, key);
+        Attribs av = get_attrib_by_name_(n, key);
         bool err = (av.type() == -1);
         if constexpr (std::is_same<Ta, std::string>::value) {
             if (err) return "error";
@@ -177,18 +168,15 @@ public:
         }
         if constexpr (std::is_same<Ta, std::int32_t>::value){
             if (err) return -1;
-
             return av.value().dec();
         }
         if constexpr (std::is_same<Ta, float>::value) {
             if (err) return 0.0;
-
             return av.value().fl();
         }
         if constexpr (std::is_same<Ta, std::vector<float>>::value)
         {
             if (err) return {};
-
             if (key == "RT" || key == "RTMat") return av.value().rtmat();
             return av.value().float_vec();
         }
@@ -200,20 +188,19 @@ public:
     }
 
 
-
+    /*
     template <typename Ta>
-    Ta string_to_nativetype(const std::string &name, const std::string &val)
-    {
+    Ta string_to_nativetype(const std::string &name, const std::string &val) {
         return std::get<Ta>(string_to_mtypes(name, val));
-    };
-
+    }
+    */
     std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t);
 
     std::int32_t get_node_level(Node& n);
     std::string get_node_type(Node& n);
 
 
-    void add_attrib(std::map<string, AttribValue> &v, std::string att_name, CRDT::MTypes att_value);
+    void add_attrib(std::map<string, Attribs> &v, std::string att_name, CRDT::MTypes att_value);
     //void add_edge_attribs(vector<EdgeAttribs> &v, EdgeAttribs& ea);
 
     //////////////////////////////////////////////////////
@@ -235,13 +222,15 @@ private:
     /**
      * Indices.
      * */
+    std::unordered_set<int> deleted;     // deleted nodes, used to avoid insertion after remove.
     std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
     std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
     std::unordered_map<pair<int, int>, std::unordered_set<std::string>, pair_hash> edges;      // collection with all graph edges. ((from, to), key)
     std::unordered_map<std::string, std::unordered_set<pair<int, int>, pair_hash>> edgeType;  // collection with all edge types.
     std::unordered_map<std::string, std::unordered_set<int>> nodeType;  // collection with all node types.
-    void update_maps_node_change(bool insert, int id, const Node& n);
-    void update_maps_edge_change(bool insert, int from, int to, const std::string& key);
+    void update_maps_node_delete(int id, const Node& n);
+    void update_maps_node_insert(int id, const Node& n);
+    void update_maps_edge_delete(int from, int to, const std::string& key);
 
     /*
      * Non-blocking graph operations
@@ -252,7 +241,7 @@ private:
     bool insert_or_assign_node_(const N &node);
     std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
     bool delete_edge_(int from, int t, const std::string& key);
-    EdgeAttribs get_edge_(int from, int to, const std::string& key);
+    Edge get_edge_(int from, int to, const std::string& key);
 
 
     int id();
@@ -262,7 +251,7 @@ private:
     void join_delta_node(AworSet aworSet);
     void join_full_graph(OrMap full_graph);
 
-    MTypes string_to_mtypes(const std::string &name, const std::string &val);
+    //MTypes string_to_mtypes(const std::string &name, const std::string &val);
 
 
 
@@ -309,7 +298,7 @@ private:
 signals:                                                                  // for graphics update
     void update_node_signal(const std::int32_t, const std::string &type); // Signal to update CRDT
 
-    void update_attrs_signal(const std::int32_t &id, const std::map<string, AttribValue> &attribs); //Signal to show node attribs.
+    void update_attrs_signal(const std::int32_t &id, const std::map<string, Attribs> &attribs); //Signal to show node attribs.
     void update_edge_signal(const std::int32_t from, const std::int32_t to);                   // Signal to show edge attribs.
 
     void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal to del edge.

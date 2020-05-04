@@ -37,7 +37,7 @@ class DoRTStuff : public  QTableWidget
         graph(graph_), from(from_), to(to_), label(label_)
     {
       qRegisterMetaType<CRDT::IDType>("DSR::IDType");
-      qRegisterMetaType<CRDT::Attribs>("DSR::Attribs");
+      qRegisterMetaType<CRDT::AttribsMap>("DSR::Attribs");
       Node n = graph->get_node(graph->get_name_from_id(from));
       Node n2 = graph->get_node(graph->get_name_from_id(to));
 
@@ -72,7 +72,7 @@ class DoRTStuff : public  QTableWidget
           std::string n_from = graph->get_name_from_id(from);
           std::string n_to = graph->get_name_from_id(to);
 
-          EdgeAttribs ea = graph->get_edge(n_from, n_to, "RT");
+          Edge ea = graph->get_edge(n_from, n_to, "RT");
 
           auto value = ea.attrs().find("RT");
           if (value != ea.attrs().end()) {
