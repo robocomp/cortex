@@ -7,9 +7,9 @@
 #include <fstream>
 #include <unistd.h>
 #include <algorithm>
-#include <QXmlSimpleReader>
-#include <libxml2/libxml/parser.h>
-#include <libxml2/libxml/tree.h>
+// #include <QXmlSimpleReader>
+// #include <libxml2/libxml/parser.h>
+// #include <libxml2/libxml/tree.h>
 
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
@@ -18,13 +18,12 @@
 
 using namespace CRDT;
 
-
-
 /////////////////////////////////////////////////
 ///// PUBLIC METHODS
 /////////////////////////////////////////////////
 
-CRDTGraph::CRDTGraph(int root, std::string name, int id) : agent_id(id) {
+CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_file) : agent_id(id) 
+{
     graph_root = root;
     agent_name = name;
     nodes = Nodes(graph_root);
@@ -34,11 +33,27 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id) : agent_id(id) {
     // RTPS Create participant 
 	auto [suc , participant_handle] = dsrparticipant.init();
 
-    // General Topic
-	// RTPS Initialize publisher
+	// RTPS Initialize publisher with general topic
 	dsrpub.init(participant_handle, "DSR", dsrparticipant.getDSRTopicName());
     dsrpub_graph_request.init(participant_handle, "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName());
     dsrpub_request_answer.init(participant_handle, "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName());
+
+    // RTPS Initialize comms threads
+     if(dsr_input_file != std::string())
+    {
+        read_from_json_file(dsr_input_file);
+        start_fullgraph_server_thread();
+        start_subscription_thread(true);
+    }
+    else
+    {    
+        start_subscription_thread(true);     // regular subscription to deltas
+        bool res = start_fullgraph_request_thread();    // for agents that want to request the graph for other agent
+        if(res == false)
+            qFatal("CRDTGraph aborting: could not get DSR from the network");  //JC ¿se pueden limpiar aquí cosas antes de salir?
+    }
+
+    qDebug() << __FUNCTION__ << "Constructor finished OK";
 
 }
 
@@ -489,15 +504,13 @@ N CRDTGraph::get_(int id) {
     return n;
 }
 
-
-
-
-
-
-std::int32_t CRDTGraph::get_node_level(Node& n){
-    try {
+std::int32_t CRDTGraph::get_node_level(Node& n)
+{
+    try 
+    {
         return get_attrib_by_name<int32_t >(n, "level");
-    } catch(const std::exception &e){
+    } 
+    catch(const std::exception &e){
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
 
     return -1;
@@ -617,7 +630,6 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
             emit del_node_signal(aworSet.id());
 
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
-
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
@@ -632,7 +644,8 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             s.emplace(std::make_pair(v.first(), v.second()));
         //nodes.context().setContext(m, s);
 
-        for (auto &[k, val] : full_graph.m()) {
+        for (auto &[k, val] : full_graph.m()) 
+        {
             auto awor = translateAwIDLtoCRDT(val);
             Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
 
@@ -647,17 +660,19 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
                 nodes[k].rmv(nd);
                 update_maps_node_delete(k, nd);
                 updates.emplace_back(make_tuple( false, k, ""));
-            } else {
-
+            } 
+            else
+            {
                 if (deleted.find(k) == deleted.end() and (nodes[k].dots().ds.empty() or (*awor.dots().ds.rbegin() != *nodes[k].dots().ds.rbegin()))) {
                     nodes[k].add(awor.dots().ds.begin()->second);
                     update_maps_node_insert(k, awor.dots().ds.begin()->second);
                     updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
-                } else {
+                } 
+                else 
+                {
                     update_maps_node_delete(k, nd);
                 }
             }
-
         }
     }
     for (auto &[signal, id, type] : updates)
@@ -667,281 +682,35 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             emit del_node_signal(id);
 }
 
-/*
-void CRDTGraph::read_from_file(const std::string &file_name)
+bool CRDTGraph::start_fullgraph_request_thread() 
 {
-    std::cout << __FUNCTION__ << "Reading xml file: " << file_name << std::endl;
-
-    // Open file and make initial checks
-    xmlDocPtr doc;
-    if ((doc = xmlParseFile(file_name.c_str())) == NULL)
-    {
-        fprintf(stderr,"Can't read XML file - probably a syntax error. \n");
-        exit(1);
-    }
-    xmlNodePtr root;
-    if ((root = xmlDocGetRootElement(doc)) == NULL)
-    {
-        fprintf(stderr,"Can't read XML file - empty document\n");
-        xmlFreeDoc(doc);
-        exit(1);
-    }
-    if (xmlStrcmp(root->name, (const xmlChar *) "AGMModel"))
-    {
-        fprintf(stderr,"Can't read XML file - root node != AGMModel");
-        xmlFreeDoc(doc);
-        exit(1);
-    }
-
-    // Read symbols (just symbols, then links in other loop)
-    for (xmlNodePtr cur=root->xmlChildrenNode; cur!=NULL; cur=cur->next)
-    {
-        if (xmlStrcmp(cur->name, (const xmlChar *)"symbol") == 0)
-        {
-            xmlChar *stype = xmlGetProp(cur, (const xmlChar *)"type");
-            xmlChar *sid = xmlGetProp(cur, (const xmlChar *)"id");
-            xmlChar *sname = xmlGetProp(cur, (const xmlChar *)"name");
-
-            //AGMModelSymbol::SPtr s = newSymbol(atoi((char *)sid), (char *)stype);
-            int node_id = std::atoi((char *)sid);
-            std::cout << __FILE__ << " " << __FUNCTION__ << ", Node: " << node_id << " " <<  std::string((char *)stype) << std::endl;
-            std::string node_type((char *)stype);
-            //auto rd = QVec::uniformVector(2,-200,200);
-            std::string name((char *)sname);
-
-            Node n;
-            n.type(node_type);
-            n.id(node_id);
-            n.agent_id(agent_id);
-            n.name(name);
-
-            name_map[name] = node_id;
-            id_map[node_id] = name;
-
-            std::map<string, Attribs> attrs;
-
-            add_attrib(attrs, "level",std::int32_t(0));
-            add_attrib(attrs, "parent",std::int32_t(0));
-
-
-            std::string qname = (char *)stype;
-            std::string full_name = std::string((char *)stype) + " [" + std::string((char *)sid) + "]";
-
-            add_attrib(attrs, "name",full_name);
-
-
-            // color selection
-            std::string color = "coral";
-            if(qname == "world") color = "SeaGreen";
-            else if(qname == "transform") color = "SteelBlue";
-            else if(qname == "plane") color = "Khaki";
-            else if(qname == "differentialrobot") color = "GoldenRod";
-            else if(qname == "laser") color = "GreenYellow";
-            else if(qname == "mesh") color = "LightBlue";
-            else if(qname == "imu") color = "LightSalmon";
-
-            add_attrib(attrs, "color", color);
-
-
-            xmlFree(sid);
-            xmlFree(stype);
-
-            for (xmlNodePtr cur2=cur->xmlChildrenNode; cur2!=NULL; cur2=cur2->next)
-            {
-                if (xmlStrcmp(cur2->name, (const xmlChar *)"attribute") == 0)
-                {
-                    xmlChar *attr_key   = xmlGetProp(cur2, (const xmlChar *)"key");
-                    xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
-                    std::string sk = std::string((char *)attr_key);
-                    if( sk == "level" or sk == "parent")
-                        add_attrib(attrs, sk, std::stoi(std::string((char *)attr_value)));
-                    else if( sk == "pos_x" or sk == "pos_y" or sk == "posx" or sk == "posy")
-                        add_attrib(attrs, sk, (float)std::stod(std::string((char *)attr_value)));
-                    else if( sk == "imName" and n.name().empty()) {
-                        n.name(std::string((char *) attr_value));
-                        add_attrib(attrs, sk, std::string((char *)attr_value));
-                    }
-                    else
-                        add_attrib(attrs, sk, std::string((char *)attr_value));
-
-
-                    xmlFree(attr_key);
-                    xmlFree(attr_value);
-                }
-                else if (xmlStrcmp(cur2->name, (const xmlChar *)"comment") == 0) { }           // coments are always ignored
-                else if (xmlStrcmp(cur2->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
-                else { printf("unexpected tag inside symbol: %s\n", cur2->name); exit(-1); } // unexpected tags make the program exit
-            }
-
-            n.attrs(attrs);
-            insert_or_assign_node(n);
-        }
-        else if (xmlStrcmp(cur->name, (const xmlChar *)"link") == 0) { }     // we'll ignore links in this first loop
-        else if (xmlStrcmp(cur->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
-        else if (xmlStrcmp(cur->name, (const xmlChar *)"comment") == 0) { }  // coments are always ignored
-        else { printf("unexpected tag #1: %s\n", cur->name); exit(-1); }      // unexpected tags make the program exit
-    }
-
-    // Read links
-    for (xmlNodePtr cur=root->xmlChildrenNode; cur!=NULL; cur=cur->next)
-    {
-        if (xmlStrcmp(cur->name, (const xmlChar *)"link") == 0)
-        {
-            xmlChar *srcn = xmlGetProp(cur, (const xmlChar *)"src");
-            if (srcn == NULL) { printf("Link %s lacks of attribute 'src'.\n", (char *)cur->name); exit(-1); }
-            int a = atoi((char *)srcn);
-            xmlFree(srcn);
-
-            xmlChar *dstn = xmlGetProp(cur, (const xmlChar *)"dst");
-            if (dstn == NULL) { printf("Link %s lacks of attribute 'dst'.\n", (char *)cur->name); exit(-1); }
-            int b = atoi((char *)dstn);
-            xmlFree(dstn);
-
-            xmlChar *label = xmlGetProp(cur, (const xmlChar *)"label");
-            if (label == NULL) { printf("Link %s lacks of attribute 'label'.\n", (char *)cur->name); exit(-1); }
-            std::string edgeName((char *)label);
-            xmlFree(label);
-            std::map<string, Attribs> attrs;
-            for (xmlNodePtr cur2=cur->xmlChildrenNode; cur2!=NULL; cur2=cur2->next)
-            {
-                if (xmlStrcmp(cur2->name, (const xmlChar *)"linkAttribute") == 0)
-                {
-                    xmlChar *attr_key   = xmlGetProp(cur2, (const xmlChar *)"key");
-                    xmlChar *attr_value = xmlGetProp(cur2, (const xmlChar *)"value");
-
-                    auto val = string_to_mtypes(std::string((char *)attr_key), std::string((char *)attr_value));
-
-                    Attribs av;
-                    av.type(val.index());
-                    Val value;
-                    switch(val.index()) {
-                        case 0:
-                            value.str(std::get<std::string>(val));
-                            av.value( value);
-                            break;
-                        case 1:
-                            value.dec(std::get<std::int32_t>(val));
-                            av.value( value);
-                            break;
-                        case 2:
-                            value.fl(std::get<float>(val));
-                            av.value( value);
-                            break;
-                        case 3:
-                            value.float_vec(std::get<std::vector<float>>(val));
-                            av.value( value);
-                            break;
-                        case 4:
-                            value.rtmat( std::get<RTMat>(val).toVector().toStdVector() );
-                            av.value(value);
-                            break;
-                    }
-
-
-                    
-                    attrs[std::string((char *)attr_key)] = av;
-                    xmlFree(attr_key);
-                    xmlFree(attr_value);
-                }
-                else if (xmlStrcmp(cur2->name, (const xmlChar *)"comment") == 0) { }           // coments are always ignored
-                else if (xmlStrcmp(cur2->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
-                else { printf("unexpected tag inside symbol: %s ==> %s\n", cur2->name,xmlGetProp(cur2, (const xmlChar *)"id") ); exit(-1); } // unexpected tags make the program exit
-            }
-
-            std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << a << " to " << b << " label "  << edgeName <<  std::endl;
-
-            Edge ea;
-            ea.from(a);
-            ea.to(b);
-            ea.type(edgeName);
-            std::map<string, Attribs> attrs_edge;
-
-            Val val;
-            val.str(edgeName);
-
-            Attribs av;
-
-            av.type(STRING);
-            av.value( val);
-            attrs["name"] = av;
-
-
-            if( edgeName == "RT")   //add level to node b as a.level +1, and add parent to node b as a
-            {
-
-                Node n = get_node(b);
-
-
-                add_attrib(n.attrs(),"level", get_node_level(n)+1);
-                add_attrib(n.attrs(),"parent", a);
-                RMat::RTMat rt;
-                float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
-                for(auto &[key, v] : attrs)
-                {
-                    if(key=="tx")	tx = v.value().fl();
-                    if(key=="ty")	ty = v.value().fl();
-                    if(key=="tz")	tz = v.value().fl();
-                    if(key=="rx")	rx = v.value().fl();
-                    if(key=="ry")	ry = v.value().fl();
-                    if(key=="rz")	rz = v.value().fl();
-                }
-                rt.set(rx, ry, rz, tx, ty, tz);
-                //rt.print("in reader");
-                add_attrib(attrs_edge, "RT", rt);
-                //this->add_edge_attrib(a, b,"RT",rt);
-
-                insert_or_assign_node(n);
-            }
-            else
-            {
-                Node n = get_node(b);
-                add_attrib(n.attrs(),"parent",0);
-                insert_or_assign_node(n);
-                for(auto &[k,v] : attrs)
-                    attrs_edge[k] = v;
-
-            }
-
-
-            ea.attrs(attrs_edge);
-            insert_or_assign_edge(ea);
-
-        }
-        else if (xmlStrcmp(cur->name, (const xmlChar *)"symbol") == 0) { }   // symbols are now ignored
-        else if (xmlStrcmp(cur->name, (const xmlChar *)"text") == 0) { }     // we'll ignore 'text'
-        else if (xmlStrcmp(cur->name, (const xmlChar *)"comment") == 0) { }  // comments are always ignored
-        else { printf("unexpected tag #2: %s\n", cur->name); exit(-1); }      // unexpected tags make the program exit
-    }
-}
-*/
-
-
-void CRDTGraph::start_fullgraph_request_thread() {
-    fullgraph_request_thread();
+    return fullgraph_request_thread();
 }
 
-
-void CRDTGraph::start_fullgraph_server_thread() {
+void CRDTGraph::start_fullgraph_server_thread() 
+{
     fullgraph_server_thread();
 }
 
-
-void CRDTGraph::start_subscription_thread(bool showReceived) {
+void CRDTGraph::start_subscription_thread(bool showReceived) 
+{
     subscription_thread(showReceived);
 }
 
-
-int CRDTGraph::id() {
+int CRDTGraph::id() 
+{
     return nodes.getId();
 }
 
-
-DotContext CRDTGraph::context() { // Context to ICE
+DotContext CRDTGraph::context() 
+{ // Context to ICE
     DotContext om_dotcontext;
-    for (auto &kv_cc : nodes.context().getCcDc().first) {
+    for (auto &kv_cc : nodes.context().getCcDc().first) 
+    {
         om_dotcontext.cc().emplace(make_pair(kv_cc.first, kv_cc.second));
     }
-    for (auto &kv_dc : nodes.context().getCcDc().second){
+    for (auto &kv_dc : nodes.context().getCcDc().second)
+    {
         PairInt p_i;
         p_i.first(kv_dc.first);
         p_i.second(kv_dc.second);
@@ -950,8 +719,8 @@ DotContext CRDTGraph::context() { // Context to ICE
     return om_dotcontext;
 }
 
-
-std::map<int,AworSet> CRDTGraph::Map() {
+std::map<int,AworSet> CRDTGraph::Map() 
+{
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     std::map<int,AworSet>  m;
     for (auto kv : nodes.getMapRef()) { // Map of Aworset to ICE
@@ -965,9 +734,8 @@ std::map<int,AworSet> CRDTGraph::Map() {
     return m;
 }
 
-
-void CRDTGraph::subscription_thread(bool showReceived) {
-
+void CRDTGraph::subscription_thread(bool showReceived) 
+{
 	 // RTPS Initialize subscriptor
     auto lambda_general_topic = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
         if (*work) {
@@ -1036,20 +804,12 @@ void CRDTGraph::fullgraph_server_thread()
 
     };
     dsrpub_graph_request_call = NewMessageFunctor(this, &work, lambda_graph_request);
-
     dsrsub_graph_request.init(dsrparticipant.getParticipant(), "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName(), dsrpub_graph_request_call);
-
-
 };
 
-
-
-
-
-void CRDTGraph::fullgraph_request_thread() {
-
+bool CRDTGraph::fullgraph_request_thread() 
+{
     bool sync = false;
-
     // Answer Topic
     auto lambda_request_answer = [&sync] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
 
@@ -1071,19 +831,23 @@ void CRDTGraph::fullgraph_request_thread() {
     dsrpub_request_answer_call = NewMessageFunctor(this, &work, lambda_request_answer);
     dsrsub_request_answer.init(dsrparticipant.getParticipant(), "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(),dsrpub_request_answer_call);
 
-    sleep(1);
+    std::this_thread::sleep_for(300ms);
 
     std::cout << " Requesting the complete graph " << std::endl;
     GraphRequest gr;
     gr.from(agent_name);
     dsrpub_graph_request.write(&gr);
 
-    while (!sync) {
-        sleep(1);
+    bool timeout = false;
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    while (!sync and !timeout) 
+    {
+        std::this_thread::sleep_for(500ms);
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() > TIMEOUT;
     }
     eprosima::fastrtps::Domain::removeSubscriber(dsrsub_request_answer.getSubscriber());
-    //start_subscription_thread(true);
-
+    return sync;
 }
 
 AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data) {
@@ -1235,10 +999,6 @@ void CRDTGraph::add_attrib(std::map<string, Attribs> &v, std::string att_name, C
     v[att_name] = av;
 }
 
-
-
-
-
 void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 {
     std::cout << __FUNCTION__ << " Reading json file: " << json_file_path << std::endl;
@@ -1281,8 +1041,6 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         name_map[name] = id;
         id_map[id] = name;
 
-
-
         std::map<string, Attribs> attrs;
         add_attrib(attrs, "level",std::int32_t(0));
         add_attrib(attrs, "parent",std::int32_t(0));
@@ -1310,7 +1068,6 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             std::string attr_key = attr_obj.value("key").toString().toStdString();
             QString attr_value = attr_obj.value("value").toString();
             int attr_type = attr_obj.value("type").toInt();
-
 
             switch (attr_type) {
                 case 0:
@@ -1375,8 +1132,12 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         int srcn = link_obj.value("src").toString().toInt();
         int dstn = link_obj.value("dst").toString().toInt();
         std::string edgeName = link_obj.value("label").toString().toStdString();
-
         std::map<string, Attribs> attrs;
+        Edge ea;
+        ea.from(srcn);
+        ea.to(dstn);
+        ea.type(edgeName);
+
         // link atributes
         QJsonArray attributesArray =  link_obj.value("linkAttribute").toArray();
         foreach (const QJsonValue & attribValue, attributesArray)
@@ -1391,7 +1152,8 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             av.type(attr_type);
             Val value;
 
-            switch (attr_type) {
+            switch (attr_type) 
+            {
                 case 0:
                     add_attrib(attrs, attr_key, attr_value.toStdString());
                     break;
@@ -1429,60 +1191,61 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             attrs[attr_key] = av;
         }
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
-
-
-
-
-
-        Edge ea;
-        ea.from(srcn);
-        ea.to(dstn);
-        ea.type(edgeName);
-        std::map<string, Attribs> attrs_edge;
-
-        //auto val = mtype_to_icevalue(edgeName);
-        Val val;
-        val.str(edgeName);
-
-        Attribs av;
-        av.type(STRING);
-        av.value( val);
-        attrs["name"] = av;
-
-
-        if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
-        {
-            Node n = get_node(dstn);
-
-            add_attrib(n.attrs(),"level", get_node_level(n)+1);
-            add_attrib(n.attrs(),"parent", srcn);
-            RMat::RTMat rt;
-            float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
-            for(auto &[key, v] : attrs)
-            {
-                if(key=="tx")	tx = v.value().fl();
-                if(key=="ty")	ty = v.value().fl();
-                if(key=="tz")	tz = v.value().fl();
-                if(key=="rx")	rx = v.value().fl();
-                if(key=="ry")	ry = v.value().fl();
-                if(key=="rz")	rz = v.value().fl();
-            }
-            rt.set(rx, ry, rz, tx, ty, tz);
-            //rt.print("in reader");
-            add_attrib(attrs_edge, "RT", rt);
-            //this->add_edge_attrib(a, dstn,"RT",rt);
-            insert_or_assign_node(n);
-        }
-        else
-        {
-            Node n = get_node(dstn);
-            add_attrib(n.attrs(),"parent",0);
-            insert_or_assign_node(n);
-            for(auto &[k,v] : attrs)
-                attrs_edge[k] = v;
-        }
-        ea.attrs(attrs_edge);
+        ea.attrs(attrs);
         insert_or_assign_edge(ea);
+
+
+
+
+        // Edge ea;
+        // ea.from(srcn);
+        // ea.to(dstn);
+        // ea.type(edgeName);
+        // std::map<string, Attribs> attrs_edge;
+
+        // //auto val = mtype_to_icevalue(edgeName);
+        // Val val;
+        // val.str(edgeName);
+
+        // Attribs av;
+        // av.type(STRING);
+        // av.value( val);
+        // attrs["name"] = av;
+
+
+        // if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
+        // {
+        //     Node n = get_node(dstn);
+
+        //     add_attrib(n.attrs(),"level", get_node_level(n)+1);
+        //     add_attrib(n.attrs(),"parent", srcn);
+        //     RMat::RTMat rt;
+        //     float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
+        //     for(auto &[key, v] : attrs)
+        //     {
+        //         if(key=="tx")	tx = v.value().fl();
+        //         if(key=="ty")	ty = v.value().fl();
+        //         if(key=="tz")	tz = v.value().fl();
+        //         if(key=="rx")	rx = v.value().fl();
+        //         if(key=="ry")	ry = v.value().fl();
+        //         if(key=="rz")	rz = v.value().fl();
+        //     }
+        //     rt.set(rx, ry, rz, tx, ty, tz);
+        //     //rt.print("in reader");
+        //     add_attrib(attrs_edge, "RT", rt);
+        //     //this->add_edge_attrib(a, dstn,"RT",rt);
+        //     insert_or_assign_node(n);
+        // }
+        // else
+        // {
+        //     Node n = get_node(dstn);
+        //     add_attrib(n.attrs(),"parent",0);
+        //     insert_or_assign_node(n);
+        //     for(auto &[k,v] : attrs)
+        //         attrs_edge[k] = v;
+        // }
+        // ea.attrs(attrs_edge);
+        // insert_or_assign_edge(ea);
 
     } //foreach(links)
 }
