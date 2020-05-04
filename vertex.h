@@ -30,7 +30,11 @@ namespace CRDT
         public:
             VEdge(Edge _edge) : edge(std::move(_edge)) {};
             VEdge(VEdge &vedge) : edge(std::move(vedge.edge)) {};
-        
+            VEdge() { edge.type("error"); };
+            int to() const { return edge.to(); };
+            int from() const { return edge.from(); };
+            EdgeKey get_key() const { EdgeKey key; key.to(edge.to()); key.type(edge.type()); return key; };
+            Edge& get_CRDT_edge() { return edge; };
         private:
             Edge edge;
     };
@@ -138,11 +142,53 @@ namespace CRDT
             }
             
             // Edges
-            VEdge get_edge(const std::string& to, const std::string& key);
-            Edge get_edge(int to, const std::string& key);
-            bool insert_or_assign_edge(const VEdge& attrs);
+            VEdge get_edge(int to, const std::string& key)
+            {
+                EdgeKey ek;
+                ek.to(to);
+                ek.type(key);
+                auto edge = node.fano().find(ek);
+                if (edge != node.fano().end())
+                    return VEdge(Edge(edge->second));
+                else
+                    return VEdge();
+            }
+            void insert_or_assign_edge(VEdge& vedge)
+            {
+                node.fano().insert_or_assign(vedge.get_key(), vedge.get_CRDT_edge());
+            }
             bool delete_edge(const std::string& t, const std::string& key);
-            bool delete_edge(int t, const std::string& key);
+            bool delete_edge(const VEdge& vedge)
+            {
+                try
+                {
+                    node.fano().erase(vedge.get_key());
+                    // update_maps_edge_delete(from, to, key);   // Don't have access to maps here
+                    // node.agent_id(agent_id);
+                }
+                catch(const std::exception& e)
+                {
+                    std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what() << std::endl;
+                    return false;
+                }
+            }
+            bool delete_edge(int to, const std::string& key)
+            {
+                try 
+                {
+                    EdgeKey ek;
+                    ek.to(to);
+                    ek.type(key);
+                    node.fano().erase(ek);
+                    // update_maps_edge_delete(from, to, key);   // Don't have access to maps here
+                    // node.agent_id(agent_id);
+                } 
+                catch (const std::exception &e) 
+                { 
+                    std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what() << std::endl;
+                    return false;
+                };
+            }
             std::vector<VEdge> get_edges_by_type(const std::string& type);
             std::vector<VEdge> get_edges_to_id(int id);
 
