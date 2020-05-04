@@ -111,6 +111,8 @@ namespace CRDT
         std::vector<Node> get_nodes_by_type(const std::string& type);
         std::string get_name_from_id(std::int32_t id);  // caché
         int get_id_from_name(const std::string &name);  // caché
+        
+        // to be moved to Vertex //////////////////////////////////
         std::int32_t get_node_level(Node& n);
         std::string get_node_type(Node& n);
         void add_attrib(std::map<string, Attribs> &v, std::string att_name, CRDT::MTypes att_value);
