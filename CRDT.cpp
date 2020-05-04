@@ -1007,7 +1007,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 
     QJsonObject dsrobject = jObject.value("DSRModel").toObject();
 	QJsonArray symbolArray = dsrobject.value("symbol").toArray();
-
+    QJsonArray linksArray;
     // Read symbols (just symbols, then links in other loop)
     foreach (const QJsonValue & symbolValue, symbolArray)
     {
@@ -1110,11 +1110,12 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         }
         n.attrs(attrs);
         insert_or_assign_node(n);
+        // get links
+        QJsonArray nodeLinksArray = sym_obj.value("links").toArray();
+        std::copy(nodeLinksArray.begin(), nodeLinksArray.end(), std::back_inserter(linksArray));
     }
-
     // Read links
-    QJsonArray linkArray = dsrobject.value("link").toArray();
-    foreach (const QJsonValue & linkValue, linkArray)
+    foreach (const QJsonValue & linkValue, linksArray)
     {
         QJsonObject link_obj = linkValue.toObject();
         int srcn = link_obj.value("src").toString().toInt();
@@ -1297,8 +1298,8 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
             attrsArray.push_back(attr);
         }
         symbol["attribute"] = attrsArray;
-        symbolsArray.push_back(symbol);
         //link
+        QJsonArray nodeLinksArray;
         for (const auto &[key, value]: node.fano()){
                 QJsonObject link;
                 link["src"] = QString::number(value.from());
@@ -1346,14 +1347,13 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                     attr[QString::fromStdString(key)] = QString::fromStdString(val);
                     lattrsArray.push_back(attr);
                 }
-
                 link["linkAttribute"] = lattrsArray;
-                linksArray.push_back(link);
-
+                nodeLinksArray.push_back(link);
         }
+        symbol["links"] = nodeLinksArray;
+        symbolsArray.push_back(symbol);
     }
     dsrObject["symbol"] = symbolsArray;
-    dsrObject["link"] = linksArray;
 
     QJsonObject jsonObject;
     jsonObject["DSRModel"] = dsrObject;
