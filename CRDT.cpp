@@ -129,8 +129,6 @@ bool CRDTGraph::insert_or_assign_node_(const N &node)
             update_maps_node_insert(node.id(), node);
             //name_map[node.name()] = node.id();
             //id_map[node.id()] = node.name();
-
-
             auto val = translateAwCRDTtoIDL(node.id(), delta);
             dsrpub.write(&val);
 
@@ -141,7 +139,6 @@ bool CRDTGraph::insert_or_assign_node_(const N &node)
     };
     return false;
 }
-
 
 bool CRDTGraph::delete_node(const std::string& name)
 {
@@ -157,15 +154,13 @@ bool CRDTGraph::delete_node(const std::string& name)
         result = r;
         edges = e;
     }
-    if (!result) return false;
+    if (!result) 
+        return false;
     emit del_node_signal(id);
 
-    for (auto &[id0, id1, label] : edges) {
+    for (auto &[id0, id1, label] : edges)
         emit del_edge_signal(id0, id1, label);
-    }
     return true;
-
-
 }
 
 bool CRDTGraph::delete_node(int id)
@@ -180,12 +175,12 @@ bool CRDTGraph::delete_node(int id)
         result = r;
         edges = e;
     }
-    if (!result) return false;
+    if (!result) 
+        return false;
     emit del_node_signal(id);
 
-    for (auto &[id0, id1, label] : edges) {
+    for (auto &[id0, id1, label] : edges) 
         emit del_edge_signal(id0, id1, label);
-    }
     return true;
 }
 
@@ -250,9 +245,9 @@ std::vector<Node> CRDTGraph::get_nodes_by_type(const std::string& type)
     return nodes_;
 }
 
-///////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 // EDGE METHODS
-///////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 Edge CRDTGraph::get_edge(const std::string& from, const std::string& to, const std::string& key)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
@@ -300,9 +295,9 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         int from = attrs.from();
         int to = attrs.to();
-
         try {
-            if (in(from) && in(to)) {
+            if (in(from) && in(to))
+            {
                 auto node = get_(from);
                 EdgeKey ek;
                 ek.to(to);
@@ -312,7 +307,8 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
                 node.agent_id(agent_id);
                 r = insert_or_assign_node_(node);
 
-            } else {
+            } else 
+            {
                 //std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
                 return false;
             }
@@ -325,21 +321,18 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
     }
     if (r)
         emit update_edge_signal( attrs.from(),  attrs.to());
-
     return true;
 }
 
 
 bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
 {
-
     bool result;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (!in(from) || !in(to)) return false;
         result = delete_edge_(from, to, key);
     }
-
     if (result)
             emit update_edge_signal(from, to);
     return result;
@@ -366,9 +359,7 @@ bool CRDTGraph::delete_edge(const std::string& from, const std::string& to, cons
 
 bool CRDTGraph::delete_edge_(int from, int to, const std::string& key)
 {
-
     try {
-
             auto node = get_(from);
             EdgeKey ek;
             ek.to(to);
@@ -431,14 +422,14 @@ std::map<long,Node> CRDTGraph::getCopy() const
     return mymap;
 }
 
-std::vector<long> CRDTGraph::getKeys() const
-{
-    std::vector<long> keys;
-    std::shared_lock<std::shared_mutex>  lock(_mutex);
-    for (auto &[key, val] : nodes.getMap())
-        keys.emplace_back(key);
-    return keys;
-}
+// std::vector<long> CRDTGraph::getKeys() const
+// {
+//     std::vector<long> keys;
+//     std::shared_lock<std::shared_mutex>  lock(_mutex);
+//     for (auto &[key, val] : nodes.getMap())
+//         keys.emplace_back(key);
+//     return keys;
+// }
 
 void CRDTGraph::print()
 {
@@ -468,8 +459,6 @@ Nodes CRDTGraph::get() {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return nodes;
 }
-
-
 
 N CRDTGraph::get(int id) {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
@@ -516,7 +505,6 @@ std::int32_t CRDTGraph::get_node_level(Node& n)
     return -1;
 }
 
-
 std::string CRDTGraph::get_node_type(Node& n)
 {
     try {
@@ -540,8 +528,6 @@ inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
         edges[{k.to(), id}].erase(k.type());
         edgeType[k.type()].erase({id, k.to()});
     }
-
-
 }
 
 inline void CRDTGraph::update_maps_node_insert(int id, const Node& n)
@@ -562,8 +548,6 @@ inline void CRDTGraph::update_maps_edge_delete(int from, int to, const std::stri
     edgeType[key].erase({from, to});
 }
 
-
-
 int CRDTGraph::get_id_from_name(const std::string &name)
 {
         auto v = name_map.find(name);
@@ -571,7 +555,6 @@ int CRDTGraph::get_id_from_name(const std::string &name)
         return   -1;
 
 }
-
 
 std::string CRDTGraph::get_name_from_id(std::int32_t id)
 {
@@ -949,6 +932,7 @@ CRDT::MTypes CRDTGraph::string_to_mtypes(const std::string &type, const std::str
     return res;
 }
 */
+
 std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const MTypes &t)
 {
     return std::visit(overload
@@ -961,8 +945,8 @@ std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const 
                       str += std::to_string(f) + " ";
                   return make_tuple("vector<float>",  str += "\n",a.size());
               },
-              [](std::string a) -> std::tuple<std::string, std::string, int>								{ return  make_tuple("string", a,1); },
-              [](auto a) -> std::tuple<std::string, std::string, int>										{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
+              [](std::string a) -> std::tuple<std::string, std::string, int>	{ return  make_tuple("string", a,1); },
+              [](auto a) -> std::tuple<std::string, std::string, int>			{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
       }, t);
 }
 
@@ -998,6 +982,10 @@ void CRDTGraph::add_attrib(std::map<string, Attribs> &v, std::string att_name, C
 
     v[att_name] = av;
 }
+
+/////////////////////////////////////////////////////////////////////////
+//// UTILS
+////////////////////////////////////////////////////////////////////////
 
 void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 {

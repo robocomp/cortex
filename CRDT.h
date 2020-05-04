@@ -9,28 +9,23 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
-
 #include <chrono>
 #include <thread>
-
 #include <mutex>
 #include <shared_mutex>
-
-#include "libs/delta-crdts.cc"
-
-
-#include "fast_rtps/dsrparticipant.h"
-#include "fast_rtps/dsrpublisher.h"
-#include "fast_rtps/dsrsubscriber.h"
-
-#include "topics/DSRGraphPubSubTypes.h"
-
 #include <any>
 #include <memory>
 #include <vector>
 #include <variant>
 #include <qmat/QMatAll>
 #include <typeinfo>
+
+#include "libs/delta-crdts.cc"
+#include "fast_rtps/dsrparticipant.h"
+#include "fast_rtps/dsrpublisher.h"
+#include "fast_rtps/dsrsubscriber.h"
+#include "topics/DSRGraphPubSubTypes.h"
+#include "vertex.h"
 
 #define NO_PARENT -1
 #define TIMEOUT 5
@@ -39,13 +34,11 @@
 template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
 template<class... Ts> overload(Ts...) -> overload<Ts...>;
 
-
 namespace CRDT
 {
 
     using N = Node;
     using Nodes = ormap<int, aworset<N,  int >, int>;
-    //using MTypes = std::variant<std::uint32_t, std::int32_t, float, std::string, std::vector<float>, RMat::RTMat>;
     using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, RMat::RTMat>;
     using IDType = std::int32_t;
     using AttribsMap = std::unordered_map<std::string, MTypes>;
@@ -58,6 +51,23 @@ namespace CRDT
         return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
         }
     };
+
+    /////////////////////////////////////////////////////////////////
+    /// DSR Exceptions
+    /////////////////////////////////////////////////////////////////
+    class DSRException : std::runtime_error
+    {
+        public:
+            explicit DSRException(const std::string &message): std::runtime_error(buildMsg(message)){};
+        private:
+        std::string buildMsg(const std::string &message)
+        {
+            std::ostringstream buffer;
+            buffer << "DSRException: " << message;
+            return buffer.str();
+        };
+    };
+
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
@@ -86,9 +96,9 @@ namespace CRDT
         void write_to_json_file(const std::string &json_file_path);
         bool empty(const int &id);
         void print();
-        std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t);
-        std::map<long, Node> getCopy() const;   //deprecated
-        std::vector<long> getKeys() const ;     //deprecated
+        std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t); //Used by viewer
+        std::map<long, Node> getCopy() const;   
+        //std::vector<long> getKeys() const ;     //deprecated
         typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
         typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
@@ -99,39 +109,37 @@ namespace CRDT
         bool delete_node(const std::string &name);
         bool delete_node(int id);
         std::vector<Node> get_nodes_by_type(const std::string& type);
-        std::string get_name_from_id(std::int32_t id);
-        int get_id_from_name(const std::string &name);
+        std::string get_name_from_id(std::int32_t id);  // caché
+        int get_id_from_name(const std::string &name);  // caché
+        
+        // to be moved to Vertex //////////////////////////////////
         std::int32_t get_node_level(Node& n);
         std::string get_node_type(Node& n);
         void add_attrib(std::map<string, Attribs> &v, std::string att_name, CRDT::MTypes att_value);
-        // gets a const node ref and searches an attrib by name. With a map should be constant time.
         template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
-        Attribs get_attrib_by_name_(const T& n, const std::string &key) {
-            try {
+        Attribs get_attrib_by_name_(const T& n, const std::string &key) 
+        {
+            try 
+            {
                 auto attrs = n.attrs();
                 auto value  = attrs.find(key);
-
-                if (value != attrs.end()) {
+                if (value != attrs.end())
                     return value->second;
-                }
             }
-            catch(const std::exception &e){
-                if constexpr (std::is_same<Node,  T>::value) {
+            catch(const std::exception &e)
+            {
+                if constexpr (std::is_same<Node,  T>::value)
                     std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                             << "-> " << n.id() << std::endl;
-                }
-                if constexpr (std::is_same<Attribs,  T>::value) {
+                if constexpr (std::is_same<Attribs,  T>::value)
                     std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                             << "-> " << n.to() << std::endl;
-                }
             };
             Attribs av;
-            //av.type(STRING);
             av.type(-1);
             Val v;
             v.str("unkown");
             av.value(v);
-
 
             return av;
         }
@@ -161,7 +169,6 @@ namespace CRDT
                 if (err) return RTMat();
                 return RTMat { QMat{ av.value().rtmat()} } ;
             }
-
         }
 
         //Edges
