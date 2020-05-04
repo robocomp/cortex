@@ -116,7 +116,7 @@ bool CRDTGraph::insert_or_assign_node_(const N &node)
             //id_map[node.id()] = node.name();
 
 
-            auto val = translateAwCRDTtoICE(node.id(), delta);
+            auto val = translateAwCRDTtoIDL(node.id(), delta);
             dsrpub.write(&val);
 
             return true;
@@ -191,7 +191,7 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
         }
         // Get remove delta.
         auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
-        auto val = translateAwCRDTtoICE(id, delta);
+        auto val = translateAwCRDTtoIDL(id, delta);
         dsrpub.write(&val);
         update_maps_node_delete(id, node);
 
@@ -212,7 +212,7 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
                 update_maps_edge_delete(visited_node.id(), id, key);
 
                 // Send changes.
-                auto val = translateAwCRDTtoICE(visited_node.id(), delta);
+                auto val = translateAwCRDTtoIDL(visited_node.id(), delta);
                 dsrpub.write(&val);
             }
         }
@@ -519,7 +519,7 @@ inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
     name_map.erase(id_map[id]);
     id_map.erase(id);
     deleted.insert(id);
-    //std::cout <<" DELETED: "<< *deleted.find(id) << endl;
+
     if (nodeType.find(n.type()) != nodeType.end())
         nodeType[n.type()].erase(id);
 
@@ -591,7 +591,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
 {
     try{
         bool signal = true;
-        auto d = translateAwICEtoCRDT(aworSet);
+        auto d = translateAwIDLtoCRDT(aworSet);
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             std::cout << "JOINING " << aworSet.id();
@@ -633,7 +633,7 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
         //nodes.context().setContext(m, s);
 
         for (auto &[k, val] : full_graph.m()) {
-            auto awor = translateAwICEtoCRDT(val);
+            auto awor = translateAwIDLtoCRDT(val);
             Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
 
             if (nodes.getMapRef().find(k) == nodes.getMapRef().end()) {
@@ -960,7 +960,7 @@ std::map<int,AworSet> CRDTGraph::Map() {
         auto last = *kv.second.dots().ds.rbegin();
         n.dots().ds.insert(last);
         n.dots().c = kv.second.dots().c;
-        m[kv.first] = translateAwCRDTtoICE(kv.first, n);
+        m[kv.first] = translateAwCRDTtoIDL(kv.first, n);
     }
     return m;
 }
@@ -1086,7 +1086,7 @@ void CRDTGraph::fullgraph_request_thread() {
 
 }
 
-AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {
+AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data) {
     AworSet delta_crdt;
     for (auto &kv_dots : data.dots().ds) {
         PairInt pi;
@@ -1110,7 +1110,7 @@ AworSet CRDTGraph::translateAwCRDTtoICE(int id, aworset<N, int> &data) {
     return delta_crdt;
 }
 
-aworset<N, int> CRDTGraph::translateAwICEtoCRDT(AworSet &data) {
+aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data) {
     // Context
     dotcontext<int> dotcontext_aux;
     //auto m = static_cast<std::map<int, int>>(data.dk().cbase().cc());

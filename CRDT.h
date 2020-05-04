@@ -278,8 +278,8 @@ private:
     void fullgraph_request_thread();
 
     // Translators
-    AworSet translateAwCRDTtoICE(int id, aworset<N, int> &data);
-    aworset<N, int> translateAwICEtoCRDT(AworSet &data);
+    AworSet translateAwCRDTtoIDL(int id, aworset<N, int> &data);
+    aworset<N, int> translateAwIDLtoCRDT(AworSet &data);
 
     // RTSP participant
     DSRParticipant dsrparticipant;
