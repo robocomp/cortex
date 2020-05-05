@@ -37,9 +37,11 @@ namespace CRDT
             Edge& get_CRDT_edge() { return edge; }; // only for reinserting
             void print()
             {
-                std::cout << "Edge-type:" << edge.type() << " from:" << edge.from() << " to:" << edge.to()  << std::endl;
+                std::cout << "------------------------------------" << std::endl;
+                std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
                 for(auto [k, v] : edge.attrs())
-                    std::cout << "              Key:" << k << " Type:" << v.type() << " Value:" << v.value()  << std::endl;
+                    std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+                std::cout << "------------------------------------" << std::endl;
             }
 
         private:
@@ -162,6 +164,7 @@ namespace CRDT
                 else
                     return std::make_shared<VEdge>();
             }
+            
             void insert_or_assign_edge(const VEdgePtr& vedge)
             {
                 node.fano().insert_or_assign(vedge->get_key(), vedge->get_CRDT_edge());
@@ -198,24 +201,33 @@ namespace CRDT
                     return false;
                 };
             }
+            std::vector<VEdgePtr> get_edges()
+            {
+                std::vector<VEdgePtr> res;
+                for(auto &[k,v]: node.fano())
+                    res.emplace_back(std::make_shared<VEdge>(v));
+                return res;
+            }
             std::vector<VEdgePtr> get_edges_by_type(const std::string& type);
             std::vector<VEdgePtr> get_edges_to_id(int id);
 
             // Utils
             void print()
             {   
-                std::cout << "Node: " << node.id() << std::endl;
-                std::cout << "  Type:" << node.type() << std::endl;
-                std::cout << "  Name:" << node.name() << std::endl;
-                std::cout << "  Agent_id:" << node.agent_id()  << std::endl;
+                std::cout << "------------------------------------" << std::endl;
+                std::cout << "Node-> " << node.id() << std::endl;
+                std::cout << "  Type->" << node.type() << std::endl;
+                std::cout << "  Name->" << node.name() << std::endl;
+                std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
                 for(auto [key, val] : node.attrs())
-                std::cout << "      Key:" << key << " Type:" << val.type() << " Value:" << val.value()  << std::endl;
+                std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
                 for(auto [key, val] : node.fano())
                 {
-                    std::cout << "          Edge-type:" << val.type() << " from:" << val.from() << " to:" << val.to()  << std::endl;
+                    std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
                     for(auto [k, v] : val.attrs())
-                    std::cout << "              Key:" << k << " Type:" << v.type() << " Value:" << v.value()  << std::endl;
+                    std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
                 }
+                std::cout << "------------------------------------" << std::endl;
             }
 
         private:

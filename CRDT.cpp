@@ -50,7 +50,7 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
         start_subscription_thread(true);     // regular subscription to deltas
         bool res = start_fullgraph_request_thread();    // for agents that want to request the graph for other agent
         if(res == false)
-            qFatal("CRDTGraph aborting: could not get DSR from the network");  //JC ¿se pueden limpiar aquí cosas antes de salir?
+            qFatal("CRDTGraph aborting: could not get DSR from the network after timeout");  //JC ¿se pueden limpiar aquí cosas antes de salir?
     }
     qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
