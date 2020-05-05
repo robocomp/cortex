@@ -97,14 +97,14 @@ Node CRDTGraph::get_node(int id)
     return get_(id);
 }
 
-Vertex CRDTGraph::get_vnode(const std::string& name)
+VertexPtr CRDTGraph::get_vertex(const std::string& name)
 {
-    return Vertex(get_node(name));
+    return std::make_shared<Vertex>(get_node(name));
 }
   
-Vertex CRDTGraph::get_vnode(int id)
+VertexPtr CRDTGraph::get_vertex(int id)
 {
-    return Vertex(get_node(id));
+    return std::make_shared<Vertex>(get_node(id));
 }
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
@@ -1371,4 +1371,6 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
     outfile.open(json_file_path, std::ios_base::out | std::ios_base::trunc);
     outfile << strJson.toStdString();
     outfile.close();
+    auto now_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::cout << __FILE__ << " " << __FUNCTION__ << "File: " << json_file_path << " written to disk at " << now_c << std::endl;
 }

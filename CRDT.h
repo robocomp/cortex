@@ -42,7 +42,7 @@ namespace CRDT
     using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, RMat::RTMat>;
     using IDType = std::int32_t;
     using AttribsMap = std::unordered_map<std::string, MTypes>;
-
+    using VertexPtr = std::shared_ptr<Vertex>;
     struct pair_hash
     {
         template <class T1, class T2>
@@ -105,8 +105,8 @@ namespace CRDT
         // Nodes
         Node get_node(const std::string& name);
         Node get_node(int id);
-        Vertex get_vnode(const std::string& name);
-        Vertex get_vnode(int id);
+        VertexPtr get_vertex(const std::string& name);
+        VertexPtr get_vertex(int id);
         bool insert_or_assign_node(const N &node);
         bool delete_node(const std::string &name);
         bool delete_node(int id);

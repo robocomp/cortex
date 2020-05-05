@@ -34,10 +34,19 @@ namespace CRDT
             int to() const { return edge.to(); };
             int from() const { return edge.from(); };
             EdgeKey get_key() const { EdgeKey key; key.to(edge.to()); key.type(edge.type()); return key; };
-            Edge& get_CRDT_edge() { return edge; };
+            Edge& get_CRDT_edge() { return edge; }; // only for reinserting
+            void print()
+            {
+                std::cout << "Edge-type:" << edge.type() << " from:" << edge.from() << " to:" << edge.to()  << std::endl;
+                for(auto [k, v] : edge.attrs())
+                    std::cout << "              Key:" << k << " Type:" << v.type() << " Value:" << v.value()  << std::endl;
+            }
+
         private:
             Edge edge;
     };
+
+    using VEdgePtr = std::shared_ptr<VEdge>;
 
     class Vertex   
     {
@@ -142,27 +151,27 @@ namespace CRDT
             }
             
             // Edges
-            VEdge get_edge(int to, const std::string& key)
+            VEdgePtr get_edge(int to, const std::string& key)
             {
                 EdgeKey ek;
                 ek.to(to);
                 ek.type(key);
                 auto edge = node.fano().find(ek);
                 if (edge != node.fano().end())
-                    return VEdge(Edge(edge->second));
+                    return std::make_shared<VEdge>(Edge(edge->second));
                 else
-                    return VEdge();
+                    return std::make_shared<VEdge>();
             }
-            void insert_or_assign_edge(VEdge& vedge)
+            void insert_or_assign_edge(const VEdgePtr& vedge)
             {
-                node.fano().insert_or_assign(vedge.get_key(), vedge.get_CRDT_edge());
+                node.fano().insert_or_assign(vedge->get_key(), vedge->get_CRDT_edge());
             }
             bool delete_edge(const std::string& t, const std::string& key);
-            bool delete_edge(const VEdge& vedge)
+            bool delete_edge(const VEdgePtr& vedge)
             {
                 try
                 {
-                    node.fano().erase(vedge.get_key());
+                    node.fano().erase(vedge->get_key());
                     // update_maps_edge_delete(from, to, key);   // Don't have access to maps here
                     // node.agent_id(agent_id);
                 }
@@ -189,8 +198,25 @@ namespace CRDT
                     return false;
                 };
             }
-            std::vector<VEdge> get_edges_by_type(const std::string& type);
-            std::vector<VEdge> get_edges_to_id(int id);
+            std::vector<VEdgePtr> get_edges_by_type(const std::string& type);
+            std::vector<VEdgePtr> get_edges_to_id(int id);
+
+            // Utils
+            void print()
+            {   
+                std::cout << "Node: " << node.id() << std::endl;
+                std::cout << "  Type:" << node.type() << std::endl;
+                std::cout << "  Name:" << node.name() << std::endl;
+                std::cout << "  Agent_id:" << node.agent_id()  << std::endl;
+                for(auto [key, val] : node.attrs())
+                std::cout << "      Key:" << key << " Type:" << val.type() << " Value:" << val.value()  << std::endl;
+                for(auto [key, val] : node.fano())
+                {
+                    std::cout << "          Edge-type:" << val.type() << " from:" << val.from() << " to:" << val.to()  << std::endl;
+                    for(auto [k, v] : val.attrs())
+                    std::cout << "              Key:" << k << " Type:" << v.type() << " Value:" << v.value()  << std::endl;
+                }
+            }
 
         private:
             N node;
