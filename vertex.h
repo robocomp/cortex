@@ -35,6 +35,54 @@ namespace CRDT
             int from() const { return edge.from(); };
             EdgeKey get_key() const { EdgeKey key; key.to(edge.to()); key.type(edge.type()); return key; };
             Edge& get_CRDT_edge() { return edge; }; // only for reinserting
+            Attrib get_attrib_by_name_(const std::string &key)
+            {
+                try 
+                {
+                    auto attrs = edge.attrs();
+                    auto value  = attrs.find(key);
+                    if (value != attrs.end())
+                        return value->second;
+                }
+                catch(const std::exception &e) { std::cout << e.what() << std::endl; };
+
+                Attrib av;
+                av.type(-1);
+                Val v;
+                v.str("unkown");
+                av.value(v);
+                return av;
+            }
+            template <typename Ta>
+            Ta get_attrib_by_name(const std::string &key)
+            {
+                Attrib av = get_attrib_by_name_(key);
+                bool err = (av.type() == -1);
+                if constexpr (std::is_same<Ta, std::string>::value) {
+                    if (err) return "error";
+                    return av.value().str();
+                }
+                if constexpr (std::is_same<Ta, std::int32_t>::value){
+                    if (err) return -1;
+                    return av.value().dec();
+                }
+                if constexpr (std::is_same<Ta, float>::value) {
+                    if (err) return 0.0;
+                    return av.value().fl();
+                }
+                if constexpr (std::is_same<Ta, std::vector<float>>::value)
+                {
+                    if (err) return {};
+                    return av.value().float_vec();
+                }
+                if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
+                    auto &at = edge.attrs();
+                    return RTMat { at["rot"].value().float_vec()[0], at["rot"].value().float_vec()[1], at["rot"].value().float_vec()[2],
+                                   at["trans"].value().float_vec()[0], at["trans"].value().float_vec()[1], at["trans"].value().float_vec()[2]} ;
+                }
+            }
+            
+  
             void print()
             {
                 std::cout << "------------------------------------" << std::endl;
@@ -59,7 +107,7 @@ namespace CRDT
             std::int32_t get_level() 
             {
                 try 
-                {  return get_attrib_by_name<std::int32_t>(node, "level"); } 
+                {  return get_attrib_by_name<std::int32_t>("level"); } 
                 catch(const std::exception &e)
                 {  std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
                 return -1;
@@ -93,25 +141,17 @@ namespace CRDT
           }
             std::int32_t id() const { return node.id(); };
             std::string type() const { return node.type(); };    
-            template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
-            Attrib get_attrib_by_name_(const T& n, const std::string &key)
+            Attrib get_attrib_by_name_(const std::string &key)
             {
                 try 
                 {
-                    auto attrs = n.attrs();
+                    auto attrs = node.attrs();
                     auto value  = attrs.find(key);
                     if (value != attrs.end())
                         return value->second;
                 }
-                catch(const std::exception &e)
-                {
-                    if constexpr (std::is_same<Node,  T>::value)
-                        std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
-                                << "-> " << n.id() << std::endl;
-                    if constexpr (std::is_same<Attrib,  T>::value)
-                        std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
-                                << "-> " << n.to() << std::endl;
-                };
+                catch(const std::exception &e) { std::cout << e.what() << std::endl; };
+
                 Attrib av;
                 av.type(-1);
                 Val v;
@@ -119,10 +159,10 @@ namespace CRDT
                 av.value(v);
                 return av;
             }
-            template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
-            Ta get_attrib_by_name(Type& n, const std::string &key)
+            template <typename Ta>
+            Ta get_attrib_by_name(const std::string &key)
             {
-                Attrib av = get_attrib_by_name_(n, key);
+                Attrib av = get_attrib_by_name_(key);
                 bool err = (av.type() == -1);
                 if constexpr (std::is_same<Ta, std::string>::value) {
                     if (err) return "error";
@@ -142,8 +182,9 @@ namespace CRDT
                     return av.value().float_vec();
                 }
                 if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                    return RTMat { n.attrs()["rot"].value().float_vec()[0],  n.attrs()["rot"].value().float_vec()[1],  n.attrs()["rot"].value().float_vec()[2],
-                                   n.attrs()["trans"].value().float_vec()[0], n.attrs()["trans"].value().float_vec()[1], n.attrs()["trans"].value().float_vec()[2]   } ;
+                    auto &at = node.attrs();
+                    return RTMat { at["rot"].value().float_vec()[0], at["rot"].value().float_vec()[1], at["rot"].value().float_vec()[2],
+                                   at["trans"].value().float_vec()[0], at["trans"].value().float_vec()[1], at["trans"].value().float_vec()[2]} ;
                 }
             }
             
@@ -159,42 +200,9 @@ namespace CRDT
                 else
                     return std::make_shared<VEdge>();
             }
-            
             void insert_or_assign_edge(const VEdgePtr& vedge)
             {
                 node.fano().insert_or_assign(vedge->get_key(), vedge->get_CRDT_edge());
-            }
-            bool delete_edge(const std::string& t, const std::string& key);
-            bool delete_edge(const VEdgePtr& vedge)
-            {
-                try
-                {
-                    node.fano().erase(vedge->get_key());
-                    // update_maps_edge_delete(from, to, key);   // Don't have access to maps here
-                    // node.agent_id(agent_id);
-                }
-                catch(const std::exception& e)
-                {
-                    std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what() << std::endl;
-                    return false;
-                }
-            }
-            bool delete_edge(int to, const std::string& key)
-            {
-                try 
-                {
-                    EdgeKey ek;
-                    ek.to(to);
-                    ek.type(key);
-                    node.fano().erase(ek);
-                    // update_maps_edge_delete(from, to, key);   // Don't have access to maps here
-                    // node.agent_id(agent_id);
-                } 
-                catch (const std::exception &e) 
-                { 
-                    std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what() << std::endl;
-                    return false;
-                };
             }
             std::vector<VEdgePtr> get_edges()
             {

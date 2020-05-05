@@ -986,10 +986,10 @@ void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CR
             value.float_vec(std::get<std::vector<float>>(att_value));
             av.value( value);
             break;
-        case 4:
-            value.rtmat(std::get<RTMat>(att_value).toVector().toStdVector());
-            av.value(value);
-            break;
+        // case 4:
+        //     value.rtmat(std::get<RTMat>(att_value).toVector().toStdVector());
+        //     av.value(value);
+        //     break;
     }
 
     v[att_name] = av;
@@ -1145,8 +1145,8 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         {
             QJsonObject attr_obj = attribValue.toObject();
             std::string attr_key = attr_obj.value("key").toString().toStdString();
-            QString attr_value = attr_obj.value("value").toString();
-
+            //QString attr_value = attr_obj.value("value").toString();
+        
             int attr_type = attr_obj.value("type").toString().toInt();
 
             Attrib av;
@@ -1156,40 +1156,35 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             switch (attr_type) 
             {
                 case 0:
-                    add_attrib(attrs, attr_key, attr_value.toStdString());
+                {
+                    add_attrib(attrs, attr_key, attr_obj.value("value").toString().toStdString());
                     break;
+                }
                 case 1:
+                {
+                    QString attr_value = attr_obj.value("value").toString();
                     add_attrib(attrs, attr_key, attr_value.toInt());
                     break;
+                }
                 case 2:
+                {
+                    QString attr_value = attr_obj.value("value").toString();
                     add_attrib(attrs, attr_key, attr_value.replace(",", ".").toFloat());
                     break;
-                case 3: {
+                }
+                case 3: 
+                {
+                    QJsonArray attr_value = attr_obj.value("value").toArray();
                     std::vector<float> v;
-                    std::istringstream iss(attr_value.toStdString());
-                    std::copy(std::istream_iterator<float>(iss),
-                              std::istream_iterator<float>(),
-                              std::back_inserter(v));
+                    foreach (const QJsonValue& number, attr_value)
+                        v.push_back(number.toString().toFloat());    
+                    qDebug() << "SHIT" << QString::fromStdString(attr_key);
+                    for(auto f: v) 
+                        qDebug() << f;
                     add_attrib(attrs, attr_key, v);
                     break;
                 }
-                case 4: {
-                    std::vector<float> r;
-                    std::istringstream is(attr_value.toStdString());
-                    std::copy(std::istream_iterator<float>(is),
-                              std::istream_iterator<float>(),
-                              std::back_inserter(r));
-                    auto rtMat = RTMat(QMat(QVec::fromStdVector(r)));
-
-                    add_attrib(attrs, attr_key, r);
-
-                    break;
-                }
-                default:
-                    add_attrib(attrs, attr_key, attr_value.toStdString());
             }
-            //av.value(std::string((char *)attr_value));
-            //attrs[attr_key] = av;
         }
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
         ea.attrs(attrs);
