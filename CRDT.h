@@ -28,7 +28,7 @@
 #include "vertex.h"
 
 #define NO_PARENT -1
-#define TIMEOUT 5
+#define TIMEOUT 5000
 
 // Overload pattern used inprintVisitor
 template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
