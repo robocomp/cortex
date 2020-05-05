@@ -115,8 +115,11 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         r = insert_or_assign_node_(node);
     }
-    if (r)
+    if (r) {
         emit update_node_signal(node.id(), node.type());
+        for (const auto &[k,v]: node.fano())
+            emit update_edge_signal(node.id(), k.to());
+    }
     return r;
 }
 
@@ -162,6 +165,7 @@ bool CRDTGraph::delete_node(const std::string& name)
     }
     if (!result) 
         return false;
+
     emit del_node_signal(id);
 
     for (auto &[id0, id1, label] : edges)
@@ -957,9 +961,9 @@ std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const 
 }
 
 
-void CRDTGraph::add_attrib(std::map<string, Attribs> &v, std::string att_name, CRDT::MTypes att_value) {
+void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value) {
 
-    Attribs av;
+    Attrib av;
     av.type(att_value.index());
 
     Val value;
@@ -1035,7 +1039,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         name_map[name] = id;
         id_map[id] = name;
 
-        std::map<string, Attribs> attrs;
+        std::map<string, Attrib> attrs;
         add_attrib(attrs, "level",std::int32_t(0));
         add_attrib(attrs, "parent",std::int32_t(0));
 
@@ -1127,7 +1131,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         int srcn = link_obj.value("src").toString().toInt();
         int dstn = link_obj.value("dst").toString().toInt();
         std::string edgeName = link_obj.value("label").toString().toStdString();
-        std::map<string, Attribs> attrs;
+        std::map<string, Attrib> attrs;
         Edge ea;
         ea.from(srcn);
         ea.to(dstn);
@@ -1143,7 +1147,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 
             int attr_type = attr_obj.value("type").toInt();
 
-            Attribs av;
+            Attrib av;
             av.type(attr_type);
             Val value;
 

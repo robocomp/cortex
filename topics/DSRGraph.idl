@@ -21,7 +21,7 @@
         _RT_MAT
     };
 
-    struct Attribs
+    struct _Attrib
     {
         long type;
         Val value;
@@ -31,7 +31,7 @@
         long to; //key1
 		string type; //key2
 		long from; // Se mantiene para trabajar más fácilmente con los Edges.
-		map<string, Attribs>    attrs;
+		map<string, Attrib>    attrs;
 	};
 
     struct EdgeKey {
@@ -44,7 +44,7 @@
         string name;
         long id;
         long agent_id;
-		map<string, Attribs>   attrs;
+		map<string, Attrib>   attrs;
 		map<EdgeKey, Edge> fano;
     };
 
