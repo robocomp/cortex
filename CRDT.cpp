@@ -31,10 +31,10 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     work = true;
 
     // RTPS Create participant 
-	auto [suc , participant_handle] = dsrparticipant.init();
+    auto [suc, participant_handle] = dsrparticipant.init();
 
-	// RTPS Initialize publisher with general topic
-	dsrpub.init(participant_handle, "DSR", dsrparticipant.getDSRTopicName());
+    // RTPS Initialize publisher with general topic
+    dsrpub.init(participant_handle, "DSR", dsrparticipant.getDSRTopicName());
     dsrpub_graph_request.init(participant_handle, "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName());
     dsrpub_request_answer.init(participant_handle, "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName());
 
@@ -267,7 +267,8 @@ Edge CRDTGraph::get_edge(const std::string& from, const std::string& to, const s
 }
 
 
-Edge CRDTGraph::get_edge(int from, int  to, const std::string& key) {
+Edge CRDTGraph::get_edge(int from, int to, const std::string &key)
+{
     return get_edge_(from, to, key);
 }
 
@@ -276,7 +277,8 @@ Edge CRDTGraph::get_edge_(int from, int  to, const std::string& key)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
 
-    try { if(in(from) && in(to)) {
+    try {
+        if (in(from) && in(to)) {
             auto n = get_(from);
             EdgeKey ek;
             ek.to(to);
@@ -286,7 +288,7 @@ Edge CRDTGraph::get_edge_(int from, int  to, const std::string& key)
                 return Edge(edge->second);
             }
 
-            std::cout <<"Error obteniedo edge from: "<< from  << " to: " << to <<" key " << key << endl;
+            std::cout << "Error obteniedo edge from: "<< from  << " to: " << to <<" key " << key << endl;
 
         }
     }
@@ -1251,6 +1253,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 
 void CRDTGraph::write_to_json_file(const std::string &json_file_path)
 {
+    std::setlocale(LC_NUMERIC, "en_US.UTF-8");
     //create json object
     QJsonObject dsrObject;
     QJsonArray linksArray;
@@ -1291,74 +1294,55 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                     }
                     val = vf.str();
                     break;
-                case 4:
-                    if (!value.value().rtmat().empty())
-                    {
-                        std::copy(value.value().rtmat().begin(), value.value().rtmat().end()-1,
-                                  std::ostream_iterator<float>(vf, ", "));
-
-                        vf << value.value().rtmat().back();
-                    }
-                    val = vf.str();
-                    break;
             }
 
             attr["type"] = QString::number(value.value()._d());
-            attr[QString::fromStdString(key)] = QString::fromStdString(val);
+            attr["key"] = QString::fromStdString(key);
+            attr["value"] = QString::fromStdString(val);
             attrsArray.push_back(attr);
         }
         symbol["attribute"] = attrsArray;
         //link
         QJsonArray nodeLinksArray;
-        for (const auto &[key, value]: node.fano()){
-                QJsonObject link;
-                link["src"] = QString::number(value.from());
-                link["dst"] = QString::number(value.to());
-                link["label"] = QString::fromStdString(value.type());
-                // link attribute
-                QJsonArray lattrsArray;
-                for (const auto &[key, value]: value.attrs()) {
-                    std::ostringstream vf;
+        for (const auto &[key, value]: node.fano()) {
+            QJsonObject link;
+            link["src"] = QString::number(value.from());
+            link["dst"] = QString::number(value.to());
+            link["label"] = QString::fromStdString(value.type());
+            // link attribute
+            QJsonArray lattrsArray;
+            for (const auto &[key, value]: value.attrs()) {
+                std::ostringstream vf;
 
-                    QJsonObject attr;
-                    std::string val;
-                    switch (value.value()._d()) {
-                        case 0:
-                            val = value.value().str();
-                            break;
-                        case 1:
-                            val = std::to_string(value.value().dec());
-                            break;
-                        case 2:
-                            val = std::to_string(value.value().fl());
-                            break;
-                        case 3:
-                            if (!value.value().float_vec().empty())
-                            {
-                                std::copy(value.value().float_vec().begin(), value.value().float_vec().end()-1,
-                                          std::ostream_iterator<float>(vf, ", "));
+                QJsonObject attr;
+                std::string val;
+                switch (value.value()._d()) {
+                    case 0:
+                        val = value.value().str();
+                        break;
+                    case 1:
+                        val = std::to_string(value.value().dec());
+                        break;
+                    case 2:
+                        val = std::to_string(value.value().fl());
+                        break;
+                    case 3:
+                        if (!value.value().float_vec().empty()) {
+                            std::copy(value.value().float_vec().begin(), value.value().float_vec().end() - 1,
+                                      std::ostream_iterator<float>(vf, ", "));
 
-                                vf << value.value().float_vec().back();
-                            }
-                            val = vf.str();
-                            break;
-                        case 4:
-                            if (!value.value().rtmat().empty())
-                            {
-                                std::copy(value.value().rtmat().begin(), value.value().rtmat().end()-1,
-                                          std::ostream_iterator<float>(vf, ", "));
-
-                                vf << value.value().rtmat().back();
-                            }
-                            val = vf.str();
-                            break;
-                    }
-                    attr["type"] = QString::number(value.value()._d());
-                    attr[QString::fromStdString(key)] = QString::fromStdString(val);
-                    lattrsArray.push_back(attr);
+                            vf << value.value().float_vec().back();
+                        }
+                        val = vf.str();
+                        break;
                 }
-                link["linkAttribute"] = lattrsArray;
-                nodeLinksArray.push_back(link);
+                attr["type"] = QString::number(value.value()._d());
+                attr["key"] = QString::fromStdString(key);
+                attr["value"] = QString::fromStdString(val);
+                lattrsArray.push_back(attr);
+            }
+            link["linkAttribute"] = lattrsArray;
+            nodeLinksArray.push_back(link);
         }
         symbol["links"] = nodeLinksArray;
         symbolsArray.push_back(symbol);
@@ -1369,12 +1353,13 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
     jsonObject["DSRModel"] = dsrObject;
     //writable data
     QJsonDocument jsonDoc(jsonObject);
-	QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
+    QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
     //write to file
     std::ofstream outfile;
     outfile.open(json_file_path, std::ios_base::out | std::ios_base::trunc);
     outfile << strJson.toStdString();
     outfile.close();
     auto now_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::cout << __FILE__ << " " << __FUNCTION__ << "File: " << json_file_path << " written to disk at " << now_c << std::endl;
+    std::cout << __FILE__ << " " << __FUNCTION__ << "File: " << json_file_path << " written to disk at " << now_c
+              << std::endl;
 }
