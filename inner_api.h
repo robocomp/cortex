@@ -2,16 +2,18 @@
 #define INNER_API
 
 #include <qmat/QMatAll>
-#include "CRDT.h"
+#include "topics/DSRGraphPubSubTypes.h"
 
 namespace CRDT
 {
 
     class CRDTGraph;
+    class VEdge;
 
     class InnerAPI
     {
-        using ListsPtr = std::tuple<std::list<Edge>, std::list<Edge> >; 
+        using VEdgePtr = std::shared_ptr<VEdge>;
+        using ListsPtr = std::tuple<std::list<VEdgePtr>, std::list<VEdgePtr> >; 
         public:
             InnerAPI(CRDTGraph *G_);
             

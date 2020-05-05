@@ -113,6 +113,14 @@ namespace CRDT
                 return -1;
             }
             std::string get_type() const { return node.type(); };
+            std::int32_t get_parent()
+            {
+                try 
+                {  return get_attrib_by_name<std::int32_t>("parent"); } 
+                catch(const std::exception &e)
+                {  std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
+                return -1;
+            }
             void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value)
             {
                 Attrib av;

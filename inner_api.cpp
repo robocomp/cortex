@@ -1,5 +1,8 @@
 
 #include "inner_api.h"
+#include "CRDT.h"
+
+using namespace CRDT;
 
 //InnerAPI::InnerAPI(std::shared_ptr<CRDT::CRDTGraph> _G)
 InnerAPI::InnerAPI(CRDT::CRDTGraph *G_)
@@ -10,33 +13,33 @@ InnerAPI::InnerAPI(CRDT::CRDTGraph *G_)
 /// Computation of resultant RTMat going from A to common ancestor and from common ancestor to B (inverted)
 InnerAPI::ListsPtr InnerAPI::setLists(const std::string &destId, const std::string &origId)
 {
-    std::list<EdgeAttribs> listA, listB;
+    std::list<VEdgePtr> listA, listB;
 
-    auto a = G->getNode(origId);
-    auto b = G->getNode(destId);
+    auto a = G->get_vertex(origId);
+    auto b = G->get_vertex(destId);
 
 	if (a->id() == -1)
 		throw CRDT::DSRException("Cannot find node: \"" + origId + "\"");
 	if (b->id() == -1)
 		throw CRDT::DSRException("Cannot find node: "+ destId +"\"");
 
-	int minLevel = std::min(a->getLevel(), b->getLevel());
-	while (a->getLevel() >= minLevel)
+	int minLevel = std::min(a->get_level(), b->get_level());
+	while (a->get_level() >= minLevel)
 	{
         //qDebug() << "listaA" << a->id() << a->getLevel() << a->getParentId();
-		auto p_node = G->getNode(a->getParentId());
+		auto p_node = G->get_vertex(a->get_parent());
       	if(p_node->id() == -1)
 			break;
-        listA.push_back(p_node->edge(a->id(), "RT"));   // the downwards RT link from parent to a
+        listA.push_back(p_node->get_edge(a->id(), "RT"));   // the downwards RT link from parent to a
 		a = p_node;
 	}
-	while (b->getLevel() >= minLevel)
+	while (b->get_level() >= minLevel)
 	{
         //qDebug() << "listaB" << b->id() << b->getLevel();
-		auto p_node = G->getNode(b->getParentId());
+		auto p_node = G->get_vertex(b->get_parent());
 		if(p_node->id() == -1)
 			break;
-        listB.push_front(p_node->edge(b->id(), "RT"));
+        listB.push_front(p_node->get_edge(b->id(), "RT"));
 		b = p_node;
 	}
 	// while (b->id() != a->id())  		// Estaba en InnerModel pero no sé bien cuándo hace falta
@@ -64,20 +67,20 @@ RTMat InnerAPI::getTransformationMatrixS(const std::string &dest, const std::str
     //     qDebug() << QString::fromStdString(a.label());
     // for(auto b : listB)
     //     qDebug() << QString::fromStdString(b.label());
-    auto rt = [](EdgeAttribs &edge){ auto &ats = edge.attrs(); return RTMat(  std::stod(ats["rx"].value()),
-                                                        					  std::stod(ats["ry"].value()),
-                                                        					  std::stod(ats["rz"].value()),
-                                                        					  std::stod(ats["tx"].value()),
-                                                        					  std::stod(ats["ty"].value()),
-                                                        					  std::stod(ats["tz"].value()));}; 
+    // auto rt = [](EdgeAttribs &edge){ auto &ats = edge.attrs(); return RTMat(  std::stod(ats["rx"].value()),
+    //                                                     					  std::stod(ats["ry"].value()),
+    //                                                     					  std::stod(ats["rz"].value()),
+    //                                                     					  std::stod(ats["tx"].value()),
+    //                                                     					  std::stod(ats["ty"].value()),
+    //                                                     					  std::stod(ats["tz"].value()));}; 
     for(auto &edge: listA )
     {
-        ret = ((RTMat)(rt(edge))).operator*(ret);
+        ret = edge->get_attrib_by_name<RTMat>("RT").operator*(ret); 
         //rt(edge).print("ListA");
     }
     for(auto &edge: listB )
     {
-        ret = rt(edge).invert() * ret;
+        ret = edge->get_attrib_by_name<RTMat>("RT").invert() * ret;
         //rt(edge).print("ListB");
     }
     //	localHashTr[QPair<QString, QString>(to, from)] = ret;
