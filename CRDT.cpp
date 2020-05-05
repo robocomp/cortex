@@ -1065,7 +1065,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             QJsonObject attr_obj = attribValue.toObject();
             std::string attr_key = attr_obj.value("key").toString().toStdString();
             QString attr_value = attr_obj.value("value").toString();
-            int attr_type = attr_obj.value("type").toInt();
+            int attr_type = attr_obj.value("type").toString().toInt();
 
             switch (attr_type) {
                 case 0:
@@ -1145,7 +1145,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             std::string attr_key = attr_obj.value("key").toString().toStdString();
             QString attr_value = attr_obj.value("value").toString();
 
-            int attr_type = attr_obj.value("type").toInt();
+            int attr_type = attr_obj.value("type").toString().toInt();
 
             Attrib av;
             av.type(attr_type);
