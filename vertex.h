@@ -88,10 +88,6 @@ namespace CRDT
                         value.float_vec(std::get<std::vector<float>>(att_value));
                         av.value( value);
                         break;
-                    case 4:
-                        value.rtmat(std::get<RTMat>(att_value).toVector().toStdVector());
-                        av.value(value);
-                        break;
                 }
                 v[att_name] = av;
           }
@@ -143,12 +139,11 @@ namespace CRDT
                 if constexpr (std::is_same<Ta, std::vector<float>>::value)
                 {
                     if (err) return {};
-                    if (key == "RT" || key == "RTMat") return av.value().rtmat();
                     return av.value().float_vec();
                 }
                 if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                    if (err) return RTMat();
-                    return RTMat { QMat{ av.value().rtmat()} } ;
+                    return RTMat { n.attrs()["rot"].value().float_vec()[0],  n.attrs()["rot"].value().float_vec()[1],  n.attrs()["rot"].value().float_vec()[2],
+                                   n.attrs()["trans"].value().float_vec()[0], n.attrs()["trans"].value().float_vec()[1], n.attrs()["trans"].value().float_vec()[2]   } ;
                 }
             }
             

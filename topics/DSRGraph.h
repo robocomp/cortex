@@ -87,8 +87,6 @@ public:
                 return m_fl < rhs.m_fl;
             case 3:
                 return m_float_vec < rhs.m_float_vec;
-            case 4:
-                return m_rtmat < rhs.m_rtmat;
             default:
                 return false;
         }
@@ -119,8 +117,6 @@ public:
                 return m_fl == rhs.m_fl;
             case 3:
                 return m_float_vec == rhs.m_float_vec;
-            case 4:
-                return m_rtmat == rhs.m_rtmat;
             default:
                 return false;
         }
@@ -141,17 +137,11 @@ public:
                 os << " dec: " << type.m_dec;
                 break;
             case 2:
-                os << " floar: " << type.m_fl;
+                os << " float: " << type.m_fl;
                 break;
             case 3:
                 os << " float_vec: [ ";
                 for (auto &k: type.m_float_vec)
-                    os << k << ", ";
-                os << "] ";
-                break;
-            case 4:
-                os << "rtmat: [" ;
-                for (auto &k: type.m_rtmat)
                     os << k << ", ";
                 os << "] ";
                 break;
@@ -304,31 +294,6 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport std::vector<float>& float_vec();
-    /*!
-     * @brief This function copies the value in member rtmat
-     * @param _rtmat New value to be copied in member rtmat
-     */
-    eProsima_user_DllExport void rtmat(const std::vector<float> &_rtmat);
-
-    /*!
-     * @brief This function moves the value in member rtmat
-     * @param _rtmat New value to be moved in member rtmat
-     */
-    eProsima_user_DllExport void rtmat(std::vector<float> &&_rtmat);
-
-    /*!
-     * @brief This function returns a constant reference to member rtmat
-     * @return Constant reference to member rtmat
-     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
-     */
-    eProsima_user_DllExport const std::vector<float>& rtmat() const;
-
-    /*!
-     * @brief This function returns a reference to member rtmat
-     * @return Reference to member rtmat
-     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
-     */
-    eProsima_user_DllExport std::vector<float>& rtmat();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -369,7 +334,6 @@ private:
     int32_t m_dec;
     float m_fl;
     std::vector<float> m_float_vec;
-    std::vector<float> m_rtmat;
 };
 /*!
  * @brief This class represents the enumeration Types defined by the user in the IDL file.
@@ -379,10 +343,9 @@ enum Types : uint32_t
 {
     STRING,
     INT,
-    FLOAT,
-    FLOAT_VEC,
-    RT_MAT
+    FLOAT
 };
+
 /*!
  * @brief This class represents the structure Attrib defined by the user in the IDL file.
  * @ingroup DSRGRAPH

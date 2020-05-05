@@ -8,8 +8,8 @@
         float fl;
       case 3:
         sequence<float>  float_vec;
-      case 4:
-       sequence<float> rtmat;
+      //case 4:
+      // sequence<float> rtmat;
     };
 
     enum Types
@@ -17,8 +17,8 @@
         _STRING,
         _INT,
         _FLOAT,
-        _FLOAT_VEC,
-        _RT_MAT
+        _FLOAT_VEC
+       // _RT_MAT
     };
 
     struct _Attrib
