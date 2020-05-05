@@ -451,7 +451,7 @@ void CRDTGraph::print()
         std::cout << "  Name:" << node.name() << std::endl;
         std::cout << "  Agent_id:" << node.agent_id()  << std::endl;
         for(auto [key, val] : node.attrs())
-            std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
+            std::cout << "      [ " << key << ", " << val.type() << ", " << val.value() << " ]"  << std::endl;
         for(auto [key, val] : node.fano())
         {
             std::cout << "          Edge-type->" << val.type() << " from:" << val.from() << " to:" << val.to()  << std::endl;
