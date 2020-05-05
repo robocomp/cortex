@@ -1018,12 +1018,12 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
     QJsonObject jObject = doc.object();
 
     QJsonObject dsrobject = jObject.value("DSRModel").toObject();
-	QJsonArray symbolArray = dsrobject.value("symbol").toArray();
+	QJsonObject symbolMap = dsrobject.value("symbol").toObject();
     QJsonArray linksArray;
     // Read symbols (just symbols, then links in other loop)
-    foreach (const QJsonValue & symbolValue, symbolArray)
+    foreach (const QString &key, symbolMap.keys())
     {
-        QJsonObject sym_obj = symbolValue.toObject();
+        QJsonObject sym_obj = symbolMap[key].toObject();
         int id = sym_obj.value("id").toString().toInt();
         std::string type = sym_obj.value("type").toString().toStdString();
         std::string name = sym_obj.value("name").toString().toStdString();
@@ -1246,7 +1246,7 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
     //create json object
     QJsonObject dsrObject;
     QJsonArray linksArray;
-    QJsonArray symbolsArray;
+    QJsonObject symbolsMap;
     for (auto kv : nodes.getMapRef()) {
         Node node = kv.second.dots().ds.rbegin()->second;
         // symbol data
@@ -1302,40 +1302,35 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                 std::ostringstream vf;
 
                 QJsonObject attr, content;
-                std::string val;
+                QJsonValue val;
                 switch (value.value()._d()) {
                     case 0:
-                        val = value.value().str();
+                        val = QString::fromStdString(value.value().str());
                         break;
                     case 1:
-                        val = std::to_string(value.value().dec());
+                        val = value.value().dec();
                         break;
                     case 2:
-                        val = std::to_string(value.value().fl());
+                        val = value.value().fl();
                         break;
                     case 3:
-                        val = "[";
-                        std::vector<float> vector = value.value().float_vec();
-                        for(size_t i = 0; i < vector.size(); ++i)
-                        {
-                            if(i != 0)
-                                val += ",";
-                            val += std::to_string(vector[i]);
-                        }
-                        val += "]";
+                        QJsonArray array;
+                        for(const float &value : value.value().float_vec())
+                            array.push_back(value);
+                        val = array;                        
                         break;
                 }
                 content["type"] = QString::number(value.value()._d());
-                content["value"] = QString::fromStdString(val);
+                content["value"] = val;
                 lattrsObject[QString::fromStdString(key)] = content;
             }
             link["linkAttribute"] = lattrsObject;
             nodeLinksArray.push_back(link);
         }
         symbol["links"] = nodeLinksArray;
-        symbolsArray.push_back(symbol);
+        symbolsMap[QString::number(node.id())] = symbol;
     }
-    dsrObject["symbol"] = symbolsArray;
+    dsrObject["symbol"] = symbolsMap;
 
     QJsonObject jsonObject;
     jsonObject["DSRModel"] = dsrObject;
