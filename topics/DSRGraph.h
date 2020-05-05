@@ -141,7 +141,7 @@ public:
                 os << " dec: " << type.m_dec;
                 break;
             case 2:
-                os << " floar: " << type.m_fl;
+                os << " float: " << type.m_fl;
                 break;
             case 3:
                 os << " float_vec: [ ";

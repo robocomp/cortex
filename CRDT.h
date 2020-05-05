@@ -26,6 +26,7 @@
 #include "fast_rtps/dsrsubscriber.h"
 #include "topics/DSRGraphPubSubTypes.h"
 #include "vertex.h"
+#include "inner_api.h"
 
 #define NO_PARENT -1
 #define TIMEOUT 5000
@@ -98,9 +99,14 @@ namespace CRDT
         void print();
         std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t); //Used by viewer
         std::map<long, Node> getCopy() const;   
-        std::vector<long> getKeys() const ;     //deprecated
+        std::vector<long> getKeys() const ;   
+          
+        // not working yet
         typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
         typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
+
+        // Innermodel API
+        std::unique_ptr<InnerAPI> get_inner_api() { return std::make_unique<InnerAPI>(this); };
 
         // Nodes
         Node get_node(const std::string& name);

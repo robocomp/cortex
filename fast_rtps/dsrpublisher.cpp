@@ -109,7 +109,7 @@ void DSRPublisher::run()
     // Publication code
     //DSRGraphTopic st;
 
-    int msgsent = 0;  
+    //int msgsent = 0;  
     do
     {
     //     mp_publisher->write(&st);  

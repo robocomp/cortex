@@ -1187,7 +1187,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
                     add_attrib(attrs, attr_key, attr_value.toStdString());
             }
             //av.value(std::string((char *)attr_value));
-            attrs[attr_key] = av;
+            //attrs[attr_key] = av;
         }
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
         ea.attrs(attrs);
