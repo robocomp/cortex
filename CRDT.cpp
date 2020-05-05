@@ -1251,6 +1251,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
 
 void CRDTGraph::write_to_json_file(const std::string &json_file_path)
 {
+    std::setlocale(LC_NUMERIC, "en_US.UTF-8");
     //create json object
     QJsonObject dsrObject;
     QJsonArray linksArray;
