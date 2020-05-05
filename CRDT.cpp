@@ -1009,7 +1009,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
     if (not file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         fprintf(stderr,"Can't open JSON file, check file provided. \n");
-        exit(1);
+        exit(-1);
     }
     QString val = file.readAll();
     file.close();
@@ -1061,13 +1061,12 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         add_attrib(attrs, "color", color);
 
         // node atributes
-        QJsonArray attributesArray =  sym_obj.value("attribute").toArray();
-        foreach (const QJsonValue & attribValue, attributesArray)
+        QVariantMap attributesMap = sym_obj.value("attribute").toObject().toVariantMap();
+        for(QVariantMap::const_iterator iter = attributesMap.begin(); iter != attributesMap.end(); ++iter)
         {
-            QJsonObject attr_obj = attribValue.toObject();
-            std::string attr_key = attr_obj.value("key").toString().toStdString();
-            QString attr_value = attr_obj.value("value").toString();
-            int attr_type = attr_obj.value("type").toString().toInt();
+            std::string attr_key = iter.key().toStdString();
+            QString attr_value = iter.value().toMap()["value"].toString();
+            int attr_type = iter.value().toMap()["type"].toString().toInt();
 
             switch (attr_type) {
                 case 0:
@@ -1140,14 +1139,12 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         ea.type(edgeName);
 
         // link atributes
-        QJsonArray attributesArray =  link_obj.value("linkAttribute").toArray();
-        foreach (const QJsonValue & attribValue, attributesArray)
+        QVariantMap linkAttributesMap = link_obj.value("linkAttribute").toObject().toVariantMap();
+        for(QVariantMap::const_iterator iter = linkAttributesMap.begin(); iter != linkAttributesMap.end(); ++iter)
         {
-            QJsonObject attr_obj = attribValue.toObject();
-            std::string attr_key = attr_obj.value("key").toString().toStdString();
-            //QString attr_value = attr_obj.value("value").toString();
-        
-            int attr_type = attr_obj.value("type").toString().toInt();
+            std::string attr_key = iter.key().toStdString();
+            QVariant attr_value = iter.value().toMap()["value"];
+            int attr_type = iter.value().toMap()["type"].toString().toInt();
 
             Attrib av;
             av.type(attr_type);
@@ -1157,27 +1154,24 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
             {
                 case 0:
                 {
-                    add_attrib(attrs, attr_key, attr_obj.value("value").toString().toStdString());
+                    add_attrib(attrs, attr_key, attr_value.toString().toStdString());
                     break;
                 }
                 case 1:
                 {
-                    QString attr_value = attr_obj.value("value").toString();
                     add_attrib(attrs, attr_key, attr_value.toInt());
                     break;
                 }
                 case 2:
                 {
-                    QString attr_value = attr_obj.value("value").toString();
-                    add_attrib(attrs, attr_key, attr_value.replace(",", ".").toFloat());
+                    add_attrib(attrs, attr_key, attr_value.toString().replace(",", ".").toFloat());
                     break;
                 }
                 case 3: 
                 {
-                    QJsonArray attr_value = attr_obj.value("value").toArray();
                     std::vector<float> v;
-                    foreach (const QJsonValue& number, attr_value)
-                        v.push_back(number.toString().toFloat());    
+                    foreach (const QVariant& value, attr_value.toList())
+                        v.push_back(value.toFloat());    
                     qDebug() << "SHIT" << QString::fromStdString(attr_key);
                     for(auto f: v) 
                         qDebug() << f;
@@ -1261,12 +1255,12 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
         symbol["type"] = QString::fromStdString(node.type());
         symbol["name"] = QString::fromStdString(node.name());
         // symbol attribute
-        QJsonArray attrsArray;
+        QJsonObject attrsObject;
         for (const auto &[key, value]: node.attrs())
         {
             std::ostringstream vf;
 
-            QJsonObject attr;
+            QJsonObject content;
             std::string val;
 
             switch (value.value()._d()) {
@@ -1290,13 +1284,11 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                     val = vf.str();
                     break;
             }
-
-            attr["type"] = QString::number(value.value()._d());
-            attr["key"] = QString::fromStdString(key);
-            attr["value"] = QString::fromStdString(val);
-            attrsArray.push_back(attr);
+            content["type"] = QString::number(value.value()._d());
+            content["value"] = QString::fromStdString(val);
+            attrsObject[QString::fromStdString(key)] = content;
         }
-        symbol["attribute"] = attrsArray;
+        symbol["attribute"] = attrsObject;
         //link
         QJsonArray nodeLinksArray;
         for (const auto &[key, value]: node.fano()) {
@@ -1305,11 +1297,11 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
             link["dst"] = QString::number(value.to());
             link["label"] = QString::fromStdString(value.type());
             // link attribute
-            QJsonArray lattrsArray;
+            QJsonObject lattrsObject;
             for (const auto &[key, value]: value.attrs()) {
                 std::ostringstream vf;
 
-                QJsonObject attr;
+                QJsonObject attr, content;
                 std::string val;
                 switch (value.value()._d()) {
                     case 0:
@@ -1322,21 +1314,22 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                         val = std::to_string(value.value().fl());
                         break;
                     case 3:
-                        if (!value.value().float_vec().empty()) {
-                            std::copy(value.value().float_vec().begin(), value.value().float_vec().end() - 1,
-                                      std::ostream_iterator<float>(vf, ", "));
-
-                            vf << value.value().float_vec().back();
+                        val = "[";
+                        std::vector<float> vector = value.value().float_vec();
+                        for(size_t i = 0; i < vector.size(); ++i)
+                        {
+                            if(i != 0)
+                                val += ",";
+                            val += std::to_string(vector[i]);
                         }
-                        val = vf.str();
+                        val += "]";
                         break;
                 }
-                attr["type"] = QString::number(value.value()._d());
-                attr["key"] = QString::fromStdString(key);
-                attr["value"] = QString::fromStdString(val);
-                lattrsArray.push_back(attr);
+                content["type"] = QString::number(value.value()._d());
+                content["value"] = QString::fromStdString(val);
+                lattrsObject[QString::fromStdString(key)] = content;
             }
-            link["linkAttribute"] = lattrsArray;
+            link["linkAttribute"] = lattrsObject;
             nodeLinksArray.push_back(link);
         }
         symbol["links"] = nodeLinksArray;
