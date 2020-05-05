@@ -116,7 +116,7 @@ class DoRGBDStuff : public  QLabel
       resize(640,480);
       setWindowTitle("RGBD");
       setParent(this);
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::map<string,Attribs> &attrs){
+      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::map<string,Attrib> &attrs){
                         Node n = graph->get_node(graph->get_name_from_id(node_id));
                         const auto &lDists = graph->get_attrib_by_name<std::vector<float>>(n, "rgbd_data");
                             //label.setPixmap(QImage());                          
@@ -135,7 +135,7 @@ class DoTableStuff : public  QTableWidget
     {
       qRegisterMetaType<std::int32_t>("std::int32_t");
       qRegisterMetaType<std::string>("std::string");
-      qRegisterMetaType<map<string, Attribs>>("Attribs");
+      qRegisterMetaType<map<string, Attrib>>("Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
         Node n = graph->get_node(graph->get_name_from_id(node_id));
@@ -174,7 +174,7 @@ class DoTableStuff : public  QTableWidget
     };
 
   public slots:
-    void drawSLOT(const std::int32_t &id, const std::map<string,Attribs> &attribs) {
+    void drawSLOT(const std::int32_t &id, const std::map<string,Attrib> &attribs) {
         //std::cout << " Window " << this->window()->windowTitle().toStdString() << " id " << QString::number(id).toStdString() << " contains? " << this->window()->windowTitle().contains(QString::number(id)) << std::endl;
         if (this->window()->windowTitle().contains(QString::number(id))) {
         int i = 0;

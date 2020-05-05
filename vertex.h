@@ -54,9 +54,9 @@ namespace CRDT
                 return -1;
             }
             std::string get_type() const { return node.type(); };
-            void add_attrib(std::map<string, Attribs> &v, std::string att_name, CRDT::MTypes att_value)
+            void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value)
             {
-                Attribs av;
+                Attrib av;
                 av.type(att_value.index());
                 Val value;
                 switch(att_value.index()) 
@@ -87,7 +87,7 @@ namespace CRDT
             std::int32_t id() const { return node.id(); };
             std::string type() const { return node.type(); };    
             template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
-            Attribs get_attrib_by_name_(const T& n, const std::string &key) 
+            Attrib get_attrib_by_name_(const T& n, const std::string &key)
             {
                 try 
                 {
@@ -101,11 +101,11 @@ namespace CRDT
                     if constexpr (std::is_same<Node,  T>::value)
                         std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                                 << "-> " << n.id() << std::endl;
-                    if constexpr (std::is_same<Attribs,  T>::value)
+                    if constexpr (std::is_same<Attrib,  T>::value)
                         std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                                 << "-> " << n.to() << std::endl;
                 };
-                Attribs av;
+                Attrib av;
                 av.type(-1);
                 Val v;
                 v.str("unkown");
@@ -115,7 +115,7 @@ namespace CRDT
             template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
             Ta get_attrib_by_name(Type& n, const std::string &key)
             {
-                Attribs av = get_attrib_by_name_(n, key);
+                Attrib av = get_attrib_by_name_(n, key);
                 bool err = (av.type() == -1);
                 if constexpr (std::is_same<Ta, std::string>::value) {
                     if (err) return "error";

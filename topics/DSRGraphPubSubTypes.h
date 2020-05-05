@@ -35,16 +35,16 @@
 
 
 /*!
- * @brief This class represents the TopicDataType of the type Attribs defined by the user in the IDL file.
+ * @brief This class represents the TopicDataType of the type Attrib defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class AttribsPubSubType : public eprosima::fastrtps::TopicDataType {
+class AttribPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
-    typedef Attribs type;
+    typedef Attrib type;
 
-    eProsima_user_DllExport AttribsPubSubType();
+    eProsima_user_DllExport AttribPubSubType();
 
-    eProsima_user_DllExport virtual ~AttribsPubSubType();
+    eProsima_user_DllExport virtual ~AttribPubSubType();
     eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
     eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
     eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;

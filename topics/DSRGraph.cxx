@@ -634,7 +634,7 @@ void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
 
 
 
-Attribs::Attribs()
+Attrib::Attrib()
 {
     // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@77be656f
     m_type = 0;
@@ -643,25 +643,25 @@ Attribs::Attribs()
 
 }
 
-Attribs::~Attribs()
+Attrib::~Attrib()
 {
 
 
 }
 
-Attribs::Attribs(const Attribs &x)
+Attrib::Attrib(const Attrib &x)
 {
     m_type = x.m_type;
     m_value = x.m_value;
 }
 
-Attribs::Attribs(Attribs &&x)
+Attrib::Attrib(Attrib &&x)
 {
     m_type = x.m_type;
     m_value = std::move(x.m_value);
 }
 
-Attribs& Attribs::operator=(const Attribs &x)
+Attrib& Attrib::operator=(const Attrib &x)
 {
 
     m_type = x.m_type;
@@ -670,7 +670,7 @@ Attribs& Attribs::operator=(const Attribs &x)
     return *this;
 }
 
-Attribs& Attribs::operator=(Attribs &&x)
+Attrib& Attrib::operator=(Attrib &&x)
 {
 
     m_type = x.m_type;
@@ -679,7 +679,7 @@ Attribs& Attribs::operator=(Attribs &&x)
     return *this;
 }
 
-size_t Attribs::getMaxCdrSerializedSize(size_t current_alignment)
+size_t Attrib::getMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t initial_alignment = current_alignment;
 
@@ -692,7 +692,7 @@ size_t Attribs::getMaxCdrSerializedSize(size_t current_alignment)
     return current_alignment - initial_alignment;
 }
 
-size_t Attribs::getCdrSerializedSize(const Attribs& data, size_t current_alignment)
+size_t Attrib::getCdrSerializedSize(const Attrib& data, size_t current_alignment)
 {
     (void)data;
     size_t initial_alignment = current_alignment;
@@ -706,14 +706,14 @@ size_t Attribs::getCdrSerializedSize(const Attribs& data, size_t current_alignme
     return current_alignment - initial_alignment;
 }
 
-void Attribs::serialize(eprosima::fastcdr::Cdr &scdr) const
+void Attrib::serialize(eprosima::fastcdr::Cdr &scdr) const
 {
 
     scdr << m_type;
     scdr << m_value;
 }
 
-void Attribs::deserialize(eprosima::fastcdr::Cdr &dcdr)
+void Attrib::deserialize(eprosima::fastcdr::Cdr &dcdr)
 {
 
     dcdr >> m_type;
@@ -724,7 +724,7 @@ void Attribs::deserialize(eprosima::fastcdr::Cdr &dcdr)
  * @brief This function sets a value in member type
  * @param _type New value for member type
  */
-void Attribs::type(int32_t _type)
+void Attrib::type(int32_t _type)
 {
 m_type = _type;
 }
@@ -733,7 +733,7 @@ m_type = _type;
  * @brief This function returns the value of member type
  * @return Value of member type
  */
-int32_t Attribs::type() const
+int32_t Attrib::type() const
 {
     return m_type;
 }
@@ -742,7 +742,7 @@ int32_t Attribs::type() const
  * @brief This function returns a reference to member type
  * @return Reference to member type
  */
-int32_t& Attribs::type()
+int32_t& Attrib::type()
 {
     return m_type;
 }
@@ -751,7 +751,7 @@ int32_t& Attribs::type()
  * @brief This function copies the value in member value
  * @param _value New value to be copied in member value
  */
-void Attribs::value(const Val &_value)
+void Attrib::value(const Val &_value)
 {
 m_value = _value;
 }
@@ -760,7 +760,7 @@ m_value = _value;
  * @brief This function moves the value in member value
  * @param _value New value to be moved in member value
  */
-void Attribs::value(Val &&_value)
+void Attrib::value(Val &&_value)
 {
 m_value = std::move(_value);
 }
@@ -769,7 +769,7 @@ m_value = std::move(_value);
  * @brief This function returns a constant reference to member value
  * @return Constant reference to member value
  */
-const Val& Attribs::value() const
+const Val& Attrib::value() const
 {
     return m_value;
 }
@@ -778,12 +778,12 @@ const Val& Attribs::value() const
  * @brief This function returns a reference to member value
  * @return Reference to member value
  */
-Val& Attribs::value()
+Val& Attrib::value()
 {
     return m_value;
 }
 
-size_t Attribs::getKeyMaxCdrSerializedSize(size_t current_alignment)
+size_t Attrib::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
 
@@ -794,12 +794,12 @@ size_t Attribs::getKeyMaxCdrSerializedSize(size_t current_alignment)
     return current_align;
 }
 
-bool Attribs::isKeyDefined()
+bool Attrib::isKeyDefined()
 {
    return false;
 }
 
-void Attribs::serializeKey(eprosima::fastcdr::Cdr &scdr) const
+void Attrib::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 {
     (void) scdr;
      
@@ -885,7 +885,7 @@ size_t Edge::getMaxCdrSerializedSize(size_t current_alignment)
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
 
 
-        current_alignment += Attribs::getMaxCdrSerializedSize(current_alignment);
+        current_alignment += Attrib::getMaxCdrSerializedSize(current_alignment);
     }
 
 
@@ -912,7 +912,7 @@ size_t Edge::getCdrSerializedSize(const Edge& data, size_t current_alignment)
     {
         (void)a;
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + a.first.size() + 1;
-        current_alignment += Attribs::getCdrSerializedSize((a.second), current_alignment);
+        current_alignment += Attrib::getCdrSerializedSize((a.second), current_alignment);
 
     }
 
@@ -1032,7 +1032,7 @@ int32_t& Edge::from()
  * @brief This function copies the value in member attrs
  * @param _attrs New value to be copied in member attrs
  */
-void Edge::attrs(const std::map<std::string, Attribs> &_attrs)
+void Edge::attrs(const std::map<std::string, Attrib> &_attrs)
 {
 m_attrs = _attrs;
 }
@@ -1041,7 +1041,7 @@ m_attrs = _attrs;
  * @brief This function moves the value in member attrs
  * @param _attrs New value to be moved in member attrs
  */
-void Edge::attrs(std::map<std::string, Attribs> &&_attrs)
+void Edge::attrs(std::map<std::string, Attrib> &&_attrs)
 {
 m_attrs = std::move(_attrs);
 }
@@ -1050,7 +1050,7 @@ m_attrs = std::move(_attrs);
  * @brief This function returns a constant reference to member attrs
  * @return Constant reference to member attrs
  */
-const std::map<std::string, Attribs>& Edge::attrs() const
+const std::map<std::string, Attrib>& Edge::attrs() const
 {
     return m_attrs;
 }
@@ -1059,7 +1059,7 @@ const std::map<std::string, Attribs>& Edge::attrs() const
  * @brief This function returns a reference to member attrs
  * @return Reference to member attrs
  */
-std::map<std::string, Attribs>& Edge::attrs()
+std::map<std::string, Attrib>& Edge::attrs()
 {
     return m_attrs;
 }
@@ -1360,7 +1360,7 @@ size_t Node::getMaxCdrSerializedSize(size_t current_alignment)
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + 255 + 1;
 
 
-        current_alignment += Attribs::getMaxCdrSerializedSize(current_alignment);
+        current_alignment += Attrib::getMaxCdrSerializedSize(current_alignment);
     }
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
@@ -1398,7 +1398,7 @@ size_t Node::getCdrSerializedSize(const Node& data, size_t current_alignment)
     {
         (void)a;
         current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4) + a.first.size() + 1;
-        current_alignment += Attribs::getCdrSerializedSize((a.second), current_alignment);
+        current_alignment += Attrib::getCdrSerializedSize((a.second), current_alignment);
 
     }
 
@@ -1568,7 +1568,7 @@ int32_t& Node::agent_id()
  * @brief This function copies the value in member attrs
  * @param _attrs New value to be copied in member attrs
  */
-void Node::attrs(const std::map<std::string, Attribs> &_attrs)
+void Node::attrs(const std::map<std::string, Attrib> &_attrs)
 {
 m_attrs = _attrs;
 }
@@ -1577,7 +1577,7 @@ m_attrs = _attrs;
  * @brief This function moves the value in member attrs
  * @param _attrs New value to be moved in member attrs
  */
-void Node::attrs(std::map<std::string, Attribs> &&_attrs)
+void Node::attrs(std::map<std::string, Attrib> &&_attrs)
 {
 m_attrs = std::move(_attrs);
 }
@@ -1586,7 +1586,7 @@ m_attrs = std::move(_attrs);
  * @brief This function returns a constant reference to member attrs
  * @return Constant reference to member attrs
  */
-const std::map<std::string, Attribs>& Node::attrs() const
+const std::map<std::string, Attrib>& Node::attrs() const
 {
     return m_attrs;
 }
@@ -1595,7 +1595,7 @@ const std::map<std::string, Attribs>& Node::attrs() const
  * @brief This function returns a reference to member attrs
  * @return Reference to member attrs
  */
-std::map<std::string, Attribs>& Node::attrs()
+std::map<std::string, Attrib>& Node::attrs()
 {
     return m_attrs;
 }

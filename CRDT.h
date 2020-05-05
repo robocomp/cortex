@@ -91,7 +91,7 @@ namespace CRDT
         //////////////////////////////////////////////////////
 
         // Utils
-        void read_from_file(const std::string &xml_file_path);
+        //void read_from_file(const std::string &xml_file_path);
         void read_from_json_file(const std::string &json_file_path);
         void write_to_json_file(const std::string &json_file_path);
         bool empty(const int &id);
@@ -117,9 +117,9 @@ namespace CRDT
         // to be moved to Vertex //////////////////////////////////
         std::int32_t get_node_level(Node& n);
         std::string get_node_type(Node& n);
-        void add_attrib(std::map<string, Attribs> &v, std::string att_name, CRDT::MTypes att_value);
+        void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value);
         template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
-        Attribs get_attrib_by_name_(const T& n, const std::string &key) 
+        Attrib get_attrib_by_name_(const T& n, const std::string &key)
         {
             try 
             {
@@ -133,11 +133,11 @@ namespace CRDT
                 if constexpr (std::is_same<Node,  T>::value)
                     std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                             << "-> " << n.id() << std::endl;
-                if constexpr (std::is_same<Attribs,  T>::value)
+                if constexpr (std::is_same<Attrib,  T>::value)
                     std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
                             << "-> " << n.to() << std::endl;
             };
-            Attribs av;
+            Attrib av;
             av.type(-1);
             Val v;
             v.str("unkown");
@@ -147,7 +147,7 @@ namespace CRDT
         }
         template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
         Ta get_attrib_by_name(Type& n, const std::string &key) {
-            Attribs av = get_attrib_by_name_(n, key);
+            Attrib av = get_attrib_by_name_(n, key);
             bool err = (av.type() == -1);
             if constexpr (std::is_same<Ta, std::string>::value) {
                 if (err) return "error";
@@ -250,7 +250,7 @@ namespace CRDT
                                 std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f_)
                         : graph(graph_), work(work_), f(std::move(f_)){}
 
-                NewMessageFunctor() {};
+                NewMessageFunctor() = default;
 
 
                 void operator()(eprosima::fastrtps::Subscriber *sub) { f(sub, work, graph); };
@@ -282,7 +282,7 @@ namespace CRDT
     signals:                                                                  // for graphics update
         void update_node_signal(const std::int32_t, const std::string &type); // Signal to update CRDT
 
-        void update_attrs_signal(const std::int32_t &id, const std::map<string, Attribs> &attribs); //Signal to show node attribs.
+        void update_attrs_signal(const std::int32_t &id, const std::map<string, Attrib> &attribs); //Signal to show node attribs.
         void update_edge_signal(const std::int32_t from, const std::int32_t to);                   // Signal to show edge attribs.
 
         void del_edge_signal(const std::int32_t from, const std::int32_t to, const std::string &edge_tag); // Signal to del edge.

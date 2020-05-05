@@ -73,6 +73,7 @@ class Val
 {
 public:
 
+
     bool operator<(const Val &rhs) const {
 
         if (m__d != rhs.m__d) return false;
@@ -383,14 +384,14 @@ enum Types : uint32_t
     RT_MAT
 };
 /*!
- * @brief This class represents the structure Attribs defined by the user in the IDL file.
+ * @brief This class represents the structure Attrib defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class Attribs
+class Attrib
 {
 public:
 
-    bool operator==(const Attribs &av_) const {
+    bool operator==(const Attrib &av_) const {
         if (this == &av_) {
             return true;
         }
@@ -399,7 +400,7 @@ public:
         }
         return true;
     }
-    bool operator<(const Attribs &av_) const {
+    bool operator<(const Attrib &av_) const {
         if (this == &av_) {
             return false;
         }
@@ -411,59 +412,59 @@ public:
         return false;
     }
 
-    bool operator!=(const Attribs &av_) const {
+    bool operator!=(const Attrib &av_) const {
         return !operator==(av_);
     }
 
-    bool operator<=(const Attribs &av_) const {
+    bool operator<=(const Attrib &av_) const {
         return operator<(av_) || operator==(av_);
     }
 
-    bool operator>(const Attribs &av_) const {
+    bool operator>(const Attrib &av_) const {
         return !operator<(av_) && !operator==(av_);
     }
 
-    bool operator>=(const Attribs &av_) const {
+    bool operator>=(const Attrib &av_) const {
         return !operator<(av_);
     }
 
-    friend std::ostream &operator<<(std::ostream &output, const Attribs &av_) {
+    friend std::ostream &operator<<(std::ostream &output, const Attrib &av_) {
         output << "Type: "<<av_.type()<<", Value["<<av_.value()<<"]: "<<av_.value()<<", ";
         return output;
     };
     /*!
      * @brief Default constructor.
      */
-    eProsima_user_DllExport Attribs();
+    eProsima_user_DllExport Attrib();
 
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~Attribs();
+    eProsima_user_DllExport ~Attrib();
 
     /*!
      * @brief Copy constructor.
-     * @param x Reference to the object Attribs that will be copied.
+     * @param x Reference to the object Attrib that will be copied.
      */
-    eProsima_user_DllExport Attribs(const Attribs &x);
+    eProsima_user_DllExport Attrib(const Attrib &x);
 
     /*!
      * @brief Move constructor.
-     * @param x Reference to the object Attribs that will be copied.
+     * @param x Reference to the object Attrib that will be copied.
      */
-    eProsima_user_DllExport Attribs(Attribs &&x);
+    eProsima_user_DllExport Attrib(Attrib &&x);
 
     /*!
      * @brief Copy assignment.
-     * @param x Reference to the object Attribs that will be copied.
+     * @param x Reference to the object Attrib that will be copied.
      */
-    eProsima_user_DllExport Attribs& operator=(const Attribs &x);
+    eProsima_user_DllExport Attrib& operator=(const Attrib &x);
 
     /*!
      * @brief Move assignment.
-     * @param x Reference to the object Attribs that will be copied.
+     * @param x Reference to the object Attrib that will be copied.
      */
-    eProsima_user_DllExport Attribs& operator=(Attribs &&x);
+    eProsima_user_DllExport Attrib& operator=(Attrib &&x);
 
     /*!
      * @brief This function sets a value in member type
@@ -521,7 +522,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    eProsima_user_DllExport static size_t getCdrSerializedSize(const Attribs& data, size_t current_alignment = 0);
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const Attrib& data, size_t current_alignment = 0);
 
 
     /*!
@@ -568,6 +569,7 @@ private:
 class Edge
 {
 public:
+
 
     bool operator==(const Edge &eA_) const {
         if (this == &eA_) {
@@ -711,25 +713,25 @@ public:
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
-    eProsima_user_DllExport void attrs(const std::map<std::string, Attribs> &_attrs);
+    eProsima_user_DllExport void attrs(const std::map<std::string, Attrib> &_attrs);
 
     /*!
      * @brief This function moves the value in member attrs
      * @param _attrs New value to be moved in member attrs
      */
-    eProsima_user_DllExport void attrs(std::map<std::string, Attribs> &&_attrs);
+    eProsima_user_DllExport void attrs(std::map<std::string, Attrib> &&_attrs);
 
     /*!
      * @brief This function returns a constant reference to member attrs
      * @return Constant reference to member attrs
      */
-    eProsima_user_DllExport const std::map<std::string, Attribs>& attrs() const;
+    eProsima_user_DllExport const std::map<std::string, Attrib>& attrs() const;
 
     /*!
      * @brief This function returns a reference to member attrs
      * @return Reference to member attrs
      */
-    eProsima_user_DllExport std::map<std::string, Attribs>& attrs();
+    eProsima_user_DllExport std::map<std::string, Attrib>& attrs();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -785,7 +787,7 @@ private:
     int32_t m_to;
     std::string m_type;
     int32_t m_from;
-    std::map<std::string, Attribs> m_attrs;
+    std::map<std::string, Attrib> m_attrs;
 };
 /*!
  * @brief This class represents the structure EdgeKey defined by the user in the IDL file.
@@ -794,6 +796,7 @@ private:
 class EdgeKey
 {
 public:
+
 
     bool operator==(const EdgeKey &rhs) const {
         return m_to == rhs.m_to &&
@@ -960,6 +963,7 @@ private:
 class Node
 {
 public:
+
 
     bool operator==(const Node &n_) const {
         if (this == &n_) {
@@ -1130,25 +1134,25 @@ public:
      * @brief This function copies the value in member attrs
      * @param _attrs New value to be copied in member attrs
      */
-    eProsima_user_DllExport void attrs(const std::map<std::string, Attribs> &_attrs);
+    eProsima_user_DllExport void attrs(const std::map<std::string, Attrib> &_attrs);
 
     /*!
      * @brief This function moves the value in member attrs
      * @param _attrs New value to be moved in member attrs
      */
-    eProsima_user_DllExport void attrs(std::map<std::string, Attribs> &&_attrs);
+    eProsima_user_DllExport void attrs(std::map<std::string, Attrib> &&_attrs);
 
     /*!
      * @brief This function returns a constant reference to member attrs
      * @return Constant reference to member attrs
      */
-    eProsima_user_DllExport const std::map<std::string, Attribs>& attrs() const;
+    eProsima_user_DllExport const std::map<std::string, Attrib>& attrs() const;
 
     /*!
      * @brief This function returns a reference to member attrs
      * @return Reference to member attrs
      */
-    eProsima_user_DllExport std::map<std::string, Attribs>& attrs();
+    eProsima_user_DllExport std::map<std::string, Attrib>& attrs();
     /*!
      * @brief This function copies the value in member fano
      * @param _fano New value to be copied in member fano
@@ -1228,7 +1232,7 @@ private:
     std::string m_name;
     int32_t m_id;
     int32_t m_agent_id;
-    std::map<std::string, Attribs> m_attrs;
+    std::map<std::string, Attrib> m_attrs;
     std::map<EdgeKey, Edge> m_fano;
 };
 /*!
@@ -1357,6 +1361,7 @@ private:
 class PairInt
 {
 public:
+
 
     bool operator==(const PairInt &pi_) const {
         if (this == &pi_) {
@@ -1542,7 +1547,6 @@ public:
         output << "] ";
         return output;
     }
-
     /*!
      * @brief Default constructor.
      */
@@ -1692,7 +1696,6 @@ public:
         output <<dk_.cbase();
         return output;
     }
-
     /*!
      * @brief Default constructor.
      */
@@ -1835,7 +1838,6 @@ private:
 class AworSet
 {
 public:
-
 
     friend std::ostream &operator<<(std::ostream &output, const AworSet &as_) {
         output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
@@ -1987,7 +1989,6 @@ public:
         output << "\nContext: "<<om_.cbase();
         return output;
     }
-
     /*!
      * @brief Default constructor.
      */
