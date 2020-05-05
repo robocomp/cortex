@@ -42,7 +42,7 @@ namespace DSR
 			~GraphViewer();
 			void itemMoved();
 			void createGraph();
-			std::shared_ptr<CRDT::CRDTGraph> getGraph()  			  		{ return gcrdt;};
+			std::shared_ptr<CRDT::CRDTGraph> getGraph()  			  	{ return G;};
 			std::map<std::int32_t, GraphNode*> getGMap() const 			{return gmap;};
 			QGraphicsEllipseItem* getCentralPoint() const 				{return central_point;};
 		
@@ -52,7 +52,7 @@ namespace DSR
 			void timerEvent(QTimerEvent *event) override;
 			
 		private:
-			std::shared_ptr<CRDT::CRDTGraph> gcrdt;
+			std::shared_ptr<CRDT::CRDTGraph> G;
 			std::shared_ptr<SpecificWorker> worker;
 			QGraphicsScene scene;
 			int timerId = 0;

@@ -27,7 +27,7 @@
 
 using namespace DSR;
 
-GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  gcrdt(worker_->getGCRDT()) , worker(worker_)
+GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  G(worker_->G), worker(worker_)
 {
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
@@ -67,14 +67,15 @@ GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  gcrd
 	settings.beginGroup("QGraphicsView");
 		setTransform(settings.value("matrix", QTransform()).value<QTransform>());
 	settings.endGroup();
+	worker->setWindowTitle( worker->agent_name.c_str());
 
 	this->createGraph();
 
 	connect(worker->actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
 	connect(worker->actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
-    connect(gcrdt.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
-	connect(gcrdt.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
-	connect(gcrdt.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
+    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
+	connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
+	connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
 
 }
 
@@ -93,7 +94,7 @@ void GraphViewer::createGraph()
 {
 // 	std::cout << __FILE__ << __FUNCTION__ << "-- Entering GraphViewer::createGraph" << std::endl;
 	try {
-	    auto map = gcrdt->getCopy();
+	    auto map = G->getCopy();
 		for(const auto &[k, node] : map)
 		{
 			try
@@ -141,8 +142,8 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 
-    std::string name = gcrdt->get_name_from_id(id);
-	Node n = gcrdt->get_node(name);
+    std::string name = G->get_name_from_id(id);
+	Node n = G->get_node(name);
 
     if( gmap.count(id) == 0)	// if node does not exist, create it
 	{
@@ -198,7 +199,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 
 		try
 		{
-			auto qname = gcrdt->get_attrib_by_name<std::string>(n, "name");
+			auto qname = G->get_attrib_by_name<std::string>(n, "name");
 			qDebug() << QString::fromStdString(qname);
 			gnode->setTag(qname);
 		}
@@ -206,7 +207,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 
 		try
 		{
-			auto color = gcrdt->get_attrib_by_name<std::string>(n, "color");
+			auto color = G->get_attrib_by_name<std::string>(n, "color");
 			gnode->setColor(color);
 		}
 		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;}
@@ -217,8 +218,8 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
     float posx = 10; float posy = 10;
 	try
 	{
-        posx = gcrdt->get_attrib_by_name<float>(n, "pos_x");
-        posy = gcrdt->get_attrib_by_name<float>(n, "pos_y");
+        posx = G->get_attrib_by_name<float>(n, "pos_x");
+        posy = G->get_attrib_by_name<float>(n, "pos_y");
 	}
 	catch(const std::exception &e)
 	{
@@ -229,9 +230,9 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 	if(posx != gnode->x() or posy != gnode->y())
 		gnode->setPos(posx, posy);
 
-    emit gcrdt->update_attrs_signal(id, n.attrs() );
+    emit G->update_attrs_signal(id, n.attrs() );
 
-    //auto e = gcrdt->getEdges(id);
+    //auto e = G->getEdges(id);
     //	if (!e.empty())
     //	{
     //		for (auto &[k,v] : e)
