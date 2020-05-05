@@ -27,7 +27,7 @@
 
 using namespace DSR;
 
-GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  G(worker_->G), worker(worker_)
+GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  G(worker_->getGCRDT()), worker(worker_)
 {
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
@@ -67,7 +67,7 @@ GraphViewer::GraphViewer(const std::shared_ptr<SpecificWorker>& worker_) :  G(wo
 	settings.beginGroup("QGraphicsView");
 		setTransform(settings.value("matrix", QTransform()).value<QTransform>());
 	settings.endGroup();
-	worker->setWindowTitle( worker->agent_name.c_str());
+	worker->setWindowTitle( worker->getAgentName().c_str());
 
 	this->createGraph();
 
