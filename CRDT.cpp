@@ -1187,7 +1187,7 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
                     add_attrib(attrs, attr_key, attr_value.toStdString());
             }
             //av.value(std::string((char *)attr_value));
-            attrs[attr_key] = av;
+            //attrs[attr_key] = av;
         }
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
         ea.attrs(attrs);
@@ -1304,7 +1304,8 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
             }
 
             attr["type"] = QString::number(value.value()._d());
-            attr[QString::fromStdString(key)] = QString::fromStdString(val);
+            attr["key"] = QString::fromStdString(key);
+            attr["value"] = QString::fromStdString(val);
             attrsArray.push_back(attr);
         }
         symbol["attribute"] = attrsArray;
@@ -1354,7 +1355,8 @@ void CRDTGraph::write_to_json_file(const std::string &json_file_path)
                             break;
                     }
                     attr["type"] = QString::number(value.value()._d());
-                    attr[QString::fromStdString(key)] = QString::fromStdString(val);
+                    attr["key"] = QString::fromStdString(key);
+                    attr ["value"] = QString::fromStdString(val);
                     lattrsArray.push_back(attr);
                 }
                 link["linkAttribute"] = lattrsArray;
