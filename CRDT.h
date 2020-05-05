@@ -98,13 +98,15 @@ namespace CRDT
         void print();
         std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t); //Used by viewer
         std::map<long, Node> getCopy() const;   
-        //std::vector<long> getKeys() const ;     //deprecated
+        std::vector<long> getKeys() const ;     //deprecated
         typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
         typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
         // Nodes
         Node get_node(const std::string& name);
         Node get_node(int id);
+        Vertex get_vnode(const std::string& name);
+        Vertex get_vnode(int id);
         bool insert_or_assign_node(const N &node);
         bool delete_node(const std::string &name);
         bool delete_node(int id);

@@ -52,20 +52,16 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
         if(res == false)
             qFatal("CRDTGraph aborting: could not get DSR from the network");  //JC ¿se pueden limpiar aquí cosas antes de salir?
     }
-
     qDebug() << __FUNCTION__ << "Constructor finished OK";
-
 }
 
 
 CRDTGraph::~CRDTGraph() {
 }
 
-
 //////////////////////////////////////
 /// NODE METHODS
 /////////////////////////////////////
-
 
 Node CRDTGraph::get_node(const std::string& name)
 {
@@ -99,6 +95,16 @@ Node CRDTGraph::get_node(int id)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
+}
+
+Vertex CRDTGraph::get_vnode(const std::string& name)
+{
+    return Vertex(get_node(name));
+}
+  
+Vertex CRDTGraph::get_vnode(int id)
+{
+    return Vertex(get_node(id));
 }
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
@@ -422,14 +428,14 @@ std::map<long,Node> CRDTGraph::getCopy() const
     return mymap;
 }
 
-// std::vector<long> CRDTGraph::getKeys() const
-// {
-//     std::vector<long> keys;
-//     std::shared_lock<std::shared_mutex>  lock(_mutex);
-//     for (auto &[key, val] : nodes.getMap())
-//         keys.emplace_back(key);
-//     return keys;
-// }
+ std::vector<long> CRDTGraph::getKeys() const
+{
+    std::vector<long> keys;
+    std::shared_lock<std::shared_mutex>  lock(_mutex);
+    for (auto &[key, val] : nodes.getMap())
+        keys.emplace_back(key);
+    return keys;
+}
 
 void CRDTGraph::print()
 {
