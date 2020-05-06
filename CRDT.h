@@ -20,6 +20,8 @@
 #include <qmat/QMatAll>
 #include <typeinfo>
 
+#include <optional>
+
 #include "libs/delta-crdts.cc"
 #include "fast_rtps/dsrparticipant.h"
 #include "fast_rtps/dsrpublisher.h"
@@ -109,68 +111,55 @@ namespace CRDT
         std::unique_ptr<InnerAPI> get_inner_api() { return std::make_unique<InnerAPI>(this); };
 
         // Nodes
-        Node get_node(const std::string& name);
-        Node get_node(int id);
-        VertexPtr get_vertex(const std::string& name);
-        VertexPtr get_vertex(int id);
+        std::optional<Node> get_node(const std::string& name);
+        std::optional<Node> get_node(int id);
+        std::optional<VertexPtr> get_vertex(const std::string& name);
+        std::optional<VertexPtr> get_vertex(int id);
         bool insert_or_assign_node(const N &node);
         bool delete_node(const std::string &name);
         bool delete_node(int id);
         std::vector<Node> get_nodes_by_type(const std::string& type);
-        std::string get_name_from_id(std::int32_t id);  // caché
-        int get_id_from_name(const std::string &name);  // caché
+        std::optional<std::string> get_name_from_id(std::int32_t id);  // caché
+        std::optional<int> get_id_from_name(const std::string &name);  // caché
         
         // to be moved to Vertex //////////////////////////////////
-        std::int32_t get_node_level(Node& n);
-        std::string get_node_type(Node& n);
+        //std::int32_t get_node_level(Node& n);
+        //std::string> get_node_type(Node& n);
+
         void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value);
         template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
-        Attrib get_attrib_by_name_(const T& n, const std::string &key)
+        std::optional<Attrib> get_attrib_by_name_(const T& n, const std::string &key)
         {
-            try 
-            {
-                auto attrs = n.attrs();
-                auto value  = attrs.find(key);
-                if (value != attrs.end())
-                    return value->second;
-            }
-            catch(const std::exception &e)
-            {
+            auto attrs = n.attrs();
+            auto value  = attrs.find(key);
+            if (value != attrs.end())
+                return value->second;
+            else{
                 if constexpr (std::is_same<Node,  T>::value)
-                    std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
+                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
                             << "-> " << n.id() << std::endl;
                 if constexpr (std::is_same<Attrib,  T>::value)
-                    std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
+                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
                             << "-> " << n.to() << std::endl;
-            };
-            Attrib av;
-            av.type(-1);
-            Val v;
-            v.str("unkown");
-            av.value(v);
-
-            return av;
+            }
+            return {};
         }
         template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
-        Ta get_attrib_by_name(Type& n, const std::string &key) {
-            Attrib av = get_attrib_by_name_(n, key);
-            bool err = (av.type() == -1);
+        std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) {
+            std::optional<Attrib> av = get_attrib_by_name_(n, key);
+            if (!av.has_value()) return {};
             if constexpr (std::is_same<Ta, std::string>::value) {
-                if (err) return "error";
-                return av.value().str();
+                return av.value().value().str();
             }
             if constexpr (std::is_same<Ta, std::int32_t>::value){
-                if (err) return -1;
-                return av.value().dec();
+                return av.value().value().dec();
             }
             if constexpr (std::is_same<Ta, float>::value) {
-                if (err) return 0.0;
-                return av.value().fl();
+                return av.value().value().fl();
             }
             if constexpr (std::is_same<Ta, std::vector<float>>::value)
             {
-                if (err) return {};
-                return av.value().float_vec();
+                return av.value().value().float_vec();
             }
             if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
                 return RTMat {  n.attrs()["rot"].value().float_vec()[0],  n.attrs()["rot"].value().float_vec()[1],  n.attrs()["rot"].value().float_vec()[2],
@@ -179,8 +168,8 @@ namespace CRDT
         }
 
         //Edges
-        Edge get_edge(const std::string& from, const std::string& to, const std::string& key);
-        Edge get_edge(int from, int to, const std::string& key);
+        std::optional<Edge> get_edge(const std::string& from, const std::string& to, const std::string& key);
+        std::optional<Edge> get_edge(int from, int to, const std::string& key);
         bool insert_or_assign_edge(const Edge& attrs);
         bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
         bool delete_edge(int from, int t, const std::string& key);
@@ -190,7 +179,7 @@ namespace CRDT
         //////////////////////////////////////////////////////
         ///  Viewer
         //////////////////////////////////////////////////////
-        Nodes get();
+        //Nodes get();
 
         /*
         template <typename Ta>
@@ -231,16 +220,18 @@ namespace CRDT
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
-        N get(int id);
+        std::optional<N> get(int id);
         bool in(const int &id);
-        N get_(int id);
+        std::optional<N> get_(int id);
         bool insert_or_assign_node_(const N &node);
         std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
         bool delete_edge_(int from, int t, const std::string& key);
-        Edge get_edge_(int from, int to, const std::string& key);
+        std::optional<Edge> get_edge_(int from, int to, const std::string& key);
+
         int id();
         DotContext context();
         std::map<int, AworSet> Map();
+
         void join_delta_node(AworSet aworSet);
         void join_full_graph(OrMap full_graph);
 

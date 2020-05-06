@@ -16,6 +16,7 @@
 #include <qmat/QMatAll>
 #include <typeinfo>
 #include "topics/DSRGraphPubSubTypes.h"
+#include <optional>
 
 namespace CRDT
 {
@@ -30,50 +31,36 @@ namespace CRDT
         public:
             VEdge(Edge _edge) : edge(std::move(_edge)) {};
             VEdge(VEdge &vedge) : edge(std::move(vedge.edge)) {};
-            VEdge() { edge.type("error"); };
+            VEdge() = delete; //{ edge.type("error"); };
             int to() const { return edge.to(); };
             int from() const { return edge.from(); };
             EdgeKey get_key() const { EdgeKey key; key.to(edge.to()); key.type(edge.type()); return key; };
             Edge& get_CRDT_edge() { return edge; }; // only for reinserting
-            Attrib get_attrib_by_name_(const std::string &key)
+            std::optional<Attrib> get_attrib_by_name_(const std::string &key)
             {
-                try 
-                {
-                    auto attrs = edge.attrs();
-                    auto value  = attrs.find(key);
-                    if (value != attrs.end())
-                        return value->second;
-                }
-                catch(const std::exception &e) { std::cout << e.what() << std::endl; };
-
-                Attrib av;
-                av.type(-1);
-                Val v;
-                v.str("unkown");
-                av.value(v);
-                return av;
+                auto attrs = edge.attrs();
+                auto value  = attrs.find(key);
+                if (value != attrs.end())
+                    return value->second;
+                return {};
             }
             template <typename Ta>
-            Ta get_attrib_by_name(const std::string &key)
+            std::optional<Ta> get_attrib_by_name(const std::string &key)
             {
-                Attrib av = get_attrib_by_name_(key);
-                bool err = (av.type() == -1);
+                std::optional<Attrib> av = get_attrib_by_name_(key);
+                if (!av.has_value()) return {};
                 if constexpr (std::is_same<Ta, std::string>::value) {
-                    if (err) return "error";
-                    return av.value().str();
+                    return av->value().str();
                 }
                 if constexpr (std::is_same<Ta, std::int32_t>::value){
-                    if (err) return -1;
-                    return av.value().dec();
+                    return av->value().dec();
                 }
                 if constexpr (std::is_same<Ta, float>::value) {
-                    if (err) return 0.0;
-                    return av.value().fl();
+                    return av->value().fl();
                 }
                 if constexpr (std::is_same<Ta, std::vector<float>>::value)
                 {
-                    if (err) return {};
-                    return av.value().float_vec();
+                    return av->value().float_vec();
                 }
                 if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
                     auto &at = edge.attrs();
@@ -103,23 +90,16 @@ namespace CRDT
         public:
             Vertex(N _node) : node(std::move(_node)) {};
             Vertex(Vertex &v) : node(std::move(v.node)) {};
+            Vertex() = delete; // forbid default constructor
             N& get_CDRT_node() { return node; };    // so it can be reinserted
-            std::int32_t get_level() 
+            std::optional<std::int32_t> get_level()
             {
-                try 
-                {  return get_attrib_by_name<std::int32_t>("level"); } 
-                catch(const std::exception &e)
-                {  std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
-                return -1;
+                return get_attrib_by_name<std::int32_t>("level");
             }
             std::string get_type() const { return node.type(); };
-            std::int32_t get_parent()
+            std::optional<std::int32_t> get_parent()
             {
-                try 
-                {  return get_attrib_by_name<std::int32_t>("parent"); } 
-                catch(const std::exception &e)
-                {  std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
-                return -1;
+                return get_attrib_by_name<std::int32_t>("parent");
             }
             void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value)
             {
@@ -146,48 +126,35 @@ namespace CRDT
                         break;
                 }
                 v[att_name] = av;
-          }
+            }
             std::int32_t id() const { return node.id(); };
-            std::string type() const { return node.type(); };    
-            Attrib get_attrib_by_name_(const std::string &key)
+            std::string type() const { return node.type(); };
+            std::optional<Attrib> get_attrib_by_name_(const std::string &key)
             {
-                try 
-                {
-                    auto attrs = node.attrs();
-                    auto value  = attrs.find(key);
-                    if (value != attrs.end())
-                        return value->second;
-                }
-                catch(const std::exception &e) { std::cout << e.what() << std::endl; };
+                auto attrs = node.attrs();
+                auto value  = attrs.find(key);
+                if (value != attrs.end())
+                    return value->second;
 
-                Attrib av;
-                av.type(-1);
-                Val v;
-                v.str("unkown");
-                av.value(v);
-                return av;
+                return {};
             }
             template <typename Ta>
-            Ta get_attrib_by_name(const std::string &key)
+            std::optional<Ta> get_attrib_by_name(const std::string &key)
             {
-                Attrib av = get_attrib_by_name_(key);
-                bool err = (av.type() == -1);
+                std::optional<Attrib> av = get_attrib_by_name_(key);
+                if (!av.has_value()) return {};
                 if constexpr (std::is_same<Ta, std::string>::value) {
-                    if (err) return "error";
-                    return av.value().str();
+                    return av->value().str();
                 }
                 if constexpr (std::is_same<Ta, std::int32_t>::value){
-                    if (err) return -1;
-                    return av.value().dec();
+                    return av->value().dec();
                 }
                 if constexpr (std::is_same<Ta, float>::value) {
-                    if (err) return 0.0;
-                    return av.value().fl();
+                    return av->value().fl();
                 }
                 if constexpr (std::is_same<Ta, std::vector<float>>::value)
                 {
-                    if (err) return {};
-                    return av.value().float_vec();
+                    return av->value().float_vec();
                 }
                 if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
                     auto &at = node.attrs();
@@ -197,7 +164,7 @@ namespace CRDT
             }
             
             // Edges
-            VEdgePtr get_edge(int to, const std::string& key)
+            std::optional<VEdgePtr> get_edge(int to, const std::string& key)
             {
                 EdgeKey ek;
                 ek.to(to);
@@ -205,8 +172,7 @@ namespace CRDT
                 auto edge = node.fano().find(ek);
                 if (edge != node.fano().end())
                     return std::make_shared<VEdge>(Edge(edge->second));
-                else
-                    return std::make_shared<VEdge>();
+                return {};
             }
             void insert_or_assign_edge(const VEdgePtr& vedge)
             {

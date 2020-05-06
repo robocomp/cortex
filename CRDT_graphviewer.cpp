@@ -142,103 +142,104 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 
-    std::string name = G->get_name_from_id(id);
-	Node n = G->get_node(name);
+    //std::string name = G->get_name_from_id(id);
+	std::optional<Node> n = G->get_node(id);
+    if (n.has_value()) {
+        if (gmap.count(id) == 0)    // if node does not exist, create it
+        {
+            gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));  //REEMPLAZAR THIS
+            gnode->id_in_graph = id;
+            //gnode->name_in_graph = name;
+            gnode->setType(type);
+            scene.addItem(gnode);
+            gmap.insert(std::pair(id, gnode));
 
-    if( gmap.count(id) == 0)	// if node does not exist, create it
-	{
-		gnode = new GraphNode(std::shared_ptr<GraphViewer>(this));  //REEMPLAZAR THIS 
-		gnode->id_in_graph = id;
-		gnode->name_in_graph = name;
-		gnode->setType( type );
-		scene.addItem(gnode);
-		gmap.insert(std::pair(id, gnode));
+            // left table filling only if it is new
+            worker->tableWidgetNodes->setColumnCount(1);
+            worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"type"});
+            worker->tableWidgetNodes->verticalHeader()->setVisible(false);
+            worker->tableWidgetNodes->setShowGrid(false);
+            nodes_types_list << QString::fromStdString(type);
+            nodes_types_list.removeDuplicates();
+            int i = 0;
 
-		// left table filling only if it is new
-		worker->tableWidgetNodes->setColumnCount(1);
-		worker->tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"type"}); 
-		worker->tableWidgetNodes->verticalHeader()->setVisible(false);
-		worker->tableWidgetNodes->setShowGrid(false);
-		nodes_types_list << QString::fromStdString(type);
-		nodes_types_list.removeDuplicates();
-		int i = 0;
+            worker->tableWidgetNodes->clearContents();
+            worker->tableWidgetNodes->setRowCount(nodes_types_list.size());
+            for (auto &s : nodes_types_list) {
+                worker->tableWidgetNodes->setItem(i, 0, new QTableWidgetItem(s));
+                worker->tableWidgetNodes->item(i, 0)->setIcon(
+                        QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+                i++;
+            }
+            worker->tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);
+            worker->tableWidgetNodes->resizeRowsToContents();
+            worker->tableWidgetNodes->resizeColumnsToContents();
+            worker->tableWidgetNodes->show();
 
-		worker->tableWidgetNodes->clearContents();
-		worker->tableWidgetNodes->setRowCount(nodes_types_list.size());
-		for( auto &s : nodes_types_list)
-		{
-			worker->tableWidgetNodes->setItem(i,0, new QTableWidgetItem(s));
-			worker->tableWidgetNodes->item(i,0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
-			i++;
-		}
-		worker->tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);
-		worker->tableWidgetNodes->resizeRowsToContents();
-		worker->tableWidgetNodes->resizeColumnsToContents();
-		worker->tableWidgetNodes->show();
+            // connect QTableWidget itemClicked to hide/show nodes of selected type and nodes fanning into it
+            disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, nullptr, nullptr);
 
-		// connect QTableWidget itemClicked to hide/show nodes of selected type and nodes fanning into it
-		disconnect(worker->tableWidgetNodes, &QTableWidget::itemClicked, nullptr, nullptr);
-
-		connect(worker->tableWidgetNodes, &QTableWidget::itemClicked, this, [this](const auto &item){ 
-							static bool visible = true;
-							std::cout << __FILE__ << " " << __FUNCTION__ << "hide or show all nodes of type " << item->text().toStdString() << std::endl;
-							for( auto &[k, v] : gmap) 
-								if( item->text().toStdString() == v->getType()) 
-								{
-									v->setVisible(!v->isVisible());
-									for(const auto &gedge: gmap.at(k)->edgeList)
-										gedge->setVisible(!gedge->isVisible());
-								}
-							visible = !visible;
-							if(visible)
-								worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
-							else 
-								worker->tableWidgetNodes->item(item->row(),0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/redBall.png")));
-						} , Qt::UniqueConnection);
+            connect(worker->tableWidgetNodes, &QTableWidget::itemClicked, this, [this](const auto &item) {
+                static bool visible = true;
+                std::cout << __FILE__ << " " << __FUNCTION__ << "hide or show all nodes of type "
+                          << item->text().toStdString() << std::endl;
+                for (auto &[k, v] : gmap)
+                    if (item->text().toStdString() == v->getType()) {
+                        v->setVisible(!v->isVisible());
+                        for (const auto &gedge: gmap.at(k)->edgeList)
+                            gedge->setVisible(!gedge->isVisible());
+                    }
+                visible = !visible;
+                if (visible)
+                    worker->tableWidgetNodes->item(item->row(), 0)->setIcon(
+                            QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+                else
+                    worker->tableWidgetNodes->item(item->row(), 0)->setIcon(
+                            QPixmap::fromImage(QImage("../../graph-related-classes/redBall.png")));
+            }, Qt::UniqueConnection);
 
 
-		try
-		{
-			auto qname = G->get_attrib_by_name<std::string>(n, "name");
-			qDebug() << QString::fromStdString(qname);
-			gnode->setTag(qname);
-		}
-		catch(const std::exception &e){ std::cout << e.what() << " Exception name" << std::endl;}
+            try {
+                auto qname = G->get_attrib_by_name<std::string>(n.value(), "name");
+                if (qname.has_value()) {
+                    qDebug() << QString::fromStdString(qname.value());
+                    gnode->setTag(qname.value());
+                }
+            }
+            catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; }
 
-		try
-		{
-			auto color = G->get_attrib_by_name<std::string>(n, "color");
-			gnode->setColor(color);
-		}
-		catch(const std::exception &e){ std::cout << e.what() << " Exception in color " << std::endl;}
-	}
-	else
-		gnode = gmap.at(id);
+            try {
+                auto color = G->get_attrib_by_name<std::string>(n.value(), "color");
+                if (color.has_value())
+                    gnode->setColor(color.value());
+            }
+            catch (const std::exception &e) { std::cout << e.what() << " Exception in color " << std::endl; }
+        } else
+            gnode = gmap.at(id);
 
-    float posx = 10; float posy = 10;
-	try
-	{
-        posx = G->get_attrib_by_name<float>(n, "pos_x");
-        posy = G->get_attrib_by_name<float>(n, "pos_y");
-	}
-	catch(const std::exception &e)
-	{
-		auto rd = QVec::uniformVector(2,-200,200);
-		posx = rd.x();
-		posy = rd.y();
-	}
-	if(posx != gnode->x() or posy != gnode->y())
-		gnode->setPos(posx, posy);
+        float posx = 10;
+        float posy = 10;
+        try {
+            posx = G->get_attrib_by_name<float>(n.value(), "pos_x").value_or(10);
+            posy = G->get_attrib_by_name<float>(n.value(), "pos_y").value_or(10);
+        }
+        catch (const std::exception &e) {
+            auto rd = QVec::uniformVector(2, -200, 200);
+            posx = rd.x();
+            posy = rd.y();
+        }
+        if (posx != gnode->x() or posy != gnode->y())
+            gnode->setPos(posx, posy);
 
-    emit G->update_attrs_signal(id, n.attrs() );
+        emit G->update_attrs_signal(id, n.value().attrs());
 
-    //auto e = G->getEdges(id);
-    //	if (!e.empty())
-    //	{
-    //		for (auto &[k,v] : e)
-    //			addEdgeSLOT(id, k, v.label);
-    //	}
-
+        //auto e = G->getEdges(id);
+        //	if (!e.empty())
+        //	{
+        //		for (auto &[k,v] : e)
+        //			addEdgeSLOT(id, k, v.label);
+        //	}
+    }
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)

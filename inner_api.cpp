@@ -18,29 +18,29 @@ InnerAPI::ListsPtr InnerAPI::setLists(const std::string &destId, const std::stri
     auto a = G->get_vertex(origId);
     auto b = G->get_vertex(destId);
 
-	if (a->id() == -1)
+	if (!a.has_value())
 		throw CRDT::DSRException("Cannot find node: \"" + origId + "\"");
-	if (b->id() == -1)
+	if (!b.has_value())
 		throw CRDT::DSRException("Cannot find node: "+ destId +"\"");
 
-	int minLevel = std::min(a->get_level(), b->get_level());
-	while (a->get_level() >= minLevel)
+	int minLevel = std::min(a.value()->get_level().value_or(-1), b.value()->get_level().value_or(-1));
+	while (a.value()->get_level() >= minLevel)
 	{
         //qDebug() << "listaA" << a->id() << a->getLevel() << a->getParentId();
-		auto p_node = G->get_vertex(a->get_parent());
-      	if(p_node->id() == -1)
+		auto p_node = G->get_vertex(a.value()->get_parent().value_or(-1));
+      	if(!p_node.has_value())
 			break;
-        listA.push_back(p_node->get_edge(a->id(), "RT"));   // the downwards RT link from parent to a
-		a = p_node;
+        listA.push_back(p_node.value()->get_edge(a.value()->id(), "RT").value());   // the downwards RT link from parent to a
+        a = p_node;
 	}
-	while (b->get_level() >= minLevel)
+	while (b.value()->get_level() >= minLevel)
 	{
         //qDebug() << "listaB" << b->id() << b->getLevel();
-		auto p_node = G->get_vertex(b->get_parent());
-		if(p_node->id() == -1)
+		auto p_node = G->get_vertex(b.value()->get_parent().value_or(-1));
+		if(!p_node.has_value())
 			break;
-        listB.push_front(p_node->get_edge(b->id(), "RT"));
-		b = p_node;
+        listB.push_front(p_node.value()->get_edge(a.value()->id(), "RT").value());
+        b = p_node;
 	}
 	// while (b->id() != a->id())  		// Estaba en InnerModel pero no sé bien cuándo hace falta
 	// {
@@ -75,12 +75,12 @@ RTMat InnerAPI::getTransformationMatrixS(const std::string &dest, const std::str
     //                                                     					  std::stod(ats["tz"].value()));}; 
     for(auto &edge: listA )
     {
-        ret = edge->get_attrib_by_name<RTMat>("RT").operator*(ret); 
+        ret = edge->get_attrib_by_name<RTMat>("RT").value().operator*(ret);
         //rt(edge).print("ListA");
     }
     for(auto &edge: listB )
     {
-        ret = edge->get_attrib_by_name<RTMat>("RT").invert() * ret;
+        ret = edge->get_attrib_by_name<RTMat>("RT").value().invert() * ret;
         //rt(edge).print("ListB");
     }
     //	localHashTr[QPair<QString, QString>(to, from)] = ret;
