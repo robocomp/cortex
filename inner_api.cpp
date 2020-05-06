@@ -67,12 +67,7 @@ RTMat InnerAPI::getTransformationMatrixS(const std::string &dest, const std::str
     //     qDebug() << QString::fromStdString(a.label());
     // for(auto b : listB)
     //     qDebug() << QString::fromStdString(b.label());
-    // auto rt = [](EdgeAttribs &edge){ auto &ats = edge.attrs(); return RTMat(  std::stod(ats["rx"].value()),
-    //                                                     					  std::stod(ats["ry"].value()),
-    //                                                     					  std::stod(ats["rz"].value()),
-    //                                                     					  std::stod(ats["tx"].value()),
-    //                                                     					  std::stod(ats["ty"].value()),
-    //                                                     					  std::stod(ats["tz"].value()));}; 
+    
     for(auto &edge: listA )
     {
         ret = edge->get_attrib_by_name<RTMat>("RT").operator*(ret); 
