@@ -23,6 +23,7 @@
 #include <QListView>
 #include "CRDT.h"
 #include <typeinfo>
+#include "graphUI.h"
 
 class SpecificWorker;
 class GraphNode;
@@ -34,11 +35,12 @@ namespace DSR
 	/// Drawing controller to display the graph in real-time using DataStorm updates
 	//////////////////////////////////////////////////////////////////////////////////////////////77
 	
-	class GraphViewer : public QGraphicsView
+	//class GraphViewer : public QGraphicsView 
+	class GraphViewer : public QWidget, public Ui_graphDlg
 	{
 		Q_OBJECT
 		public:
-			GraphViewer(const std::shared_ptr<SpecificWorker>& worker_);
+			GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G);
 			~GraphViewer();
 			void itemMoved();
 			void createGraph();
@@ -53,7 +55,6 @@ namespace DSR
 			
 		private:
 			std::shared_ptr<CRDT::CRDTGraph> G;
-			std::shared_ptr<SpecificWorker> worker;
 			QGraphicsScene scene;
 			int timerId = 0;
 			QStringList nodes_types_list, edges_types_list;

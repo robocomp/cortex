@@ -38,22 +38,27 @@ class DoRTStuff : public  QTableWidget
     {
       qRegisterMetaType<CRDT::IDType>("DSR::IDType");
       qRegisterMetaType<CRDT::AttribsMap>("DSR::Attribs");
-      Node n = graph->get_node(graph->get_name_from_id(from));
-      Node n2 = graph->get_node(graph->get_name_from_id(to));
 
-      //setWindowModality(Qt::ApplicationModal);
-      setWindowTitle("RT: " + QString::fromStdString(graph->get_node_type(n)) + " to " + QString::fromStdString(graph->get_node_type(n2)));
-      setColumnCount(4);
-      setRowCount(4);
-      setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d"}); 
-      setVerticalHeaderLabels(QStringList{"a", "b", "c", "d"}); 
-      horizontalHeader()->setStretchLastSection(true);
-      resizeRowsToContents();
-      resizeColumnsToContents();      
-      drawSLOT(from, to);	
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DoRTStuff::drawSLOT);
-      show();
-      std::cout << __FILE__ << " " << __FUNCTION__ << " End ofDoRTStuff Constructor "  << std::endl;
+      std::optional<Node> n = graph->get_node(from);
+      std::optional<Node> n2 = graph->get_node(to);
+
+      if (n.has_value() &&  n2.has_value()) {
+          //TODO: COmprobar esto
+          //setWindowModality(Qt::ApplicationModal);
+          setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " +
+                         QString::fromStdString(n2.value().type()));
+          setColumnCount(4);
+          setRowCount(4);
+          setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d"});
+          setVerticalHeaderLabels(QStringList{"a", "b", "c", "d"});
+          horizontalHeader()->setStretchLastSection(true);
+          resizeRowsToContents();
+          resizeColumnsToContents();
+          drawSLOT(from, to);
+          QObject::connect(graph.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DoRTStuff::drawSLOT);
+          show();
+          std::cout << __FILE__ << " " << __FUNCTION__ << " End ofDoRTStuff Constructor " << std::endl;
+      }
     };
   
   void closeEvent (QCloseEvent *event) override 
@@ -69,15 +74,16 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          std::string n_from = graph->get_name_from_id(from);
-          std::string n_to = graph->get_name_from_id(to);
+          //std::string n_from = graph->get_name_from_id(from);
+          //std::string n_to = graph->get_name_from_id(to);
 
-          Edge ea = graph->get_edge(n_from, n_to, "RT");
+          std::optional<Edge> ea = graph->get_edge(from, to, "RT");
 
-          auto value = ea.attrs().find("RT");
-          if (value != ea.attrs().end()) {
+          //TODO: Comprobar esto
+          //auto value = ea.attrs().find("RT");
+          if (ea.has_value()) {
               //auto rtvalue = value->second.value();
-              auto mat = graph->get_attrib_by_name<RMat::RTMat>(ea, "RT");
+              auto mat = graph->get_attrib_by_name<RMat::RTMat>(ea.value(), "RT").value_or(RTMat());
 
               //mat.print("mat");
               for (auto i : iter::range(mat.nRows()))

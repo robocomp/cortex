@@ -76,26 +76,31 @@ class DoLaserStuff : public QGraphicsView
       try
       {
         std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
-        Node n = graph->get_node(graph->get_name_from_id(id));
-        const vector<float> lAngles = graph->get_attrib_by_name<vector<float>>(n, "laser_data_angles");
-        const vector<float> lDists = graph->get_attrib_by_name<vector<float>>(n, "laser_data_dists");
+        std::optional<Node> n = graph->get_node(id);
+        if (n.has_value()) {
+            const auto lAngles = graph->get_attrib_by_name<vector<float>>(n.value(),"laser_data_angles");
+            const auto lDists = graph->get_attrib_by_name<vector<float>>(n.value(), "laser_data_dists");
 
-        QPolygonF polig;
-        for(const auto v : lAngles)
-            std::cout <<v;
-          cout<<std::endl;
-          for(const auto v : lDists)
-              std::cout << v;
-        cout<<std::endl;
-        for(const auto &[dist, angle] : iter::zip(lDists, lAngles))
-        {
-          std::cout << dist<< ","<<angle<<std::endl;
-          polig << QPointF(dist*sin(angle), dist*cos(angle));
+            if (lAngles.has_value() and lDists.has_value()) {
+                QPolygonF polig;
+                for (const auto v : lAngles.value())
+                    std::cout << v;
+                cout << std::endl;
+                for (const auto v : lDists.value())
+                    std::cout << v;
+                cout << std::endl;
+                for (const auto &[dist, angle] : iter::zip(lDists.value(), lAngles.value())) {
+                    std::cout << dist << "," << angle << std::endl;
+                    polig << QPointF(dist * sin(angle), dist * cos(angle));
+                }
+                scene.clear();
+                QPolygonF robot;
+                robot << QPointF(-200, 0) << QPointF(-100, 150) << QPointF(0, 200) << QPointF(100, 150)
+                      << QPointF(200, 0);
+                scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
+                scene.addPolygon(polig, QPen(QColor("LightPink"), 8), QBrush(QColor("LightPink")));
+            }
         }
-        scene.clear();
-        QPolygonF robot; robot << QPointF(-200, 0) << QPointF(-100,150) << QPointF(0,200) << QPointF(100,150) << QPointF(200,0);
-        scene.addPolygon(robot, QPen(Qt::blue, 8), QBrush(Qt::blue));
-        scene.addPolygon(polig, QPen(QColor("LightPink"), 8), QBrush(QColor("LightPink")));
       }
       catch(const std::exception &e){ std::cout << "Node " << node_id << " problem. "<<e.what() << std::endl;};
     };
@@ -117,8 +122,10 @@ class DoRGBDStuff : public  QLabel
       setWindowTitle("RGBD");
       setParent(this);
       QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, [&](const std::int32_t &id, const std::map<string,Attrib> &attrs){
-                        Node n = graph->get_node(graph->get_name_from_id(node_id));
-                        const auto &lDists = graph->get_attrib_by_name<std::vector<float>>(n, "rgbd_data");
+                        std::optional<Node> n = graph->get_node(node_id);
+                        //Esto no hace nada
+                        if (n.has_value())
+                            const auto &lDists = graph->get_attrib_by_name<std::vector<float>>(n.value(), "rgbd_data");
                             //label.setPixmap(QImage());                          
                           });
       show();
@@ -138,39 +145,44 @@ class DoTableStuff : public  QTableWidget
       qRegisterMetaType<map<string, Attrib>>("Attribs");
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
-        Node n = graph->get_node(graph->get_name_from_id(node_id));
-        setWindowTitle("Node " + QString::fromStdString(graph->get_node_type(n)) + " [" + QString::number(node_id) + "]");
-      setColumnCount(2);
-      setRowCount(n.attrs().size() );
-      setHorizontalHeaderLabels(QStringList{"Key", "Value"}); 
-      int i=0;
-      for( auto &[k, v] : n.attrs() )
-      {
-        setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
-        switch (v.value()._d()) {
-            case 0:
-                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
-                break;
-            case 1:
-                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().dec())))));
-                break;
-            case 2:
-                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().fl())))));
-                break;
-            case 3:
-                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().float_vec())))));
-                break;
-            case 4:
-                setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
-                break;
-        }
-        i++;
+      std::optional<Node> n = graph->get_node(node_id_);
+      if (n.has_value()) {
+          setWindowTitle(
+                  "Node " + QString::fromStdString(n.value().type()) + " [" + QString::number(node_id) + "]");
+          setColumnCount(2);
+          setRowCount(n.value().attrs().size());
+          setHorizontalHeaderLabels(QStringList{"Key", "Value"});
+          int i = 0;
+          for (auto &[k, v] : n.value().attrs()) {
+              setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
+              switch (v.value()._d()) {
+                  case 0:
+                      setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                      break;
+                  case 1:
+                      setItem(i, 1, new QTableWidgetItem(
+                              QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().dec())))));
+                      break;
+                  case 2:
+                      setItem(i, 1, new QTableWidgetItem(
+                              QString::fromStdString(std::get<1>(graph_->nativetype_to_string(v.value().fl())))));
+                      break;
+                  case 3:
+                      setItem(i, 1, new QTableWidgetItem(QString::fromStdString(
+                              std::get<1>(graph_->nativetype_to_string(v.value().float_vec())))));
+                      break;
+                  case 4:
+                      setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                      break;
+              }
+              i++;
+          }
+          horizontalHeader()->setStretchLastSection(true);
+          resizeRowsToContents();
+          resizeColumnsToContents();
+          QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoTableStuff::drawSLOT);
+          show();
       }
-      horizontalHeader()->setStretchLastSection(true);
-      resizeRowsToContents();
-      resizeColumnsToContents();
-      QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoTableStuff::drawSLOT);
-      show();
     };
 
   public slots:
@@ -212,7 +224,7 @@ class GraphNode : public QObject, public QGraphicsItem
 	public:
     GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_);
 
-    std::string name_in_graph;
+    //std::string name_in_graph;
     std::int32_t id_in_graph;
     QList<GraphEdge *> edgeList;
     

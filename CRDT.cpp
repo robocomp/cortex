@@ -49,62 +49,54 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     {    
         start_subscription_thread(true);     // regular subscription to deltas
         bool res = start_fullgraph_request_thread();    // for agents that want to request the graph for other agent
-        if(res == false)
+        if(res == false) {
+            eprosima::fastrtps::Domain::removeParticipant(participant_handle); // Remove a Participant and all associated publishers and subscribers.
             qFatal("CRDTGraph aborting: could not get DSR from the network after timeout");  //JC ¿se pueden limpiar aquí cosas antes de salir?
+
+        }
     }
     qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
 
 
 CRDTGraph::~CRDTGraph() {
+    eprosima::fastrtps::Domain::removeParticipant(dsrparticipant.getParticipant()); // Remove a Participant and all associated publishers and subscribers.
 }
 
 //////////////////////////////////////
 /// NODE METHODS
 /////////////////////////////////////
 
-Node CRDTGraph::get_node(const std::string& name)
+std::optional<Node> CRDTGraph::get_node(const std::string& name)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
-    try {
-        if (name.empty()) {
-            Node n;
-            n.type("error");
-            n.agent_id(agent_id);
-            n.id(-1);
-            return n;
-        };
-        int id = get_id_from_name(name);
-        if (id != -1) {
-            auto n = &nodes[id].dots().ds.rbegin()->second;
-            if (n->name() == name) return Node(*n);
-        }
+    if (name.empty()) return {};
+    int id = get_id_from_name(name).value_or(-1);
+    if (in(id)) {
+        auto n = &nodes[id].dots().ds.rbegin()->second;
+        if (n->name() == name) return Node(*n);
+    }
 
-    } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;
-    };
-    Node n;
-    n.type("error");
-    n.agent_id(agent_id);
-    n.id(-1);
-    return n;
+    return {};
 }
 
 
-Node CRDTGraph::get_node(int id)
+std::optional<Node> CRDTGraph::get_node(int id)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
 }
 
-VertexPtr CRDTGraph::get_vertex(const std::string& name)
+std::optional<VertexPtr> CRDTGraph::get_vertex(const std::string& name)
 {
-    return std::make_shared<Vertex>(get_node(name));
+    auto n = get_node(name);
+    return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
 }
-  
-VertexPtr CRDTGraph::get_vertex(int id)
+
+std::optional<VertexPtr> CRDTGraph::get_vertex(int id)
 {
-    return std::make_shared<Vertex>(get_node(id));
+    auto n = get_node(id);
+    return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
 }
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
@@ -118,80 +110,74 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
     if (r) {
         emit update_node_signal(node.id(), node.type());
         for (const auto &[k,v]: node.fano())
-            emit update_edge_signal(node.id(), k.to());
+            emit update_edge_signal(node.id(), k.to(), v.type());
     }
     return r;
 }
 
 bool CRDTGraph::insert_or_assign_node_(const N &node)
 {
-    try {
+    if (!nodes[node.id()].dots().ds.empty() and nodes[node.id()].dots().ds.rbegin()->second == node) {
+        //Esto debería ser true?
+        return true;
+    }
+    if (deleted.find(node.id()) == deleted.end()) {
+        aworset<Node, int> delta = nodes[node.id()].add(node, node.id());
+        update_maps_node_insert(node.id(), node);
+        auto val = translateAwCRDTtoIDL(node.id(), delta);
+        dsrpub.write(&val);
 
-        if (nodes[node.id()].getNodesSimple(node.id()).first == node) {
-            count++;
-            //std::cout << "Skip node insertion: " << node.id() << " skipped: " << count << std::endl;
-            return true;
-        }
-        count = 0;
-        if (deleted.find(node.id()) == deleted.end()) {
-            aworset<Node, int> delta = nodes[node.id()].add(node, node.id());
-            update_maps_node_insert(node.id(), node);
-            //name_map[node.name()] = node.id();
-            //id_map[node.id()] = node.name();
-            auto val = translateAwCRDTtoIDL(node.id(), delta);
-            dsrpub.write(&val);
-
-            return true;
-        }
-    } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;
-    };
+        return true;
+    }
     return false;
 }
 
 bool CRDTGraph::delete_node(const std::string& name)
 {
-    bool result;
-    vector<tuple<int,int, std::string>> edges;
-    int id = -1;
+    bool result = false;
+    vector<tuple<int,int, std::string>> edges_;
+    std::optional<int> id = {};
     {
         std::unique_lock<std::shared_mutex>  lock(_mutex);
         id = get_id_from_name(name);
-        if(id == -1)
-            return false;
-        auto [r, e] = delete_node_(id);
-        result = r;
-        edges = e;
+        if(id.has_value()) {
+            auto[r, e] = delete_node_(id.value());
+            result = r;
+            edges_ = e;
+        } else { return false; }
     }
-    if (!result) 
-        return false;
 
-    emit del_node_signal(id);
+    if (result) {
+        emit del_node_signal(id.value());
 
-    for (auto &[id0, id1, label] : edges)
-        emit del_edge_signal(id0, id1, label);
-    return true;
+        for (auto &[id0, id1, label] : edges_)
+                emit del_edge_signal(id0, id1, label);
+        return true;
+    }
+    return false;
 }
 
 bool CRDTGraph::delete_node(int id)
 {
     bool result;
-    vector<tuple<int,int, std::string>> edges;
+    vector<tuple<int,int, std::string>> edges_;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
-        if (id == -1)
-            return false;
-        auto[r, e] = delete_node_(id);
-        result = r;
-        edges = e;
+        if (in(id)) {
+            auto[r, e] = delete_node_(id);
+            result = r;
+            edges_ = e;
+        } else { return false; }
     }
-    if (!result) 
-        return false;
-    emit del_node_signal(id);
 
-    for (auto &[id0, id1, label] : edges) 
-        emit del_edge_signal(id0, id1, label);
-    return true;
+    if (result) {
+        emit del_node_signal(id);
+
+        for (auto &[id0, id1, label] : edges_)
+                emit del_edge_signal(id0, id1, label);
+        return true;
+    }
+    return false;
 }
 
 std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(int id)
@@ -199,58 +185,54 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
     // std::cout << "Tomando lock único para borrar un nodo" << std::endl;
     vector<tuple<int,int, std::string>> edges_;
     //std::unique_lock<std::shared_mutex>  lock(_mutex);
-    try 
-    {
-        //1. Get and remove node.
-        auto node = get_(id);
-        //Aunque el id no sea -1 el nodo puede no existir.
-        if (node.id() == -1) return make_pair(false, edges_);
-        for (const auto &v : node.fano()) { // Delete all edges from this node.
-            std::cout << id << " -> " << v.first.to() << " " << v.first.type() << std::endl;
-             edges_.emplace_back(make_tuple(id, v.first.to(), v.first.type()));
+    //1. Get and remove node.
+    auto node = get_(id);
+    if (!node.has_value()) return make_pair(false, edges_);
+    for (const auto &v : node.value().fano()) { // Delete all edges from this node.
+        std::cout << id << " -> " << v.first.to() << " " << v.first.type() << std::endl;
+         edges_.emplace_back(make_tuple(id, v.first.to(), v.first.type()));
+    }
+    // Get remove delta.
+    auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
+    auto val = translateAwCRDTtoIDL(id, delta);
+    dsrpub.write(&val);
+    update_maps_node_delete(id, node.value());
+
+    //2. search and remove edges.
+    //For each node check if there is an edge to remove.
+    for (auto [k, v] : nodes.getMapRef()) {
+        if (edges.find({k, id}) == edges.end()) continue;
+        for (const auto &key : edges[{k, id}]) {
+
+            EdgeKey ek;
+            ek.to(k);
+            ek.type(key);
+            auto visited_node =  Node(v.dots().ds.rbegin()->second);
+
+            visited_node.fano().erase(ek);
+            auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
+            edges_.emplace_back(make_tuple(visited_node.id(), id, key));
+            update_maps_edge_delete(visited_node.id(), id, key);
+
+            // Send changes.
+            auto val = translateAwCRDTtoIDL(visited_node.id(), delta);
+            dsrpub.write(&val);
         }
-        // Get remove delta.
-        auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
-        auto val = translateAwCRDTtoIDL(id, delta);
-        dsrpub.write(&val);
-        update_maps_node_delete(id, node);
-
-        //2. search and remove edges.
-        //For each node check if there is an edge to remove.
-        for (auto [k, v] : nodes.getMapRef()) {
-            if (edges.find({k, id}) == edges.end()) continue;
-            for (const auto &key : edges[{k, id}]) {
-
-                EdgeKey ek;
-                ek.to(k);
-                ek.type(key);
-                auto visited_node =  Node(v.dots().ds.rbegin()->second);
-
-                visited_node.fano().erase(ek);
-                auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
-                edges_.emplace_back(make_tuple(visited_node.id(), id, key));
-                update_maps_edge_delete(visited_node.id(), id, key);
-
-                // Send changes.
-                auto val = translateAwCRDTtoIDL(visited_node.id(), delta);
-                dsrpub.write(&val);
-            }
-        }
-        return make_pair(true,  edges_);
-    } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;
-    };
-
-    return make_pair(false, edges_);
+    }
+    return make_pair(true,  edges_);
+    //return make_pair(false, edges_);
 }
 
 std::vector<Node> CRDTGraph::get_nodes_by_type(const std::string& type)
 {
+    std::shared_lock<std::shared_mutex>  lock(_mutex);
     std::vector<Node> nodes_;
-    if (nodeType.find(type) != nodeType.end())
-    {
-        for (auto id: nodeType[type])
-            nodes_.emplace_back(get_(id));
+    if (nodeType.find(type) != nodeType.end()) {
+        for (auto id: nodeType[type]) {
+            auto n = get_(id);
+            if (n.has_value())
+                nodes_.emplace_back(n.value());
+        }
     }
     return nodes_;
 }
@@ -258,46 +240,40 @@ std::vector<Node> CRDTGraph::get_nodes_by_type(const std::string& type)
 //////////////////////////////////////////////////////////////////////////////////
 // EDGE METHODS
 //////////////////////////////////////////////////////////////////////////////////
-Edge CRDTGraph::get_edge(const std::string& from, const std::string& to, const std::string& key)
+std::optional<Edge> CRDTGraph::get_edge(const std::string& from, const std::string& to, const std::string& key)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
-    int id_from = get_id_from_name(from);
-    int id_to = get_id_from_name(to);
-    return get_edge_(id_from, id_to, key);
+    std::optional<int> id_from = get_id_from_name(from);
+    std::optional<int> id_to = get_id_from_name(to);
+    if (id_from.has_value() and id_to.has_value())
+        return get_edge_(id_from.value(), id_to.value(), key);
+    return {};
 }
 
 
-Edge CRDTGraph::get_edge(int from, int to, const std::string &key)
+std::optional<Edge> CRDTGraph::get_edge(int from, int to, const std::string &key)
 {
     return get_edge_(from, to, key);
 }
 
 
-Edge CRDTGraph::get_edge_(int from, int  to, const std::string& key)
+std::optional<Edge> CRDTGraph::get_edge_(int from, int  to, const std::string& key)
 {
-    std::shared_lock<std::shared_mutex>  lock(_mutex);
-
-    try {
-        if (in(from) && in(to)) {
-            auto n = get_(from);
+     std::shared_lock<std::shared_mutex>  lock(_mutex);
+     if (in(from) && in(to)) {
+        auto n = get_(from);
+        if (n.has_value()) {
             EdgeKey ek;
             ek.to(to);
             ek.type(key);
-            auto edge = n.fano().find(ek);
-            if (edge != n.fano().end()) {
+            auto edge = n.value().fano().find(ek);
+            if (edge != n.value().fano().end()) {
                 return Edge(edge->second);
             }
-
-            std::cout << "Error obteniedo edge from: "<< from  << " to: " << to <<" key " << key << endl;
-
         }
-    }
-    catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
-
-    Edge ea;
-    ea.type("error");
-    return ea;
+         std::cout << __FUNCTION__ <<":" << __LINE__ << " Error obteniedo edge from: "<< from  << " to: " << to <<" key " << key << endl;
+     }
+     return {};
 }
 
 bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
@@ -307,32 +283,26 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         int from = attrs.from();
         int to = attrs.to();
-        try {
-            if (in(from) && in(to))
-            {
-                auto node = get_(from);
+        if (in(from) && in(to))
+        {
+            auto node = get_(from);
+            if (node.has_value()) {
                 EdgeKey ek;
                 ek.to(to);
                 ek.type(attrs.type());
-                node.fano().insert_or_assign(ek, attrs);
+                node.value().fano().insert_or_assign(ek, attrs);
 
-                node.agent_id(agent_id);
-                r = insert_or_assign_node_(node);
-
-            } else 
-            {
-                //std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
-                return false;
+                node.value().agent_id(agent_id);
+                r = insert_or_assign_node_(node.value());
             }
-        }
-        catch (const std::exception &e) {
-            std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
-                      << std::endl;
+        } else
+        {
+            std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<<from<<" or "<<to<<" not found. Cant update. "<< std::endl;
             return false;
         }
     }
     if (r)
-        emit update_edge_signal( attrs.from(),  attrs.to());
+        emit update_edge_signal( attrs.from(),  attrs.to(), attrs.type());
     return true;
 }
 
@@ -346,52 +316,44 @@ bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
         result = delete_edge_(from, to, key);
     }
     if (result)
-            emit update_edge_signal(from, to);
+            emit update_edge_signal(from, to, key);
     return result;
 }
 
 bool CRDTGraph::delete_edge(const std::string& from, const std::string& to, const std::string& key)
 {
-    int id_from = 0;
-    int id_to = 0;
-    bool result;
+    std::optional<int> id_from = {};
+    std::optional<int> id_to = {};
+    bool result = false;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         id_from = get_id_from_name(from);
         id_to = get_id_from_name(to);
 
-        if (id_from == -1 || id_to == -1) return false;
-        result = delete_edge_(id_from, id_to, key);
+        if (id_from.has_value() && id_to.has_value())
+            result = delete_edge_(id_from.value(), id_to.value(), key);
     }
 
     if (result)
-        emit update_edge_signal(id_from, id_to);
+        emit update_edge_signal(id_from.value(), id_to.value(), key);
     return result;
 }
 
 bool CRDTGraph::delete_edge_(int from, int to, const std::string& key)
 {
-    try {
-            auto node = get_(from);
-            EdgeKey ek;
-            ek.to(to);
-            ek.type(key);
-            if (node.fano().find(ek) != node.fano().end()) {
-                node.fano().erase(ek);
-                update_maps_edge_delete(from, to, key);
-                node.agent_id(agent_id);
-                insert_or_assign_node_(node);
-            }
-
-    } catch (const std::exception &e) {
-            std::cout << "EXCEPTION: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " " << e.what()
-                      << std::endl;
-            return false;
-    };
-
-
-    return true;
-
+    auto node = get_(from);
+    if (node.has_value()) {
+        EdgeKey ek;
+        ek.to(to);
+        ek.type(key);
+        if (node.value().fano().find(ek) != node.value().fano().end()) {
+            node.value().fano().erase(ek);
+            update_maps_edge_delete(from, to, key);
+            node.value().agent_id(agent_id);
+            insert_or_assign_node_(node.value());
+        }
+    }
+    return false;
 }
 
 std::vector<Edge> CRDTGraph::get_edges_by_type(const std::string& type)
@@ -400,8 +362,11 @@ std::vector<Edge> CRDTGraph::get_edges_by_type(const std::string& type)
     std::vector<Edge> edges_;
     if (edgeType.find(type) != edgeType.end())
     {
-        for (auto &[from, to] : edgeType[type])
-            edges_.emplace_back(get_edge_(from, to, type));
+        for (auto &[from, to] : edgeType[type]) {
+            auto n = get_edge_(from, to, type);
+            if (n.has_value())
+                edges_.emplace_back(n.value());
+        }
     }
     return edges_;
 }
@@ -413,8 +378,11 @@ std::vector<Edge> CRDTGraph::get_edges_to_id(int id) {
     {
         auto [from, to] = key;
         if (to == id) {
-            for (const std::string& type : types)
-                edges_.emplace_back(get_edge_(from, to, type));
+            for (const std::string& type : types) {
+                auto n = get_edge_(from, to, type);
+                if (n.has_value())
+                    edges_.emplace_back(n.value());
+            }
         }
     }
     return edges_;
@@ -467,44 +435,29 @@ void CRDTGraph::print()
 /////  CORE
 //////////////////////////////////////////////////////////////////////////////
 
+/*
 Nodes CRDTGraph::get() {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return nodes;
 }
+*/
 
-N CRDTGraph::get(int id) {
+std::optional<Node> CRDTGraph::get(int id) {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
 }
 
-N CRDTGraph::get_(int id) {
-    try 
-    {
-        if (in(id)) {
-            if (!nodes[id].dots().ds.empty()) {
-                return nodes[id].dots().ds.rbegin()->second;
-            }
-            else {
-                Node n;
-                n.type("empty");
-                n.id(-1);
-                return n;
-            };
+std::optional<Node> CRDTGraph::get_(int id) {
+
+    if (in(id)) {
+        if (!nodes[id].dots().ds.empty()) {
+            return nodes[id].dots().ds.rbegin()->second;
         }
-    } catch(const std::exception &e)
-    {
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << "-> "<<id<<std::endl;
-        Node n;
-        n.type("error");
-        n.id(-1);
-        return n;
     }
-    Node n;
-    n.type("error");
-    n.id(-1);
-    return n;
+    return {};
 }
 
+/*
 std::int32_t CRDTGraph::get_node_level(Node& n)
 {
     try 
@@ -525,6 +478,7 @@ std::string CRDTGraph::get_node_type(Node& n)
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
     return "error";
 }
+*/
 
 inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
 {
@@ -560,19 +514,19 @@ inline void CRDTGraph::update_maps_edge_delete(int from, int to, const std::stri
     edgeType[key].erase({from, to});
 }
 
-int CRDTGraph::get_id_from_name(const std::string &name)
+std::optional<int> CRDTGraph::get_id_from_name(const std::string &name)
 {
         auto v = name_map.find(name);
         if (v != name_map.end()) return v->second;
-        return   -1;
+        return {};
 
 }
 
-std::string CRDTGraph::get_name_from_id(std::int32_t id)
+std::optional<std::string> CRDTGraph::get_name_from_id(std::int32_t id)
 {
     auto v = id_map.find(id);
     if (v != id_map.end()) return v->second;
-    return   "error";
+    return {};
 }
 
 size_t CRDTGraph::size ()
@@ -603,8 +557,6 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             std::cout << "JOINING " << aworSet.id();
-            //auto n_begin = nodes[aworSet.id()].dots().ds.rbegin();
-            //auto n_end = nodes[aworSet.id()].dots().ds.rend();
             Node nd = (nodes[aworSet.id()].dots().ds.rbegin() == nodes[aworSet.id()].dots().ds.rend()) ? Node() : nodes[aworSet.id()].dots().ds.rbegin()->second;
 
             nodes[aworSet.id()].join_replace(d);
@@ -632,6 +584,7 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
     bool signal = true;
     vector<tuple<bool, int, std::string>> updates;
     {
+
         std::unique_lock<std::shared_mutex> lock(_mutex);
         auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
         std::set<pair<int, int>> s;
@@ -644,11 +597,6 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             auto awor = translateAwIDLtoCRDT(val);
             Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
 
-            if (nodes.getMapRef().find(k) == nodes.getMapRef().end()) {
-                std::cout << "NUEVO DEBUG " << k<< endl;
-            } else {
-                std::cout << "NO NUEVO DEBUG " << k<< endl;
-            }
             //nodes[k].join_replace(awor);
             if (awor.dots().ds.size() == 0) {
                 signal = false;
@@ -659,6 +607,7 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             else
             {
                 if (deleted.find(k) == deleted.end() and (nodes[k].dots().ds.empty() or (*awor.dots().ds.rbegin() != *nodes[k].dots().ds.rbegin()))) {
+                    nodes[k].setContext(awor.context());
                     nodes[k].add(awor.dots().ds.begin()->second);
                     update_maps_node_insert(k, awor.dots().ds.begin()->second);
                     updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
@@ -1183,8 +1132,6 @@ void CRDTGraph::read_from_json_file(const std::string &json_file_path)
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
         ea.attrs(attrs);
         insert_or_assign_edge(ea);
-
-
 
 
         // Edge ea;
