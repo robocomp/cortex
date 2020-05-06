@@ -49,14 +49,18 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     {    
         start_subscription_thread(true);     // regular subscription to deltas
         bool res = start_fullgraph_request_thread();    // for agents that want to request the graph for other agent
-        if(res == false)
+        if(res == false) {
+            eprosima::fastrtps::Domain::removeParticipant(participant_handle); // Remove a Participant and all associated publishers and subscribers.
             qFatal("CRDTGraph aborting: could not get DSR from the network after timeout");  //JC ¿se pueden limpiar aquí cosas antes de salir?
+
+        }
     }
     qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
 
 
 CRDTGraph::~CRDTGraph() {
+    eprosima::fastrtps::Domain::removeParticipant(dsrparticipant.getParticipant()); // Remove a Participant and all associated publishers and subscribers.
 }
 
 //////////////////////////////////////
@@ -603,8 +607,6 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             std::cout << "JOINING " << aworSet.id();
-            //auto n_begin = nodes[aworSet.id()].dots().ds.rbegin();
-            //auto n_end = nodes[aworSet.id()].dots().ds.rend();
             Node nd = (nodes[aworSet.id()].dots().ds.rbegin() == nodes[aworSet.id()].dots().ds.rend()) ? Node() : nodes[aworSet.id()].dots().ds.rbegin()->second;
 
             nodes[aworSet.id()].join_replace(d);
@@ -632,6 +634,7 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
     bool signal = true;
     vector<tuple<bool, int, std::string>> updates;
     {
+
         std::unique_lock<std::shared_mutex> lock(_mutex);
         auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
         std::set<pair<int, int>> s;
@@ -641,14 +644,34 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
 
         for (auto &[k, val] : full_graph.m()) 
         {
+            /*
+            auto d = translateAwIDLtoCRDT(val);
+
+            std::cout << "JOINING " << k;
+            Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
+
+            nodes[k].join_replace(d);
+            if (nodes[k].dots().ds.size() == 0)
+            {
+                //Node nd = (n_begin == n_end) ? Node() : n_begin->second;
+                signal = false;
+                update_maps_node_delete(k, nd);
+                std::cout << " REMOVE" << endl;
+                updates.emplace_back(make_tuple( false, k, ""));
+
+            } else {
+                update_maps_node_insert(k, nodes[k].dots().ds.rbegin()->second);
+                std::cout << " INSERT"  << endl;
+                updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
+
+            }
+             */
+
+
+
             auto awor = translateAwIDLtoCRDT(val);
             Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
 
-            if (nodes.getMapRef().find(k) == nodes.getMapRef().end()) {
-                std::cout << "NUEVO DEBUG " << k<< endl;
-            } else {
-                std::cout << "NO NUEVO DEBUG " << k<< endl;
-            }
             //nodes[k].join_replace(awor);
             if (awor.dots().ds.size() == 0) {
                 signal = false;
@@ -659,6 +682,7 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             else
             {
                 if (deleted.find(k) == deleted.end() and (nodes[k].dots().ds.empty() or (*awor.dots().ds.rbegin() != *nodes[k].dots().ds.rbegin()))) {
+                    nodes[k].setContext(awor.context());
                     nodes[k].add(awor.dots().ds.begin()->second);
                     update_maps_node_insert(k, awor.dots().ds.begin()->second);
                     updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
