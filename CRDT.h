@@ -198,6 +198,19 @@ namespace CRDT
 
         //////////////////////////////////////////////////////
 
+
+        //For testing
+
+        void reset() {
+            nodes.reset();
+            deleted.clear();
+            name_map.clear();
+            id_map.clear();
+            edges.clear();
+            edgeType.clear();
+            nodeType.clear();
+        }
+
         //For debug
         int count = 0;
 

@@ -54,11 +54,12 @@ class DoRTStuff : public  QTableWidget
           horizontalHeader()->setStretchLastSection(true);
           resizeRowsToContents();
           resizeColumnsToContents();
-          drawSLOT(from, to);
           QObject::connect(graph.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DoRTStuff::drawSLOT);
+          drawSLOT(from, to);
           show();
           std::cout << __FILE__ << " " << __FUNCTION__ << " End ofDoRTStuff Constructor " << std::endl;
       }
+
     };
   
   void closeEvent (QCloseEvent *event) override 

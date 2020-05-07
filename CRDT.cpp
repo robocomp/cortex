@@ -571,17 +571,20 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
                 std::cout << " INSERT"  << endl;
             }
         }
-        if (signal)
+        if (signal) {
             emit update_node_signal(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second.type());
-        else
+            for (const auto &[k,v] : nodes[aworSet.id()].dots().ds.rbegin()->second.fano()) {
+                emit update_edge_signal(aworSet.id(), k.to(), k.type());
+            }
+        }
+        else {
             emit del_node_signal(aworSet.id());
-
+        }
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
 {
-    bool signal = true;
     vector<tuple<bool, int, std::string>> updates;
     {
 
@@ -599,7 +602,6 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
 
             //nodes[k].join_replace(awor);
             if (awor.dots().ds.size() == 0) {
-                signal = false;
                 nodes[k].rmv(nd);
                 update_maps_node_delete(k, nd);
                 updates.emplace_back(make_tuple( false, k, ""));
@@ -620,10 +622,15 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
         }
     }
     for (auto &[signal, id, type] : updates)
-        if (signal)
+        if (signal) {
             emit update_node_signal(id, type);
-        else
+            for (const auto &[k,v] : nodes[id].dots().ds.rbegin()->second.fano()) {
+                emit update_edge_signal(id, k.to(), k.type());
+            }
+        }
+        else {
             emit del_node_signal(id);
+        }
 }
 
 bool CRDTGraph::start_fullgraph_request_thread() 
