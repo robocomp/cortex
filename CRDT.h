@@ -146,6 +146,13 @@ namespace CRDT
         }
         template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) {
+
+            if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
+                if (n.attrs().find("rot") == n.attrs().end() || n.attrs().find("trans") == n.attrs().end()) return {};
+                return RTMat {  n.attrs()["rot"].value().float_vec()[0],  n.attrs()["rot"].value().float_vec()[1],  n.attrs()["rot"].value().float_vec()[2],
+                                n.attrs()["trans"].value().float_vec()[0], n.attrs()["trans"].value().float_vec()[1], n.attrs()["trans"].value().float_vec()[2]      } ;
+            }
+
             std::optional<Attrib> av = get_attrib_by_name_(n, key);
             if (!av.has_value()) return {};
             if constexpr (std::is_same<Ta, std::string>::value) {
@@ -161,10 +168,12 @@ namespace CRDT
             {
                 return av.value().value().float_vec();
             }
-            if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                return RTMat {  n.attrs()["rot"].value().float_vec()[0],  n.attrs()["rot"].value().float_vec()[1],  n.attrs()["rot"].value().float_vec()[2],
-                                n.attrs()["trans"].value().float_vec()[0], n.attrs()["trans"].value().float_vec()[1], n.attrs()["trans"].value().float_vec()[2]      } ;
-            }
+            /*
+            if constexpr (std::is_same<Ta, QVec>::value)
+            {
+                if (av.value().value()._d() == FLOAT_VEC)
+                return QVec { av.value().value().float_vec() };
+            }*/
         }
 
         //Edges

@@ -343,7 +343,8 @@ enum Types : uint32_t
 {
     STRING,
     INT,
-    FLOAT
+    FLOAT,
+    FLOAT_VEC
 };
 
 /*!
