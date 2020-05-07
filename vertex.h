@@ -36,6 +36,14 @@ namespace CRDT
             int from() const { return edge.from(); };
             EdgeKey get_key() const { EdgeKey key; key.to(edge.to()); key.type(edge.type()); return key; };
             Edge& get_CRDT_edge() { return edge; }; // only for reinserting
+            RMat::RTMat to_RT()
+            {
+                auto r = get_attrib_by_name<std::vector<float>>("rotation_euler_xyz");
+                auto t = get_attrib_by_name<std::vector<float>>("translation");
+                if( r.has_value() and t.has_value() )
+                    return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
+                else return {};
+            };
             std::optional<Attrib> get_attrib_by_name_(const std::string &key)
             {
                 auto attrs = edge.attrs();
@@ -62,14 +70,34 @@ namespace CRDT
                 {
                     return av->value().float_vec();
                 }
-                if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                    auto &at = edge.attrs();
-                    return RTMat { at["rot"].value().float_vec()[0], at["rot"].value().float_vec()[1], at["rot"].value().float_vec()[2],
-                                   at["trans"].value().float_vec()[0], at["trans"].value().float_vec()[1], at["trans"].value().float_vec()[2]} ;
+                if constexpr (std::is_same<Ta, RMat::QVec>::value)
+                {
+                    if (av.value().value()._d() == FLOAT_VEC and (key == "translation" or key=="rotation_euler_xyz")) 
+                    {   
+                        const auto &val = av.value().value().float_vec();
+                        if (val.size()==3 or val.size()==6)
+                            return QVec{val};
+                        else return {};
+                    }
+                    else return {};
                 }
+                if constexpr (std::is_same<Ta, RMat::QMat>::value)
+                {
+                    if (av.value().value()._d() == FLOAT_VEC and key== "rotation_euler_xyz")
+                    {
+                        const auto& val = av.value().value().float_vec();
+                        if(val.size() == 3)
+                            return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
+                        else
+                            return {};
+                    }
+                    else return {};
+                }
+                else return {};
             }
             
-  
+            // add_attr(key, val);
+
             void print()
             {
                 std::cout << "------------------------------------" << std::endl;
@@ -90,6 +118,8 @@ namespace CRDT
         public:
             Vertex(N _node) : node(std::move(_node)) {};
             Vertex(Vertex &v) : node(std::move(v.node)) {};
+            Vertex(Vertex &&v) : node(std::move(v.node)) {};
+            // Faltan los constructores de copia
             Vertex() = delete; // forbid default constructor
             N& get_CDRT_node() { return node; };    // so it can be reinserted
             std::optional<std::int32_t> get_level()
@@ -135,7 +165,6 @@ namespace CRDT
                 auto value  = attrs.find(key);
                 if (value != attrs.end())
                     return value->second;
-
                 return {};
             }
             template <typename Ta>
@@ -156,13 +185,15 @@ namespace CRDT
                 {
                     return av->value().float_vec();
                 }
-                if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                    auto &at = node.attrs();
-                    return RTMat { at["rot"].value().float_vec()[0], at["rot"].value().float_vec()[1], at["rot"].value().float_vec()[2],
-                                   at["trans"].value().float_vec()[0], at["trans"].value().float_vec()[1], at["trans"].value().float_vec()[2]} ;
-                }
+                // SI NO ES NINGUNO DE ESTOS NO DEBERÍA COMPILAR
+
+                // if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
+                //     auto &r = node.attrs()["rotation_euler_xyz"].value().float_vec();
+                //     auto &t = node.attrs()["translation"].value().float_vec();
+                //     return RTMat { r[0], r[1], r[2], t[0], t[1], t[2] } ;
+                // }
             }
-            
+
             // Edges
             std::optional<VEdgePtr> get_edge(int to, const std::string& key)
             {
@@ -187,6 +218,15 @@ namespace CRDT
             }
             std::vector<VEdgePtr> get_edges_by_type(const std::string& type);
             std::vector<VEdgePtr> get_edges_to_id(int id);
+            std::optional<RTMat> get_edge_RT(int to) 
+            {
+                auto ve = get_edge(to, "RT");
+                if(ve.has_value())
+                    return ve.value()->to_RT();
+                else
+                    return {};               
+            }
+            //add_edge(const VEdge& v) 
 
             // Utils
             void print()

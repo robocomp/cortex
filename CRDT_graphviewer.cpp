@@ -228,20 +228,18 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
             gnode->setPos(posx, posy);
 
         emit G->update_attrs_signal(id, n.value().attrs());
-
-        // for (auto &[k,v] : n.value().fano())
-        // 	addEdgeSLOT(id, v.to(), v.type());
     }
 }
 
 void GraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
 	try {
- 		qDebug() << "edge id " << QString::fromStdString(edge_tag) << from << to;
+ 		qDebug() << __FUNCTION__ << "edge id " << QString::fromStdString(edge_tag) << from << to;
 		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
 
 		if(gmap_edges.count(key) == 0) 
-		{ 		// check if edge already exists
+		{ 		
+			// check if edge already exists
 			auto node_origen = gmap.at(from);
 			auto node_dest = gmap.at(to);
 			auto item = new GraphEdge(node_origen, node_dest, edge_tag.c_str());

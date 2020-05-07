@@ -148,11 +148,11 @@ namespace CRDT
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) {
 
             if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                if (n.attrs().find("rot") == n.attrs().end() || n.attrs().find("trans") == n.attrs().end()) return {};
-                return RTMat {  n.attrs()["rot"].value().float_vec()[0],  n.attrs()["rot"].value().float_vec()[1],  n.attrs()["rot"].value().float_vec()[2],
-                                n.attrs()["trans"].value().float_vec()[0], n.attrs()["trans"].value().float_vec()[1], n.attrs()["trans"].value().float_vec()[2]      } ;
+                if (n.attrs().find("rotation_euler_xyz") == n.attrs().end() || n.attrs().find("translation") == n.attrs().end()) return {};
+                const auto&  r = n.attrs()["rotation_euler_xyz"].value().float_vec();
+                const auto&  t = n.attrs()["translation"].value().float_vec();
+                return RTMat { r[0], r[1], r[2], t[0], t[1], t[2] } ;
             }
-
             std::optional<Attrib> av = get_attrib_by_name_(n, key);
             if (!av.has_value()) return {};
             if constexpr (std::is_same<Ta, std::string>::value) {
@@ -168,12 +168,21 @@ namespace CRDT
             {
                 return av.value().value().float_vec();
             }
-            /*
             if constexpr (std::is_same<Ta, QVec>::value)
             {
-                if (av.value().value()._d() == FLOAT_VEC)
-                return QVec { av.value().value().float_vec() };
-            }*/
+                const auto &val = av.value().value().float_vec();
+                if (av.value().value()._d() == FLOAT_VEC and (key == "translation" or key=="rotation_euler_xyz") 
+                                and ( val.size()==3) or val.size()==6)
+                    return QVec{val};
+            }
+            if constexpr (std::is_same<Ta, QMat>::value)
+            {
+                if (av.value().value()._d() == FLOAT_VEC and key=="rotation_euler_xyz")
+                {
+                    const auto& val = av.value().value().float_vec();
+                    return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
+                }
+            }
         }
 
         //Edges
