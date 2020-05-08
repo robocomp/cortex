@@ -326,7 +326,7 @@ bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
         result = delete_edge_(from, to, key);
     }
     if (result)
-            emit update_edge_signal(from, to, key);
+            emit del_edge_signal(from, to, key);
     return result;
 }
 
@@ -345,7 +345,7 @@ bool CRDTGraph::delete_edge(const std::string& from, const std::string& to, cons
     }
 
     if (result)
-        emit update_edge_signal(id_from.value(), id_to.value(), key);
+        emit del_edge_signal(id_from.value(), id_to.value(), key);
     return result;
 }
 
