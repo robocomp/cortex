@@ -130,13 +130,6 @@ namespace CRDT
         }
         template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) {
-
-            // if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-            //     if (n.attrs().find("rotation_euler_xyz") == n.attrs().end() || n.attrs().find("translation") == n.attrs().end()) return {};
-            //     const auto&  r = n.attrs()["rotation_euler_xyz"].value().float_vec();
-            //     const auto&  t = n.attrs()["translation"].value().float_vec();
-            //     return RTMat { r[0], r[1], r[2], t[0], t[1], t[2] } ;
-            // }
             std::optional<Attrib> av = get_attrib_by_name_(n, key);
             if (!av.has_value()) return {};
             if constexpr (std::is_same<Ta, std::string>::value) {

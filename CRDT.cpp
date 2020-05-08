@@ -38,7 +38,13 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     // RTPS Initialize comms threads
      if(dsr_input_file != std::string())
     {
-        utils->read_from_json_file(dsr_input_file);
+        try
+        {   utils->read_from_json_file(dsr_input_file);  }
+        catch(const CRDT::DSRException& e)
+        {  
+            std::cout << e.what() << '\n';  
+            qFatal("Aborting program. Cannot continue without intial file");
+        }
         start_fullgraph_server_thread();
         start_subscription_thread(true);
     }
