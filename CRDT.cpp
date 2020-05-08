@@ -2,14 +2,10 @@
 // Created by crivac on 5/02/19.
 //
 
-
 #include "CRDT.h"
 #include <fstream>
 #include <unistd.h>
 #include <algorithm>
-// #include <QXmlSimpleReader>
-// #include <libxml2/libxml/parser.h>
-// #include <libxml2/libxml/tree.h>
 
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
@@ -27,6 +23,7 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     graph_root = root;
     agent_name = name;
     nodes = Nodes(graph_root);
+    utils = std::make_unique<Utilities>(this);
 
     work = true;
 
@@ -41,7 +38,7 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     // RTPS Initialize comms threads
      if(dsr_input_file != std::string())
     {
-        read_from_json_file(dsr_input_file);
+        utils->read_from_json_file(dsr_input_file);
         start_fullgraph_server_thread();
         start_subscription_thread(true);
     }
@@ -467,17 +464,9 @@ std::optional<Node> CRDTGraph::get_(int id) {
     return {};
 }
 
-/*
-std::int32_t CRDTGraph::get_node_level(Node& n)
+std::optional<std::int32_t> CRDTGraph::get_node_level(Node& n)
 {
-    try 
-    {
-        return get_attrib_by_name<int32_t >(n, "level");
-    } 
-    catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl; };
-
-    return -1;
+    return get_attrib_by_name<int32_t>(n, "level");
 }
 
 std::string CRDTGraph::get_node_type(Node& n)
@@ -488,7 +477,6 @@ std::string CRDTGraph::get_node_type(Node& n)
         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
     return "error";
 }
-*/
 
 inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
 {
@@ -980,348 +968,3 @@ void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CR
 //// UTILS
 ////////////////////////////////////////////////////////////////////////
 
-void CRDTGraph::read_from_json_file(const std::string &json_file_path)
-{
-    std::cout << __FUNCTION__ << " Reading json file: " << json_file_path << std::endl;
-
-    // Open file and make initial checks
-    QFile file;
-    file.setFileName(QString::fromStdString(json_file_path));
-    if (not file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        fprintf(stderr,"Can't open JSON file, check file provided. \n");
-        exit(-1);
-    }
-    QString val = file.readAll();
-    file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(val.toUtf8());
-    QJsonObject jObject = doc.object();
-
-    QJsonObject dsrobject = jObject.value("DSRModel").toObject();
-	QJsonObject symbolMap = dsrobject.value("symbol").toObject();
-    QJsonArray linksArray;
-    // Read symbols (just symbols, then links in other loop)
-    foreach (const QString &key, symbolMap.keys())
-    {
-        QJsonObject sym_obj = symbolMap[key].toObject();
-        int id = sym_obj.value("id").toString().toInt();
-        std::string type = sym_obj.value("type").toString().toStdString();
-        std::string name = sym_obj.value("name").toString().toStdString();
-        //AGMModelSymbol::SPtr s = newSymbol(id), type);
-        if (id == -1) {
-            std::cout << __FILE__ << " " << __FUNCTION__ << " Invalid ID Node: " << std::to_string(id);
-            continue;
-        }
-        std::cout << __FILE__ << " " << __FUNCTION__ << ", Node: " << std::to_string(id) << " " <<  type << std::endl;
-        Node n;
-        n.type(type);
-        n.id(id);
-        n.agent_id(agent_id);
-        n.name(name);
-        name_map[name] = id;
-        id_map[id] = name;
-
-        std::map<string, Attrib> attrs;
-        add_attrib(attrs, "level",std::int32_t(0));
-        add_attrib(attrs, "parent",std::int32_t(0));
-
-        std::string full_name = type + " [" + std::to_string(id) + "]";
-        add_attrib(attrs, "name",full_name);
-
-        // color selection
-        std::string color = "coral";
-        if(type == "world") color = "SeaGreen";
-        else if(type == "transform") color = "SteelBlue";
-        else if(type == "plane") color = "Khaki";
-        else if(type == "differentialrobot") color = "GoldenRod";
-        else if(type == "laser") color = "GreenYellow";
-        else if(type == "mesh") color = "LightBlue";
-        else if(type == "imu") color = "LightSalmon";
-
-        add_attrib(attrs, "color", color);
-
-        // node atributes
-        QVariantMap attributesMap = sym_obj.value("attribute").toObject().toVariantMap();
-        for(QVariantMap::const_iterator iter = attributesMap.begin(); iter != attributesMap.end(); ++iter)
-        {
-            std::string attr_key = iter.key().toStdString();
-            QString attr_value = iter.value().toMap()["value"].toString();
-            int attr_type = iter.value().toMap()["type"].toString().toInt();
-
-            switch (attr_type) {
-                case 0:
-                    add_attrib(attrs, attr_key, attr_value.toStdString());
-                    break;
-                case 1:
-                    add_attrib(attrs, attr_key, attr_value.toInt());
-                    break;
-                case 2:
-                    add_attrib(attrs, attr_key, attr_value.replace(",", ".").toFloat());
-                    break;
-                case 3: {
-                    std::vector<float> v;
-                    std::istringstream iss(attr_value.toStdString());
-                    std::copy(std::istream_iterator<float>(iss),
-                              std::istream_iterator<float>(),
-                              std::back_inserter(v));
-                    add_attrib(attrs, attr_key, v);
-                    break;
-                }
-                case 4: {
-                    std::vector<float> r;
-                    std::istringstream is(attr_value.toStdString());
-                    std::copy(std::istream_iterator<float>(is),
-                              std::istream_iterator<float>(),
-                              std::back_inserter(r));
-                    auto rtMat = RTMat(QMat(QVec::fromStdVector(r)));
-
-                    add_attrib(attrs, attr_key, r);
-
-                    break;
-                }
-                default:
-                    add_attrib(attrs, attr_key, attr_value.toStdString());
-            }
-            /**
-            if( attr_key == "level" or attr_key == "parent" or attr_key == "src" or attr_key == "dst" or attr_key == "from" or  attr_key == "to")
-                add_attrib(attrs, attr_key, attr_value.toInt());
-            else if( attr_key == "pos_x" or attr_key == "pos_y" or attr_key == "posx" or attr_key == "posy") {
-                if (attr_key == "posx" or attr_key == "posy") attr_key = attr_key.insert(attr_key.size()-1, "_");
-                add_attrib(attrs, attr_key, attr_value.replace(",", ".").toFloat());
-            }
-            else if( attr_key == "imName" and n.name() == "") {
-                n.name(attr_value.toStdString());
-                add_attrib(attrs, attr_key, attr_value.toStdString());
-            }
-            else {
-                add_attrib(attrs, attr_key, attr_value.toStdString());
-            }*/
-
-
-        }
-        n.attrs(attrs);
-        insert_or_assign_node(n);
-        // get links
-        QJsonArray nodeLinksArray = sym_obj.value("links").toArray();
-        std::copy(nodeLinksArray.begin(), nodeLinksArray.end(), std::back_inserter(linksArray));
-    }
-    // Read links
-    foreach (const QJsonValue & linkValue, linksArray)
-    {
-        QJsonObject link_obj = linkValue.toObject();
-        int srcn = link_obj.value("src").toString().toInt();
-        int dstn = link_obj.value("dst").toString().toInt();
-        std::string edgeName = link_obj.value("label").toString().toStdString();
-        std::map<string, Attrib> attrs;
-        Edge ea;
-        ea.from(srcn);
-        ea.to(dstn);
-        ea.type(edgeName);
-
-        // link atributes
-        QVariantMap linkAttributesMap = link_obj.value("linkAttribute").toObject().toVariantMap();
-        for(QVariantMap::const_iterator iter = linkAttributesMap.begin(); iter != linkAttributesMap.end(); ++iter)
-        {
-            std::string attr_key = iter.key().toStdString();
-            QVariant attr_value = iter.value().toMap()["value"];
-            int attr_type = iter.value().toMap()["type"].toString().toInt();
-
-            Attrib av;
-            av.type(attr_type);
-            Val value;
-
-            switch (attr_type) 
-            {
-                case 0:
-                {
-                    add_attrib(attrs, attr_key, attr_value.toString().toStdString());
-                    break;
-                }
-                case 1:
-                {
-                    add_attrib(attrs, attr_key, attr_value.toInt());
-                    break;
-                }
-                case 2:
-                {
-                    add_attrib(attrs, attr_key, attr_value.toString().replace(",", ".").toFloat());
-                    break;
-                }
-                case 3: 
-                {
-                    std::vector<float> v;
-                    foreach (const QVariant& value, attr_value.toList())
-                        v.push_back(value.toFloat());    
-                    qDebug() << "SHIT" << QString::fromStdString(attr_key);
-                    for(auto f: v) 
-                        qDebug() << f;
-                    add_attrib(attrs, attr_key, v);
-                    break;
-                }
-            }
-        }
-        std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
-        ea.attrs(attrs);
-        insert_or_assign_edge(ea);
-
-
-        // Edge ea;
-        // ea.from(srcn);
-        // ea.to(dstn);
-        // ea.type(edgeName);
-        // std::map<string, Attribs> attrs_edge;
-
-        // //auto val = mtype_to_icevalue(edgeName);
-        // Val val;
-        // val.str(edgeName);
-
-        // Attribs av;
-        // av.type(STRING);
-        // av.value( val);
-        // attrs["name"] = av;
-
-
-        // if( edgeName == "RT")   //add level to node dst as src.level +1, and add parent to node dst as src
-        // {
-        //     Node n = get_node(dstn);
-
-        //     add_attrib(n.attrs(),"level", get_node_level(n)+1);
-        //     add_attrib(n.attrs(),"parent", srcn);
-        //     RMat::RTMat rt;
-        //     float tx=0,ty=0,tz=0,rx=0,ry=0,rz=0;
-        //     for(auto &[key, v] : attrs)
-        //     {
-        //         if(key=="tx")	tx = v.value().fl();
-        //         if(key=="ty")	ty = v.value().fl();
-        //         if(key=="tz")	tz = v.value().fl();
-        //         if(key=="rx")	rx = v.value().fl();
-        //         if(key=="ry")	ry = v.value().fl();
-        //         if(key=="rz")	rz = v.value().fl();
-        //     }
-        //     rt.set(rx, ry, rz, tx, ty, tz);
-        //     //rt.print("in reader");
-        //     add_attrib(attrs_edge, "RT", rt);
-        //     //this->add_edge_attrib(a, dstn,"RT",rt);
-        //     insert_or_assign_node(n);
-        // }
-        // else
-        // {
-        //     Node n = get_node(dstn);
-        //     add_attrib(n.attrs(),"parent",0);
-        //     insert_or_assign_node(n);
-        //     for(auto &[k,v] : attrs)
-        //         attrs_edge[k] = v;
-        // }
-        // ea.attrs(attrs_edge);
-        // insert_or_assign_edge(ea);
-
-    } //foreach(links)
-}
-
-void CRDTGraph::write_to_json_file(const std::string &json_file_path)
-{
-    std::setlocale(LC_NUMERIC, "en_US.UTF-8");
-    //create json object
-    QJsonObject dsrObject;
-    QJsonArray linksArray;
-    QJsonObject symbolsMap;
-    for (auto kv : nodes.getMapRef()) {
-        Node node = kv.second.dots().ds.rbegin()->second;
-        // symbol data
-        QJsonObject symbol;
-        symbol["id"] = QString::number(node.id());
-        symbol["type"] = QString::fromStdString(node.type());
-        symbol["name"] = QString::fromStdString(node.name());
-        // symbol attribute
-        QJsonObject attrsObject;
-        for (const auto &[key, value]: node.attrs())
-        {
-            std::ostringstream vf;
-
-            QJsonObject content;
-            std::string val;
-
-            switch (value.value()._d()) {
-                case 0:
-                    val = value.value().str();
-                    break;
-                case 1:
-                    val = std::to_string(value.value().dec());
-                    break;
-                case 2:
-                    val = std::to_string(value.value().fl());
-                    break;
-                case 3:
-                    if (!value.value().float_vec().empty())
-                    {
-                        std::copy(value.value().float_vec().begin(), value.value().float_vec().end()-1,
-                                  std::ostream_iterator<float>(vf, ", "));
-
-                        vf << value.value().float_vec().back();
-                    }
-                    val = vf.str();
-                    break;
-            }
-            content["type"] = QString::number(value.value()._d());
-            content["value"] = QString::fromStdString(val);
-            attrsObject[QString::fromStdString(key)] = content;
-        }
-        symbol["attribute"] = attrsObject;
-        //link
-        QJsonArray nodeLinksArray;
-        for (const auto &[key, value]: node.fano()) {
-            QJsonObject link;
-            link["src"] = QString::number(value.from());
-            link["dst"] = QString::number(value.to());
-            link["label"] = QString::fromStdString(value.type());
-            // link attribute
-            QJsonObject lattrsObject;
-            for (const auto &[key, value]: value.attrs()) {
-                std::ostringstream vf;
-
-                QJsonObject attr, content;
-                QJsonValue val;
-                switch (value.value()._d()) {
-                    case 0:
-                        val = QString::fromStdString(value.value().str());
-                        break;
-                    case 1:
-                        val = value.value().dec();
-                        break;
-                    case 2:
-                        val = value.value().fl();
-                        break;
-                    case 3:
-                        QJsonArray array;
-                        for(const float &value : value.value().float_vec())
-                            array.push_back(value);
-                        val = array;                        
-                        break;
-                }
-                content["type"] = QString::number(value.value()._d());
-                content["value"] = val;
-                lattrsObject[QString::fromStdString(key)] = content;
-            }
-            link["linkAttribute"] = lattrsObject;
-            nodeLinksArray.push_back(link);
-        }
-        symbol["links"] = nodeLinksArray;
-        symbolsMap[QString::number(node.id())] = symbol;
-    }
-    dsrObject["symbol"] = symbolsMap;
-
-    QJsonObject jsonObject;
-    jsonObject["DSRModel"] = dsrObject;
-    //writable data
-    QJsonDocument jsonDoc(jsonObject);
-    QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
-    //write to file
-    std::ofstream outfile;
-    outfile.open(json_file_path, std::ios_base::out | std::ios_base::trunc);
-    outfile << strJson.toStdString();
-    outfile.close();
-    auto now_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::cout << __FILE__ << " " << __FUNCTION__ << "File: " << json_file_path << " written to disk at " << now_c
-              << std::endl;
-}

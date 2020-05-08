@@ -19,7 +19,6 @@
 #include <variant>
 #include <qmat/QMatAll>
 #include <typeinfo>
-
 #include <optional>
 
 #include "libs/delta-crdts.cc"
@@ -29,6 +28,7 @@
 #include "topics/DSRGraphPubSubTypes.h"
 #include "vertex.h"
 #include "inner_api.h"
+#include "dsr_utils.h"
 
 #define NO_PARENT -1
 #define TIMEOUT 5000
@@ -63,7 +63,7 @@ namespace CRDT
     class CRDTGraph : public QObject
     {
         Q_OBJECT
-    public:
+        public:
         size_t size();
         CRDTGraph(int root, std::string name, int id, std::string dsr_input_file = std::string());
         ~CRDTGraph();
@@ -86,7 +86,8 @@ namespace CRDT
         std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t); //Used by viewer
         std::map<long, Node> getCopy() const;   
         std::vector<long> getKeys() const ;   
-          
+        int32_t get_agent_id() const { return agent_id; };
+
         // not working yet
         typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
         typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
@@ -107,11 +108,8 @@ namespace CRDT
         std::vector<Node> get_nodes_by_type(const std::string& type);
         std::optional<std::string> get_name_from_id(std::int32_t id);  // caché
         std::optional<int> get_id_from_name(const std::string &name);  // caché
-        
-        // to be moved to Vertex //////////////////////////////////
-        //std::int32_t get_node_level(Node& n);
-        //std::string> get_node_type(Node& n);
-
+        std::optional<std::int32_t> get_node_level(Node& n);
+        std::string get_node_type(Node& n);
         void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value);
         template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
         std::optional<Attrib> get_attrib_by_name_(const T& n, const std::string &key)
@@ -219,21 +217,25 @@ namespace CRDT
         //For debug
         int count = 0;
 
-    private:
+    //private:
         Nodes nodes;
+    private:
         int graph_root;
         bool work;
         mutable std::shared_mutex _mutex;
         std::string filter;
         std::string agent_name;
         const int agent_id;
+        std::unique_ptr<Utilities> utils;
 
         //////////////////////////////////////////////////////////////////////////
         // Cache maps
         ///////////////////////////////////////////////////////////////////////////
         std::unordered_set<int> deleted;     // deleted nodes, used to avoid insertion after remove.
-        std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
-        std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
+        public:
+            std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
+            std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
+        private:
         std::unordered_map<pair<int, int>, std::unordered_set<std::string>, pair_hash> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<std::string, std::unordered_set<pair<int, int>, pair_hash>> edgeType;  // collection with all edge types.
         std::unordered_map<std::string, std::unordered_set<int>> nodeType;  // collection with all node types.
