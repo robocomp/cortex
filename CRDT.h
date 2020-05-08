@@ -55,23 +55,7 @@ namespace CRDT
         }
     };
 
-    /////////////////////////////////////////////////////////////////
-    /// DSR Exceptions
-    /////////////////////////////////////////////////////////////////
-    class DSRException : std::runtime_error
-    {
-        public:
-            explicit DSRException(const std::string &message): std::runtime_error(buildMsg(message)){};
-        private:
-        std::string buildMsg(const std::string &message)
-        {
-            std::ostringstream buffer;
-            buffer << "DSRException: " << message;
-            return buffer.str();
-        };
-    };
-
-
+  
     /////////////////////////////////////////////////////////////////
     /// CRDT API
     /////////////////////////////////////////////////////////////////
@@ -116,6 +100,8 @@ namespace CRDT
         std::optional<VertexPtr> get_vertex(const std::string& name);
         std::optional<VertexPtr> get_vertex(int id);
         bool insert_or_assign_node(const N &node);
+        bool insert_or_assign_node(const VertexPtr &vertex);
+        bool insert_or_assign_node(Vertex &vertex);
         bool delete_node(const std::string &name);
         bool delete_node(int id);
         std::vector<Node> get_nodes_by_type(const std::string& type);
@@ -147,12 +133,12 @@ namespace CRDT
         template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) {
 
-            if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                if (n.attrs().find("rotation_euler_xyz") == n.attrs().end() || n.attrs().find("translation") == n.attrs().end()) return {};
-                const auto&  r = n.attrs()["rotation_euler_xyz"].value().float_vec();
-                const auto&  t = n.attrs()["translation"].value().float_vec();
-                return RTMat { r[0], r[1], r[2], t[0], t[1], t[2] } ;
-            }
+            // if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
+            //     if (n.attrs().find("rotation_euler_xyz") == n.attrs().end() || n.attrs().find("translation") == n.attrs().end()) return {};
+            //     const auto&  r = n.attrs()["rotation_euler_xyz"].value().float_vec();
+            //     const auto&  t = n.attrs()["translation"].value().float_vec();
+            //     return RTMat { r[0], r[1], r[2], t[0], t[1], t[2] } ;
+            // }
             std::optional<Attrib> av = get_attrib_by_name_(n, key);
             if (!av.has_value()) return {};
             if constexpr (std::is_same<Ta, std::string>::value) {
@@ -183,6 +169,7 @@ namespace CRDT
                     return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
                 }
             }
+            throw(DSRException("Illegal Return type"));
         }
 
         //Edges

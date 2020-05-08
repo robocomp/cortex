@@ -17,6 +17,7 @@
 #include <typeinfo>
 #include "topics/DSRGraphPubSubTypes.h"
 #include <optional>
+#include "dsr_exceptions.h"
 
 namespace CRDT
 {
@@ -95,9 +96,11 @@ namespace CRDT
                 }
                 else return {};
             }
-            
-            // add_attr(key, val);
-
+            void add_attrib(const std::string &key, int type, const Val &av)
+            {
+                Attrib at; at.type(type); at.value(av);
+                edge.attrs().insert_or_assign(key, at);
+            }
             void print()
             {
                 std::cout << "------------------------------------" << std::endl;
@@ -121,7 +124,7 @@ namespace CRDT
             Vertex(Vertex &&v) : node(std::move(v.node)) {};
             // Faltan los constructores de copia
             Vertex() = delete; // forbid default constructor
-            N& get_CDRT_node() { return node; };    // so it can be reinserted
+            N& get_CRDT_node() { return node; };            // so it can be reinserted
             std::optional<std::int32_t> get_level()
             {
                 return get_attrib_by_name<std::int32_t>("level");
@@ -185,13 +188,7 @@ namespace CRDT
                 {
                     return av->value().float_vec();
                 }
-                // SI NO ES NINGUNO DE ESTOS NO DEBERÍA COMPILAR
-
-                // if constexpr (std::is_same<Ta, RMat::RTMat>::value) {
-                //     auto &r = node.attrs()["rotation_euler_xyz"].value().float_vec();
-                //     auto &t = node.attrs()["translation"].value().float_vec();
-                //     return RTMat { r[0], r[1], r[2], t[0], t[1], t[2] } ;
-                // }
+                throw(DSRException("Illegal Return type"));
             }
 
             // Edges

@@ -115,6 +115,16 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
     return r;
 }
 
+bool CRDTGraph::insert_or_assign_node(const VertexPtr &vertex)
+{
+    return insert_or_assign_node(vertex->get_CRDT_node());
+}
+
+bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
+{
+    return insert_or_assign_node(vertex.get_CRDT_node());
+}
+
 bool CRDTGraph::insert_or_assign_node_(const N &node)
 {
     if (!nodes[node.id()].dots().ds.empty() and nodes[node.id()].dots().ds.rbegin()->second == node) {
