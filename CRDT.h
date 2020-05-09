@@ -118,7 +118,8 @@ namespace CRDT
         std::optional<Edge> get_edge(const Node &n, int to, const std::string& key);   // not implemented
         bool insert_or_assign_edge(const Edge& attrs);
         bool insert_or_assign_edge(Node& n, const Edge& e);   
-        bool insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, std::vector<float>& rot_euler);
+        void insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, const std::vector<float>& rot_euler);
+        void insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& trans, std::vector<float>&& rot_euler);
         bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
         bool delete_edge(int from, int t, const std::string& key);
         std::vector<Edge> get_edges_by_type(const std::string& type);
@@ -128,6 +129,31 @@ namespace CRDT
             std::optional<Node> n = get_node(id);
             return n.has_value() ?  std::optional<std::map<EdgeKey, Edge>>(n.value().fano()) : std::nullopt;
         };
+        RTMat get_edge_RT(const Node &n, int to)
+        {
+            auto edges = n.fano();
+            EdgeKey key; key.to(to); key.type("RT");
+            auto res  = edges.find(key);
+            if (res != edges.end())
+            {
+                auto rtmat = edge_to_RTMat(res->second);
+                if(rtmat.has_value())
+                    return rtmat.value();
+                else
+                    throw std::runtime_error("Could not find rot and trans attributes in " + std::to_string(n.id()) + " " + std::to_string(key.to()) + " in edge_to_RTMat()");
+            }
+            else
+                throw std::runtime_error("Could not find edge " + std::to_string(key.to()) + " in node " + std::to_string(n.id()) + " in edge_to_RTMat()");
+            
+        }
+        std::optional<RTMat> edge_to_RTMat(Edge &edge)
+        {
+            auto r = get_attrib_by_name<std::vector<float>>(edge, "rotation_euler_xyz");
+            auto t = get_attrib_by_name<std::vector<float>>(edge, "translation");
+            if( r.has_value() and t.has_value() )
+                return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
+            else return {};
+        }
         
         // Both
         template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
@@ -173,7 +199,7 @@ namespace CRDT
             {
                 const auto &val = av.value().value().float_vec();
                 if (av.value().value()._d() == FLOAT_VEC and (key == "translation" or key=="rotation_euler_xyz") 
-                                and ( val.size()==3) or val.size()==6)
+                                and ( val.size()==3 or val.size()==6))
                     return QVec{val};
             }
             if constexpr (std::is_same<Ta, QMat>::value)
@@ -184,11 +210,10 @@ namespace CRDT
                     return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
                 }
             }
-            //throw(DSRException("Illegal Return type"));
             throw std::runtime_error("Illegal return type in get_attrib_by_name()");
         }       
         template <typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>, typename Va, typename = std::enable_if_t<std::is_same<std::int32_t, Va>::value || std::is_same<std::string, Va>::value || std::is_same<std::float_t, Va>::value || std::is_same<std::vector<float_t>, Va>::value, Va>>    
-        void add_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
+        void insert_or_assign_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
         {
             // check Attrib coherence : type -> content
             Attrib at;  Val value;
@@ -250,6 +275,39 @@ namespace CRDT
             }
             else 
                 throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
+        }
+
+        // Utils
+        void print_edge(const Edge &edge)
+        {
+            std::cout << "------------------------------------" << std::endl;
+            std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
+            for(auto [k, v] : edge.attrs())
+                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+            std::cout << "------------------------------------" << std::endl;
+        }
+        void print_node(const Node &node)
+        {   
+            std::cout << "------------------------------------" << std::endl;
+            std::cout << "Node-> " << node.id() << std::endl;
+            std::cout << "  Type->" << node.type() << std::endl;
+            std::cout << "  Name->" << node.name() << std::endl;
+            std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
+            for(auto [key, val] : node.attrs())
+            std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
+            for(auto [key, val] : node.fano())
+            {
+                std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
+                for(auto [k, v] : val.attrs())
+                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+            }
+            std::cout << "------------------------------------" << std::endl;
+        }
+        void print_node(int id)
+        {
+            auto node = get_node(id);
+            if(node.has_value())
+                print_node(node.value());
         }
 
         //For testing

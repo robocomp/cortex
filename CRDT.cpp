@@ -339,7 +339,34 @@ bool CRDTGraph::insert_or_assign_edge(Node& n, const Edge& e)
     return true;
 }
 
-bool CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, std::vector<float>& rot_euler)
+void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& trans, std::vector<float>&& rot_euler)
+{
+    bool r = false;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (in(to))
+        {
+            EdgeKey ek; ek.to(to); ek.type("RT");   
+            Edge e; e.to(to); e.from(n.id()); e.type("RT");
+            Attrib tr; tr.type(3); tr.value().float_vec(trans);
+            Attrib rot; rot.type(3); rot.value().float_vec(rot_euler);
+            e.attrs().insert_or_assign("rotation_euler_xyz", rot);
+            e.attrs().insert_or_assign("translation", tr);
+            n.fano().insert_or_assign(ek, e);
+            n.agent_id(agent_id);
+            if(insert_or_assign_node_(n))
+               r=true;
+            else
+                throw std::runtime_error("Could not insert Node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT()");
+        } else
+            throw std::runtime_error("Destination node " + std::to_string(n.id()) + " not found in G in insert_or_assign_edge_RT()");
+    }
+    if (r)
+        emit update_edge_signal( n.id(),  to, "RT");
+    return;
+}        
+
+void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, const std::vector<float>& rot_euler)
 {
     bool r = false;
     {
@@ -348,20 +375,22 @@ bool CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
         {
             EdgeKey ek; ek.to(to); ek.type("RT");   // PONER EN UNA TABLA
             Edge e; e.to(to); e.from(n.id()); n.type("RT");
-            Attrib tr; tr.type(3); tr.value().float_vec (trans);
+            Attrib tr; tr.type(3); tr.value().float_vec(trans);
             Attrib rot; rot.type(3); rot.value().float_vec(rot_euler);
+            e.attrs().insert_or_assign("rotation_euler_xyz", rot);
+            e.attrs().insert_or_assign("translation", tr);
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
-            r = insert_or_assign_node_(n);
+            if(insert_or_assign_node_(n))
+              r=true;
+            else
+               throw std::runtime_error("Could not insert node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT()");
         } else
-        {
-            std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<< n.id() <<" or "<< to <<" not found. Cant update. "<< std::endl;
-            return false;
-        }
+            throw std::runtime_error("Destination node " + std::to_string(n.id()) + " not found in G in insert_or_assign_edge_RT()");
     }
     if (r)
         emit update_edge_signal( n.id(),  to, "RT");
-    return true;
+    return;
 }        
 
 bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
