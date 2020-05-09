@@ -188,7 +188,7 @@ namespace CRDT
             throw std::runtime_error("Illegal return type in get_attrib_by_name()");
         }       
         template <typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>, typename Va, typename = std::enable_if_t<std::is_same<std::int32_t, Va>::value || std::is_same<std::string, Va>::value || std::is_same<std::float_t, Va>::value || std::is_same<std::vector<float_t>, Va>::value, Va>>    
-        bool add_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
+        void add_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
         {
             // check Attrib coherence : type -> content
             Attrib at;  Val value;
@@ -224,7 +224,7 @@ namespace CRDT
                 auto r = elem.attrs().insert_or_assign(new_name, at);
                 if(r.second)
                     if(insert_or_assign_node(elem))
-                        return true;
+                        return;
                     else
                         throw std::runtime_error("Could not insert Node " + std::to_string(elem.id()) + " in G in add_attrib_by_name()");
                 else
@@ -238,7 +238,7 @@ namespace CRDT
                     if(elem.attrs().insert_or_assign(new_name, at))
                         if(node.value().insert_or_assign_edge(elem))
                             if(insert_or_assign_node(elem))
-                                return true;
+                                return;
                             else
                                 throw std::runtime_error("Could not insert Node " + elem.from() + " in G in add_attrib_by_name()");
                         else 
@@ -246,7 +246,7 @@ namespace CRDT
                     else 
                             throw std::runtime_error("Could not insert existing attribute " + new_name + " in edge " + elem.to() +  " for node " + elem.from() + " in add_attrib_by_name()");              
                 else 
-                    throw std::runtime_error("Node " + std::to_string(elem.from) + " not found in attrib_by_name()");
+                    throw std::runtime_error("Node " + std::to_string(elem.from()) + " not found in attrib_by_name()");
             }
             else 
                 throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
