@@ -18,13 +18,12 @@ using namespace CRDT;
 ///// PUBLIC METHODS
 /////////////////////////////////////////////////
 
-CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_file) : agent_id(id) 
+CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_file) : agent_id(id) , agent_name(name)
 {
     graph_root = root;
-    agent_name = name;
     nodes = Nodes(graph_root);
     utils = std::make_unique<Utilities>(this);
-
+    std::cout << "Agent name: " << agent_name << std::endl;
     work = true;
 
     // RTPS Create participant 

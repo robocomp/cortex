@@ -328,8 +328,8 @@ namespace CRDT
         bool work;
         mutable std::shared_mutex _mutex;
         std::string filter;
-        std::string agent_name;
         const int agent_id;
+        std::string agent_name;
         std::unique_ptr<Utilities> utils;
 
         //////////////////////////////////////////////////////////////////////////

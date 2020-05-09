@@ -65,8 +65,6 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	settings.beginGroup("QGraphicsView");
 		graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
 	settings.endGroup();
-	setWindowTitle(QString::fromStdString(G->get_agent_name()));
-
 	this->createGraph();
 
 	// connect(actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
