@@ -61,8 +61,9 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
 
-
-CRDTGraph::~CRDTGraph() {
+CRDTGraph::~CRDTGraph() 
+{
+    qDebug() << "Removing rtps participant";
     eprosima::fastrtps::Domain::removeParticipant(dsrparticipant.getParticipant()); // Remove a Participant and all associated publishers and subscribers.
 }
 
@@ -82,7 +83,6 @@ std::optional<Node> CRDTGraph::get_node(const std::string& name)
 
     return {};
 }
-
 
 std::optional<Node> CRDTGraph::get_node(int id)
 {
@@ -263,12 +263,10 @@ std::optional<Edge> CRDTGraph::get_edge(const std::string& from, const std::stri
     return {};
 }
 
-
 std::optional<Edge> CRDTGraph::get_edge(int from, int to, const std::string &key)
 {
     return get_edge_(from, to, key);
 }
-
 
 std::optional<Edge> CRDTGraph::get_edge_(int from, int  to, const std::string& key)
 {
@@ -319,6 +317,52 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
     return true;
 }
 
+bool CRDTGraph::insert_or_assign_edge(Node& n, const Edge& e)
+{
+    bool r = false;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (in(e.to()))
+        {
+            EdgeKey ek; ek.to(e.to()); ek.type(e.type());
+            n.fano().insert_or_assign(ek, e);
+            n.agent_id(agent_id);
+            r = insert_or_assign_node_(n);
+        } else
+        {
+            std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<< e.from() <<" or "<< e.to() <<" not found. Cant update. "<< std::endl;
+            return false;
+        }
+    }
+    if (r)
+        emit update_edge_signal( e.from(),  e.to(), e.type());
+    return true;
+}
+
+bool CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, std::vector<float>& rot_euler)
+{
+    bool r = false;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (in(to))
+        {
+            EdgeKey ek; ek.to(to); ek.type("RT");   // PONER EN UNA TABLA
+            Edge e; e.to(to); e.from(n.id()); n.type("RT");
+            Attrib tr; tr.type(3); tr.value().float_vec (trans);
+            Attrib rot; rot.type(3); rot.value().float_vec(rot_euler);
+            n.fano().insert_or_assign(ek, e);
+            n.agent_id(agent_id);
+            r = insert_or_assign_node_(n);
+        } else
+        {
+            std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<< n.id() <<" or "<< to <<" not found. Cant update. "<< std::endl;
+            return false;
+        }
+    }
+    if (r)
+        emit update_edge_signal( n.id(),  to, "RT");
+    return true;
+}        
 
 bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
 {
@@ -448,13 +492,6 @@ void CRDTGraph::print()
 /////  CORE
 //////////////////////////////////////////////////////////////////////////////
 
-/*
-Nodes CRDTGraph::get() {
-    std::shared_lock<std::shared_mutex>  lock(_mutex);
-    return nodes;
-}
-*/
-
 std::optional<Node> CRDTGraph::get(int id) {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     return get_(id);
@@ -523,7 +560,6 @@ std::optional<int> CRDTGraph::get_id_from_name(const std::string &name)
         auto v = name_map.find(name);
         if (v != name_map.end()) return v->second;
         return {};
-
 }
 
 std::optional<std::string> CRDTGraph::get_name_from_id(std::int32_t id)
@@ -551,7 +587,6 @@ bool CRDTGraph::empty(const int &id)
     } else
         return false;
 }
-
 
 void CRDTGraph::join_delta_node(AworSet aworSet)
 {
@@ -673,7 +708,7 @@ int CRDTGraph::id()
 }
 
 DotContext CRDTGraph::context() 
-{ // Context to ICE
+{
     DotContext om_dotcontext;
     for (auto &kv_cc : nodes.context().getCcDc().first) 
     {
@@ -693,7 +728,8 @@ std::map<int,AworSet> CRDTGraph::Map()
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     std::map<int,AworSet>  m;
-    for (auto kv : nodes.getMapRef()) { // Map of Aworset to ICE
+    for (auto kv : nodes.getMapRef()) 
+    { 
         aworset<Node, int> n;
 
         auto last = *kv.second.dots().ds.rbegin();
@@ -712,8 +748,6 @@ void CRDTGraph::subscription_thread(bool showReceived)
             try {
                 eprosima::fastrtps::SampleInfo_t m_info;
                 AworSet sample;
-
-
                 //std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
                 //read or take
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
@@ -730,19 +764,16 @@ void CRDTGraph::subscription_thread(bool showReceived)
             }
             catch (const std::exception &ex) { cerr << ex.what() << endl; }
         }
-
     };
     dsrpub_call = NewMessageFunctor(this, &work, lambda_general_topic);
 	auto res = dsrsub.init(dsrparticipant.getParticipant(), "DSR", dsrparticipant.getDSRTopicName(), dsrpub_call);
     std::cout << (res == true ? "Ok" : "Error") << std::endl;
-
 }
 
 void CRDTGraph::fullgraph_server_thread() 
 {
     std::cout << __FUNCTION__ << "->Entering thread to attend full graph requests" << std::endl;
     // Request Topic
-
     auto lambda_graph_request = [&] (eprosima::fastrtps::Subscriber* sub, bool* work, CRDT::CRDTGraph *graph) {
 
         eprosima::fastrtps::SampleInfo_t m_info;
@@ -753,7 +784,6 @@ void CRDTGraph::fullgraph_server_thread()
                 if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
                     std::cout << " Received Full Graph request: from " << m_info.sample_identity.writer_guid()
                               << std::endl;
-
                     *work = false;
                     OrMap mp;
                     mp.id(graph->id());
@@ -767,11 +797,9 @@ void CRDTGraph::fullgraph_server_thread()
                         std::cout << k << "," << v.dk() << std::endl;
                     std::cout << "Full graph written" << std::endl;
                     *work = true;
-
                 }
             }
         }
-
     };
     dsrpub_graph_request_call = NewMessageFunctor(this, &work, lambda_graph_request);
     dsrsub_graph_request.init(dsrparticipant.getParticipant(), "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName(), dsrpub_graph_request_call);
@@ -801,7 +829,7 @@ bool CRDTGraph::fullgraph_request_thread()
     dsrpub_request_answer_call = NewMessageFunctor(this, &work, lambda_request_answer);
     dsrsub_request_answer.init(dsrparticipant.getParticipant(), "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName(),dsrpub_request_answer_call);
 
-    std::this_thread::sleep_for(300ms);
+    std::this_thread::sleep_for(300ms);   // NEEDED ?
 
     std::cout << " Requesting the complete graph " << std::endl;
     GraphRequest gr;
@@ -820,7 +848,8 @@ bool CRDTGraph::fullgraph_request_thread()
     return sync;
 }
 
-AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data) {
+AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data) 
+{
     AworSet delta_crdt;
     for (auto &kv_dots : data.dots().ds) {
         PairInt pi;
@@ -839,12 +868,12 @@ AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data) {
 
         delta_crdt.dk().cbase().dc().push_back(pi);
     }
-
     delta_crdt.id(id);
     return delta_crdt;
 }
 
-aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data) {
+aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data) 
+{
     // Context
     dotcontext<int> dotcontext_aux;
     //auto m = static_cast<std::map<int, int>>(data.dk().cbase().cc());
@@ -866,60 +895,6 @@ aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data) {
     return aw;
 }
 
-/*
-// Converts string values into Mtypes
-CRDT::MTypes CRDTGraph::string_to_mtypes(const std::string &type, const std::string &val)
-{
-    // WE NEED TO ADD A TYPE field to the Attribute values and get rid of this shit
-    static const std::list<std::string> string_types{ "imName", "imType", "tableType", "texture", "engine", "path", "render", "color", "type"};
-    static const std::list<std::string> bool_types{ "collidable", "collide"};
-    static const std::list<std::string> RT_types{ "RT"};
-    static const std::list<std::string> vector_float_types{ "laser_data_dists", "laser_data_angles"};
-
-    MTypes res;
-    if(std::find(string_types.begin(), string_types.end(), type) != string_types.end())
-        res = val;
-    else if(std::find(bool_types.begin(), bool_types.end(), type) != bool_types.end())
-    { if( val == "true") res = true; else res = false; }
-    else if(std::find(vector_float_types.begin(), vector_float_types.end(), type) != vector_float_types.end())
-    {
-        std::vector<float> numbers;
-        std::istringstream iss(val);
-        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
-                       std::back_inserter(numbers), [](const std::string &s){ return (float)std::stof(s);});
-        res = numbers;
-
-    }
-        // instantiate a QMat from string marshalling
-    else if(std::find(RT_types.begin(), RT_types.end(), type) != RT_types.end())
-    {
-        std::vector<float> ns;
-        std::istringstream iss(val);
-        std::transform(std::istream_iterator<std::string>(iss), std::istream_iterator<std::string>(),
-                       std::back_inserter(ns), [](const std::string &s){ return QString::fromStdString(s).toFloat();});
-        RMat::RTMat rt;
-        if(ns.size() == 6)
-        {
-            rt.set(ns[3],ns[4],ns[5],ns[0],ns[1],ns[2]);
-        }
-        else
-        {
-            std::cout << __FUNCTION__ <<":"<<__LINE__<< "Error reading RTMat. Initializing with identity";
-            rt = QMat::identity(4);
-        }
-        return(rt);
-    }
-    else
-    {
-        try
-        { res = (float)std::stod(val); }
-        catch(const std::exception &e)
-        { std::cout << __FUNCTION__ <<":"<<__LINE__<<" catch: " << type << " " << val << std::endl; res = std::string{""}; }
-    }
-    return res;
-}
-*/
-
 std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const MTypes &t)
 {
     return std::visit(overload
@@ -937,8 +912,8 @@ std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const 
       }, t);
 }
 
-
-void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value) {
+void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value) 
+{
 
     Attrib av;
     av.type(att_value.index());
@@ -966,11 +941,6 @@ void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CR
         //     av.value(value);
         //     break;
     }
-
     v[att_name] = av;
 }
-
-/////////////////////////////////////////////////////////////////////////
-//// UTILS
-////////////////////////////////////////////////////////////////////////
 

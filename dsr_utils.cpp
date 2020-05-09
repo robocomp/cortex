@@ -23,7 +23,8 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
     QFile file;
     file.setFileName(QString::fromStdString(json_file_path));
     if (not file.open(QIODevice::ReadOnly | QIODevice::Text))
-        throw DSRException("File " + json_file_path + " not found. Cannot continue.");
+        //throw DSRException("File " + json_file_path + " not found. Cannot continue.");
+        throw std::runtime_error("File " + json_file_path + " not found. Cannot continue.");
     //     fprintf(stderr,"Can't open JSON file, check file provided. \n");
     //     exit(-1);
     // }

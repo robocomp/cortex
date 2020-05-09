@@ -75,18 +75,12 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          //std::string n_from = graph->get_name_from_id(from);
-          //std::string n_to = graph->get_name_from_id(to);
-
-          std::optional<Edge> ea = graph->get_edge(from, to, "RT");
-
-          //TODO: Comprobar esto
-          //auto value = ea.attrs().find("RT");
-          if (ea.has_value()) {
-              //auto rtvalue = value->second.value();
-              auto mat = graph->get_attrib_by_name<RMat::RTMat>(ea.value(), "RT").value_or(RTMat());
-
-              //mat.print("mat");
+          std::optional<CRDT::VertexPtr> vertex = graph->get_vertex(from);
+          if (vertex.has_value()) 
+          {
+              auto mat_op = vertex.value()->get_edge_RT(to);
+              auto mat = mat_op.value();
+              mat.print("matrt");
               for (auto i : iter::range(mat.nRows()))
                   for (auto j : iter::range(mat.nCols()))
                       if (item(i, j) == 0)
