@@ -243,33 +243,28 @@ namespace CRDT
             // assign value and insert int attribute map
             at.value( value);
             
-            // insert in node or edge
+            // insert in node 
             if constexpr (std::is_same<Node,  Type>::value)
             {
-                auto r = elem.attrs().insert_or_assign(new_name, at);
-                if(r.second)
-                    if(insert_or_assign_node(elem))
-                        return;
-                    else
-                        throw std::runtime_error("Could not insert Node " + std::to_string(elem.id()) + " in G in add_attrib_by_name()");
+                elem.attrs().insert_or_assign(new_name, at);
+                if(insert_or_assign_node_(elem))
+                    return;
                 else
-                    throw std::runtime_error("Could not insert existing attribute " + new_name + " in node " + std::to_string(elem.id()) + " in add_attrib_by_name()");
+                    throw std::runtime_error("Could not insert Node " + std::to_string(elem.id()) + " in G in add_attrib_by_name()");
             }
+            // insert in edge
             else if constexpr (std::is_same<Edge,  Type>::value)
             {
-                // get node
                 auto node = get_node(elem.from());
                 if(node.has_value())
-                    if(elem.attrs().insert_or_assign(new_name, at))
-                        if(node.value().insert_or_assign_edge(elem))
-                            if(insert_or_assign_node(elem))
-                                return;
-                            else
-                                throw std::runtime_error("Could not insert Node " + elem.from() + " in G in add_attrib_by_name()");
-                        else 
-                            throw std::runtime_error("Could not insert edge " + elem.to() + " in node " + elem.from() + " in add_attrib_by_name()");
-                    else 
-                            throw std::runtime_error("Could not insert existing attribute " + new_name + " in edge " + elem.to() +  " for node " + elem.from() + " in add_attrib_by_name()");              
+                {
+                    elem.attrs().insert_or_assign(new_name, at);
+                    insert_or_assign_edge(node.value(), elem);
+                    if(insert_or_assign_node_(node))
+                        return;
+                    else
+                        throw std::runtime_error("Could not insert Node " + elem.from() + " in G in add_attrib_by_name()");
+                }
                 else 
                     throw std::runtime_error("Node " + std::to_string(elem.from()) + " not found in attrib_by_name()");
             }
