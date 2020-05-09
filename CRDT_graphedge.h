@@ -42,13 +42,14 @@ class DoRTStuff : public  QTableWidget
       std::optional<Node> n = graph->get_node(from);
       std::optional<Node> n2 = graph->get_node(to);
 
-      if (n.has_value() &&  n2.has_value()) {
+      if (n.has_value() &&  n2.has_value()) 
+      {
           //TODO: COmprobar esto
           //setWindowModality(Qt::ApplicationModal);
           setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " +
                          QString::fromStdString(n2.value().type()));
           setColumnCount(4);
-          setRowCount(4);
+          setRowCount(7);
           setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d"});
           setVerticalHeaderLabels(QStringList{"a", "b", "c", "d"});
           horizontalHeader()->setStretchLastSection(true);
@@ -59,7 +60,6 @@ class DoRTStuff : public  QTableWidget
           show();
           std::cout << __FILE__ << " " << __FUNCTION__ << " End ofDoRTStuff Constructor " << std::endl;
       }
-
     };
   
   void closeEvent (QCloseEvent *event) override 
@@ -75,12 +75,14 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          std::optional<CRDT::VertexPtr> vertex = graph->get_vertex(from);
-          if (vertex.has_value()) 
+          //std::optional<CRDT::VertexPtr> vertex = graph->get_vertex(from);
+          std::optional<Node> node = graph->get_node(from);
+          if (node.has_value()) 
           {
-              auto mat_op = vertex.value()->get_edge_RT(to);
+              //auto mat_op = node.value()->get_edge_RT(to);
+              auto mat_op = graph->get_edge_RT(node.value(), to);
               auto mat = mat_op.value();
-              mat.print("matrt");
+              mat.print("mat_rt");
               for (auto i : iter::range(mat.nRows()))
                   for (auto j : iter::range(mat.nCols()))
                       if (item(i, j) == 0)

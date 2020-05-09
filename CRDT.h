@@ -77,14 +77,46 @@ namespace CRDT
 
         // Utils
         //void read_from_file(const std::string &xml_file_path);
-        void read_from_json_file(const std::string &json_file_path);
-        void write_to_json_file(const std::string &json_file_path);
         bool empty(const int &id);
-        void print();
         std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t); //Used by viewer
         std::map<long, Node> getCopy() const;   
         std::vector<long> getKeys() const ;   
         int32_t get_agent_id() const { return agent_id; };
+        std::string get_agent_name() const { return agent_name; };
+        void print();
+        void print_edge(const Edge &edge)
+        {
+            std::cout << "------------------------------------" << std::endl;
+            std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
+            for(auto [k, v] : edge.attrs())
+                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+            std::cout << "------------------------------------" << std::endl;
+        }
+        void print_node(const Node &node)
+        {   
+            std::cout << "------------------------------------" << std::endl;
+            std::cout << "Node-> " << node.id() << std::endl;
+            std::cout << "  Type->" << node.type() << std::endl;
+            std::cout << "  Name->" << node.name() << std::endl;
+            std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
+            for(auto [key, val] : node.attrs())
+            std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
+            for(auto [key, val] : node.fano())
+            {
+                std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
+                for(auto [k, v] : val.attrs())
+                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+            }
+            std::cout << "------------------------------------" << std::endl;
+        }
+        void print_node(int id)
+        {
+            auto node = get_node(id);
+            if(node.has_value())
+                print_node(node.value());
+        }
+        void write_to_json_file(const std::string &file) const { utils->write_to_json_file(file); };
+        void read_from_json_file(const std::string &file) const { utils->read_from_json_file(file); };
 
         // not working yet
         typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
@@ -108,7 +140,7 @@ namespace CRDT
         std::optional<int> get_id_from_name(const std::string &name);  // caché
         std::optional<std::int32_t> get_node_level(Node& n);
         std::string get_node_type(Node& n);
-        void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value);
+        void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value); //to be deprecated
         void add_attrib(std::int32_t from, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         void add_attrib(Node &n, std::int32_t to, std::string key, const Attrib &attr);  // not implemented 
         
@@ -129,7 +161,7 @@ namespace CRDT
             std::optional<Node> n = get_node(id);
             return n.has_value() ?  std::optional<std::map<EdgeKey, Edge>>(n.value().fano()) : std::nullopt;
         };
-        RTMat get_edge_RT(const Node &n, int to)
+        std::optional<RTMat> get_edge_RT(const Node &n, int to)
         {
             auto edges = n.fano();
             EdgeKey key; key.to(to); key.type("RT");
@@ -140,7 +172,8 @@ namespace CRDT
                 if(rtmat.has_value())
                     return rtmat.value();
                 else
-                    throw std::runtime_error("Could not find rot and trans attributes in " + std::to_string(n.id()) + " " + std::to_string(key.to()) + " in edge_to_RTMat()");
+                    return {};
+                    //throw std::runtime_error("Could not find rot and trans attributes in " + std::to_string(n.id()) + " " + std::to_string(key.to()) + " in edge_to_RTMat()");
             }
             else
                 throw std::runtime_error("Could not find edge " + std::to_string(key.to()) + " in node " + std::to_string(n.id()) + " in edge_to_RTMat()");
@@ -260,49 +293,16 @@ namespace CRDT
                 {
                     elem.attrs().insert_or_assign(new_name, at);
                     insert_or_assign_edge(node.value(), elem);
-                    if(insert_or_assign_node_(node))
+                    if(insert_or_assign_node_(node.value()))
                         return;
                     else
-                        throw std::runtime_error("Could not insert Node " + elem.from() + " in G in add_attrib_by_name()");
+                        throw std::runtime_error("Could not insert Node " + std::to_string(elem.from()) + " in G in add_attrib_by_name()");
                 }
                 else 
                     throw std::runtime_error("Node " + std::to_string(elem.from()) + " not found in attrib_by_name()");
             }
             else 
                 throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
-        }
-
-        // Utils
-        void print_edge(const Edge &edge)
-        {
-            std::cout << "------------------------------------" << std::endl;
-            std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
-            for(auto [k, v] : edge.attrs())
-                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-            std::cout << "------------------------------------" << std::endl;
-        }
-        void print_node(const Node &node)
-        {   
-            std::cout << "------------------------------------" << std::endl;
-            std::cout << "Node-> " << node.id() << std::endl;
-            std::cout << "  Type->" << node.type() << std::endl;
-            std::cout << "  Name->" << node.name() << std::endl;
-            std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
-            for(auto [key, val] : node.attrs())
-            std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
-            for(auto [key, val] : node.fano())
-            {
-                std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
-                for(auto [k, v] : val.attrs())
-                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-            }
-            std::cout << "------------------------------------" << std::endl;
-        }
-        void print_node(int id)
-        {
-            auto node = get_node(id);
-            if(node.has_value())
-                print_node(node.value());
         }
 
         //For testing
@@ -322,6 +322,7 @@ namespace CRDT
 
     //private:
         Nodes nodes;
+    
     private:
         int graph_root;
         bool work;
