@@ -82,13 +82,26 @@ class DoRTStuff : public  QTableWidget
               //auto mat_op = node.value()->get_edge_RT(to);
               auto mat_op = graph->get_edge_RT(node.value(), to);
               auto mat = mat_op.value();
-              mat.print("mat_rt");
+              //mat.print("mat_rt");
               for (auto i : iter::range(mat.nRows()))
                   for (auto j : iter::range(mat.nCols()))
                       if (item(i, j) == 0)
                           this->setItem(i, j, new QTableWidgetItem(QString::number(mat(i, j))));
                       else
                           this->item(i, j)->setText(QString::number(mat(i, j)));
+              auto trans = mat.getTr();
+              for(auto i: iter::range(3))
+                if(this->item(5,i) == 0)
+                  this->setItem(5,i, new QTableWidgetItem(QString::number(trans[i])));
+                else
+                    this->item(5,i)->setText(QString::number(trans[i]));
+              std::vector<float> rot{mat.getRxValue(), mat.getRyValue(), mat.getRzValue()};
+              for(auto i: iter::range(3))
+                if(this->item(6,i) == 0)
+                  this->setItem(6,i, new QTableWidgetItem(QString::number(rot[i])));
+                else
+                    this->item(6,i)->setText(QString::number(trans[i]));
+         
           }
         }
         catch (const std::exception &e)
