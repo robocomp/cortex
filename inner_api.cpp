@@ -49,6 +49,10 @@ std::optional<InnerAPI::Lists> InnerAPI::setLists(const std::string &destId, con
     return std::make_tuple(listA, listB);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+////// TRNASFORMATION MATRIX
+////////////////////////////////////////////////////////////////////////////////////////
+
 std::optional<RTMat> InnerAPI::getTransformationMatrixS(const std::string &dest, const std::string &orig)
 {
 	RTMat ret;
@@ -84,6 +88,9 @@ std::optional<RTMat> InnerAPI::getTransformationMatrix(const QString &dest, cons
 	return getTransformationMatrixS(dest.toStdString(), orig.toStdString());
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+////// TRNASFORM
+////////////////////////////////////////////////////////////////////////////////////////
 std::optional<QVec> InnerAPI::transformS(const std::string &destId, const QVec &initVec, const std::string &origId)
 {
 	if (initVec.size()==3)

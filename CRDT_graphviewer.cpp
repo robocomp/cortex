@@ -43,16 +43,16 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	this->graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	this->setContextMenuPolicy(Qt::ActionsContextMenu);
 	this->graphicsView->scale(qreal(0.8), qreal(0.8));
-	this->graphicsView->setMinimumSize(400, 400);
+	this->graphicsView->setMinimumSize(200, 200);
 	this->graphicsView->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
 	this->graphicsView->adjustSize();
  	QRect availableGeometry(QApplication::desktop()->availableGeometry());
  	this->move((availableGeometry.width() - width()) / 2, (availableGeometry.height() - height()) / 2);
 	setMouseTracking(true);
     graphicsView->viewport()->setMouseTracking(true);
-	central_point = new QGraphicsEllipseItem();
-	central_point->setPos(scene.sceneRect().center());
-	scrollArea->setMinimumSize(600,600);
+	// central_point = new QGraphicsEllipseItem();
+	// central_point->setPos(scene.sceneRect().center());
+	// scrollArea->setMinimumSize(600,600);
 	auto ind_2 = splitter_1->indexOf(scrollArea);
 	auto ind_1 = splitter_1->indexOf(splitter_1);
 	splitter_1->setStretchFactor(ind_1,1);	
@@ -67,13 +67,16 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	settings.endGroup();
 	this->createGraph();
 
-	// connect(actionSave, &QAction::triggered, this, &GraphViewer::saveGraphSLOT);
-	// connect(actionStart_Stop, &QAction::triggered, this, &GraphViewer::toggleSimulationSLOT);
+
     connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &GraphViewer::addEdgeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
 
+	for (auto &[k, v] : gmap)
+	{
+		std::cout << "Nodo " << k << " " << v->getType() << '\n';
+	}
 }
 
 GraphViewer::~GraphViewer()

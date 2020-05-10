@@ -14,7 +14,6 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QGraphicsView>
-#include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QSplitter>
@@ -27,27 +26,27 @@ QT_BEGIN_NAMESPACE
 class Ui_graphDlg
 {
 public:
-    QVBoxLayout *verticalLayout;
-    QSplitter *splitter_2;
+    QVBoxLayout *verticalLayout_2;
+    QSplitter *splittee_2;
     QSplitter *splitter_1;
     QTableWidget *tableWidgetNodes;
     QTableWidget *tableWidgetEdges;
     QScrollArea *scrollArea;
     QWidget *scrollAreaWidgetContents;
-    QHBoxLayout *horizontalLayout;
+    QVBoxLayout *verticalLayout;
     QGraphicsView *graphicsView;
 
     void setupUi(QWidget *graphDlg)
     {
         if (graphDlg->objectName().isEmpty())
             graphDlg->setObjectName(QStringLiteral("graphDlg"));
-        graphDlg->resize(784, 445);
-        verticalLayout = new QVBoxLayout(graphDlg);
-        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
-        splitter_2 = new QSplitter(graphDlg);
-        splitter_2->setObjectName(QStringLiteral("splitter_2"));
-        splitter_2->setOrientation(Qt::Horizontal);
-        splitter_1 = new QSplitter(splitter_2);
+        graphDlg->resize(784, 467);
+        verticalLayout_2 = new QVBoxLayout(graphDlg);
+        verticalLayout_2->setObjectName(QStringLiteral("verticalLayout_2"));
+        splittee_2 = new QSplitter(graphDlg);
+        splittee_2->setObjectName(QStringLiteral("splittee_2"));
+        splittee_2->setOrientation(Qt::Horizontal);
+        splitter_1 = new QSplitter(splittee_2);
         splitter_1->setObjectName(QStringLiteral("splitter_1"));
         splitter_1->setOrientation(Qt::Vertical);
         tableWidgetNodes = new QTableWidget(splitter_1);
@@ -63,30 +62,24 @@ public:
         sizePolicy.setHeightForWidth(tableWidgetEdges->sizePolicy().hasHeightForWidth());
         tableWidgetEdges->setSizePolicy(sizePolicy);
         splitter_1->addWidget(tableWidgetEdges);
-        splitter_2->addWidget(splitter_1);
-        scrollArea = new QScrollArea(splitter_2);
+        splittee_2->addWidget(splitter_1);
+        scrollArea = new QScrollArea(splittee_2);
         scrollArea->setObjectName(QStringLiteral("scrollArea"));
-        QSizePolicy sizePolicy1(QSizePolicy::Maximum, QSizePolicy::Expanding);
-        sizePolicy1.setHorizontalStretch(0);
-        sizePolicy1.setVerticalStretch(0);
-        sizePolicy1.setHeightForWidth(scrollArea->sizePolicy().hasHeightForWidth());
-        scrollArea->setSizePolicy(sizePolicy1);
-        scrollArea->setMinimumSize(QSize(500, 0));
         scrollArea->setWidgetResizable(true);
         scrollAreaWidgetContents = new QWidget();
         scrollAreaWidgetContents->setObjectName(QStringLiteral("scrollAreaWidgetContents"));
-        scrollAreaWidgetContents->setGeometry(QRect(0, 0, 501, 425));
-        horizontalLayout = new QHBoxLayout(scrollAreaWidgetContents);
-        horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
+        scrollAreaWidgetContents->setGeometry(QRect(0, 0, 392, 447));
+        verticalLayout = new QVBoxLayout(scrollAreaWidgetContents);
+        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         graphicsView = new QGraphicsView(scrollAreaWidgetContents);
         graphicsView->setObjectName(QStringLiteral("graphicsView"));
 
-        horizontalLayout->addWidget(graphicsView);
+        verticalLayout->addWidget(graphicsView);
 
         scrollArea->setWidget(scrollAreaWidgetContents);
-        splitter_2->addWidget(scrollArea);
+        splittee_2->addWidget(scrollArea);
 
-        verticalLayout->addWidget(splitter_2);
+        verticalLayout_2->addWidget(splittee_2);
 
 
         retranslateUi(graphDlg);
