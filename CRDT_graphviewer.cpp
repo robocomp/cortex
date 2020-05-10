@@ -73,7 +73,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &GraphViewer::addEdgeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
-	
+
 }
 
 GraphViewer::~GraphViewer()
@@ -145,7 +145,6 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
             gnode->setType(type);
             scene.addItem(gnode);
             gmap.insert(std::pair(id, gnode));
-
             // left table filling only if it is new
             tableWidgetNodes->setColumnCount(1);
             tableWidgetNodes->setHorizontalHeaderLabels(QStringList{"type"});
@@ -160,8 +159,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
             for (auto &s : nodes_types_list) 
 			{
                 tableWidgetNodes->setItem(i, 0, new QTableWidgetItem(s));
-                tableWidgetNodes->item(i, 0)->setIcon(
-                        QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
+                tableWidgetNodes->item(i, 0)->setIcon(QPixmap::fromImage(QImage("../../graph-related-classes/greenBall.png")));
                 i++;
             }
             tableWidgetNodes->horizontalHeader()->setStretchLastSection(true);

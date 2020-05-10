@@ -46,15 +46,22 @@ class DoRTStuff : public  QTableWidget
       {
           //TODO: COmprobar esto
           //setWindowModality(Qt::ApplicationModal);
-          setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " +
-                         QString::fromStdString(n2.value().type()));
+          setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " + QString::fromStdString(n2.value().type()));
           setColumnCount(4);
           setRowCount(7);
-          setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d"});
+          setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d", "", "T", "R"});
           setVerticalHeaderLabels(QStringList{"a", "b", "c", "d"});
           horizontalHeader()->setStretchLastSection(true);
           resizeRowsToContents();
           resizeColumnsToContents();
+          int width = (this->model()->columnCount() - 1) + this->verticalHeader()->width();
+          int height = (this->model()->rowCount() - 1) + this->horizontalHeader()->height();
+          for(int column = 0; column < this->model()->columnCount(); column++)
+            width = width + this->columnWidth(column);
+          for(int row = 0; row < this->model()->rowCount(); row++)
+            height = height + this->rowHeight(row);
+          this->setMinimumWidth(width);
+          this->setMinimumHeight(height);
           QObject::connect(graph.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DoRTStuff::drawSLOT);
           drawSLOT(from, to);
           show();
@@ -101,7 +108,6 @@ class DoRTStuff : public  QTableWidget
                   this->setItem(6,i, new QTableWidgetItem(QString::number(rot[i])));
                 else
                     this->item(6,i)->setText(QString::number(trans[i]));
-         
           }
         }
         catch (const std::exception &e)

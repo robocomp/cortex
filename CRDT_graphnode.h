@@ -146,9 +146,9 @@ class DoTableStuff : public  QTableWidget
 
       //setWindowFlags(Qt::Widget | Qt::FramelessWindowHint);
       std::optional<Node> n = graph->get_node(node_id_);
-      if (n.has_value()) {
-          setWindowTitle(
-                  "Node " + QString::fromStdString(n.value().type()) + " [" + QString::number(node_id) + "]");
+      if (n.has_value()) 
+      {
+          setWindowTitle("Node " + QString::fromStdString(n.value().type()) + " [" + QString::number(node_id) + "]");
           setColumnCount(2);
           setRowCount(n.value().attrs().size());
           setHorizontalHeaderLabels(QStringList{"Key", "Value"});
@@ -180,17 +180,27 @@ class DoTableStuff : public  QTableWidget
           horizontalHeader()->setStretchLastSection(true);
           resizeRowsToContents();
           resizeColumnsToContents();
+          int width = (this->model()->columnCount() - 1) + this->verticalHeader()->width();
+          int height = (this->model()->rowCount() - 1) + this->horizontalHeader()->height();
+          for(int column = 0; column < this->model()->columnCount(); column++)
+            width = width + this->columnWidth(column);
+          for(int row = 0; row < this->model()->rowCount(); row++)
+            height = height + this->rowHeight(row);
+          this->setMinimumWidth(width);
+          this->setMinimumHeight(height);
           QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoTableStuff::drawSLOT);
           show();
       }
     };
 
   public slots:
-    void drawSLOT(const std::int32_t &id, const std::map<string,Attrib> &attribs) {
+    void drawSLOT(const std::int32_t &id, const std::map<string,Attrib> &attribs) 
+    {
         //std::cout << " Window " << this->window()->windowTitle().toStdString() << " id " << QString::number(id).toStdString() << " contains? " << this->window()->windowTitle().contains(QString::number(id)) << std::endl;
         if (this->window()->windowTitle().contains(QString::number(id))) {
         int i = 0;
-            for (auto &[k,v] : attribs) {
+            for (auto &[k,v] : attribs) 
+            {
                 setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET
                 switch (v.value()._d()) {
                     case 0:
