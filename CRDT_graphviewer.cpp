@@ -56,7 +56,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	auto ind_2 = splitter_1->indexOf(scrollArea);
 	auto ind_1 = splitter_1->indexOf(splitter_1);
 	splitter_1->setStretchFactor(ind_1,1);	
-	splitter_1->setStretchFactor(ind_2,9);
+	splitter_2->setStretchFactor(ind_2,9);
 	QSettings settings("RoboComp", "DSR");
     settings.beginGroup("MainWindow");
     	graphicsView->resize(settings.value("size", QSize(400, 400)).toSize());

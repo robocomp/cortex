@@ -23,7 +23,7 @@
 #include <QListView>
 #include "CRDT.h"
 #include <typeinfo>
-#include "graphUI.h"
+#include "graphUItabs.h"
 
 class SpecificWorker;
 class GraphNode;
@@ -32,7 +32,7 @@ class GraphEdge;
 namespace DSR
 {
 	//////////////////////////////////////////////////////////////////////////////////////////////77
-	/// Drawing controller to display the graph in real-time using DataStorm updates
+	/// Drawing controller to display the graph in real-time using RTPS 
 	//////////////////////////////////////////////////////////////////////////////////////////////77
 	
 	//class GraphViewer : public QGraphicsView 
