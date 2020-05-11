@@ -201,7 +201,7 @@ class DoTableStuff : public  QTableWidget
         int i = 0;
             for (auto &[k,v] : attribs) 
             {
-                setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   //CHANGE TO SET
+                setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));   
                 switch (v.value()._d()) {
                     case 0:
                         setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
@@ -223,6 +223,14 @@ class DoTableStuff : public  QTableWidget
             }
         }
     }
+    void resizeEvent(QEvent* event)
+    {
+        const auto &columns = columnCount();
+        for(auto &&index : iter::range(columns))
+            setColumnWidth(index, width()/columns);
+        //resizeEvent(event)
+    }
+
   private:
     std::shared_ptr<CRDT::CRDTGraph> graph;
     std::int32_t node_id;

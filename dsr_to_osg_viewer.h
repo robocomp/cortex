@@ -34,9 +34,10 @@ namespace DSR
         public:
             DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G, float scaleX, float scaleY, QWidget *parent=0);
             void add_cylinder();
-        
+    
         public slots:
-            //connect here signals from G
+            // define slots to recoeve signals from G
+            // create a plane, mesh, move
 
             
         protected:  

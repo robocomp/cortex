@@ -72,6 +72,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &GraphViewer::addEdgeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
+	// &CRDT::CRDTGraph::update_attrs_signal is used in GraphNode's DoTableStuff auxiliary class
 
 	for (auto &[k, v] : gmap)
 	{

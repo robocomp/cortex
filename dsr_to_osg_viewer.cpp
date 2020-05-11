@@ -27,17 +27,14 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G, float scaleX,
     osgGA::TrackballManipulator* manipulator = new osgGA::TrackballManipulator;
     manipulator->setAllowThrow( false );
     this->setMouseTracking(true);
-    osg::Vec3d eye(osg::Vec3(4000.,4000.,-1000.));
+    osg::Vec3d eye(osg::Vec3(4000.,4000.,-1500.));
     osg::Vec3d center(osg::Vec3(0.,0.,-0.));
     osg::Vec3d up(osg::Vec3(0.,1.,0.));
     manipulator->setHomePosition(eye, center, up, true);
     manipulator->setByMatrix(osg::Matrixf::lookAt(eye,center,up));
     _mViewer->setCameraManipulator(manipulator);
     _mViewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
-    _mViewer->realize();
-
-	root = new osg::Group();
-
+	
  	//global stateset
 	osg::StateSet *globalStateSet = new osg::StateSet;
 	globalStateSet->setGlobalDefaults();
@@ -46,29 +43,28 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G, float scaleX,
 	// enable lighting
 	globalStateSet->setMode(GL_LIGHTING, osg::StateAttribute::ON);
 
-	// osg::Light* light = getLight();
-	// light->setAmbient(  osg::Vec4( 0.4f,    0.4f, 0.4f,  1.f ));
-	// light->setDiffuse(  osg::Vec4( 0.8f,    0.8f, 0.8f,  1.f ));
-	// light->setSpecular( osg::Vec4( 0.2f,    0.2f, 0.2f,  1.f ));
-	// light->setPosition( osg::Vec4( 0.0f, 3000.0f, 0.0f,  1.f));
-    // // 	light->setDirection(osg::Vec3(0.0f, -1.0f, 0.0f));
-
-	// osg::ref_ptr<osg::LightSource> lightSource = new osg::LightSource;
-	// lightSource->setLight(light);
+	//osg::Light* light = _mViewer->getLight();
+	//light->setAmbient(  osg::Vec4( 0.4f,    0.4f, 0.4f,  1.f ));
+	//light->setDiffuse(  osg::Vec4( 0.8f,    0.8f, 0.8f,  1.f ));
+	//light->setSpecular( osg::Vec4( 0.2f,    0.2f, 0.2f,  1.f ));
+	//light->setPosition( osg::Vec4( 0.0f, 3000.0f, 0.0f,  1.f));
+    // 	light->setDirection(osg::Vec3(0.0f, -1.0f, 0.0f));
+	//osg::ref_ptr<osg::LightSource> lightSource = new osg::LightSource;
+	//lightSource->setLight(light);
 	// lightSource->setLocalStateSetModes(osg::StateAttribute::ON);
 	// lightSource->setStateSetModes(*globalStateSet,osg::StateAttribute::ON);
-	// root->addChild(lightSource.get() );
+	//root->addChild(lightSource.get() );
 
-	//addEventHandler(new osgViewer::WindowSizeHandler);
-
-	_mViewer->setSceneData( root.get());
-
+    root = new osg::Group();
     add_cylinder();
-
+	_mViewer->setSceneData( root.get());
+    
     // connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
 	// connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &GraphViewer::addEdgeSLOT);
 	// connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
 	// connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
+
+     _mViewer->realize();
 }
 
 void DSRtoOSGViewer::add_cylinder()
@@ -78,6 +74,11 @@ void DSRtoOSGViewer::add_cylinder()
     sd->setColor( osg::Vec4( 0.8f, 0.5f, 0.2f, 1.f ) );
     osg::Geode* geode = new osg::Geode;
     geode->addDrawable(sd);
+    osg::StateSet* stateSet = geode->getOrCreateStateSet();
+    osg::Material* material = new osg::Material;
+    material->setColorMode( osg::Material::AMBIENT_AND_DIFFUSE );
+    stateSet->setAttributeAndModes( material, osg::StateAttribute::ON );
+    stateSet->setMode( GL_DEPTH_TEST, osg::StateAttribute::ON );
     root->addChild(geode);
 }
         
@@ -96,12 +97,12 @@ void DSRtoOSGViewer::resizeGL( int width, int height )
 
 void DSRtoOSGViewer::initializeGL()
 {
-    osg::Geode* geode = dynamic_cast<osg::Geode*>(_mViewer->getSceneData());
-    osg::StateSet* stateSet = geode->getOrCreateStateSet();
-    osg::Material* material = new osg::Material;
-    material->setColorMode( osg::Material::AMBIENT_AND_DIFFUSE );
-    stateSet->setAttributeAndModes( material, osg::StateAttribute::ON );
-    stateSet->setMode( GL_DEPTH_TEST, osg::StateAttribute::ON );
+    //osg::Geode* geode = dynamic_cast<osg::Geode*>(_mViewer->getSceneData());
+    //osg::StateSet* stateSet = geode->getOrCreateStateSet();
+    // osg::Material* material = new osg::Material;
+    // material->setColorMode( osg::Material::AMBIENT_AND_DIFFUSE );
+    // stateSet->setAttributeAndModes( material, osg::StateAttribute::ON );
+    // stateSet->setMode( GL_DEPTH_TEST, osg::StateAttribute::ON );
 }     
 
 void DSRtoOSGViewer::mouseMoveEvent(QMouseEvent* event)
