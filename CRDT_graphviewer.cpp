@@ -66,7 +66,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 		graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
 	settings.endGroup();
 	this->createGraph();
-
+	tabWidget->setCurrentIndex(0);
 
     connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
 	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &GraphViewer::addEdgeSLOT);

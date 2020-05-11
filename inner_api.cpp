@@ -17,37 +17,52 @@ std::optional<InnerAPI::Lists> InnerAPI::setLists(const std::string &destId, con
 
   	auto an = G->get_node(origId);
 	auto bn = G->get_node(destId);  
-    if (!an.has_value() or !bn.has_value())
+    if ( not an.has_value() or  not bn.has_value())
 		return {};
 	auto a = an.value(); auto b = bn.value();
     
 	int minLevel = std::min(G->get_node_level(a).value_or(-1), G->get_node_level(b).value_or(-1));
-	while (G->get_node_level(a) >= minLevel)
+	if (minLevel == -1) 
+		return {};
+	while (G->get_node_level(a).value_or(-1) >= minLevel)
 	{
         qDebug() << "listaA" << a.id() << G->get_node_level(a).value() << G->get_node_parent(a).value();
 		auto p_node = G->get_node(G->get_node_parent(a).value_or(-1));
-      	if(!p_node.has_value())
+      	if( not p_node.has_value())
 			break;
-        listA.push_back(G->get_edge_RT(p_node.value(), a.id()).value());   // the downwards RT link from parent to a
+		auto rt = G->get_edge_RT(p_node.value(), a.id());
+		if(rt.has_value())
+        	listA.emplace_back(std::move(rt.value()));   // the downwards RT link from parent to a
         a = p_node.value();
 	}
-	while (G->get_node_level(b) >= minLevel)
+	while (G->get_node_level(b).value_or(-1) >= minLevel)
 	{
         qDebug() << "listaB" << b.id() << G->get_node_level(b).value() << G->get_node_parent(b).value();
 		auto p_node = G->get_node(G->get_node_parent(b).value_or(-1));
-		if(!p_node.has_value())
+		if(not p_node.has_value())
 			break;
-        listB.push_front(G->get_edge_RT(p_node.value(), b.id()).value());
+		auto rt = G->get_edge_RT(p_node.value(), b.id());
+		if(rt.has_value())
+        	listB.emplace_front(std::move(rt.value()));
+		else
+			return {};
         b = p_node.value();
-	}
-	// while (b->id() != a->id())  		// Estaba en InnerModel pero no sé bien cuándo hace falta
-	// {
-	// 	listA.push_back(a);
-	// 	listB.push_front(b);
-	// 	a = G->getNode(a->getParentId());
-	// 	b = G->getNode(b->getParentId());
-	// }
-	qDebug() << "saliendo";
+	}	
+	while (a.id() != b.id())  
+	{
+		qDebug() << "listas A&B" << a.id() << b.id();
+		auto p = G->get_node(G->get_node_parent(a).value_or(-1));
+		auto q = G->get_node(G->get_node_parent(b).value_or(-1));
+		if(p.has_value() and q.has_value())
+		{
+	  		listA.push_back(G->get_edge_RT(p.value(), a.id()).value());
+	  		listB.push_front(G->get_edge_RT(q.value(), b.id()).value());
+			a = p.value();
+			b = q.value();
+		}
+		else
+			return {};
+	}	
     return std::make_tuple(listA, listB);
 }
 
@@ -73,12 +88,12 @@ std::optional<RTMat> InnerAPI::getTransformationMatrixS(const std::string &dest,
     for(auto &a: listA )
     {
 	    ret = a*ret;
-        ret.print("ListA");
+        //ret.print("ListA");
     }
     for(auto &b: listB )
     {
         ret = b.invert() * ret;
-        ret.print("ListB");
+        //ret.print("ListB");
     }
     //	localHashTr[QPair<QString, QString>(to, from)] = ret;
     //}
