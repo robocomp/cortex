@@ -761,6 +761,10 @@ class EdgeKey
 {
 public:
 
+    friend std::ostream &operator<<(std::ostream &os, const EdgeKey &key) {
+        os << "[ to: " << key.m_to << "- type: " << key.m_type <<" ]";
+        return os;
+    }
 
     bool operator==(const EdgeKey &rhs) const {
         return m_to == rhs.m_to &&
@@ -915,6 +919,7 @@ public:
      * @param cdr CDR serialization object.
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
+
 
 private:
     int32_t m_to;

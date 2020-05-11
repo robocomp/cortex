@@ -461,7 +461,7 @@ std::vector<Edge> CRDTGraph::get_edges_to_id(int id) {
     std::vector<Edge> edges_;
     for (const auto &[key, types] : edges)
     {
-        auto [from, to] = key;
+        auto [to, from] = key;
         if (to == id) {
             for (const std::string& type : types) {
                 auto n = get_edge_(from, to, type);
