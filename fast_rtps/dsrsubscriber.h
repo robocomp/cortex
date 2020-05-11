@@ -62,8 +62,6 @@ private:
 		int n_msg;
 		eprosima::fastrtps::rtps::GUID_t participant_ID;
 
-		//int *work;
-		//CRDT::CRDTGraph *graph;
 		std::function<void(eprosima::fastrtps::Subscriber* sub)>  f;
 
 	} m_listener;

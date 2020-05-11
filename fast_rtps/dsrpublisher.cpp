@@ -104,12 +104,8 @@ void DSRPublisher::run()
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(250)); // Sleep 250 ms
     }
-    std::cout << __FUNCTION__ << " HOLA" << std::endl;
-    
-    // Publication code
-    //DSRGraphTopic st;
 
-    //int msgsent = 0;  
+
     do
     {
     //     mp_publisher->write(&st);  

@@ -53,7 +53,6 @@ private:
 	eprosima::fastrtps::Subscriber *mp_subscriber_topic_answer; ///"DSR_GRAPH_ANSWER"
 	OrMapPubSubType graphRequestAnswerType;
 
-	//DSRGraphTopicPubSubType dsrgraphType;
 
 };
 
