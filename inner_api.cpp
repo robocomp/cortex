@@ -15,29 +15,30 @@ std::optional<InnerAPI::Lists> InnerAPI::setLists(const std::string &destId, con
 {
     std::list<RMat::RTMat> listA, listB;
 
-  	auto a = G->get_vertex(origId);
-	auto b = G->get_vertex(destId);  
-    if (!a.has_value() or !b.has_value())
+  	auto an = G->get_node(origId);
+	auto bn = G->get_node(destId);  
+    if (!an.has_value() or !bn.has_value())
 		return {};
+	auto a = an.value(); auto b = bn.value();
     
-	int minLevel = std::min(a.value()->get_level().value_or(-1), b.value()->get_level().value_or(-1));
-	while (a.value()->get_level() >= minLevel)
+	int minLevel = std::min(G->get_node_level(a).value_or(-1), G->get_node_level(b).value_or(-1));
+	while (G->get_node_level(a) >= minLevel)
 	{
-        //qDebug() << "listaA" << a.value()->id() << a.value()->get_level().value() << a.value()->get_parent().value();
-		auto p_node = G->get_vertex(a.value()->get_parent().value_or(-1));
+        qDebug() << "listaA" << a.id() << G->get_node_level(a).value() << G->get_node_parent(a).value();
+		auto p_node = G->get_node(G->get_node_parent(a).value_or(-1));
       	if(!p_node.has_value())
 			break;
-        listA.push_back(p_node.value()->get_edge(a.value()->id(), "RT").value()->to_RT());   // the downwards RT link from parent to a
-        a = p_node;
+        listA.push_back(G->get_edge_RT(p_node.value(), a.id()).value());   // the downwards RT link from parent to a
+        a = p_node.value();
 	}
-	while (b.value()->get_level() >= minLevel)
+	while (G->get_node_level(b) >= minLevel)
 	{
-        //qDebug() << "listaB" << b.value()->id() << b.value()->get_level().value();
-		auto p_node = G->get_vertex(b.value()->get_parent().value_or(-1));
+        qDebug() << "listaB" << b.id() << G->get_node_level(b).value() << G->get_node_parent(b).value();
+		auto p_node = G->get_node(G->get_node_parent(b).value_or(-1));
 		if(!p_node.has_value())
 			break;
-        listB.push_front(p_node.value()->get_edge(a.value()->id(), "RT").value()->to_RT());
-        b = p_node;
+        listB.push_front(G->get_edge_RT(p_node.value(), b.id()).value());
+        b = p_node.value();
 	}
 	// while (b->id() != a->id())  		// Estaba en InnerModel pero no sé bien cuándo hace falta
 	// {
@@ -46,6 +47,7 @@ std::optional<InnerAPI::Lists> InnerAPI::setLists(const std::string &destId, con
 	// 	a = G->getNode(a->getParentId());
 	// 	b = G->getNode(b->getParentId());
 	// }
+	qDebug() << "saliendo";
     return std::make_tuple(listA, listB);
 }
 
@@ -71,12 +73,12 @@ std::optional<RTMat> InnerAPI::getTransformationMatrixS(const std::string &dest,
     for(auto &a: listA )
     {
 	    ret = a*ret;
-        //ret.print("ListA");
+        ret.print("ListA");
     }
     for(auto &b: listB )
     {
         ret = b.invert() * ret;
-        //ret.print("ListB");
+        ret.print("ListB");
     }
     //	localHashTr[QPair<QString, QString>(to, from)] = ret;
     //}

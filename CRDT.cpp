@@ -537,7 +537,12 @@ std::optional<Node> CRDTGraph::get_(int id) {
 
 std::optional<std::int32_t> CRDTGraph::get_node_level(Node& n)
 {
-    return get_attrib_by_name<int32_t>(n, "level");
+    return get_attrib_by_name<std::int32_t>(n, "level");
+}
+
+std::optional<std::int32_t> CRDTGraph::get_node_parent(Node& n)
+{
+    return get_attrib_by_name<std::int32_t>(n, "parent");
 }
 
 std::string CRDTGraph::get_node_type(Node& n)

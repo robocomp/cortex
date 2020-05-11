@@ -223,12 +223,12 @@ class DoTableStuff : public  QTableWidget
             }
         }
     }
-    void resizeEvent(QEvent* event)
+    
+    void resizeEvent(QResizeEvent* event)
     {
-        const auto &columns = columnCount();
-        for(auto &&index : iter::range(columns))
-            setColumnWidth(index, width()/columns);
-        //resizeEvent(event)
+      const auto &columns = columnCount();
+      for(auto &&index : iter::range(columns))
+          setColumnWidth(index, width()/columns);
     }
 
   private:

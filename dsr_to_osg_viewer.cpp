@@ -59,13 +59,23 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G, float scaleX,
     add_cylinder();
 	_mViewer->setSceneData( root.get());
     
-    // connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &GraphViewer::addOrAssignNodeSLOT);
-	// connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &GraphViewer::addEdgeSLOT);
-	// connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &GraphViewer::delEdgeSLOT);
-	// connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &GraphViewer::delNodeSLOT);
+    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &DSRtoOSGViewer::add_or_assign_edge_slot);
+	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DSRtoOSGViewer::add_or_assign_edge_slot);
+	//connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &DSRtoOSGViewer::delEdgeSLOT);
+	//connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &DSRtoOSGViewer::delNodeSLOT);
 
      _mViewer->realize();
 }
+
+void DSRtoOSGViewer::add_or_assign_node_slot()
+{
+    qDebug() << __FILE__ << __FUNCTION__ ;
+}
+void DSRtoOSGViewer::add_or_assign_edge_slot()
+{
+     qDebug() << __FILE__ << __FUNCTION__ ;
+}
+
 
 void DSRtoOSGViewer::add_cylinder()
 {

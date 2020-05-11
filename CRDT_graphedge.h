@@ -48,8 +48,8 @@ class DoRTStuff : public  QTableWidget
           //setWindowModality(Qt::ApplicationModal);
           setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " + QString::fromStdString(n2.value().type()));
           setColumnCount(4);
-          setRowCount(7);
-          setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d", "", "T", "R"});
+          setRowCount(9);
+          setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d", "", "T", "", "R"});
           setVerticalHeaderLabels(QStringList{"a", "b", "c", "d"});
           horizontalHeader()->setStretchLastSection(true);
           resizeRowsToContents();
@@ -75,6 +75,13 @@ class DoRTStuff : public  QTableWidget
     QTableWidget::closeEvent(event);
   };
 
+  void resizeEvent(QResizeEvent* event)
+  {
+    const auto &columns = columnCount();
+    for(auto &&index : iter::range(columns))
+        setColumnWidth(index, width()/columns);
+  }
+
   public slots:
     void drawSLOT(const std::int32_t &from_, const std::int32_t &to_)
     {
@@ -82,32 +89,47 @@ class DoRTStuff : public  QTableWidget
       if( from == from_ and to == to_)     //ADD LABEL
         try
         {
-          //std::optional<CRDT::VertexPtr> vertex = graph->get_vertex(from);
           std::optional<Node> node = graph->get_node(from);
           if (node.has_value()) 
           {
-              //auto mat_op = node.value()->get_edge_RT(to);
               auto mat_op = graph->get_edge_RT(node.value(), to);
               auto mat = mat_op.value();
-              //mat.print("mat_rt");
+              // draw RT values
               for (auto i : iter::range(mat.nRows()))
                   for (auto j : iter::range(mat.nCols()))
                       if (item(i, j) == 0)
                           this->setItem(i, j, new QTableWidgetItem(QString::number(mat(i, j))));
                       else
                           this->item(i, j)->setText(QString::number(mat(i, j)));
+              // draw translation values
               auto trans = mat.getTr();
-              for(auto i: iter::range(3))
-                if(this->item(5,i) == 0)
-                  this->setItem(5,i, new QTableWidgetItem(QString::number(trans[i])));
-                else
-                    this->item(5,i)->setText(QString::number(trans[i]));
+              std::vector<QString> ts{"tx","ty","tz"};
+              std::vector<QString> rs{"rx","ry","rz"};
               std::vector<float> rot{mat.getRxValue(), mat.getRyValue(), mat.getRzValue()};
               for(auto i: iter::range(3))
-                if(this->item(6,i) == 0)
-                  this->setItem(6,i, new QTableWidgetItem(QString::number(rot[i])));
+              {
+                if(this->item(4,i) == 0)
+                {
+                  auto green = new QTableWidgetItem(); green->setBackground(QBrush(QColor("lightGreen")));
+                  this->setItem(4,i, green);
+                }
+                if(this->item(5,i) == nullptr)
+                  this->setItem(5,i, new QTableWidgetItem(ts[i]));
+                else
+                    this->item(5,i)->setText(QString::number(trans[i]));
+                if(this->item(6,i) == nullptr)
+                  this->setItem(6,i, new QTableWidgetItem(QString::number(trans[i])));
                 else
                     this->item(6,i)->setText(QString::number(trans[i]));
+                if(this->item(7,i) == nullptr)
+                  this->setItem(7,i, new QTableWidgetItem(rs[i]));
+                else
+                  this->item(7,i)->setText(QString::number(trans[i]));
+                if(this->item(8,i) == 0)
+                  this->setItem(8,i, new QTableWidgetItem(QString::number(rot[i])));
+                else
+                    this->item(8,i)->setText(QString::number(trans[i]));
+              }
           }
         }
         catch (const std::exception &e)

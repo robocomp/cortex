@@ -57,6 +57,10 @@ namespace DSR
             osg::ref_ptr<osgViewer::Viewer> _mViewer;
             qreal m_scaleX, m_scaleY;
             osg::ref_ptr<osg::Group> root;
+
+        public slots:
+            void add_or_assign_node_slot();
+            void add_or_assign_edge_slot();
     };
 };
 #endif
