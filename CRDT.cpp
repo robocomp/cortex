@@ -353,7 +353,10 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& t
             e.attrs().insert_or_assign("translation", tr);
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
-            if(insert_or_assign_node_(n))
+            Node to_n = get_(to).value();
+            insert_or_assign_attrib_by_name(to_n, "parent", n.id());
+            insert_or_assign_attrib_by_name(to_n, "level",  get_node_level(n).value() + 1 );
+            if(insert_or_assign_node_(n) and insert_or_assign_node_(to_n))
                r=true;
             else
                 throw std::runtime_error("Could not insert Node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT()");
@@ -380,7 +383,10 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
             e.attrs().insert_or_assign("translation", tr);
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
-            if(insert_or_assign_node_(n))
+            Node to_n = get_(to).value();
+            insert_or_assign_attrib_by_name(to_n, "parent", n.id());
+            insert_or_assign_attrib_by_name(to_n, "level",  get_node_level(n).value() + 1 );
+            if(insert_or_assign_node_(n) and insert_or_assign_node_(to_n))
               r=true;
             else
                throw std::runtime_error("Could not insert node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT()");
