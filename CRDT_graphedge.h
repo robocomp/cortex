@@ -44,7 +44,7 @@ class DoRTStuff : public  QTableWidget
 
       if (n.has_value() &&  n2.has_value()) 
       {
-          //TODO: COmprobar esto
+          //TODO: Comprobar esto
           //setWindowModality(Qt::ApplicationModal);
           setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " + QString::fromStdString(n2.value().type()));
           setColumnCount(4);
