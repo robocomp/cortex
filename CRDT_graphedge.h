@@ -46,7 +46,7 @@ class DoRTStuff : public  QTableWidget
       {
           //TODO: Comprobar esto
           //setWindowModality(Qt::ApplicationModal);
-          setWindowTitle("RT: " + QString::fromStdString(n.value().type()) + " to " + QString::fromStdString(n2.value().type()));
+          setWindowTitle("RT: " + QString::fromStdString(n.value().name()) + "(" + QString::fromStdString(n.value().type()) + ") to " + QString::fromStdString(n2.value().name()) + "(" + QString::fromStdString(n2.value().type()) + ")");
           setColumnCount(4);
           setRowCount(9);
           setHorizontalHeaderLabels(QStringList{"a", "b", "c", "d", "", "T", "", "R"});
