@@ -212,7 +212,7 @@ std::pair<bool, vector<tuple<int, int, std::string>>> CRDTGraph::delete_node_(in
 
     //2. search and remove edges.
     //For each node check if there is an edge to remove.
-    for (auto [k, v] : nodes.getMapRef()) {
+    for (auto &[k, v] : nodes.getMapRef()) {
         if (edges.find({k, id}) == edges.end()) continue;
         for (const auto &key : edges[{k, id}]) {
 
@@ -747,13 +747,14 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
 
     {
 
+
         std::unique_lock<std::shared_mutex> lock(_mutex);
         auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
         std::set<pair<int, int>> s;
         for (auto &v : full_graph.cbase().dc())
             s.emplace(std::make_pair(v.first(), v.second()));
-        //nodes.context().setContext(m, s);
 
+        //ormap<int, aworset<Node, int>> ma;
         for (auto &[k, val] : full_graph.m()) 
         {
             auto awor = translateAwIDLtoCRDT(val);
@@ -761,22 +762,21 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             for (const auto &[k,v] : nd.fano() )
                 remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
 
-            if (awor.dots().ds.size() == 0) {
-                nodes[k].rmv(nd);
-                update_maps_node_delete(k, nd);
-                updates.emplace_back(make_tuple( false, k, ""));
-            } 
-            else
-            {
-                if (deleted.find(k) == deleted.end() and (nodes[k].dots().ds.empty() or (*awor.dots().ds.rbegin() != *nodes[k].dots().ds.rbegin()))) {
-                    nodes[k].setContext(awor.context());
-                    nodes[k].add(awor.dots().ds.begin()->second);
-                    update_maps_node_insert(k, awor.dots().ds.begin()->second);
-                    updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
-                } 
-                else 
-                {
+            if (deleted.find(k) == deleted.end()) {
+                nodes[k].join_replace(awor);
+                if (awor.dots().ds.size() == 0) {
+                    //nodes[k].rmv(nd);
                     update_maps_node_delete(k, nd);
+                    updates.emplace_back(make_tuple(false, k, ""));
+                } else {
+                    if (!nodes[k].dots().ds.empty()/* or (*awor.dots().ds.rbegin() != *nodes[k].dots().ds.rbegin())*/) {
+                        //nodes[k].setContext(awor.context());
+                        //nodes[k].add(awor.dots().ds.begin()->second);
+                        update_maps_node_insert(k, awor.dots().ds.begin()->second);
+                        updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
+                    } else {
+                        update_maps_node_delete(k, nd);
+                    }
                 }
             }
         }
@@ -860,6 +860,7 @@ void CRDTGraph::subscription_thread(bool showReceived)
                 AworSet sample;
                 //std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
                 //read or take
+                //while(sub->get_unread_count() >0)
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
                     if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
                         if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
@@ -869,6 +870,9 @@ void CRDTGraph::subscription_thread(bool showReceived)
                         } /*else {
                                 std::cout << "filtered" << std::endl;
                             }*/
+                    } else {
+                        std::cout << "NOT ALIVE" << std::endl;
+
                     }
                 }
             }
@@ -952,7 +956,7 @@ bool CRDTGraph::fullgraph_request_thread()
     {
         std::this_thread::sleep_for(500ms);
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() > TIMEOUT;
+        timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() > TIMEOUT*3;
     }
     eprosima::fastrtps::Domain::removeSubscriber(dsrsub_request_answer.getSubscriber());
     return sync;

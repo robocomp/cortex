@@ -285,7 +285,11 @@ public:
                 else if (sit->second <= cc.at(sit->first)) // dominated, so prune
                 {
                     //cout <<__PRETTY_//cout <<__PRETTY<<":"<<__LINE__ << " " <<  endl;
+                    //cout << *(sit)<<" :"<<__LINE__ << " " <<  endl;
+                    //cout << dc <<" :"<<__LINE__ << " " <<  endl;
+                    //if (dc.find(*sit) != dc.end())
                     dc.erase(sit++);
+
                     // no extra compaction oportunities so flag untouched
                 }
                 else ++sit;
@@ -478,9 +482,12 @@ public:
             }
             else if ( ito != o.ds.end() && ( it == ds.end() || ito->first < it->first))
             {
-                //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
+                //cout <<"ITO: "<<":"<< ito->first << endl;
+                //cout <<"IT: "<<":"<< it->first << endl;
+                //cout <<"C: "<<":"<< c << endl;
+
                 // dot only at other
-                if(! c.dotin(ito->first)) { // If I dont know, import
+                if(!c.dotin(ito->first) || ds.empty()) { // If I dont know, import
                     ds.insert(*ito);
                     //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << endl;
                 }
@@ -580,6 +587,7 @@ public:
     void clean () {
         //typename  map<pair<K,int>,T>::iterator dsit;
 
+        //if (ds.empty()) return;
 
         map<K,int> x;
         for(auto dsit=ds.begin(); dsit != ds.end(); dsit++)
@@ -605,9 +613,13 @@ public:
             }
         }
 
+        //if (c.dc.rbegin() != c.dc.rend()) {
+        //    c.cc.insert(*c.dc.rbegin());
+        //    c.dc.clear();
+        //}
         //TODO: comprobar esto
         //c.insertdot(last);
-        c.compact();
+        //c.compact();
 
     }
 
