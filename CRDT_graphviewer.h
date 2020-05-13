@@ -24,6 +24,8 @@
 #include "CRDT.h"
 #include <typeinfo>
 #include "graphUItabs.h"
+#include <QResizeEvent>
+#include <QOpenGLWidget>
 
 class SpecificWorker;
 class GraphNode;
@@ -52,6 +54,12 @@ namespace DSR
 			void wheelEvent(QWheelEvent *event) override;
 			void keyPressEvent(QKeyEvent *event) override;
 			void timerEvent(QTimerEvent *event) override;
+			virtual void resizeEvent(QResizeEvent *e) 
+			{  
+				auto gl =tab_2->findChildren<QOpenGLWidget*>();
+				if(gl.size()>0)
+					gl[0]->resize(e->size().width(), e->size().height());
+			};
 			
 		private:
 			std::shared_ptr<CRDT::CRDTGraph> G;

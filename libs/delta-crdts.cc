@@ -1692,7 +1692,8 @@ public:
         return pair<map<N,V>,dotcontext<K>>(m,c);
     }
 
-    bool in(const N& n) {
+    bool in(const N& n) const
+    {
         return(m.find(n) != m.end());
     }
 

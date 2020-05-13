@@ -81,40 +81,12 @@ namespace CRDT
         std::tuple<std::string, std::string, int> nativetype_to_string(const MTypes &t); //Used by viewer
         std::map<long, Node> getCopy() const;   
         std::vector<long> getKeys() const ;   
-        int32_t get_agent_id() const { return agent_id; };
-        std::string get_agent_name() const { return agent_name; };
+        inline int32_t get_agent_id() const        { return agent_id; };
+        inline std::string get_agent_name() const  { return agent_name; };
         void print();
-        void print_edge(const Edge &edge)
-        {
-            std::cout << "------------------------------------" << std::endl;
-            std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
-            for(auto [k, v] : edge.attrs())
-                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-            std::cout << "------------------------------------" << std::endl;
-        }
-        void print_node(const Node &node)
-        {   
-            std::cout << "------------------------------------" << std::endl;
-            std::cout << "Node-> " << node.id() << std::endl;
-            std::cout << "  Type->" << node.type() << std::endl;
-            std::cout << "  Name->" << node.name() << std::endl;
-            std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
-            for(auto [key, val] : node.attrs())
-            std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
-            for(auto [key, val] : node.fano())
-            {
-                std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
-                for(auto [k, v] : val.attrs())
-                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-            }
-            std::cout << "------------------------------------" << std::endl;
-        }
-        void print_node(int id)
-        {
-            auto node = get_node(id);
-            if(node.has_value())
-                print_node(node.value());
-        }
+        void print_edge(const Edge &edge);
+        void print_node(const Node &node);
+        void print_node(int id);
         void write_to_json_file(const std::string &file) const { utils->write_to_json_file(file); };
         void read_from_json_file(const std::string &file) const { utils->read_from_json_file(file); };
 
@@ -157,37 +129,11 @@ namespace CRDT
         bool delete_edge(int from, int t, const std::string& key);
         std::vector<Edge> get_edges_by_type(const std::string& type);
         std::vector<Edge> get_edges_to_id(int id);
-        std::optional<std::map<EdgeKey, Edge>> get_edges(int id) 
-        { 
-            std::optional<Node> n = get_node(id);
-            return n.has_value() ?  std::optional<std::map<EdgeKey, Edge>>(n.value().fano()) : std::nullopt;
-        };
-        std::optional<RTMat> get_edge_RT(const Node &n, int to)
-        {
-            auto edges = n.fano();
-            EdgeKey key; key.to(to); key.type("RT");
-            auto res  = edges.find(key);
-            if (res != edges.end())
-            {
-                auto rtmat = edge_to_RTMat(res->second);
-                if(rtmat.has_value())
-                    return rtmat.value();
-                else
-                    return {};
-                    //throw std::runtime_error("Could not find rot and trans attributes in " + std::to_string(n.id()) + " " + std::to_string(key.to()) + " in edge_to_RTMat()");
-            }
-            else
-                throw std::runtime_error("Could not find edge " + std::to_string(key.to()) + " in node " + std::to_string(n.id()) + " in edge_to_RTMat()");
-            
-        }
-        std::optional<RTMat> edge_to_RTMat(Edge &edge)
-        {
-            auto r = get_attrib_by_name<std::vector<float>>(edge, "rotation_euler_xyz");
-            auto t = get_attrib_by_name<std::vector<float>>(edge, "translation");
-            if( r.has_value() and t.has_value() )
-                return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
-            else return {};
-        }
+        std::optional<std::map<EdgeKey, Edge>> get_edges(int id);
+        Edge get_edge_RT(const Node &n, int to);
+        RTMat get_edge_RT_as_RTMat(Edge &edge);
+        RTMat get_edge_RT_as_RTMat(Edge &&edge);
+        
         
         // Both
         template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
@@ -352,7 +298,7 @@ namespace CRDT
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
         std::optional<N> get(int id);
-        bool in(const int &id);
+        bool in(const int &id) const;
         std::optional<N> get_(int id);
         bool insert_or_assign_node_(const N &node);
         std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);

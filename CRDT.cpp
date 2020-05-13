@@ -89,17 +89,17 @@ std::optional<Node> CRDTGraph::get_node(int id)
     return get_(id);
 }
 
-std::optional<VertexPtr> CRDTGraph::get_vertex(const std::string& name)
-{
-    auto n = get_node(name);
-    return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
-}
+// std::optional<VertexPtr> CRDTGraph::get_vertex(const std::string& name)
+// {
+//     auto n = get_node(name);
+//     return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
+// }
 
-std::optional<VertexPtr> CRDTGraph::get_vertex(int id)
-{
-    auto n = get_node(id);
-    return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
-}
+// std::optional<VertexPtr> CRDTGraph::get_vertex(int id)
+// {
+//     auto n = get_node(id);
+//     return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
+// }
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
 {
@@ -249,6 +249,37 @@ std::vector<Node> CRDTGraph::get_nodes_by_type(const std::string& type)
     return nodes_;
 }
 
+void CRDTGraph::print_edge(const Edge &edge)
+{
+    std::cout << "------------------------------------" << std::endl;
+    std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
+    for(auto [k, v] : edge.attrs())
+        std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+    std::cout << "------------------------------------" << std::endl;
+}
+void CRDTGraph::print_node(const Node &node)
+{   
+    std::cout << "------------------------------------" << std::endl;
+    std::cout << "Node-> " << node.id() << std::endl;
+    std::cout << "  Type->" << node.type() << std::endl;
+    std::cout << "  Name->" << node.name() << std::endl;
+    std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
+    for(auto [key, val] : node.attrs())
+    std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
+    for(auto [key, val] : node.fano())
+    {
+        std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
+        for(auto [k, v] : val.attrs())
+        std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+    }
+    std::cout << "------------------------------------" << std::endl;
+}
+void CRDTGraph::print_node(int id)
+{
+    auto node = get_node(id);
+    if(node.has_value())
+        print_node(node.value());
+}
 //////////////////////////////////////////////////////////////////////////////////
 // EDGE METHODS
 //////////////////////////////////////////////////////////////////////////////////
@@ -473,6 +504,45 @@ std::vector<Edge> CRDTGraph::get_edges_to_id(int id) {
     return edges_;
 }
 
+std::optional<std::map<EdgeKey, Edge>> CRDTGraph::get_edges(int id) 
+{ 
+    std::optional<Node> n = get_node(id);
+    return n.has_value() ?  std::optional<std::map<EdgeKey, Edge>>(n.value().fano()) : std::nullopt;
+};
+
+Edge CRDTGraph::get_edge_RT(const Node &n, int to)
+{
+    auto edges = n.fano();
+    EdgeKey key; key.to(to); key.type("RT");
+    auto res  = edges.find(key);
+    if (res != edges.end())
+        return res->second;
+    else
+        throw std::runtime_error("Could not find edge " + std::to_string(key.to()) + " in node " + std::to_string(n.id()) + " in edge_to_RTMat()");
+    
+}
+
+RTMat CRDTGraph::get_edge_RT_as_RTMat(Edge &edge)
+{
+    auto r = get_attrib_by_name<std::vector<float>>(edge, "rotation_euler_xyz");
+    auto t = get_attrib_by_name<std::vector<float>>(edge, "translation");
+    if( r.has_value() and t.has_value() )
+        return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
+    else
+        throw std::runtime_error("Could not find required attributes in node " + edge.type() + " " + std::to_string(edge.to()) + " in get_edge_RT as_RTMat()");
+   
+}
+
+ RTMat CRDTGraph::get_edge_RT_as_RTMat(Edge &&edge)
+ {
+    auto r = get_attrib_by_name<std::vector<float>>(edge, "rotation_euler_xyz");
+    auto t = get_attrib_by_name<std::vector<float>>(edge, "translation");
+    if( r.has_value() and t.has_value() )
+        return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
+    else
+        throw std::runtime_error("Could not find required attributes in node " + edge.type() + " " + std::to_string(edge.to()) + " in get_edge_RT as_RTMat()");
+ } 
+     
 
 /////////////////////////////////////////////////
 ///// Utils
@@ -608,14 +678,15 @@ size_t CRDTGraph::size ()
     return nodes.getMapRef().size();
 };
 
-bool CRDTGraph::in(const int &id)
+bool CRDTGraph::in(const int &id) const
 {
     return nodes.in(id);
 }
 
 bool CRDTGraph::empty(const int &id)
 {
-    if (nodes.in(id)) {
+    if (nodes.in(id)) 
+    {
         return nodes[id].dots().ds.empty();
     } else
         return false;

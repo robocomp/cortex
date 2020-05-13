@@ -42,7 +42,8 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
         std::string type = sym_obj.value("type").toString().toStdString();
         std::string name = sym_obj.value("name").toString().toStdString();
        
-        if (id == -1) {
+        if (id == -1) 
+        {
             std::cout << __FILE__ << " " << __FUNCTION__ << " Invalid ID Node: " << std::to_string(id);
             continue;
         }
@@ -50,7 +51,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
         Node n;
         n.type(type);
         n.id(id);
-        //n.agent_id(G->get_agent_id());
+        n.agent_id(G->get_agent_id());
         n.name(name);
         G->name_map[name] = id;
         G->id_map[id] = name;

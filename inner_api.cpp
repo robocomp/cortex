@@ -30,9 +30,9 @@ std::optional<InnerAPI::Lists> InnerAPI::setLists(const std::string &destId, con
 		auto p_node = G->get_node(G->get_node_parent(a).value_or(-1));
       	if( not p_node.has_value())
 			break;
-		auto rt = G->get_edge_RT(p_node.value(), a.id());
-		if(rt.has_value())
-        	listA.emplace_back(std::move(rt.value()));   // the downwards RT link from parent to a
+		auto edge_rt = G->get_edge_RT(p_node.value(), a.id());
+		auto rtmat = G->get_edge_RT_as_RTMat(edge_rt);
+		listA.emplace_back(std::move(rtmat));   // the downwards RT link from parent to a
         a = p_node.value();
 	}
 	while (G->get_node_level(b).value_or(-1) >= minLevel)
@@ -41,22 +41,20 @@ std::optional<InnerAPI::Lists> InnerAPI::setLists(const std::string &destId, con
 		auto p_node = G->get_node(G->get_node_parent(b).value_or(-1));
 		if(not p_node.has_value())
 			break;
-		auto rt = G->get_edge_RT(p_node.value(), b.id());
-		if(rt.has_value())
-        	listB.emplace_front(std::move(rt.value()));
-		else
-			return {};
-        b = p_node.value();
+		auto edge_rt = G->get_edge_RT(p_node.value(), b.id());
+		auto rtmat = G->get_edge_RT_as_RTMat(edge_rt);
+        listB.emplace_front(std::move(rtmat));
+		b = p_node.value();
 	}	
 	while (a.id() != b.id())  
 	{
-		qDebug() << "listas A&B" << a.id() << b.id();
 		auto p = G->get_node(G->get_node_parent(a).value_or(-1));
 		auto q = G->get_node(G->get_node_parent(b).value_or(-1));
 		if(p.has_value() and q.has_value())
-		{
-	  		listA.push_back(G->get_edge_RT(p.value(), a.id()).value());
-	  		listB.push_front(G->get_edge_RT(q.value(), b.id()).value());
+		{  
+			qDebug() << "listas A&B" << p.value().id() << q.value().id();
+	  		listA.push_back(G->get_edge_RT_as_RTMat(G->get_edge_RT(p.value(), a.id())));
+	  		listB.push_front(G->get_edge_RT_as_RTMat(G->get_edge_RT(p.value(), b.id())));
 			a = p.value();
 			b = q.value();
 		}

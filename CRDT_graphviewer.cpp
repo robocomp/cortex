@@ -53,18 +53,19 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	// central_point = new QGraphicsEllipseItem();
 	// central_point->setPos(scene.sceneRect().center());
 	// scrollArea->setMinimumSize(600,600);
-	auto ind_2 = splitter_1->indexOf(scrollArea);
+	auto ind_2 = splitter_1->indexOf(tabWidget);
 	auto ind_1 = splitter_1->indexOf(splitter_1);
 	splitter_1->setStretchFactor(ind_1,1);	
 	splitter_2->setStretchFactor(ind_2,9);
-	QSettings settings("RoboComp", "DSR");
-    settings.beginGroup("MainWindow");
-    	graphicsView->resize(settings.value("size", QSize(400, 400)).toSize());
-    	graphicsView->move(settings.value("pos", QPoint(200, 200)).toPoint());
-    settings.endGroup();
-	settings.beginGroup("QGraphicsView");
-		graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
-	settings.endGroup();
+	// QSettings settings("RoboComp", "DSR");
+    // settings.beginGroup("MainWindow");
+    // 	graphicsView->resize(settings.value("size", QSize(400, 400)).toSize());
+    // 	graphicsView->move(settings.value("pos", QPoint(200, 200)).toPoint());
+    // settings.endGroup();
+	// settings.beginGroup("QGraphicsView");
+	// 	graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
+	// settings.endGroup();
+	
 	this->createGraph();
 	tabWidget->setCurrentIndex(0);
 

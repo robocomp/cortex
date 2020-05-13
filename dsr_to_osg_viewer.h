@@ -19,8 +19,24 @@
 
 #include <chrono>
 #include <osg/ref_ptr>
-#include <osgViewer/GraphicsWindow>
+#include <osg/Geode>
+#include <osg/Geometry>
+#include <osg/Image>
+#include <osg/LineSegment>
+#include <osg/Material>
+#include <osg/MatrixTransform>
+#include <osg/Point>
+#include <osg/Quat>
+#include <osg/Shape>
+#include <osg/ShapeDrawable>
+#include <osg/TexMat>
+#include <osg/Texture2D>
+#include <osgDB/ReadFile>
+#include <osgGA/KeySwitchMatrixManipulator>
+#include <osgGA/StateSetManipulator>
+#include <osgGA/TrackballManipulator>
 #include <osgViewer/Viewer>
+#include <osgViewer/GraphicsWindow>
 #include <QOpenGLWidget>
 #include "CRDT.h"
 
@@ -28,19 +44,23 @@ using namespace std::chrono_literals;
 
 namespace DSR
 {
-
+    enum CameraView { BACK_POV, FRONT_POV, LEFT_POV, RIGHT_POV, TOP_POV };
     class DSRtoOSGViewer : public QOpenGLWidget
     {
         public:
-            DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G, float scaleX, float scaleY, QWidget *parent=0);
-            void add_cylinder();
+            DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
+            void add_cylinder(osg::ref_ptr<osg::Group> root);
+            void add_plane();
+            void add_mesh();
+            void add_person();
     
-        public slots:
-            // define slots to recoeve signals from G
-            // create a plane, mesh, move
-
+        public slots:   // From G
+            void add_or_assign_node_slot(const std::int32_t id, const std::string &type);
+            void add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type);
+            void updateX();
             
         protected:  
+            //void resizeEvent(QResizeEvent *e) {  qDebug() << "SCAKE" << x() << y(); }; 
             virtual void paintGL();
             virtual void resizeGL( int width, int height );
             virtual void initializeGL();
@@ -55,12 +75,22 @@ namespace DSR
             osgGA::EventQueue* getEventQueue() const ;
             osg::ref_ptr<osgViewer::GraphicsWindowEmbedded> _mGraphicsWindow;
             osg::ref_ptr<osgViewer::Viewer> _mViewer;
+            
             qreal m_scaleX, m_scaleY;
             osg::ref_ptr<osg::Group> root;
 
-        public slots:
-            void add_or_assign_node_slot();
-            void add_or_assign_edge_slot();
+            //Hashes
+            osg::Group* parent;
+            using OsgTypes = std::variant<osg::Geode*, osg::Group*>;
+            std::map<std::int32_t, osg::MatrixTransform*> osgTransformMap;
+            std::map<std::int32_t, OsgTypes> osgObjectsMap;
+            
+            //std::map<std::string, IMVMesh> meshMap;
+            osg::Vec3 QVecToOSGVec(const QVec &vec) const ;
+            osg::Vec4 htmlStringToOsgVec4(const std::string &color);
+            void createGraph();
+            void setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const;
+            osgGA::TrackballManipulator* manipulator;
     };
 };
 #endif

@@ -14,8 +14,8 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QGraphicsView>
+#include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
-#include <QtWidgets/QScrollArea>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
@@ -33,15 +33,11 @@ public:
     QTableWidget *tableWidgetNodes;
     QTableWidget *tableWidgetEdges;
     QTabWidget *tabWidget;
-    QWidget *tab;
-    QVBoxLayout *verticalLayout_2;
-    QScrollArea *scrollArea;
-    QWidget *scrollAreaWidgetContents;
-    QVBoxLayout *verticalLayout;
+    QWidget *tab_1;
+    QHBoxLayout *horizontalLayout;
     QGraphicsView *graphicsView;
     QWidget *tab_2;
-    QVBoxLayout *verticalLayout_3;
-    QWidget *widget;
+    QHBoxLayout *horizontalLayout_2;
 
     void setupUi(QWidget *graphDlg)
     {
@@ -72,43 +68,20 @@ public:
         splitter_2->addWidget(splitter_1);
         tabWidget = new QTabWidget(splitter_2);
         tabWidget->setObjectName(QStringLiteral("tabWidget"));
-        tab = new QWidget();
-        tab->setObjectName(QStringLiteral("tab"));
-        verticalLayout_2 = new QVBoxLayout(tab);
-        verticalLayout_2->setObjectName(QStringLiteral("verticalLayout_2"));
-        scrollArea = new QScrollArea(tab);
-        scrollArea->setObjectName(QStringLiteral("scrollArea"));
-        QSizePolicy sizePolicy1(QSizePolicy::Maximum, QSizePolicy::Expanding);
-        sizePolicy1.setHorizontalStretch(0);
-        sizePolicy1.setVerticalStretch(0);
-        sizePolicy1.setHeightForWidth(scrollArea->sizePolicy().hasHeightForWidth());
-        scrollArea->setSizePolicy(sizePolicy1);
-        scrollArea->setMinimumSize(QSize(500, 0));
-        scrollArea->setWidgetResizable(true);
-        scrollAreaWidgetContents = new QWidget();
-        scrollAreaWidgetContents->setObjectName(QStringLiteral("scrollAreaWidgetContents"));
-        scrollAreaWidgetContents->setGeometry(QRect(0, 0, 498, 664));
-        verticalLayout = new QVBoxLayout(scrollAreaWidgetContents);
-        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
-        graphicsView = new QGraphicsView(scrollAreaWidgetContents);
+        tab_1 = new QWidget();
+        tab_1->setObjectName(QStringLiteral("tab_1"));
+        horizontalLayout = new QHBoxLayout(tab_1);
+        horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
+        graphicsView = new QGraphicsView(tab_1);
         graphicsView->setObjectName(QStringLiteral("graphicsView"));
 
-        verticalLayout->addWidget(graphicsView);
+        horizontalLayout->addWidget(graphicsView);
 
-        scrollArea->setWidget(scrollAreaWidgetContents);
-
-        verticalLayout_2->addWidget(scrollArea);
-
-        tabWidget->addTab(tab, QString());
+        tabWidget->addTab(tab_1, QString());
         tab_2 = new QWidget();
         tab_2->setObjectName(QStringLiteral("tab_2"));
-        verticalLayout_3 = new QVBoxLayout(tab_2);
-        verticalLayout_3->setObjectName(QStringLiteral("verticalLayout_3"));
-        widget = new QWidget(tab_2);
-        widget->setObjectName(QStringLiteral("widget"));
-
-        verticalLayout_3->addWidget(widget);
-
+        horizontalLayout_2 = new QHBoxLayout(tab_2);
+        horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
         tabWidget->addTab(tab_2, QString());
         splitter_2->addWidget(tabWidget);
 
@@ -117,7 +90,7 @@ public:
 
         retranslateUi(graphDlg);
 
-        tabWidget->setCurrentIndex(1);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(graphDlg);
@@ -126,7 +99,7 @@ public:
     void retranslateUi(QWidget *graphDlg)
     {
         graphDlg->setWindowTitle(QApplication::translate("graphDlg", "DSRGraph", Q_NULLPTR));
-        tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("graphDlg", "graph", Q_NULLPTR));
+        tabWidget->setTabText(tabWidget->indexOf(tab_1), QApplication::translate("graphDlg", "graph", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_2), QApplication::translate("graphDlg", "3d", Q_NULLPTR));
     } // retranslateUi
 
