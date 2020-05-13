@@ -136,24 +136,6 @@ namespace CRDT
         
         
         // Both
-        template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
-        std::optional<Attrib> get_attrib_by_name_(const T& n, const std::string &key)
-        {
-            auto attrs = n.attrs();
-            auto value  = attrs.find(key);
-            if (value != attrs.end())
-                return value->second;
-            else
-            {
-                if constexpr (std::is_same<Node,  T>::value)
-                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
-                            << "-> " << n.id() << std::endl;
-                if constexpr (std::is_same<Attrib,  T>::value)
-                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
-                            << "-> " << n.to() << std::endl;
-            }
-            return {};
-        }
         template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) 
         {
@@ -192,7 +174,7 @@ namespace CRDT
             }
             throw std::runtime_error("Illegal return type in get_attrib_by_name()");
         }       
-        template <typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>, typename Va, typename = std::enable_if_t<std::is_same<std::int32_t, Va>::value || std::is_same<std::string, Va>::value || std::is_same<std::float_t, Va>::value || std::is_same<std::vector<float_t>, Va>::value, Va>>    
+        template <typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>, typename Va, typename = std::enable_if_t<std::is_same<std::int32_t, Va>::value || std::is_same<std::string, Va>::value || std::is_same<std::float_t, Va>::value || std::is_same<std::vector<float_t>, Va>::value, Va>>
         void insert_or_assign_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
         {
             // check Attrib coherence : type -> content
@@ -279,6 +261,7 @@ namespace CRDT
         std::string agent_name;
         std::unique_ptr<Utilities> utils;
 
+
         //////////////////////////////////////////////////////////////////////////
         // Cache maps
         ///////////////////////////////////////////////////////////////////////////
@@ -294,6 +277,9 @@ namespace CRDT
         void update_maps_node_insert(int id, const Node& n);
         void update_maps_edge_delete(int from, int to, const std::string& key);
 
+
+
+
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
@@ -305,9 +291,33 @@ namespace CRDT
         bool delete_edge_(int from, int t, const std::string& key);
         std::optional<Edge> get_edge_(int from, int to, const std::string& key);
 
+
+        //////////////////////////////////////////////////////////////////////////
+        // Other methods
+        //////////////////////////////////////////////////////////////////////////
         int id();
         DotContext context();
         std::map<int, AworSet> Map();
+
+
+        template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
+        std::optional<Attrib> get_attrib_by_name_(const T& n, const std::string &key)
+        {
+            auto attrs = n.attrs();
+            auto value  = attrs.find(key);
+            if (value != attrs.end())
+                return value->second;
+            else
+            {
+                if constexpr (std::is_same<Node,  T>::value)
+                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
+                              << "-> " << n.id() << std::endl;
+                if constexpr (std::is_same<Attrib,  T>::value)
+                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
+                              << "-> " << n.to() << std::endl;
+            }
+            return {};
+        }
 
         void join_delta_node(AworSet aworSet);
         void join_full_graph(OrMap full_graph);
