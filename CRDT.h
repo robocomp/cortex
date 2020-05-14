@@ -20,6 +20,7 @@
 #include <qmat/QMatAll>
 #include <typeinfo>
 #include <optional>
+#include <type_traits>
 
 #include "libs/delta-crdts.cc"
 #include "fast_rtps/dsrparticipant.h"
@@ -41,7 +42,7 @@ namespace CRDT
 {
     using N = Node;
     using Nodes = ormap<int, aworset<N,  int >, int>;
-    using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, RMat::RTMat>;
+    using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, bool, RMat::RTMat>;
     using IDType = std::int32_t;
     using AttribsMap = std::unordered_map<std::string, MTypes>;
     using VertexPtr = std::shared_ptr<Vertex>;
@@ -53,6 +54,24 @@ namespace CRDT
         return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
         }
     };
+    template <typename Va>
+    static bool constexpr allowed_types = std::is_same<std::int32_t, Va>::value ||
+                                                                          std::is_same<std::string, Va>::value ||
+                                                                          std::is_same<std::float_t, Va>::value ||
+                                                                          std::is_same<std::vector<float_t>, Va>::value ||
+                                                                          std::is_same<bool, Va>::value;
+    template <typename Va>
+    static bool constexpr node_or_edge = std::is_same<Node, Va>::value ||
+                                         std::is_same<Edge, Va>::value ;
+
+    template <typename Va>
+    static bool constexpr allowed_return_types = std::is_same<std::int32_t, Va>::value ||
+                                          std::is_same<std::string, Va>::value ||
+                                          std::is_same<std::float_t, Va>::value ||
+                                          std::is_same<std::vector<float_t>, Va>::value ||
+                                          std::is_same<bool, Va>::value ||
+                                          std::is_same<QVec, Va>::value ||
+                                          std::is_same<QMat, Va>::value;
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
@@ -136,7 +155,7 @@ namespace CRDT
         
         
         // Both
-        template <typename Ta, typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>>
+        template <typename Ta, typename = std::enable_if<allowed_return_types<Ta>>, typename Type, typename =  std::enable_if<node_or_edge<Type>>>
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) 
         {
             std::optional<Attrib> av = get_attrib_by_name_(n, key);
@@ -157,6 +176,10 @@ namespace CRDT
             {
                 return av.value().value().float_vec();
             }
+            if constexpr (std::is_same<Ta, bool>::value)
+            {
+                return av.value().value().float_vec();
+            }
             if constexpr (std::is_same<Ta, QVec>::value)
             {
                 const auto &val = av.value().value().float_vec();
@@ -171,36 +194,43 @@ namespace CRDT
                     const auto& val = av.value().value().float_vec();
                     return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
                 }
-            }
-            throw std::runtime_error("Illegal return type in get_attrib_by_name()");
+            }  //else
+
+            //throw std::runtime_error("Illegal return type in get_attrib_by_name()");
         }       
-        template <typename Type, typename =  std::enable_if_t<std::is_same<Node,  Type>::value || std::is_same<Edge, Type>::value, Type>, typename Va, typename = std::enable_if_t<std::is_same<std::int32_t, Va>::value || std::is_same<std::string, Va>::value || std::is_same<std::float_t, Va>::value || std::is_same<std::vector<float_t>, Va>::value, Va>>
+        template <typename Type, typename =  std::enable_if<node_or_edge<Type>>,
+                  typename Va, typename = std::enable_if<allowed_types<Va>>>
         void insert_or_assign_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
         {
             // check Attrib coherence : type -> content
             Attrib at;  Val value;
             if constexpr (std::is_same<std::string,  Va>::value)
             {
-                at.type(0);
+                at.type(STRING);
                 value.str(new_val);
             }
             else if constexpr (std::is_same<std::int32_t,  Va>::value)
             {
-                at.type(1);
+                at.type(INT);
                 value.dec(new_val);
             }
             else if constexpr (std::is_same<float,  Va>::value)
             {
-                at.type(2);
+                at.type(FLOAT);
                 value.fl(new_val);
             }
             else if constexpr (std::is_same<std::vector<float_t>,  Va>::value)
             {
-                at.type(1);
+                at.type(FLOAT_VEC);
                 value.float_vec(new_val);
             }
-            else 
-                throw std::runtime_error("Content type not valid for attribute in add_attrib_by_name()");
+            else if constexpr (std::is_same<bool,  Va>::value)
+            {
+                at.type(BOOL);
+                value.float_vec(new_val);
+            }
+            //else
+                //throw std::runtime_error("Content type not valid for attribute in add_attrib_by_name()");
             
             // assign value and insert int attribute map
             at.value( value);
@@ -230,8 +260,8 @@ namespace CRDT
                 else 
                     throw std::runtime_error("Node " + std::to_string(elem.from()) + " not found in attrib_by_name()");
             }
-            else 
-                throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
+            //else
+            //    throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
         }
 
         //For testing
@@ -300,7 +330,7 @@ namespace CRDT
         std::map<int, AworSet> Map();
 
 
-        template <typename T, typename = std::enable_if_t<std::is_same<Node,  T>::value || std::is_same<Edge, T>::value ,T >  >
+        template <typename T, typename = std::enable_if<node_or_edge<T>>>
         std::optional<Attrib> get_attrib_by_name_(const T& n, const std::string &key)
         {
             auto attrs = n.attrs();

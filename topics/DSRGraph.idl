@@ -10,6 +10,8 @@
         sequence<float>  float_vec;
       //case 4:
       // sequence<float> rtmat;
+      case 4:
+        boolean bl;
     };
 
     enum Types
@@ -17,7 +19,8 @@
         _STRING,
         _INT,
         _FLOAT,
-        _FLOAT_VEC
+        _FLOAT_VEC,
+        _BOOL
        // _RT_MAT
     };
 

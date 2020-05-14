@@ -1050,6 +1050,10 @@ void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CR
             value.float_vec(std::get<std::vector<float>>(att_value));
             av.value( value);
             break;
+        case 4:
+            value.bl(std::get<bool>(att_value));
+            av.value( value);
+            break;
         // case 4:
         //     value.rtmat(std::get<RTMat>(att_value).toVector().toStdVector());
         //     av.value(value);

@@ -35,14 +35,16 @@ using namespace eprosima::fastcdr::exception;
 Val::Val()
 {
     m__d = 0;
-    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@481a15ff
+    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@306279ee
     m_str ="";
-    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@78186a70
+    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@545997b1
     m_dec = 0;
-    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@306279ee
+    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4cf4d528
     m_fl = 0.0;
-    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@545997b1
+    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@77846d2c
 
+    // m_bl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@548ad73b
+    m_bl = false;
 }
 
 Val::~Val()
@@ -67,6 +69,9 @@ Val::Val(const Val &x)
         case 3:
         m_float_vec = x.m_float_vec;
         break;
+        case 4:
+        m_bl = x.m_bl;
+        break;
         default:
         break;
     }
@@ -90,6 +95,9 @@ Val::Val(Val &&x)
         case 3:
         m_float_vec = std::move(x.m_float_vec);
         break;
+        case 4:
+        m_bl = x.m_bl;
+        break;
         default:
         break;
     }
@@ -112,6 +120,9 @@ Val& Val::operator=(const Val &x)
         break;
         case 3:
         m_float_vec = x.m_float_vec;
+        break;
+        case 4:
+        m_bl = x.m_bl;
         break;
         default:
         break;
@@ -137,6 +148,9 @@ Val& Val::operator=(Val &&x)
         break;
         case 3:
         m_float_vec = std::move(x.m_float_vec);
+        break;
+        case 4:
+        m_bl = x.m_bl;
         break;
         default:
         break;
@@ -185,6 +199,16 @@ void Val::_d(int32_t __d)
         switch(__d)
         {
             case 3:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
+        case 4:
+        switch(__d)
+        {
+            case 4:
             b = true;
             break;
             default:
@@ -403,6 +427,51 @@ std::vector<float>& Val::float_vec()
 
     return m_float_vec;
 }
+void Val::bl(bool _bl)
+{
+    m_bl = _bl;
+    m__d = 4;
+}
+
+bool Val::bl() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 4:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_bl;
+}
+
+bool& Val::bl()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 4:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_bl;
+}
 
 size_t Val::getMaxCdrSerializedSize(size_t current_alignment)
 {
@@ -451,6 +520,15 @@ size_t Val::getMaxCdrSerializedSize(size_t current_alignment)
             union_max_size_serialized = reset_alignment;
 
         
+        reset_alignment = current_alignment;
+
+        reset_alignment += 1 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 1);
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
 
     return union_max_size_serialized - initial_alignment;
 }
@@ -483,6 +561,10 @@ size_t Val::getCdrSerializedSize(const Val& data, size_t current_alignment)
 
 
         break;
+        case 4:
+        current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+        break;
         default:
         break;
     }
@@ -507,6 +589,9 @@ void Val::serialize(eprosima::fastcdr::Cdr &scdr) const
         break;
         case 3:
         scdr << m_float_vec;break;
+        case 4:
+        scdr << m_bl;
+        break;
         default:
         break;
     }
@@ -529,6 +614,9 @@ void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
         break;
         case 3:
         dcdr >> m_float_vec;break;
+        case 4:
+        dcdr >> m_bl;
+        break;
         default:
         break;
     }
@@ -538,9 +626,9 @@ void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
 
 Attrib::Attrib()
 {
-    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@59717824
+    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@15d9bc04
     m_type = 0;
-    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@146044d7
+    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@3c0a50da
 
 
 }
@@ -710,13 +798,13 @@ void Attrib::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Edge::Edge()
 {
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6b1274d2
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@ba8d91c
     m_to = 0;
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@7bc1a03d
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@7364985f
     m_type ="";
-    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@70b0b186
+    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5d20e46
     m_from = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@ba8d91c
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@709ba3fb
 
 
 }
@@ -995,9 +1083,9 @@ void Edge::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 EdgeKey::EdgeKey()
 {
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@69b794e2
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@f0f2775
     m_to = 0;
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@f0f2775
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@5a4aa2f2
     m_type ="";
 
 }
@@ -1169,17 +1257,17 @@ void EdgeKey::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Node::Node()
 {
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@4d49af10
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@4450d156
     m_type ="";
-    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@279ad2e3
+    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@4461c7e3
     m_name ="";
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@58134517
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@351d0846
     m_id = 0;
-    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4450d156
+    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@77e4c80f
     m_agent_id = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@4461c7e3
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@35fc6dc4
 
-    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@351d0846
+    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@7fe8ea47
 
 
 }
@@ -1570,7 +1658,7 @@ void Node::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 GraphRequest::GraphRequest()
 {
-    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@4f9a3314
+    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@176d53b2
     m_from ="";
 
 }
@@ -1696,9 +1784,9 @@ void GraphRequest::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 PairInt::PairInt()
 {
-    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@176d53b2
+    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2b4a2ec7
     m_first = 0;
-    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@971d0d8
+    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@18a70f16
     m_second = 0;
 
 }
@@ -1864,9 +1952,9 @@ void PairInt::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotContext::DotContext()
 {
-    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@18a70f16
+    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@6279cee3
 
-    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@62e136d3
+    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@4206a205
 
 
 }
@@ -2078,9 +2166,9 @@ void DotContext::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotKernel::DotKernel()
 {
-    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@61009542
+    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@77e9807f
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@77e9807f
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@448ff1a8
 
 
 }
@@ -2272,9 +2360,9 @@ void DotKernel::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 AworSet::AworSet()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7f77e91b
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@44a664f2
     m_id = 0;
-    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@44a664f2
+    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@7f9fcf7f
 
 
 }
@@ -2444,11 +2532,11 @@ void AworSet::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 OrMap::OrMap()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6328d34a
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@145eaa29
     m_id = 0;
-    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@145eaa29
+    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@15bb6bea
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@77e9807f
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@448ff1a8
 
 
 }

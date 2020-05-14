@@ -23,7 +23,7 @@ namespace CRDT
 {
     using N = Node;
     using Nodes = ormap<int, aworset<N,  int >, int>;
-    using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, RMat::RTMat>;
+    using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, bool, RMat::RTMat>;
     using IDType = std::int32_t;
     using AttribsMap = std::unordered_map<std::string, MTypes>;
 
@@ -70,6 +70,10 @@ namespace CRDT
                 if constexpr (std::is_same<Ta, std::vector<float>>::value)
                 {
                     return av->value().float_vec();
+                }
+                if constexpr (std::is_same<Ta, bool>::value)
+                {
+                    return av->value().bl();
                 }
                 if constexpr (std::is_same<Ta, RMat::QVec>::value)
                 {
@@ -157,6 +161,10 @@ namespace CRDT
                         value.float_vec(std::get<std::vector<float>>(att_value));
                         av.value( value);
                         break;
+                    case 4:
+                        value.bl(std::get<bool>(att_value));
+                        av.value( value);
+                        break;
                 }
                 v[att_name] = av;
             }
@@ -187,6 +195,10 @@ namespace CRDT
                 if constexpr (std::is_same<Ta, std::vector<float>>::value)
                 {
                     return av->value().float_vec();
+                }
+                if constexpr (std::is_same<Ta, bool>::value)
+                {
+                    return av->value().bl();
                 }
                 throw(DSRException("Illegal Return type"));
             }

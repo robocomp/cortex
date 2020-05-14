@@ -74,6 +74,7 @@ class Val
 public:
 
 
+
     bool operator<(const Val &rhs) const {
 
         if (m__d != rhs.m__d) return false;
@@ -87,6 +88,8 @@ public:
                 return m_fl < rhs.m_fl;
             case 3:
                 return m_float_vec < rhs.m_float_vec;
+            case 4:
+                return m_bl < rhs.m_bl;
             default:
                 return false;
         }
@@ -117,6 +120,8 @@ public:
                 return m_fl == rhs.m_fl;
             case 3:
                 return m_float_vec == rhs.m_float_vec;
+            case 4:
+                return m_bl == rhs.m_bl;
             default:
                 return false;
         }
@@ -145,6 +150,8 @@ public:
                     os << k << ", ";
                 os << "] ";
                 break;
+            case 4:
+                os << "bool: " << (type.m_bl ? " TRUE" : " FALSE");
             default:
                 os << "OTRO TIPO";
                 break;
@@ -294,6 +301,26 @@ public:
      * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
      */
     eProsima_user_DllExport std::vector<float>& float_vec();
+    /*!
+     * @brief This function sets a value in member bl
+     * @param _bl New value for member bl
+     */
+    eProsima_user_DllExport void bl(bool _bl);
+
+    /*!
+     * @brief This function returns the value of member bl
+     * @return Value of member bl
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport bool bl() const;
+
+    /*!
+     * @brief This function returns a reference to member bl
+     * @return Reference to member bl
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport bool& bl();
+
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -334,6 +361,7 @@ private:
     int32_t m_dec;
     float m_fl;
     std::vector<float> m_float_vec;
+    bool m_bl;
 };
 /*!
  * @brief This class represents the enumeration Types defined by the user in the IDL file.
@@ -344,9 +372,9 @@ enum Types : uint32_t
     STRING,
     INT,
     FLOAT,
-    FLOAT_VEC
+    FLOAT_VEC,
+    BOOL
 };
-
 /*!
  * @brief This class represents the structure Attrib defined by the user in the IDL file.
  * @ingroup DSRGRAPH
@@ -354,6 +382,7 @@ enum Types : uint32_t
 class Attrib
 {
 public:
+
 
     bool operator==(const Attrib &av_) const {
         if (this == &av_) {
@@ -396,6 +425,7 @@ public:
         output << "Type: "<<av_.type()<<", Value["<<av_.value()<<"]: "<<av_.value()<<", ";
         return output;
     };
+
     /*!
      * @brief Default constructor.
      */
@@ -580,6 +610,7 @@ public:
         output<<"]]";
         return output;
     };
+
     /*!
      * @brief Default constructor.
      */
@@ -919,7 +950,6 @@ public:
      * @param cdr CDR serialization object.
      */
     eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-
 
 private:
     int32_t m_to;
@@ -1330,7 +1360,6 @@ private:
 class PairInt
 {
 public:
-
 
     bool operator==(const PairInt &pi_) const {
         if (this == &pi_) {
@@ -1949,7 +1978,6 @@ private:
 class OrMap
 {
 public:
-
 
     friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
         output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
