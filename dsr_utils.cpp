@@ -38,7 +38,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
     foreach (const QString &key, symbolMap.keys())
     {
         QJsonObject sym_obj = symbolMap[key].toObject();
-        int id = sym_obj.value("id").toString().toInt();
+        int id = sym_obj.value("id").toInt();
         std::string type = sym_obj.value("type").toString().toStdString();
         std::string name = sym_obj.value("name").toString().toStdString();
        
@@ -57,12 +57,13 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
         G->id_map[id] = name;
 
         std::map<string, Attrib> attrs;
-        // G->add_attrib(attrs, "level",std::int32_t(0));
-        // G->add_attrib(attrs, "parent",std::int32_t(0));
+/*
+ * THIS INFORMATION MUST BE ON JSON FILE 
         G->insert_or_assign_attrib_by_name(n, "level", std::int32_t(0));
         G->insert_or_assign_attrib_by_name(n, "parent", std::int32_t(0));
         
-        std::string full_name = type + " [" + std::to_string(id) + "]";
+
+ *        std::string full_name = type + " [" + std::to_string(id) + "]";
         G->insert_or_assign_attrib_by_name(n, "name", full_name);
         // G->add_attrib(attrs, "name",full_name);
 
@@ -78,45 +79,40 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
 
         //G->add_attrib(attrs, "color", color);
         G->insert_or_assign_attrib_by_name(n, "color", color);
-
+*/
         // node atributes
         QVariantMap attributesMap = sym_obj.value("attribute").toObject().toVariantMap();
         for(QVariantMap::const_iterator iter = attributesMap.begin(); iter != attributesMap.end(); ++iter)
         {
             std::string attr_key = iter.key().toStdString();
-            QString attr_value = iter.value().toMap()["value"].toString();
-            int attr_type = iter.value().toMap()["type"].toString().toInt();
+            QVariant attr_value = iter.value().toMap()["value"];
+            int attr_type = iter.value().toMap()["type"].toInt();
 
             switch (attr_type) {
                 case 0:
-                    //G->add_attrib(attrs, attr_key, attr_value.toStdString());
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toStdString());
+                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toString().toStdString());
                     break;
                 case 1:
-                    //G->add_attrib(attrs, attr_key, attr_value.toInt());
                     G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toInt());
                     break;
                 case 2:
-                    //G->add_attrib(attrs, attr_key, attr_value.replace(",", ".").toFloat());
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.replace(",", ".").toFloat());
+                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toFloat());
                     break;
                 case 3: 
                 {
                     std::vector<float> v;
-                    std::istringstream iss(attr_value.toStdString());
-                    std::copy(std::istream_iterator<float>(iss),
-                              std::istream_iterator<float>(),
-                              std::back_inserter(v));
+                    foreach (const QVariant& value, attr_value.toList())
+                        v.push_back(value.toFloat());    
                     G->insert_or_assign_attrib_by_name(n, attr_key, v);
                     break;
                 }
                 case 4: 
                 {
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.contains("true"));
+                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toBool());
                     break;
                 }
                 default:
-                   G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toStdString());
+                   G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toString().toStdString());
             }
         }
         //n.attrs(attrs);
@@ -129,8 +125,8 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
     foreach (const QJsonValue & linkValue, linksArray)
     {
         QJsonObject link_obj = linkValue.toObject();
-        int srcn = link_obj.value("src").toString().toInt();
-        int dstn = link_obj.value("dst").toString().toInt();
+        int srcn = link_obj.value("src").toInt();
+        int dstn = link_obj.value("dst").toInt();
         std::string edgeName = link_obj.value("label").toString().toStdString();
         std::map<string, Attrib> attrs;
         Edge edge;
@@ -144,7 +140,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
         {
             std::string attr_key = iter.key().toStdString();
             QVariant attr_value = iter.value().toMap()["value"];
-            int attr_type = iter.value().toMap()["type"].toString().toInt();
+            int attr_type = iter.value().toMap()["type"].toInt();
 
             Attrib av;
             av.type(attr_type);
@@ -177,7 +173,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
                 }
                 case 4: 
                 {
-                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toString().contains("true"));
+                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toBool());
                     break;
                 }
             }
@@ -200,46 +196,38 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
         Node node = kv.second.dots().ds.rbegin()->second;
         // symbol data
         QJsonObject symbol;
-        symbol["id"] = QString::number(node.id());
+        symbol["id"] = node.id();
         symbol["type"] = QString::fromStdString(node.type());
         symbol["name"] = QString::fromStdString(node.name());
         // symbol attribute
         QJsonObject attrsObject;
         for (const auto &[key, value]: node.attrs())
         {
-            std::ostringstream vf;
-
             QJsonObject content;
-            std::string val;
-
-            switch (value.value()._d()) {
+            QJsonValue val;
+            switch (value.value()._d()) 
+            {
                 case 0:
-                    val = value.value().str();
+                    val = QString::fromStdString(value.value().str());
                     break;
                 case 1:
-                    val = std::to_string(value.value().dec());
+                    val = value.value().dec();
                     break;
                 case 2:
-                    val = std::to_string(value.value().fl());
-                    break;
-                case 3:
-                    if (!value.value().float_vec().empty())
-                    {
-                        std::copy(value.value().float_vec().begin(), value.value().float_vec().end()-1,
-                                  std::ostream_iterator<float>(vf, ", "));
-
-                        vf << value.value().float_vec().back();
-                    }
-                    val = vf.str();
+                    val = value.value().fl();
                     break;
                 case 4:
-                    val = "false";
-                    if (value.value().bl())
-                        val = "true";
+                    val = value.value().bl();
+                    break;
+                case 3:
+                    QJsonArray array;
+                    for(const float &value : value.value().float_vec())
+                        array.push_back(value);
+                    val = array;                
                     break;
             }
-            content["type"] = QString::number(value.value()._d());
-            content["value"] = QString::fromStdString(val);
+            content["type"] = value.value()._d();
+            content["value"] = val;
             attrsObject[QString::fromStdString(key)] = content;
         }
         symbol["attribute"] = attrsObject;
@@ -247,17 +235,16 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
         QJsonArray nodeLinksArray;
         for (const auto &[key, value]: node.fano()) {
             QJsonObject link;
-            link["src"] = QString::number(value.from());
-            link["dst"] = QString::number(value.to());
+            link["src"] = value.from();
+            link["dst"] = value.to();
             link["label"] = QString::fromStdString(value.type());
             // link attribute
             QJsonObject lattrsObject;
             for (const auto &[key, value]: value.attrs()) {
-                std::ostringstream vf;
-
                 QJsonObject attr, content;
                 QJsonValue val;
-                switch (value.value()._d()) {
+                switch (value.value()._d()) 
+                {
                     case 0:
                         val = QString::fromStdString(value.value().str());
                         break;
@@ -267,6 +254,9 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
                     case 2:
                         val = value.value().fl();
                         break;
+                    case 4:
+                        val = value.value().bl();
+                        break;
                     case 3:
                         QJsonArray array;
                         for(const float &value : value.value().float_vec())
@@ -274,7 +264,7 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
                         val = array;                        
                         break;
                 }
-                content["type"] = QString::number(value.value()._d());
+                content["type"] = value.value()._d();
                 content["value"] = val;
                 lattrsObject[QString::fromStdString(key)] = content;
             }
