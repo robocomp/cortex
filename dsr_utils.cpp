@@ -112,15 +112,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
                 }
                 case 4: 
                 {
-                    std::vector<float> r;
-                    std::istringstream is(attr_value.toStdString());
-                    std::copy(std::istream_iterator<float>(is),
-                              std::istream_iterator<float>(),
-                              std::back_inserter(r));
-                    auto rtMat = RTMat(QMat(QVec::fromStdVector(r)));
-
-                    G->insert_or_assign_attrib_by_name(n, attr_key, r);
-
+                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.contains("true"));
                     break;
                 }
                 default:
@@ -183,6 +175,11 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
                     G->insert_or_assign_attrib_by_name(edge, attr_key, v);
                     break;
                 }
+                case 4: 
+                {
+                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toString().contains("true"));
+                    break;
+                }
             }
         }
         std::cout << __FILE__ << " " << __FUNCTION__ << "Edge from " << std::to_string(srcn) << " to " << std::to_string(dstn) << " label "  << edgeName <<  std::endl;
@@ -234,6 +231,11 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
                         vf << value.value().float_vec().back();
                     }
                     val = vf.str();
+                    break;
+                case 4:
+                    val = "false";
+                    if (value.value().bl())
+                        val = "true";
                     break;
             }
             content["type"] = QString::number(value.value()._d());
