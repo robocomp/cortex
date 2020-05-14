@@ -129,11 +129,11 @@ bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
 
 bool CRDTGraph::insert_or_assign_node_(const N &node)
 {
-    if (!nodes[node.id()].dots().ds.empty() and nodes[node.id()].dots().ds.rbegin()->second == node) {
+    if (deleted.find(node.id()) == deleted.end()) {
+        if (!nodes[node.id()].dots().ds.empty() and nodes[node.id()].dots().ds.rbegin()->second == node) {
         //Esto debería ser true?
         return true;
-    }
-    if (deleted.find(node.id()) == deleted.end()) {
+        }
         aworset<Node, int> delta = nodes[node.id()].add(node, node.id());
         update_maps_node_insert(node.id(), node);
         auto val = translateAwCRDTtoIDL(node.id(), delta);
