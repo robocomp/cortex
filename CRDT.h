@@ -56,10 +56,12 @@ namespace CRDT
     };
     template <typename Va>
     static bool constexpr allowed_types = std::is_same<std::int32_t, Va>::value ||
-                                                                          std::is_same<std::string, Va>::value ||
-                                                                          std::is_same<std::float_t, Va>::value ||
-                                                                          std::is_same<std::vector<float_t>, Va>::value ||
-                                                                          std::is_same<bool, Va>::value;
+                                          std::is_same<std::string_view, Va>::value ||
+                                          std::is_same<std::string, Va>::value ||
+                                          std::is_same<std::float_t, Va>::value ||
+                                          std::is_same<std::double_t , Va>::value ||
+                                          std::is_same<std::vector<float_t>, Va>::value ||
+                                          std::is_same<bool, Va>::value;
     template <typename Va>
     static bool constexpr node_or_edge = std::is_same<Node, Va>::value ||
                                          std::is_same<Edge, Va>::value ;
@@ -155,37 +157,44 @@ namespace CRDT
         
         
         // Both
-        template <typename Ta, typename = std::enable_if<allowed_return_types<Ta>>, typename Type, typename =  std::enable_if<node_or_edge<Type>>>
+        template <typename Ta, typename = std::enable_if_t<allowed_return_types<Ta>>, typename Type, typename =  std::enable_if_t<node_or_edge<Type>>>
         std::optional<Ta> get_attrib_by_name(Type& n, const std::string &key) 
         {
             std::optional<Attrib> av = get_attrib_by_name_(n, key);
             if (!av.has_value()) return {};
-            if constexpr (std::is_same<Ta, std::string>::value) 
+            if constexpr (std::is_same<Ta, std::string>::value)
             {
-                return av.value().value().str();
+                if (av->value()._d() == STRING)
+                    return  av->value().str();
             }
             if constexpr (std::is_same<Ta, std::int32_t>::value)
             {
-                return av.value().value().dec();
+                if (av->value()._d() == INT)
+                    return av->value().dec();
             }
             if constexpr (std::is_same<Ta, float>::value) 
             {
-                return av.value().value().fl();
+                if (av->value()._d() == FLOAT)
+                    return av->value().fl();
             }
             if constexpr (std::is_same<Ta, std::vector<float>>::value)
             {
-                return av.value().value().float_vec();
+                if (av->value()._d() == FLOAT_VEC)
+                    return av->value().float_vec();
             }
             if constexpr (std::is_same<Ta, bool>::value)
             {
-                return av.value().value().float_vec();
+                if (av->value()._d() == BOOL)
+                    return av.value().value().bl();
             }
             if constexpr (std::is_same<Ta, QVec>::value)
             {
-                const auto &val = av.value().value().float_vec();
-                if (av.value().value()._d() == FLOAT_VEC and (key == "translation" or key=="rotation_euler_xyz") 
-                                and ( val.size()==3 or val.size()==6))
-                    return QVec{val};
+                if (av->value()._d() == FLOAT_VEC) {
+                    const auto &val = av.value().value().float_vec();
+                    if ((key == "translation" or key == "rotation_euler_xyz")
+                        and (val.size() == 3 or val.size() == 6))
+                        return QVec{val};
+                }
             }
             if constexpr (std::is_same<Ta, QMat>::value)
             {
@@ -195,16 +204,16 @@ namespace CRDT
                     return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
                 }
             }  //else
-
+            return {};
             //throw std::runtime_error("Illegal return type in get_attrib_by_name()");
         }       
-        template <typename Type, typename =  std::enable_if<node_or_edge<Type>>,
-                  typename Va, typename = std::enable_if<allowed_types<Va>>>
+        template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>,
+                  typename Va, typename = std::enable_if_t<allowed_types<Va>>>
         void insert_or_assign_attrib_by_name(Type& elem, const std::string &new_name, const Va &new_val)
         {
             // check Attrib coherence : type -> content
             Attrib at;  Val value;
-            if constexpr (std::is_same<std::string,  Va>::value)
+            if constexpr (std::is_same<std::string,  Va>::value || std::is_same<std::string_view,  Va>::value)
             {
                 at.type(STRING);
                 value.str(new_val);
@@ -214,7 +223,7 @@ namespace CRDT
                 at.type(INT);
                 value.dec(new_val);
             }
-            else if constexpr (std::is_same<float,  Va>::value)
+            else if constexpr (std::is_same<float,  Va>::value || std::is_same<double,  Va>::value)
             {
                 at.type(FLOAT);
                 value.fl(new_val);
@@ -227,7 +236,7 @@ namespace CRDT
             else if constexpr (std::is_same<bool,  Va>::value)
             {
                 at.type(BOOL);
-                value.float_vec(new_val);
+                value.bl(new_val);
             }
             //else
                 //throw std::runtime_error("Content type not valid for attribute in add_attrib_by_name()");
@@ -330,7 +339,7 @@ namespace CRDT
         std::map<int, AworSet> Map();
 
 
-        template <typename T, typename = std::enable_if<node_or_edge<T>>>
+        template <typename T, typename = std::enable_if_t<node_or_edge<T>>>
         std::optional<Attrib> get_attrib_by_name_(const T& n, const std::string &key)
         {
             auto attrs = n.attrs();
