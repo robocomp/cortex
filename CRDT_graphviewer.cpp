@@ -199,6 +199,8 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
                 if (qname.has_value()) {
                     qDebug() << QString::fromStdString(qname.value());
                     gnode->setTag(qname.value());
+                } else {
+                    gnode->setTag("");
                 }
             }
             catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; }

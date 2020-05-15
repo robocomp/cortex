@@ -31,7 +31,7 @@ GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_vi
 void GraphNode::setTag(const std::string &tag_)
 {
     QString c = QString::fromStdString(tag_);
-	tag = new QGraphicsSimpleTextItem(c, this);    
+	tag = new QGraphicsSimpleTextItem(c, this);
 	tag->setX(20);	
 	tag->setY(-10);
 }
@@ -181,6 +181,8 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+    if (tag->text() != "") return; // Explota sin esto
+
     static std::unique_ptr<QWidget> do_stuff;
     std::cout << __FILE__ <<":"<<__FUNCTION__<< "-> node: " << tag->text().toStdString() << std::endl;
     const auto graph = graph_viewer->getGraph();
