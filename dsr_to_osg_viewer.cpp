@@ -291,7 +291,7 @@ void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
     rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
     mt->setMatrix(QMatToOSGMat4(rtmat));
     osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
-    smt->setMatrix(osg::Matrix::scale(scalex.value_or(1),scaley.value_or(1),scalez.value_or(1)));
+    smt->setMatrix(osg::Matrix::scale(scalex.value_or(1)/100,scaley.value_or(1)/100,scalez.value_or(1)/100));
     mt->addChild(smt);
     // meshHash[mesh->id].osgmeshPaths = mt;
     osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(filename.value());

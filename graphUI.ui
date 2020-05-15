@@ -6,16 +6,16 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>784</width>
-    <height>467</height>
+    <width>1028</width>
+    <height>735</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>DSRGraph</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_2">
+  <layout class="QVBoxLayout" name="verticalLayout_4">
    <item>
-    <widget class="QSplitter" name="splittee_2">
+    <widget class="QSplitter" name="splitter_2">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
@@ -40,24 +40,25 @@
        </property>
       </widget>
      </widget>
-     <widget class="QScrollArea" name="scrollArea">
-      <property name="widgetResizable">
-       <bool>true</bool>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
       </property>
-      <widget class="QWidget" name="scrollAreaWidgetContents">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>0</y>
-         <width>392</width>
-         <height>447</height>
-        </rect>
-       </property>
-       <layout class="QVBoxLayout" name="verticalLayout">
+      <widget class="QWidget" name="tab_1">
+       <attribute name="title">
+        <string>graph</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
          <widget class="QGraphicsView" name="graphicsView"/>
         </item>
        </layout>
+      </widget>
+      <widget class="QWidget" name="tab_2">
+       <attribute name="title">
+        <string>3d</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_2"/>
       </widget>
      </widget>
     </widget>

@@ -23,7 +23,7 @@
 #include <QListView>
 #include "CRDT.h"
 #include <typeinfo>
-#include "graphUItabs.h"
+#include "ui_graphUI.h"
 #include <QResizeEvent>
 #include <QOpenGLWidget>
 
