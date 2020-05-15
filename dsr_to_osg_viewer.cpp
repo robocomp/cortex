@@ -235,7 +235,10 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
         sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
     }
     osgObjectsMap.insert_or_assign(node.id(), geode);
-    root->addChild(geode);
+    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
+        std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(geode);
+    else 
+        root->addChild(geode);
 
      //if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
         //    std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(geode);
@@ -268,29 +271,43 @@ void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
     if(scaley.has_value()) std::cout << scaley.value() << std::endl;
     auto scalez = G->get_attrib_by_name<std::int32_t>(node, "scalez");
     if(scalez.has_value()) std::cout << scalez.value() << std::endl;
+    auto rx = G->get_attrib_by_name<std::int32_t>(node, "rx");
+    if(rx.has_value()) std::cout << rx.value() << std::endl;
+    auto ry = G->get_attrib_by_name<std::int32_t>(node, "ry");
+    if(ry.has_value()) std::cout << ry.value() << std::endl;
+    auto rz = G->get_attrib_by_name<std::int32_t>(node, "rz");
+    if(rz.has_value()) std::cout << rz.value() << std::endl;
+    auto tx = G->get_attrib_by_name<std::int32_t>(node, "tx");
+    if(tx.has_value()) std::cout << tx.value() << std::endl;
+    auto ty = G->get_attrib_by_name<std::int32_t>(node, "ty");
+    if(ty.has_value()) std::cout << ty.value() << std::endl;
+    auto tz = G->get_attrib_by_name<std::int32_t>(node, "tz");
+    if(tz.has_value()) std::cout << tz.value() << std::endl;
 
-    // osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
-    
+    osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
     // //if (parent) parent->addChild(mt);
-    
-    // RTMat rtmat = RTMat();
-    // rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
-    // rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
-    // mt->setMatrix(QMatToOSGMat4(rtmat));
-    
-    // osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
-    // smt->setMatrix(osg::Matrix::scale(scalex.value_or(1),scaley.value_or(1),scalez.value_or(1)));
-    // mt->addChild(smt);
-    // //meshHash[mesh->id].osgmeshPaths = mt;
+    RTMat rtmat = RTMat();
+    rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
+    rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
+    mt->setMatrix(QMatToOSGMat4(rtmat));
+    osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
+    smt->setMatrix(osg::Matrix::scale(scalex.value_or(1),scaley.value_or(1),scalez.value_or(1)));
+    mt->addChild(smt);
+    // meshHash[mesh->id].osgmeshPaths = mt;
+    osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(filename.value());
+    if (!osgMesh)
+        throw  "Could not find nesh file " + filename.value();
+    osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
+    polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
+    osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
+    osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
+    smt->addChild(osgMesh);
+    osgObjectsMap.insert_or_assign(node.id(), smt);
+    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
+        std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(smt);
+    else 
+        root->addChild(smt);
 
-    // osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(mesh->meshPath.toStdString());
-    // if (!osgMesh)
-    //     throw  "Could not find nesh file " + mesh->meshPath.toStdString();
-    
-    // osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
-    // polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
-    // osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
-    // osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
     // //meshHash[mesh->id].osgmeshes = osgMesh;
     // // //meshHash[mesh->id].meshMts= mt;
     // // //osgmeshmodes[mesh->id] = polygonMode;
@@ -314,6 +331,18 @@ osg::Vec4 DSRtoOSGViewer::htmlStringToOsgVec4(const std::string &color)
 	green[0] = color[3]; green[1] = color[4];
 	blue[0]  = color[5]; blue[1]  = color[6];
 	return osg::Vec4(float(red.toInt(&ok, 16))/255., float(green.toInt(&ok, 16))/255., float(blue.toInt(&ok, 16))/255., 0.f);
+}
+
+osg::Matrix  DSRtoOSGViewer::QMatToOSGMat4(const RTMat &nodeB)
+{
+	QVec angles = nodeB.extractAnglesR();
+	QVec t = nodeB.getTr();
+	RTMat node = RTMat(-angles(0), -angles(1), angles(2), QVec::vec3(t(0), t(1), -t(2)));
+
+	return osg::Matrixd( node(0,0), node(1,0), node(2,0), node(3,0),
+	                     node(0,1), node(1,1), node(2,1), node(3,1),
+	                     node(0,2), node(1,2), node(2,2), node(3,2),
+	                     node(0,3), node(1,3), node(2,3), node(3,3) );
 }
 
 ////////////////////////////////////////////////////////////////

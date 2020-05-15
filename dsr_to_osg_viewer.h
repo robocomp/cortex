@@ -86,6 +86,7 @@ namespace DSR
             
             //std::map<std::string, IMVMesh> meshMap;
             osg::Vec3 QVecToOSGVec(const QVec &vec) const ;
+            osg::Matrix QMatToOSGMat4(const RTMat &nodeB);
             osg::Vec4 htmlStringToOsgVec4(const std::string &color);
             void createGraph();
             void setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const;
