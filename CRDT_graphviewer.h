@@ -54,7 +54,7 @@ namespace DSR
 			void wheelEvent(QWheelEvent *event) override;
 			void keyPressEvent(QKeyEvent *event) override;
 			void timerEvent(QTimerEvent *event) override;
-			virtual void resizeEvent(QResizeEvent *e) 
+			virtual void resizeEvent(QResizeEvent *e) // resize QOpenGLWidget
 			{  
 				auto gl =tab_2->findChildren<QOpenGLWidget*>();
 				if(gl.size()>0)

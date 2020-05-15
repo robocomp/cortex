@@ -33,7 +33,7 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
     // osg::Vec3d up(osg::Vec3(0.,1.,0.));
     // manipulator->setHomePosition(eye, center, up, true);
     // manipulator->setByMatrix(osg::Matrixf::lookAt(eye,center,up));
-    //manipulator->setHomePosition(osg::Vec3(0,0,0),osg::Vec3(0.f,0.,-40.),osg::Vec3(0.0f,1.f,0.0f), false);
+    // manipulator->setHomePosition(osg::Vec3(0,0,0),osg::Vec3(0.f,0.,-40.),osg::Vec3(0.0f,1.f,0.0f), false);
     _mViewer->setCameraManipulator(manipulator);
     _mViewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
 	
@@ -70,8 +70,9 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
 	//connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &DSRtoOSGViewer::delNodeSLOT);
 
     _mViewer->realize();
-    //if (viewer->size() != frameOSG->size())
-	//		viewer->setFixedSize(frameOSG->width(), frameOSG->height());
+
+    setMainCamera(manipulator, TOP_POV);
+   
 }
 
 void DSRtoOSGViewer::createGraph()
@@ -129,79 +130,114 @@ void  DSRtoOSGViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, Ca
 void DSRtoOSGViewer::add_or_assign_node_slot(const std::int32_t id, const std::string &type)
 {
      qDebug() << __FILE__ << __FUNCTION__ ;
+     
      auto node = G->get_node(id);
      std::cout << node.value().name() << " " << node.value().id() << std::endl;
-     auto name = G->get_attrib_by_name<std::string>(node.value(), "imName");
-     std::cout << name.value() << std::endl;
      auto tipoIM = G->get_attrib_by_name<std::string>(node.value(), "imType");
      std::cout << tipoIM.value() << std::endl;
-     auto parent = G->get_attrib_by_name<std::int32_t>(node.value(), "parent");
-     std::cout << parent.value() << std::endl;
-     auto color = G->get_attrib_by_name<std::string>(node.value(), "color");
-     std::cout << color.value() << std::endl;
-     auto filename = G->get_attrib_by_name<std::string>(node.value(), "texture");
-     if(filename.has_value()) std::cout << filename.value() << std::endl;
-     auto width = G->get_attrib_by_name<std::float_t>(node.value(), "width");
-     if(width.has_value()) std::cout << width.value() << std::endl;
-     auto height = G->get_attrib_by_name<std::float_t>(node.value(), "height");
-     if(height.has_value()) std::cout << height.value() << std::endl;
-     auto depth = G->get_attrib_by_name<std::float_t>(node.value(), "depth");
-     if(depth.has_value()) std::cout << depth.value() << std::endl;
-     auto transparency = G->get_attrib_by_name<std::float_t>(node.value(), "transparency");     
-     if(transparency.has_value()) std::cout << transparency.value() << std::endl;
-     
-     if(node.has_value() and tipoIM.has_value() and tipoIM.value() == "plane")
+     if(node.has_value() and tipoIM.has_value())
      {
-        //we are in bussines
-	    bool constantColor = false;
-        if (filename.value().size() == 7 and filename.value()[0] == '#')
-                constantColor = true;
-	    // Open image
-	    osg::ref_ptr<osg::TessellationHints> hints;
-        osg::Image *image;
-	    if (filename.value().size()>0 and not constantColor)
-			if( image = osgDB::readImageFile(filename.value()), image == nullptr)
-				throw std::runtime_error("Couldn't load texture from file: " + filename.value());
-	
-        hints = new osg::TessellationHints;
-	    hints->setDetailRatio(2.0f);
-	    osg::ref_ptr<osg::Box> myBox = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value()/100, height.value()/100, depth.value()/100);
-        auto plane_drawable = new osg::ShapeDrawable(myBox, hints);
-	    plane_drawable->setColor(htmlStringToOsgVec4(color.value()));
-        osg::Geode* geode = new osg::Geode;
-        geode->addDrawable(plane_drawable);
+        if( tipoIM.value() == "plane")
+         add_or_assign_box(node.value());
+        if( tipoIM.value() == "mesh")
+         add_or_assign_mesh(node.value());
+     }
+}
+void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type)
+{
+     qDebug() << __FILE__ << __FUNCTION__ ;
+}
 
-        if (not constantColor)
-        {
-            // Texture
-            auto texture = new osg::Texture2D;
-            texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-            texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-            texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-            texture->setImage(image);
-            //texture->setDataVariance(Object::DYNAMIC);
-            texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
-            texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-            texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-            texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-            texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-            texture->setTextureWidth(1);
-            texture->setTextureHeight(1);
-            texture->setResizeNonPowerOfTwoHint(false);
+void DSRtoOSGViewer::add_or_assign_box(Node &node)
+{
+    qDebug() << __FUNCTION__ ;
+    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
+    std::cout << parent.value() << std::endl;
+    auto color = G->get_attrib_by_name<std::string>(node, "color");
+    std::cout << color.value() << std::endl;
+    auto filename = G->get_attrib_by_name<std::string>(node, "texture");
+    if(filename.has_value()) std::cout << filename.value() << std::endl;
+    auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
+    if(width.has_value()) std::cout << width.value() << std::endl;
+    auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
+    if(height.has_value()) std::cout << height.value() << std::endl;
+    auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
+    if(depth.has_value()) std::cout << depth.value() << std::endl;
+    auto nx = G->get_attrib_by_name<std::int32_t>(node, "nx");
+    if(nx.has_value()) std::cout << nx.value() << std::endl;
+    auto ny = G->get_attrib_by_name<std::int32_t>(node, "ny");
+    if(ny.has_value()) std::cout << ny.value() << std::endl;
+    auto nz = G->get_attrib_by_name<std::int32_t>(node, "nz");
+    if(nz.has_value()) std::cout << nz.value() << std::endl;
+    auto px = G->get_attrib_by_name<std::int32_t>(node, "px");
+    if(px.has_value()) std::cout << px.value() << std::endl;
+    auto py = G->get_attrib_by_name<std::int32_t>(node, "py");
+    if(py.has_value()) std::cout << py.value() << std::endl;
+    auto pz = G->get_attrib_by_name<std::int32_t>(node, "pz");
+    if(pz.has_value()) std::cout << pz.value() << std::endl;
+    auto transparency = G->get_attrib_by_name<std::float_t>(node, "transparency");     
+    if(transparency.has_value()) std::cout << transparency.value() << std::endl;
+    
+    //we are in bussines
+    bool constantColor = false;
+    if (filename.value().size() == 7 and filename.value()[0] == '#')
+            constantColor = true;
+    // Open image
+    osg::ref_ptr<osg::TessellationHints> hints;
+    osg::Image *image;
+    if (filename.value().size()>0 and not constantColor)
+    {
+        if( image = osgDB::readImageFile(filename.value()), image == nullptr)
+            throw std::runtime_error("Couldn't load texture from file: " + filename.value());
+    }   
 
-            // Material
-            osg::ref_ptr<osg::Material> material = new osg::Material();
-            material->setTransparency( osg::Material::FRONT_AND_BACK, transparency.value_or(0));
-            material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
-            // Assign the material and texture to the plane
-            osg::StateSet *sphereStateSet = geode->getOrCreateStateSet();
-            sphereStateSet->ref();
-            sphereStateSet->setAttribute(material);
-        }
-        
-        osgObjectsMap.insert_or_assign(node.value().id(), geode);
-        root->addChild(geode);
-        //if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
+    hints = new osg::TessellationHints;
+    hints->setDetailRatio(2.0f);
+    osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(px.value()/100,py.value()/100,pz.value()/100)), width.value()/100, height.value()/100, depth.value()/100);
+    osg::Matrix r;
+	r.makeRotate(osg::Vec3(0, 0, 1), QVecToOSGVec(QVec::vec3(nx.value(),ny.value(),nz.value())));
+	osg::Matrix t;
+	t.makeTranslate(QVecToOSGVec(QVec::vec3(px.value()/100,py.value()/100,pz.value()/100)));
+    osg::Quat qr; qr.set(r*t);
+	box->setRotation(qr);
+    auto plane_drawable = new osg::ShapeDrawable(box, hints);
+    plane_drawable->setColor(htmlStringToOsgVec4(color.value()));
+    osg::Geode* geode = new osg::Geode;
+    geode->addDrawable(plane_drawable);
+
+    if (not constantColor)
+    {
+        // Texture
+        auto texture = new osg::Texture2D;
+        texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+        texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+        texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+        texture->setImage(image);
+        //texture->setDataVariance(Object::DYNAMIC);
+        texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
+        texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+        texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+        texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+        texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+        texture->setTextureWidth(1);
+        texture->setTextureHeight(1);
+        texture->setResizeNonPowerOfTwoHint(false);
+
+        // Material
+        osg::ref_ptr<osg::Material> material = new osg::Material();
+        material->setTransparency( osg::Material::FRONT_AND_BACK, transparency.value_or(0));
+        material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
+        // Assign the material and texture to the plane
+        osg::StateSet *sphereStateSet = geode->getOrCreateStateSet();
+        sphereStateSet->ref();
+        sphereStateSet->setAttribute(material);
+        sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
+        sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
+    }
+    osgObjectsMap.insert_or_assign(node.id(), geode);
+    root->addChild(geode);
+
+     //if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
         //    std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(geode);
         
         // see if there are RT edges
@@ -216,32 +252,49 @@ void DSRtoOSGViewer::add_or_assign_node_slot(const std::int32_t id, const std::s
         // }
 	
         //setOSGMatrixTransformForPlane(mt, plane);
-     }
-     
-}
-void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type)
-{
-     qDebug() << __FILE__ << __FUNCTION__ ;
 }
 
-void DSRtoOSGViewer::add_plane()
-{
+void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
+{   
+    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
+    if(parent.has_value()) std::cout << parent.value() << std::endl;
+    auto color = G->get_attrib_by_name<std::string>(node, "color");
+    if(color.has_value()) std::cout << color.value() << std::endl;
+    auto filename = G->get_attrib_by_name<std::string>(node, "path");
+    if(filename.has_value()) std::cout << filename.value() << std::endl;
+    auto scalex = G->get_attrib_by_name<std::int32_t>(node, "scalex");
+    if(scalex.has_value()) std::cout << scalex.value() << std::endl;
+    auto scaley = G->get_attrib_by_name<std::int32_t>(node, "scaley");
+    if(scaley.has_value()) std::cout << scaley.value() << std::endl;
+    auto scalez = G->get_attrib_by_name<std::int32_t>(node, "scalez");
+    if(scalez.has_value()) std::cout << scalez.value() << std::endl;
 
-}
+    // osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
+    
+    // //if (parent) parent->addChild(mt);
+    
+    // RTMat rtmat = RTMat();
+    // rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
+    // rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
+    // mt->setMatrix(QMatToOSGMat4(rtmat));
+    
+    // osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
+    // smt->setMatrix(osg::Matrix::scale(scalex.value_or(1),scaley.value_or(1),scalez.value_or(1)));
+    // mt->addChild(smt);
+    // //meshHash[mesh->id].osgmeshPaths = mt;
 
-void DSRtoOSGViewer::add_cylinder(osg::ref_ptr<osg::Group> root)
-{
-    osg::Cylinder* cylinder  = new osg::Cylinder( osg::Vec3( 0.f, 0.f, 0.f ), 5.25f, 3.5f );
-    osg::ShapeDrawable* sd = new osg::ShapeDrawable( cylinder );
-    sd->setColor( osg::Vec4( 0.8f, 0.5f, 0.2f, 1.f ) );
-    osg::Geode* geode = new osg::Geode;
-    geode->addDrawable(sd);
-    osg::StateSet* stateSet = geode->getOrCreateStateSet();
-    osg::Material* material = new osg::Material;
-    material->setColorMode( osg::Material::AMBIENT_AND_DIFFUSE );
-    stateSet->setAttributeAndModes( material, osg::StateAttribute::ON );
-    stateSet->setMode( GL_DEPTH_TEST, osg::StateAttribute::ON );
-    root->addChild(geode);
+    // osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(mesh->meshPath.toStdString());
+    // if (!osgMesh)
+    //     throw  "Could not find nesh file " + mesh->meshPath.toStdString();
+    
+    // osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
+    // polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
+    // osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
+    // osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
+    // //meshHash[mesh->id].osgmeshes = osgMesh;
+    // // //meshHash[mesh->id].meshMts= mt;
+    // // //osgmeshmodes[mesh->id] = polygonMode;
+    // smt->addChild(osgMesh);
 }
 
 /////////////////////////////////////////////////////////////
@@ -262,6 +315,7 @@ osg::Vec4 DSRtoOSGViewer::htmlStringToOsgVec4(const std::string &color)
 	blue[0]  = color[5]; blue[1]  = color[6];
 	return osg::Vec4(float(red.toInt(&ok, 16))/255., float(green.toInt(&ok, 16))/255., float(blue.toInt(&ok, 16))/255., 0.f);
 }
+
 ////////////////////////////////////////////////////////////////
 
 void DSRtoOSGViewer::paintGL() 
@@ -271,7 +325,6 @@ void DSRtoOSGViewer::paintGL()
 
 void DSRtoOSGViewer::resizeGL( int width, int height ) 
 {
-    qDebug() << "SCAKE" << x() << y();
     this->getEventQueue()->windowResize(this->x()*m_scaleX, this->y() * m_scaleY, width*m_scaleX, height*m_scaleY);
     _mGraphicsWindow->resized(this->x()*m_scaleX, this->y() * m_scaleY, width*m_scaleX, height*m_scaleY);
     osg::Camera* camera = _mViewer->getCamera();
@@ -349,5 +402,7 @@ bool DSRtoOSGViewer::event(QEvent* event)
 osgGA::EventQueue* DSRtoOSGViewer::getEventQueue() const 
 {
     osgGA::EventQueue* eventQueue = _mGraphicsWindow->getEventQueue();
+    // auto center = manipulator->getCenter();
+    // qDebug() << center.x() << center.y() << center.z() ;
     return eventQueue;
 }

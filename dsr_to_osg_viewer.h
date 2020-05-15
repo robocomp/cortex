@@ -49,7 +49,6 @@ namespace DSR
     {
         public:
             DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
-            void add_cylinder(osg::ref_ptr<osg::Group> root);
             void add_plane();
             void add_mesh();
             void add_person();
@@ -91,6 +90,9 @@ namespace DSR
             void createGraph();
             void setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const;
             osgGA::TrackballManipulator* manipulator;
+
+            void add_or_assign_box(Node &node);
+            void add_or_assign_mesh(Node &node);
     };
 };
 #endif
