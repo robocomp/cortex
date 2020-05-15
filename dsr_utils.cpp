@@ -214,7 +214,7 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
                     val = value.value().dec();
                     break;
                 case 2:
-                    val = value.value().fl();
+                    val = std::round(static_cast<double>(value.value().fl()) *1000000)/ 1000000;
                     break;
                 case 4:
                     val = value.value().bl();
@@ -252,7 +252,7 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
                         val = value.value().dec();
                         break;
                     case 2:
-                        val = value.value().fl();
+                        val = std::round(static_cast<double>(value.value().fl()) *1000000)/ 1000000 ;
                         break;
                     case 4:
                         val = value.value().bl();
