@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>DSRGraph</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_4">
+  <layout class="QHBoxLayout" name="horizontalLayout_3">
    <item>
     <widget class="QSplitter" name="splitter_2">
      <property name="orientation">
@@ -42,7 +42,7 @@
      </widget>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="tab_1">
        <attribute name="title">
@@ -59,6 +59,12 @@
         <string>3d</string>
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_2"/>
+      </widget>
+      <widget class="QWidget" name="tab3">
+       <attribute name="title">
+        <string>2d</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_4"/>
       </widget>
      </widget>
     </widget>

@@ -1,13 +1,13 @@
 /********************************************************************************
-** Form generated from reading UI file 'graphUItabs.ui'
+** Form generated from reading UI file 'graphUI.ui'
 **
 ** Created by: Qt User Interface Compiler version 5.9.5
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
 
-#ifndef GRAPHUITABS_H
-#define GRAPHUITABS_H
+#ifndef GRAPHUI_H
+#define GRAPHUI_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QAction>
@@ -19,7 +19,6 @@
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
-#include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -27,7 +26,7 @@ QT_BEGIN_NAMESPACE
 class Ui_graphDlg
 {
 public:
-    QVBoxLayout *verticalLayout_4;
+    QHBoxLayout *horizontalLayout_3;
     QSplitter *splitter_2;
     QSplitter *splitter_1;
     QTableWidget *tableWidgetNodes;
@@ -38,14 +37,16 @@ public:
     QGraphicsView *graphicsView;
     QWidget *tab_2;
     QHBoxLayout *horizontalLayout_2;
+    QWidget *tab3;
+    QHBoxLayout *horizontalLayout_4;
 
     void setupUi(QWidget *graphDlg)
     {
         if (graphDlg->objectName().isEmpty())
             graphDlg->setObjectName(QStringLiteral("graphDlg"));
         graphDlg->resize(1028, 735);
-        verticalLayout_4 = new QVBoxLayout(graphDlg);
-        verticalLayout_4->setObjectName(QStringLiteral("verticalLayout_4"));
+        horizontalLayout_3 = new QHBoxLayout(graphDlg);
+        horizontalLayout_3->setObjectName(QStringLiteral("horizontalLayout_3"));
         splitter_2 = new QSplitter(graphDlg);
         splitter_2->setObjectName(QStringLiteral("splitter_2"));
         splitter_2->setOrientation(Qt::Horizontal);
@@ -83,14 +84,19 @@ public:
         horizontalLayout_2 = new QHBoxLayout(tab_2);
         horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
         tabWidget->addTab(tab_2, QString());
+        tab3 = new QWidget();
+        tab3->setObjectName(QStringLiteral("tab3"));
+        horizontalLayout_4 = new QHBoxLayout(tab3);
+        horizontalLayout_4->setObjectName(QStringLiteral("horizontalLayout_4"));
+        tabWidget->addTab(tab3, QString());
         splitter_2->addWidget(tabWidget);
 
-        verticalLayout_4->addWidget(splitter_2);
+        horizontalLayout_3->addWidget(splitter_2);
 
 
         retranslateUi(graphDlg);
 
-        tabWidget->setCurrentIndex(0);
+        tabWidget->setCurrentIndex(2);
 
 
         QMetaObject::connectSlotsByName(graphDlg);
@@ -101,6 +107,7 @@ public:
         graphDlg->setWindowTitle(QApplication::translate("graphDlg", "DSRGraph", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_1), QApplication::translate("graphDlg", "graph", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_2), QApplication::translate("graphDlg", "3d", Q_NULLPTR));
+        tabWidget->setTabText(tabWidget->indexOf(tab3), QApplication::translate("graphDlg", "2d", Q_NULLPTR));
     } // retranslateUi
 
 };
@@ -111,4 +118,4 @@ namespace Ui {
 
 QT_END_NAMESPACE
 
-#endif // GRAPHUITABS_H
+#endif // GRAPHUI_H
