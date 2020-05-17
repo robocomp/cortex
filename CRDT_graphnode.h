@@ -237,7 +237,7 @@ class GraphNode : public QObject, public QGraphicsItem
 {
   Q_OBJECT
 	public:
-    GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_);
+    GraphNode(std::shared_ptr<DSR::DSRtoGraphViewer> graph_viewer_);
 
     //std::string name_in_graph;
     std::int32_t id_in_graph;
@@ -256,13 +256,15 @@ class GraphNode : public QObject, public QGraphicsItem
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     void setColor(const std::string &plain);
-    std::shared_ptr<DSR::GraphViewer> getGraphViewer() const { return graph_viewer;};
+    std::shared_ptr<DSR::DSRtoGraphViewer> getGraphViewer() const { return dsr_to_graph_viewer;};
     
 	protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;  
     void keyPressEvent(QKeyEvent *event) override;
+    //void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override { qDebug() << "move " << event->pos();};
+
   public slots:
     //void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
 
@@ -271,13 +273,7 @@ class GraphNode : public QObject, public QGraphicsItem
     QGraphicsSimpleTextItem *tag;
     QString dark_color = "darkyello", plain_color = "yellow";
     std::string type;
-    std::shared_ptr<DSR::GraphViewer> graph_viewer;
+    std::shared_ptr<DSR::DSRtoGraphViewer> dsr_to_graph_viewer;
 };
 
 #endif // GRAPHNODE_H
-
-
- // for( const auto &[k,v] : sample.getValue())
-            //     std::cout << "Received: node " << k << " with laser_data " << v.attrs.at("laser_data_dists") << " from " << sample.getKey() << std::endl;
-            //std::cout << "received: " << sample.getValue().at(134).attrs.at("laser_data_dists") << std::endl;
-            //std::cout << "--------------------" << std::endl;
