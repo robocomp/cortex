@@ -37,7 +37,7 @@ public:
     QGraphicsView *graphicsView;
     QWidget *tab_2;
     QHBoxLayout *horizontalLayout_2;
-    QWidget *tab3;
+    QWidget *tab_3;
     QHBoxLayout *horizontalLayout_4;
 
     void setupUi(QWidget *graphDlg)
@@ -84,11 +84,11 @@ public:
         horizontalLayout_2 = new QHBoxLayout(tab_2);
         horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
         tabWidget->addTab(tab_2, QString());
-        tab3 = new QWidget();
-        tab3->setObjectName(QStringLiteral("tab3"));
-        horizontalLayout_4 = new QHBoxLayout(tab3);
+        tab_3 = new QWidget();
+        tab_3->setObjectName(QStringLiteral("tab_3"));
+        horizontalLayout_4 = new QHBoxLayout(tab_3);
         horizontalLayout_4->setObjectName(QStringLiteral("horizontalLayout_4"));
-        tabWidget->addTab(tab3, QString());
+        tabWidget->addTab(tab_3, QString());
         splitter_2->addWidget(tabWidget);
 
         horizontalLayout_3->addWidget(splitter_2);
@@ -107,7 +107,7 @@ public:
         graphDlg->setWindowTitle(QApplication::translate("graphDlg", "DSRGraph", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_1), QApplication::translate("graphDlg", "graph", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(tab_2), QApplication::translate("graphDlg", "3d", Q_NULLPTR));
-        tabWidget->setTabText(tabWidget->indexOf(tab3), QApplication::translate("graphDlg", "2d", Q_NULLPTR));
+        tabWidget->setTabText(tabWidget->indexOf(tab_3), QApplication::translate("graphDlg", "2d", Q_NULLPTR));
     } // retranslateUi
 
 };

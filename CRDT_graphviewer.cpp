@@ -81,6 +81,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	}
 
 	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
+	dsr_to_graphicscene_viewer = std::make_unique<DSR::DSRtoGraphicsceneViewer>(G, 1, 1, tab_3);
    
 }
 

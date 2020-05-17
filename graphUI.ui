@@ -60,7 +60,7 @@
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_2"/>
       </widget>
-      <widget class="QWidget" name="tab3">
+      <widget class="QWidget" name="tab_3">
        <attribute name="title">
         <string>2d</string>
        </attribute>

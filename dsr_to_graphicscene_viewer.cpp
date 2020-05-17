@@ -290,11 +290,11 @@ void DSRtoGraphicsceneViewer::mouseReleaseEvent(QMouseEvent* event)
     }
     this->getEventQueue()->mouseButtonRelease(event->x()*m_scaleX, event->y()*m_scaleY, button);
 }
-
-void DSRtoGraphicsceneViewer::own_wheelEvent(QWheelEvent* event)
+*/
+void DSRtoGraphicsceneViewer::wheelEvent(QWheelEvent* event)
 {
     qDebug()<<"wheel";
-    const QGraphicsView::ViewportAnchor anchor = view->transformationAnchor();
+/*    const QGraphicsView::ViewportAnchor anchor = view->transformationAnchor();
 	view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	int angle = event->angleDelta().y();
 	qreal factor;
@@ -311,9 +311,9 @@ void DSRtoGraphicsceneViewer::own_wheelEvent(QWheelEvent* event)
 		scene.setSceneRect(r);
 	}
 	view->scale(factor, factor);
-	view->setTransformationAnchor(anchor);
+	view->setTransformationAnchor(anchor);*/
 }
-
+/*
 bool DSRtoGraphicsceneViewer::event(QEvent* event)
 {
     bool handled = QOpenGLWidget::event(event);

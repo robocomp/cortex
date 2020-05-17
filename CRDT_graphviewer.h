@@ -27,6 +27,7 @@
 #include <QResizeEvent>
 #include <QOpenGLWidget>
 #include "../../../graph-related-classes/dsr_to_osg_viewer.h"
+#include "../../../graph-related-classes/dsr_to_graphicscene_viewer.h"
 
 
 class SpecificWorker;
@@ -76,6 +77,7 @@ namespace DSR
             void delEdgeSLOT(const std::int32_t from, const std::int32_t to,  const std::string &edge_tag);
 			void delNodeSLOT(int id);
 			std::unique_ptr<DSR::DSRtoOSGViewer> dsr_to_osg_viewer;
+			std::unique_ptr<DSR::DSRtoGraphicsceneViewer> dsr_to_graphicscene_viewer;
 
 		public slots:
 			void addOrAssignNodeSLOT(const std::int32_t id, const std::string &type);
