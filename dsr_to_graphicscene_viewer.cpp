@@ -11,7 +11,7 @@ DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph
     this->resize(parent->width(), parent->height());
 	scene.setItemIndexMethod(QGraphicsScene::NoIndex);
 	scene.setSceneRect(-5000, -5000, 10000, 10000);
-    view = new QGraphicsView(parent);
+    view = new QGraphicsView();
     view->resize(parent->width(), parent->height());
 	view->setScene(&scene);
 	view->setCacheMode(QGraphicsView::CacheBackground);
@@ -19,13 +19,13 @@ DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph
 	view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	view->setRenderHint(QPainter::Antialiasing);
 	view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-	this->setContextMenuPolicy(Qt::ActionsContextMenu);
+	//this->setContextMenuPolicy(Qt::ActionsContextMenu);
 	view->scale(scaleX, scaleY);
 	view->setMinimumSize(200, 200);
 	view->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
 	view->adjustSize();
  	QRect availableGeometry(QApplication::desktop()->availableGeometry());
- 	this->move((availableGeometry.width() - width()) / 2, (availableGeometry.height() - height()) / 2);
+ 	//this->move((availableGeometry.width() - width()) / 2, (availableGeometry.height() - height()) / 2);
 	setMouseTracking(true);
     view->viewport()->setMouseTracking(true);
 

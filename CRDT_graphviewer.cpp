@@ -346,33 +346,33 @@ void GraphViewer::timerEvent(QTimerEvent *event)
 ///// Qt Events
 /////////////////////////
 
-void GraphViewer::wheelEvent(QWheelEvent *event)
-{
-	// zoom
-	const QGraphicsView::ViewportAnchor anchor = graphicsView->transformationAnchor();
-	graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-	int angle = event->angleDelta().y();
-	qreal factor;
-	if (angle > 0) 
-	{
-		factor = 1.1;
-		QRectF r = scene.sceneRect();
-		this->scene.setSceneRect(r);
-	}
-	else
-	{
-		factor = 0.9;
-		QRectF r = scene.sceneRect();
-		this->scene.setSceneRect(r);
-	}
-	graphicsView->scale(factor, factor);
-	graphicsView->setTransformationAnchor(anchor);
+// void GraphViewer::wheelEvent(QWheelEvent *event)
+// {
+// 	// zoom
+// 	const QGraphicsView::ViewportAnchor anchor = graphicsView->transformationAnchor();
+// 	graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+// 	int angle = event->angleDelta().y();
+// 	qreal factor;
+// 	if (angle > 0) 
+// 	{
+// 		factor = 1.1;
+// 		QRectF r = scene.sceneRect();
+// 		this->scene.setSceneRect(r);
+// 	}
+// 	else
+// 	{
+// 		factor = 0.9;
+// 		QRectF r = scene.sceneRect();
+// 		this->scene.setSceneRect(r);
+// 	}
+// 	graphicsView->scale(factor, factor);
+// 	graphicsView->setTransformationAnchor(anchor);
 	
-	QSettings settings("RoboComp", "DSR");
-	settings.beginGroup("QGraphicsView");
-		settings.setValue("matrix", graphicsView->transform());
-	settings.endGroup();
-}
+// 	QSettings settings("RoboComp", "DSR");
+// 	settings.beginGroup("QGraphicsView");
+// 		settings.setValue("matrix", graphicsView->transform());
+// 	settings.endGroup();
+// }
 
 void GraphViewer::keyPressEvent(QKeyEvent* event) 
 {

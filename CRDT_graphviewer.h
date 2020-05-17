@@ -54,7 +54,7 @@ namespace DSR
 			QGraphicsEllipseItem* getCentralPoint() const 				{return central_point;};
 		
 		protected:
-			virtual void wheelEvent(QWheelEvent *event);
+			//virtual void wheelEvent(QWheelEvent *event);
 			virtual void keyPressEvent(QKeyEvent *event);
 			virtual void timerEvent(QTimerEvent *event); 
 			virtual void resizeEvent(QResizeEvent *e) // resize QOpenGLWidget
