@@ -81,10 +81,13 @@ void DSRtoOSGViewer::createGraph()
     {
         auto map = G->getCopy();
 		for(const auto &[k, node] : map)
-		       add_or_assign_node_slot(k,  node.type());
-		for(auto node : map) // Aworset
-           	for(const auto &[k, edges] : node.second.fano())
-			    add_or_assign_edge_slot(edges.from(), edges.to(), edges.type());
+		    add_or_assign_node_slot(k,  node.type());
+        for(const auto &[k, node] : map)
+            for(const auto &[ek, edge]: node.fano())
+		            add_or_assign_edge_slot(edge.from(), edge.to(), edge.type());
+		//for(auto node : map) // Aworset
+        //   	for(const auto &[k, edges] : node.second.fano())
+		//	    add_or_assign_edge_slot(edges.from(), edges.to(), edges.type());
     }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
 }
@@ -151,16 +154,15 @@ void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std:
 void DSRtoOSGViewer::add_or_assign_box(Node &node)
 {
     qDebug() << __FUNCTION__ ;
+    std::cout << node.name() << " " << node.id() << std::endl;
+    auto texture = G->get_attrib_by_name<std::string>(node, "texture");
+    if(texture.has_value()) std::cout << texture.value() << std::endl;
     auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
-    std::cout << parent.value() << std::endl;
-    auto color = G->get_attrib_by_name<std::string>(node, "color");
-    std::cout << color.value() << std::endl;
-    auto filename = G->get_attrib_by_name<std::string>(node, "texture");
-    if(filename.has_value()) std::cout << filename.value() << std::endl;
-    auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
-    if(width.has_value()) std::cout << width.value() << std::endl;
+    if(parent.has_value()) std::cout << parent.value() << std::endl;
     auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
     if(height.has_value()) std::cout << height.value() << std::endl;
+    auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
+    if(width.has_value()) std::cout << height.value() << std::endl;
     auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
     if(depth.has_value()) std::cout << depth.value() << std::endl;
     auto nx = G->get_attrib_by_name<std::int32_t>(node, "nx");
@@ -180,15 +182,15 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
     
     //we are in bussines
     bool constantColor = false;
-    if (filename.value().size() == 7 and filename.value()[0] == '#')
+    if (texture.value().size() == 7 and texture.value()[0] == '#')
             constantColor = true;
     // Open image
     osg::ref_ptr<osg::TessellationHints> hints;
     osg::Image *image;
-    if (filename.value().size()>0 and not constantColor)
+    if (texture.value().size()>0 and not constantColor)
     {
-        if( image = osgDB::readImageFile(filename.value()), image == nullptr)
-            throw std::runtime_error("Couldn't load texture from file: " + filename.value());
+        if( image = osgDB::readImageFile(texture.value()), image == nullptr)
+            throw std::runtime_error("Couldn't load texture from file: " + texture.value());
     }   
 
     hints = new osg::TessellationHints;
@@ -201,7 +203,7 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
     osg::Quat qr; qr.set(r*t);
 	box->setRotation(qr);
     auto plane_drawable = new osg::ShapeDrawable(box, hints);
-    plane_drawable->setColor(htmlStringToOsgVec4(color.value()));
+    plane_drawable->setColor(htmlStringToOsgVec4(texture.value_or("#FF0000")));
     osg::Geode* geode = new osg::Geode;
     geode->addDrawable(plane_drawable);
 

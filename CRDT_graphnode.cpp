@@ -27,13 +27,13 @@ GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_vi
     setZValue(-1);
 }
 
-
 void GraphNode::setTag(const std::string &tag_)
 {
     QString c = QString::fromStdString(tag_);
 	tag = new QGraphicsSimpleTextItem(c, this);
 	tag->setX(20);	
 	tag->setY(-10);
+    std::cout << " Name" << tag_ << std::endl;
 }
 
 void GraphNode::setType(const std::string &type_)
@@ -165,15 +165,21 @@ void GraphNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 
 QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 {
+    qDebug() << __FUNCTION__ << change << value;
     switch (change) 
 	{
-    case ItemPositionHasChanged:
-        foreach (GraphEdge *edge, edgeList)
-            edge->adjust();
-        graph_viewer->itemMoved();
-        break;
-    default:
-        break;
+        case ItemPositionChange:
+        {
+            QPointF newPos = value.toPointF();
+            qDebug() << mapToParent(newPos); 
+            foreach (GraphEdge *edge, edgeList)
+                edge->adjust();
+            graph_viewer->itemMoved();
+            //return mapToScene(newPos); 
+            break;
+        }
+        default:
+            break;
     };
 
     return QGraphicsItem::itemChange(change, value);
@@ -182,12 +188,11 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     if (tag->text() != "") return; // Explota sin esto
-
-    static std::unique_ptr<QWidget> do_stuff;
     std::cout << __FILE__ <<":"<<__FUNCTION__<< "-> node: " << tag->text().toStdString() << std::endl;
     const auto graph = graph_viewer->getGraph();
     if( event->button()== Qt::RightButton)
     {
+        static std::unique_ptr<QWidget> do_stuff;
         if(tag->text().contains("laser"))
             do_stuff = std::make_unique<DoLaserStuff>(graph, id_in_graph);
         else if(tag->text().contains("rgdb"))
@@ -204,16 +209,15 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     if( event->button()== Qt::LeftButton)
     {
         auto g = graph_viewer->getGraph();
-        std::cout << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
+        std::cout << __FILE__ <<" : "<<__FUNCTION__<< ". Node being moved: " << id_in_graph << std::endl;
         std::optional<Node> n = g->get_node(id_in_graph);
-        if (n.has_value()) {
-            g->add_attrib(n.value().attrs(), "pos_x", (float) event->scenePos().x());
-            g->add_attrib(n.value().attrs(), "pos_y", (float) event->scenePos().y());
-            g->insert_or_assign_node(n.value());
+        if (n.has_value()) 
+        {
+            g->insert_or_assign_attrib_by_name(n.value(), "pos_x", (float) event->scenePos().x());
+            g->insert_or_assign_attrib_by_name(n.value(), "pos_y", (float) event->scenePos().y());
+            qDebug() << __FUNCTION__ << "record " << (float) event->scenePos().x() << (float) event->scenePos().y();
         }
     }
-    // update();
-    // QGraphicsItem::mouseReleaseEvent(event);
 }
 
 void GraphNode::keyPressEvent(QKeyEvent *event) 

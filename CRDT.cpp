@@ -484,7 +484,8 @@ std::vector<Edge> CRDTGraph::get_edges_by_type(const std::string& type)
     std::vector<Edge> edges_;
     if (edgeType.find(type) != edgeType.end())
     {
-        for (auto &[from, to] : edgeType[type]) {
+        for (auto &[from, to] : edgeType[type]) 
+        {
             auto n = get_edge_(from, to, type);
             if (n.has_value())
                 edges_.emplace_back(n.value());

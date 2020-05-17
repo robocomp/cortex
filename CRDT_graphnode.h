@@ -34,11 +34,8 @@
 #include "CRDT_graphedge.h"
 #include "CRDT_graphviewer.h"
 
-
-
 class GraphEdge;
 class QGraphicsSceneMouseEvent;
-
 
 class DoLaserStuff : public QGraphicsView
 {
@@ -260,6 +257,7 @@ class GraphNode : public QObject, public QGraphicsItem
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     void setColor(const std::string &plain);
     std::shared_ptr<DSR::GraphViewer> getGraphViewer() const { return graph_viewer;};
+    
 	protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;

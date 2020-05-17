@@ -53,8 +53,8 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	// central_point = new QGraphicsEllipseItem();
 	// central_point->setPos(scene.sceneRect().center());
 	// scrollArea->setMinimumSize(600,600);
-	auto ind_2 = splitter_1->indexOf(tabWidget);
 	auto ind_1 = splitter_1->indexOf(splitter_1);
+	auto ind_2 = splitter_2->indexOf(tabWidget);
 	splitter_1->setStretchFactor(ind_1,1);	
 	splitter_2->setStretchFactor(ind_2,9);
 	// QSettings settings("RoboComp", "DSR");
@@ -148,6 +148,7 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
             gnode->id_in_graph = id;
             //gnode->name_in_graph = name;
             gnode->setType(type);
+			gnode->setTag(n.value().name() + " [" + std::to_string(n.value().id()) + "]");
             scene.addItem(gnode);
             gmap.insert(std::pair(id, gnode));
             // left table filling only if it is new
@@ -158,7 +159,6 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
             nodes_types_list << QString::fromStdString(type);
             nodes_types_list.removeDuplicates();
             int i = 0;
-
             tableWidgetNodes->clearContents();
             tableWidgetNodes->setRowCount(nodes_types_list.size());
             for (auto &s : nodes_types_list) 
@@ -192,26 +192,16 @@ void GraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
                     tableWidgetNodes->item(item->row(), 0)->setIcon(
                             QPixmap::fromImage(QImage("../../graph-related-classes/redBall.png")));
             }, Qt::UniqueConnection);
-
-            try 
-			{
-                auto qname = G->get_attrib_by_name<std::string>(n.value(), "name");
-                if (qname.has_value()) {
-                    qDebug() << QString::fromStdString(qname.value());
-                    gnode->setTag(qname.value());
-                } else {
-                    gnode->setTag("");
-                }
-            }
-            catch (const std::exception &e) { std::cout << e.what() << " Exception name" << std::endl; }
-
-            try
-			{
-                auto color = G->get_attrib_by_name<std::string>(n.value(), "color");
-                if (color.has_value())
-                    gnode->setColor(color.value());
-            }
-            catch (const std::exception &e) { std::cout << e.what() << " Exception in color " << std::endl; }
+        
+			std::string color = "coral";
+			if(type == "world") color = "SeaGreen";
+			else if(type == "transform") color = "SteelBlue";
+			else if(type == "plane") color = "Khaki";
+			else if(type == "differentialrobot") color = "GoldenRod";
+			else if(type == "laser") color = "GreenYellow";
+			else if(type == "mesh") color = "LightBlue";
+			else if(type == "imu") color = "LightSalmon";
+			gnode->setColor(color);
         } else
             gnode = gmap.at(id);
 

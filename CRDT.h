@@ -238,8 +238,6 @@ namespace CRDT
                 at.type(BOOL);
                 value.bl(new_val);
             }
-            //else
-                //throw std::runtime_error("Content type not valid for attribute in add_attrib_by_name()");
             
             // assign value and insert int attribute map
             at.value( value);
@@ -349,11 +347,11 @@ namespace CRDT
             else
             {
                 if constexpr (std::is_same<Node,  T>::value)
-                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
-                              << "-> " << n.id() << std::endl;
-                if constexpr (std::is_same<Attrib,  T>::value)
-                    std::cout << "ERROR: " << __FILE__ << " " << __FUNCTION__ << ":" << __LINE__ << " "
-                              << "-> " << n.to() << std::endl;
+                    std::cout << "ERROR: " <<  __FUNCTION__ << ":" << __LINE__ << " "
+                              << "Attribute " << key << " not found in node  -> " << n.id() << std::endl;
+                if constexpr (std::is_same<Edge,  T>::value)
+                    std::cout << "ERROR: " <<  __FUNCTION__ << ":" << __LINE__ << " "
+                              << "Atribute " << key << " not found in edge -> " << n.to() << std::endl;
             }
             return {};
         }
