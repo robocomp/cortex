@@ -22,9 +22,11 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QGLWidget>
+#include <QHBoxLayout>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QMouseEvent>
+#include <QResizeEvent>
 #include "CRDT.h"
 
 namespace DSR
@@ -32,6 +34,7 @@ namespace DSR
 
     class DSRtoGraphicsceneViewer : public QWidget
     {
+        Q_OBJECT
         public:
             DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
 //            void add_plane();
@@ -51,10 +54,7 @@ namespace DSR
 //            virtual void mousePressEvent(QMouseEvent* event);
 //            virtual void mouseReleaseEvent(QMouseEvent* event);
             virtual void wheelEvent(QWheelEvent* event);
-            virtual void resizeEvent(QResizeEvent *e) // resize QOpenGLWidget
-			{  
-                qDebug()<<"resize scene";
-			};
+            virtual void resizeEvent(QResizeEvent *e); 
 //            virtual bool event(QEvent* event);
 
         private:
