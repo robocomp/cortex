@@ -26,6 +26,8 @@
 #include "ui_graphUI.h"
 #include <QResizeEvent>
 #include <QOpenGLWidget>
+#include "../../../graph-related-classes/dsr_to_osg_viewer.h"
+
 
 class SpecificWorker;
 class GraphNode;
@@ -51,9 +53,9 @@ namespace DSR
 			QGraphicsEllipseItem* getCentralPoint() const 				{return central_point;};
 		
 		protected:
-			void wheelEvent(QWheelEvent *event) override;
-			void keyPressEvent(QKeyEvent *event) override;
-			void timerEvent(QTimerEvent *event) override;
+			virtual void wheelEvent(QWheelEvent *event);
+			virtual void keyPressEvent(QKeyEvent *event);
+			virtual void timerEvent(QTimerEvent *event); 
 			virtual void resizeEvent(QResizeEvent *e) // resize QOpenGLWidget
 			{  
 				auto gl =tab_2->findChildren<QOpenGLWidget*>();
@@ -73,6 +75,7 @@ namespace DSR
             void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
             void delEdgeSLOT(const std::int32_t from, const std::int32_t to,  const std::string &edge_tag);
 			void delNodeSLOT(int id);
+			std::unique_ptr<DSR::DSRtoOSGViewer> dsr_to_osg_viewer;
 
 		public slots:
 			void addOrAssignNodeSLOT(const std::int32_t id, const std::string &type);

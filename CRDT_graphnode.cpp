@@ -165,23 +165,33 @@ void GraphNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 
 QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 {
-    qDebug() << __FUNCTION__ << change << value;
     switch (change) 
 	{
         case ItemPositionChange:
         {
             QPointF newPos = value.toPointF();
-            qDebug() << mapToParent(newPos); 
-            foreach (GraphEdge *edge, edgeList)
-                edge->adjust();
-            graph_viewer->itemMoved();
-            //return mapToScene(newPos); 
+            qDebug() << newPos << pos();; 
+            // foreach (GraphEdge *edge, edgeList)
+            //     edge->adjust();
+            // graph_viewer->itemMoved();
+            return newPos - pos(); 
             break;
+        }
+        case ItemPositionHasChanged:
+        {
+            // auto g = graph_viewer->getGraph();
+            // std::cout << __FILE__ <<" : "<<__FUNCTION__<< ". Node being moved: " << id_in_graph << std::endl;
+            // std::optional<Node> n = g->get_node(id_in_graph);
+            // if (n.has_value()) 
+            // {
+            //     g->insert_or_assign_attrib_by_name(n.value(), "pos_x", value.toPointF().x());
+            //     g->insert_or_assign_attrib_by_name(n.value(), "pos_y", value.toPointF().y());
+            // }
+          
         }
         default:
             break;
     };
-
     return QGraphicsItem::itemChange(change, value);
 }
 
@@ -206,18 +216,18 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if( event->button()== Qt::LeftButton)
-    {
-        auto g = graph_viewer->getGraph();
-        std::cout << __FILE__ <<" : "<<__FUNCTION__<< ". Node being moved: " << id_in_graph << std::endl;
-        std::optional<Node> n = g->get_node(id_in_graph);
-        if (n.has_value()) 
-        {
-            g->insert_or_assign_attrib_by_name(n.value(), "pos_x", (float) event->scenePos().x());
-            g->insert_or_assign_attrib_by_name(n.value(), "pos_y", (float) event->scenePos().y());
-            qDebug() << __FUNCTION__ << "record " << (float) event->scenePos().x() << (float) event->scenePos().y();
-        }
-    }
+    // if( event->button()== Qt::LeftButton)
+    // {
+    //     auto g = graph_viewer->getGraph();
+    //     std::cout << __FILE__ <<" : "<<__FUNCTION__<< ". Node being moved: " << id_in_graph << std::endl;
+    //     std::optional<Node> n = g->get_node(id_in_graph);
+    //     if (n.has_value()) 
+    //     {
+    //         g->insert_or_assign_attrib_by_name(n.value(), "pos_x", (float) event->scenePos().x());
+    //         g->insert_or_assign_attrib_by_name(n.value(), "pos_y", (float) event->scenePos().y());
+    //         qDebug() << __FUNCTION__ << "record " << (float) event->scenePos().x() << (float) event->scenePos().y();
+    //     }
+    // }
 }
 
 void GraphNode::keyPressEvent(QKeyEvent *event) 

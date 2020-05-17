@@ -79,6 +79,9 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	{
 		std::cout << "Nodo " << k << " " << v->getType() << '\n';
 	}
+
+	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
+   
 }
 
 GraphViewer::~GraphViewer()
