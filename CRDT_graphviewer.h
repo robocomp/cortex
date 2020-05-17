@@ -28,11 +28,7 @@
 #include <QOpenGLWidget>
 #include "../../../graph-related-classes/dsr_to_osg_viewer.h"
 #include "../../../graph-related-classes/dsr_to_graphicscene_viewer.h"
-
-
-class SpecificWorker;
-class GraphNode;
-class GraphEdge;
+#include "../../../graph-related-classes/dsr_to_graph_viewer.h"
 
 namespace DSR
 {
@@ -49,46 +45,38 @@ namespace DSR
 			~GraphViewer();
 			void itemMoved();
 			void createGraph();
-			std::shared_ptr<CRDT::CRDTGraph> getGraph()  			  	{return G;};
-			std::map<std::int32_t, GraphNode*> getGMap() const 			{return gmap;};
-			QGraphicsEllipseItem* getCentralPoint() const 				{return central_point;};
-		
+			
 		protected:
-			//virtual void wheelEvent(QWheelEvent *event);
 			virtual void keyPressEvent(QKeyEvent *event);
-			virtual void timerEvent(QTimerEvent *event); 
-			virtual void resizeEvent(QResizeEvent *e) // resize QOpenGLWidget
+			virtual void timerEvent(QTimerEvent *event);
+			// Resize tabs. The event does not propagate for some reason
+			virtual void resizeEvent(QResizeEvent *e) 
 			{  
-				auto gl =tab_2->findChildren<QOpenGLWidget*>();
-				if(gl.size()>0)
-					gl[0]->resize(e->size().width(), e->size().height());
-			};
+				dsr_to_graph_viewer->resize(graphicsView->size());
+				dsr_to_graph_viewer->fitInView(dsr_to_graph_viewer->scene.sceneRect(), Qt::KeepAspectRatio );
+			 	auto gl =tab_2->findChildren<QOpenGLWidget*>();
+			 	if(gl.size()>0)
+			 		gl[0]->resize(e->size().width(), e->size().height());
+				gl =tab_3->findChildren<QOpenGLWidget*>();
+			 	if(gl.size()>0)
+			 		gl[0]->resize(e->size().width(), e->size().height());
+			 };
 			
 		private:
 			std::shared_ptr<CRDT::CRDTGraph> G;
-			QGraphicsScene scene;
 			int timerId = 0;
-			QStringList nodes_types_list, edges_types_list;
 			bool do_simulate = false;
-            std::map<std::int32_t, GraphNode*> gmap;
-			std::map<std::tuple<std::int32_t, std::int32_t, std::string>, GraphEdge*> gmap_edges;
-			QGraphicsEllipseItem *central_point;
-            void addEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &ege_tag);
-            void delEdgeSLOT(const std::int32_t from, const std::int32_t to,  const std::string &edge_tag);
-			void delNodeSLOT(int id);
 			std::unique_ptr<DSR::DSRtoOSGViewer> dsr_to_osg_viewer;
 			std::unique_ptr<DSR::DSRtoGraphicsceneViewer> dsr_to_graphicscene_viewer;
+			std::unique_ptr<DSR::DSRtoGraphViewer> dsr_to_graph_viewer;
 
 		public slots:
-			void addOrAssignNodeSLOT(const std::int32_t id, const std::string &type);
 			void saveGraphSLOT();		
 			void toggleSimulationSLOT();
-			//void NodeAttrsChangedSLOT(const IDType &id, const DSR::Attribs &attribs);
 
 		signals:
 			void saveGraphSIGNAL();
 			void closeWindowSIGNAL();
-
 	};
 }
 

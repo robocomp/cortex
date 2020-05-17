@@ -17,7 +17,7 @@
 #include "CRDT_graphnode.h"
 
 
-GraphNode::GraphNode(std::shared_ptr<DSR::GraphViewer> graph_viewer_) : graph_viewer(graph_viewer_)
+GraphNode::GraphNode(std::shared_ptr<DSR::DSRtoGraphViewer> dsr_to_graph_viewer_) : dsr_to_graph_viewer(dsr_to_graph_viewer_)
 {
     setFlag(ItemIsMovable);
     setFlag(ItemSendsGeometryChanges);
@@ -71,7 +71,7 @@ void GraphNode::calculateForces()
     qreal xvel = 0;
     qreal yvel = 0;
     //foreach (QGraphicsItem *item, scene()->items()) 
-    for( auto &[k,node] : graph_viewer->getGMap())
+    for( auto &[k,node] : dsr_to_graph_viewer->getGMap())
 	{
         //GraphNode *node = qgraphicsitem_cast<GraphNode *>(item);
         //if (!node)
@@ -104,7 +104,7 @@ void GraphNode::calculateForces()
     }
 
     // Subtract force from central pos pulling item to the center of the image
-    QPointF to_central_point = mapFromItem(graph_viewer->getCentralPoint(), 0, 0);
+    QPointF to_central_point = mapFromItem(dsr_to_graph_viewer->getCentralPoint(), 0, 0);
     xvel += to_central_point.x() / (weight/2) ;
     yvel += to_central_point.y() / (weight/2) ;
 
@@ -174,21 +174,9 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
             // foreach (GraphEdge *edge, edgeList)
             //     edge->adjust();
             // graph_viewer->itemMoved();
-            return newPos - pos(); 
             break;
         }
-        case ItemPositionHasChanged:
-        {
-            // auto g = graph_viewer->getGraph();
-            // std::cout << __FILE__ <<" : "<<__FUNCTION__<< ". Node being moved: " << id_in_graph << std::endl;
-            // std::optional<Node> n = g->get_node(id_in_graph);
-            // if (n.has_value()) 
-            // {
-            //     g->insert_or_assign_attrib_by_name(n.value(), "pos_x", value.toPointF().x());
-            //     g->insert_or_assign_attrib_by_name(n.value(), "pos_y", value.toPointF().y());
-            // }
-          
-        }
+
         default:
             break;
     };
@@ -197,9 +185,10 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
+    qDebug() << "MOUSE PRESS" << mapToScene(event->pos());
     if (tag->text() != "") return; // Explota sin esto
     std::cout << __FILE__ <<":"<<__FUNCTION__<< "-> node: " << tag->text().toStdString() << std::endl;
-    const auto graph = graph_viewer->getGraph();
+    const auto graph = dsr_to_graph_viewer->getGraph();
     if( event->button()== Qt::RightButton)
     {
         static std::unique_ptr<QWidget> do_stuff;
