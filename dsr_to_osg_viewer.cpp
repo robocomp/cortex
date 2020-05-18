@@ -208,18 +208,18 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
     if(width.has_value()) std::cout << height.value() << std::endl;
     auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
     if(depth.has_value()) std::cout << depth.value() << std::endl;
-    auto nx = G->get_attrib_by_name<std::int32_t>(node, "nx");
-    if(nx.has_value()) std::cout << nx.value() << std::endl;
-    auto ny = G->get_attrib_by_name<std::int32_t>(node, "ny");
-    if(ny.has_value()) std::cout << ny.value() << std::endl;
-    auto nz = G->get_attrib_by_name<std::int32_t>(node, "nz");
-    if(nz.has_value()) std::cout << nz.value() << std::endl;
-    auto px = G->get_attrib_by_name<std::int32_t>(node, "px");
-    if(px.has_value()) std::cout << px.value() << std::endl;
-    auto py = G->get_attrib_by_name<std::int32_t>(node, "py");
-    if(py.has_value()) std::cout << py.value() << std::endl;
-    auto pz = G->get_attrib_by_name<std::int32_t>(node, "pz");
-    if(pz.has_value()) std::cout << pz.value() << std::endl;
+    // auto nx = G->get_attrib_by_name<std::int32_t>(node, "nx");
+    // if(nx.has_value()) std::cout << nx.value() << std::endl;
+    // auto ny = G->get_attrib_by_name<std::int32_t>(node, "ny");
+    // if(ny.has_value()) std::cout << ny.value() << std::endl;
+    // auto nz = G->get_attrib_by_name<std::int32_t>(node, "nz");
+    // if(nz.has_value()) std::cout << nz.value() << std::endl;
+    // auto px = G->get_attrib_by_name<std::int32_t>(node, "px");
+    // if(px.has_value()) std::cout << px.value() << std::endl;
+    // auto py = G->get_attrib_by_name<std::int32_t>(node, "py");
+    // if(py.has_value()) std::cout << py.value() << std::endl;
+    // auto pz = G->get_attrib_by_name<std::int32_t>(node, "pz");
+    // if(pz.has_value()) std::cout << pz.value() << std::endl;
     
     //we are in bussines
     auto textu = texture.value_or("#000000");
@@ -237,13 +237,13 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
 
     hints = new osg::TessellationHints;
     hints->setDetailRatio(2.0f);
-    osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(px.value()/100,py.value()/100,pz.value()/100)), width.value()/100, height.value()/100, depth.value()/100);
-    osg::Matrix r;
-	r.makeRotate(osg::Vec3(0, 0, 1), QVecToOSGVec(QVec::vec3(nx.value(),ny.value(),nz.value())));
-	osg::Matrix t;
-	t.makeTranslate(QVecToOSGVec(QVec::vec3(px.value()/100,py.value()/100,pz.value()/100)));
-    osg::Quat qr; qr.set(r*t);
-	box->setRotation(qr);
+    osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value()/100, height.value()/100, depth.value()/100);
+    // osg::Matrix r;
+	// r.makeRotate(osg::Vec3(0, 0, 1), QVecToOSGVec(QVec::vec3(nx.value(),ny.value(),nz.value())));
+	// osg::Matrix t;
+	// t.makeTranslate(QVecToOSGVec(QVec::vec3(px.value()/100,py.value()/100,pz.value()/100)));
+    // osg::Quat qr; qr.set(r*t);
+	// box->setRotation(qr);
     auto plane_drawable = new osg::ShapeDrawable(box, hints);
     plane_drawable->setColor(htmlStringToOsgVec4(texture.value_or("#FF0000")));
     osg::Geode* geode = new osg::Geode;
