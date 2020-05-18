@@ -22,7 +22,7 @@ DSRtoGraphViewer::DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QGraphic
 	this->setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
 	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	this->setRenderHint(QPainter::Antialiasing);
-	//this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	//this->setMinimumSize(200, 200);
 	this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
 	this->adjustSize();
