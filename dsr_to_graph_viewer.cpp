@@ -25,13 +25,13 @@ DSRtoGraphViewer::DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QGraphic
 	//this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	//this->setMinimumSize(200, 200);
 	this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
-	//this->adjustSize();
+	this->adjustSize();
  	setMouseTracking(true);
     this->viewport()->setMouseTracking(true);
 
     createGraph();
 
-    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &DSRtoGraphViewer::addOrAssignNodeSLOT);
+    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &DSRtoGraphViewer::add_or_assign_node_SLOT);
 	//connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DSRtoGraphViewer::addEdgeSLOT);
 	//connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &DSRtoGraphViewer::delEdgeSLOT);
 	//connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &DSRtoGraphViewer::delNodeSLOT);
@@ -39,14 +39,15 @@ DSRtoGraphViewer::DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QGraphic
 
 void DSRtoGraphViewer::createGraph()
 {
+	qDebug() << __FUNCTION__ << "Reading graph in Graph Viewer";
     try
     {
         auto map = G->getCopy();
 		for(const auto &[k, node] : map)
-		       addOrAssignNodeSLOT(k,  node.type());
+		       add_or_assign_node_SLOT(k,  node.type());
 		for(auto node : map) // Aworset
            	for(const auto &[k, edges] : node.second.fano())
-			   addEdgeSLOT(edges.from(), edges.to(), edges.type());
+			   add_or_assign_edge_SLOT(edges.from(), edges.to(), edges.type());
     }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
 }
@@ -54,7 +55,7 @@ void DSRtoGraphViewer::createGraph()
 //////////////////////////////////////////////////////////////////////////////////////
 ///// SLOTS
 //////////////////////////////////////////////////////////////////////////////////////
-void DSRtoGraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
+void DSRtoGraphViewer::add_or_assign_node_SLOT(int id, const std::string &type)
 {	
 	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
@@ -144,7 +145,7 @@ void DSRtoGraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
     }
 }
 
-void DSRtoGraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
+void DSRtoGraphViewer::add_or_assign_edge_SLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
 	try 
     {
@@ -185,7 +186,7 @@ void DSRtoGraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std
 		std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<<" "<<e.what()<< std::endl;}
 }
 
-void DSRtoGraphViewer::delEdgeSLOT(const std::int32_t from, const std::int32_t to, const std::string &edge_tag)
+void DSRtoGraphViewer::del_edge_SLOT(const std::int32_t from, const std::int32_t to, const std::string &edge_tag)
 {
     std::cout<<__FUNCTION__<<":"<<__LINE__<< std::endl;
 	try {
@@ -198,7 +199,7 @@ void DSRtoGraphViewer::delEdgeSLOT(const std::int32_t from, const std::int32_t t
 
 }
 
-void DSRtoGraphViewer::delNodeSLOT(int id)
+void DSRtoGraphViewer::del_node_SLOT(int id)
 {
     std::cout<<__FUNCTION__<<":"<<__LINE__<< std::endl;
     try {
@@ -230,11 +231,6 @@ void DSRtoGraphViewer::delNodeSLOT(int id)
 //////////////////////////////////////////////////////////////////////////////////////
 ///// EVENTS
 //////////////////////////////////////////////////////////////////////////////////////
-
-void DSRtoGraphViewer::resizeEvent(QResizeEvent *e)
-{
-    //qDebug() << "hola";
-}
 
 void DSRtoGraphViewer::wheelEvent(QWheelEvent* event)
 {

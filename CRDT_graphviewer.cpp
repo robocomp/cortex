@@ -35,10 +35,10 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	setupUi(this);
  	QRect availableGeometry(QApplication::desktop()->availableGeometry());
  	this->move((availableGeometry.width() - width()) / 2, (availableGeometry.height() - height()) / 2);
-	auto ind_1 = splitter_1->indexOf(splitter_1);
-	auto ind_2 = splitter_2->indexOf(tabWidget);
-	splitter_1->setStretchFactor(ind_1,1);	
-	splitter_2->setStretchFactor(ind_2,9);
+	//auto ind_1 = splitter_1->indexOf(splitter_1);
+	auto ind = splitter->indexOf(tabWidget);
+	//splitter_1->setStretchFactor(ind_1,1);	
+	splitter->setStretchFactor(ind,9);
 	
 	// QSettings settings("RoboComp", "DSR");
     // settings.beginGroup("MainWindow");
@@ -52,7 +52,9 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	tabWidget->setCurrentIndex(0);
 
 	dsr_to_graph_viewer = std::make_unique<DSR::DSRtoGraphViewer>(G, graphicsView);
-	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
+	dsr_to_tree_viewer = std::make_unique<DSR::DSRtoTreeViewer>(G, treeWidget);
+	
+	//dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
 	//dsr_to_graphicscene_viewer = std::make_unique<DSR::DSRtoGraphicsceneViewer>(G, 1, 1, tab_3);
 	   
 }

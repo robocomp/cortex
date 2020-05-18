@@ -29,6 +29,8 @@
 #include "../../../graph-related-classes/dsr_to_osg_viewer.h"
 #include "../../../graph-related-classes/dsr_to_graphicscene_viewer.h"
 #include "../../../graph-related-classes/dsr_to_graph_viewer.h"
+#include "../../../graph-related-classes/dsr_to_tree_viewer.h"
+
 
 namespace DSR
 {
@@ -69,6 +71,7 @@ namespace DSR
 			std::unique_ptr<DSR::DSRtoOSGViewer> dsr_to_osg_viewer;
 			std::unique_ptr<DSR::DSRtoGraphicsceneViewer> dsr_to_graphicscene_viewer;
 			std::unique_ptr<DSR::DSRtoGraphViewer> dsr_to_graph_viewer;
+			std::unique_ptr<DSR::DSRtoTreeViewer> dsr_to_tree_viewer;
 
 		public slots:
 			void saveGraphSLOT();		

@@ -80,22 +80,20 @@ namespace DSR
             osg::ref_ptr<osg::Group> root;
 
             //Hashes
-            osg::Group* parent;
-            using OsgTypes = std::variant<osg::Geode*, osg::Group*>;
-            std::map<std::int32_t, osg::MatrixTransform*> osgTransformMap;
-            std::map<std::int32_t, OsgTypes> osgObjectsMap;
+            //using OsgTypes = std::variant<osg::, osg::MatrixTransform*>;
+            std::map<std::int32_t, osg::Group*> osg_map;
             
             //std::map<std::string, IMVMesh> meshMap;
             osg::Vec3 QVecToOSGVec(const QVec &vec) const ;
             osg::Matrix QMatToOSGMat4(const RTMat &nodeB);
             osg::Vec4 htmlStringToOsgVec4(const std::string &color);
-            void createGraph();
+            osg::ref_ptr<osg::Group> createGraph();
             void setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const;
             osgGA::TrackballManipulator* manipulator;
 
             void add_or_assign_box(Node &node);
             void add_or_assign_mesh(Node &node);
-            void add_or_assign_transform(Node &node);
+            void add_or_assign_transform(const Node &node, const Node &parent);
 
             void traverse_RT_tree(const Node& node);
     };

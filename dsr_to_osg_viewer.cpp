@@ -16,7 +16,7 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
 {
     G = G_;
     this->resize(parent->width(), parent->height());
-    root = new osg::Group();
+    
     osg::Camera* camera = new osg::Camera;
     camera->setViewport( 0, 0, this->width(), this->height() );
     camera->setClearColor( osg::Vec4( 0.9f, 0.9f, 1.f, 1.f ) );
@@ -57,9 +57,11 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
 	//root->addChild(lightSource.get() );
 
     //add_cylinder(root);
-	_mViewer->setSceneData( root.get());
+	//_mViewer->setSceneData( root.get());
+
+	root = createGraph();
+    _mViewer->setSceneData( root.get());
 	
-    createGraph();
     //connect(&timer, &QTimer::timeout, this, &DSRtoOSGViewer::updateX);
     //timer.start(100);
     
@@ -92,14 +94,15 @@ void DSRtoOSGViewer::traverse_RT_tree(const Node& node)
 	}
 }
 
-void DSRtoOSGViewer::createGraph()
+osg::ref_ptr<osg::Group> DSRtoOSGViewer::createGraph()
 {
-    qDebug() << __FUNCTION__ << "Reading graph in OSG viewer";
+    qDebug() << __FUNCTION__ << "Reading graph in OSG Viewer";
     try
-    {   std::optional<Node> root = G->get_node_root().value();  //HAS TO BE TRANSFORM
-        add_or_assign_transform(root.value());
-       
-        traverse_RT_tree(root.value());
+    {   std::optional<Node> g_root = G->get_node_root().value();  //HAS TO BE TRANSFORM
+        root = new osg::Group();
+
+        traverse_RT_tree(g_root.value());
+        return root;
 
         //auto map = G->getCopy();
 		//for(const auto &[k, node] : map)
@@ -154,18 +157,18 @@ void DSRtoOSGViewer::add_or_assign_node_slot(const std::int32_t id, const std::s
      qDebug() << __FILE__ << __FUNCTION__ ;
      
      auto node = G->get_node(id);
-     std::cout << node.value().name() << " " << node.value().id() << std::endl;
-     auto tipoIM = G->get_attrib_by_name<std::string>(node.value(), "imType");
-     std::cout << tipoIM.value() << std::endl;
-     if(node.has_value() and tipoIM.has_value())
+     
+     if(node.has_value())
      {
-        if( tipoIM.value() == "plane")
-         add_or_assign_box(node.value());
-        if( tipoIM.value() == "mesh")
-         add_or_assign_mesh(node.value());
-        if( tipoIM.value() == "transform")
-         add_or_assign_transform(node.value());
-     }
+        auto type = node.value().type();
+        std::cout << node.value().name() << " " << node.value().id() << " " << node.value().type() << std::endl;
+        if( type == "plane")
+        add_or_assign_box(node.value());
+        if( type == "mesh")
+        add_or_assign_mesh(node.value());
+        if( type == "transform")
+        add_or_assign_transform(node.value(), node.value());
+    }
 }
 void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type)
 {
@@ -174,27 +177,21 @@ void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std:
 
 ////////////////////////////////////////////////////////////////
 
-void DSRtoOSGViewer::add_or_assign_transform(Node &node)
+void DSRtoOSGViewer::add_or_assign_transform(const Node &node, const Node& parent)
 {
-    qDebug() << __FUNCTION__ ;
-    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
-    if(parent.has_value()) 
-        std::cout << "parent: " << parent.value() << std::endl;
-    else
-        return;
-
+   
     osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform; 
     osg::Matrix *mat = new osg::Matrix;		
     mat->makeIdentity();    
-    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value()) 
-    {  
-        if( auto res = osgObjectsMap.find( parent_node.value().id()); res != osgObjectsMap.end())   
-            std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(transform);
-        else if(parent.value() == 0)
-            root->addChild(transform);
-        else
-            return;  /// MSG
-    }
+    // if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value()) 
+    // {  
+    //     if( auto res = osg_map.find( parent_node.value().id()); res != osg_map.end())   
+    //         std::get<osg::*>(osg_map.at(parent_node.value().id()))->addChild(transform);
+    //     else if(parent.value() == 0)
+    //         root->addChild(transform);
+    //     else
+    //         return;  /// MSG
+    // }
 }
 
 void DSRtoOSGViewer::add_or_assign_box(Node &node)
@@ -326,43 +323,36 @@ void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
     if(scaley.has_value()) std::cout << scaley.value() << std::endl;
     auto scalez = G->get_attrib_by_name<std::int32_t>(node, "scalez");
     if(scalez.has_value()) std::cout << scalez.value() << std::endl;
-    auto rx = G->get_attrib_by_name<std::int32_t>(node, "rx");
-    if(rx.has_value()) std::cout << rx.value() << std::endl;
-    auto ry = G->get_attrib_by_name<std::int32_t>(node, "ry");
-    if(ry.has_value()) std::cout << ry.value() << std::endl;
-    auto rz = G->get_attrib_by_name<std::int32_t>(node, "rz");
-    if(rz.has_value()) std::cout << rz.value() << std::endl;
-    auto tx = G->get_attrib_by_name<std::int32_t>(node, "tx");
-    if(tx.has_value()) std::cout << tx.value() << std::endl;
-    auto ty = G->get_attrib_by_name<std::int32_t>(node, "ty");
-    if(ty.has_value()) std::cout << ty.value() << std::endl;
-    auto tz = G->get_attrib_by_name<std::int32_t>(node, "tz");
-    if(tz.has_value()) std::cout << tz.value() << std::endl;
+    
 
     osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
     // //if (parent) parent->addChild(mt);
-    RTMat rtmat = RTMat();
-    rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
-    rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
-    mt->setMatrix(QMatToOSGMat4(rtmat));
-    osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
-    smt->setMatrix(osg::Matrix::scale(scalex.value_or(1)/100,scaley.value_or(1)/100,scalez.value_or(1)/100));
-    mt->addChild(smt);
+    // RTMat rtmat = RTMat();
+    // rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
+    // rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
+    // mt->setMatrix(QMatToOSGMat4(rtmat));
+    // osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
+    // smt->setMatrix(osg::Matrix::scale(scalex.value_or(1)/100,scaley.value_or(1)/100,scalez.value_or(1)/100));
+    // mt->addChild(smt);
     // meshHash[mesh->id].osgmeshPaths = mt;
     osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(filename.value());
     if (!osgMesh)
-        throw  "Could not find nesh file " + filename.value();
+        throw  std::runtime_error("Could not find nesh file " + filename.value());
     osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
     polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
     osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
     osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
-    smt->addChild(osgMesh);
-    osgObjectsMap.insert_or_assign(node.id(), smt);
-    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
-        std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(smt);
-    else 
-        root->addChild(smt);
-
+    //osg_map.insert_or_assign(node.id(), osgMesh);
+    //  if (auto parent_node = G->get_node(parent.value()); parent_node.has_value() and parent_node.value().type() == "transform") 
+    // {  
+    //     if( auto res = osg_map.find( parent_node.value().id()); res != osg_map.end())   
+    //         std::get<osg::Group*>(osg_map.at(parent_node.value().id()))->addChild(osgMesh);
+    //     else if(parent.value() == 0)
+    //         root->addChild(osgMesh);
+    //     else
+    //         return;  /// MSG
+    // }
+    
     // //meshHash[mesh->id].osgmeshes = osgMesh;
     // // //meshHash[mesh->id].meshMts= mt;
     // // //osgmeshmodes[mesh->id] = polygonMode;

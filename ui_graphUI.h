@@ -18,7 +18,8 @@
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QTabWidget>
-#include <QtWidgets/QTableWidget>
+#include <QtWidgets/QTreeWidget>
+#include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -26,11 +27,9 @@ QT_BEGIN_NAMESPACE
 class Ui_graphDlg
 {
 public:
-    QHBoxLayout *horizontalLayout_3;
-    QSplitter *splitter_2;
-    QSplitter *splitter_1;
-    QTableWidget *tableWidgetNodes;
-    QTableWidget *tableWidgetEdges;
+    QVBoxLayout *verticalLayout;
+    QSplitter *splitter;
+    QTreeWidget *treeWidget;
     QTabWidget *tabWidget;
     QWidget *tab_1;
     QHBoxLayout *horizontalLayout;
@@ -44,30 +43,24 @@ public:
     {
         if (graphDlg->objectName().isEmpty())
             graphDlg->setObjectName(QStringLiteral("graphDlg"));
-        graphDlg->resize(1028, 735);
-        horizontalLayout_3 = new QHBoxLayout(graphDlg);
-        horizontalLayout_3->setObjectName(QStringLiteral("horizontalLayout_3"));
-        splitter_2 = new QSplitter(graphDlg);
-        splitter_2->setObjectName(QStringLiteral("splitter_2"));
-        splitter_2->setOrientation(Qt::Horizontal);
-        splitter_1 = new QSplitter(splitter_2);
-        splitter_1->setObjectName(QStringLiteral("splitter_1"));
-        splitter_1->setOrientation(Qt::Vertical);
-        tableWidgetNodes = new QTableWidget(splitter_1);
-        tableWidgetNodes->setObjectName(QStringLiteral("tableWidgetNodes"));
+        graphDlg->resize(1055, 712);
+        verticalLayout = new QVBoxLayout(graphDlg);
+        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
+        splitter = new QSplitter(graphDlg);
+        splitter->setObjectName(QStringLiteral("splitter"));
+        splitter->setOrientation(Qt::Horizontal);
+        treeWidget = new QTreeWidget(splitter);
+        QTreeWidgetItem *__qtreewidgetitem = new QTreeWidgetItem();
+        __qtreewidgetitem->setText(0, QStringLiteral("1"));
+        treeWidget->setHeaderItem(__qtreewidgetitem);
+        treeWidget->setObjectName(QStringLiteral("treeWidget"));
         QSizePolicy sizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
-        sizePolicy.setHeightForWidth(tableWidgetNodes->sizePolicy().hasHeightForWidth());
-        tableWidgetNodes->setSizePolicy(sizePolicy);
-        splitter_1->addWidget(tableWidgetNodes);
-        tableWidgetEdges = new QTableWidget(splitter_1);
-        tableWidgetEdges->setObjectName(QStringLiteral("tableWidgetEdges"));
-        sizePolicy.setHeightForWidth(tableWidgetEdges->sizePolicy().hasHeightForWidth());
-        tableWidgetEdges->setSizePolicy(sizePolicy);
-        splitter_1->addWidget(tableWidgetEdges);
-        splitter_2->addWidget(splitter_1);
-        tabWidget = new QTabWidget(splitter_2);
+        sizePolicy.setHeightForWidth(treeWidget->sizePolicy().hasHeightForWidth());
+        treeWidget->setSizePolicy(sizePolicy);
+        splitter->addWidget(treeWidget);
+        tabWidget = new QTabWidget(splitter);
         tabWidget->setObjectName(QStringLiteral("tabWidget"));
         tab_1 = new QWidget();
         tab_1->setObjectName(QStringLiteral("tab_1"));
@@ -89,14 +82,14 @@ public:
         horizontalLayout_4 = new QHBoxLayout(tab_3);
         horizontalLayout_4->setObjectName(QStringLiteral("horizontalLayout_4"));
         tabWidget->addTab(tab_3, QString());
-        splitter_2->addWidget(tabWidget);
+        splitter->addWidget(tabWidget);
 
-        horizontalLayout_3->addWidget(splitter_2);
+        verticalLayout->addWidget(splitter);
 
 
         retranslateUi(graphDlg);
 
-        tabWidget->setCurrentIndex(2);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(graphDlg);
