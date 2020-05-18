@@ -238,7 +238,6 @@ void DSRtoGraphViewer::resizeEvent(QResizeEvent *e)
 
 void DSRtoGraphViewer::wheelEvent(QWheelEvent* event)
 {
-    qDebug()<<"wheel";
     const QGraphicsView::ViewportAnchor anchor = transformationAnchor();
 	setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	int angle = event->angleDelta().y();

@@ -181,8 +181,7 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    qDebug() << "gola";
-    if (tag->text() != "") return; // Explota sin esto
+    //if (tag->text() != "") return; // Explota sin esto
     std::cout << __FILE__ <<":"<<__FUNCTION__<< "-> node: " << tag->text().toStdString() << std::endl;
     const auto graph = dsr_to_graph_viewer->getGraph();
     if( event->button()== Qt::RightButton)
@@ -195,6 +194,7 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
         else
             do_stuff = std::make_unique<DoTableStuff>(graph, id_in_graph);
     }
+    
     update();
     QGraphicsItem::mousePressEvent(event);
 }

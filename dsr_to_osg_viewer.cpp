@@ -94,6 +94,7 @@ void DSRtoOSGViewer::traverse_RT_tree(const Node& node)
 
 void DSRtoOSGViewer::createGraph()
 {
+    qDebug() << __FUNCTION__ << "Reading graph in OSG viewer";
     try
     {   std::optional<Node> root = G->get_node_root().value();  //HAS TO BE TRANSFORM
         add_or_assign_transform(root.value());
