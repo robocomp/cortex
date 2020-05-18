@@ -168,11 +168,8 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 	{
         case ItemPositionChange:
         {
-            QPointF newPos = value.toPointF();
-            //qDebug() << newPos << pos() ; 
             foreach (GraphEdge *edge, edgeList)
                  edge->adjust();
-            // graph_viewer->itemMoved();
             break;
         }
 
@@ -184,7 +181,7 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
 void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    qDebug() << "MOUSE PRESS" << mapToScene(event->pos());
+    qDebug() << "gola";
     if (tag->text() != "") return; // Explota sin esto
     std::cout << __FILE__ <<":"<<__FUNCTION__<< "-> node: " << tag->text().toStdString() << std::endl;
     const auto graph = dsr_to_graph_viewer->getGraph();
@@ -204,18 +201,18 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    // if( event->button()== Qt::LeftButton)
-    // {
-    //     auto g = graph_viewer->getGraph();
-    //     std::cout << __FILE__ <<" : "<<__FUNCTION__<< ". Node being moved: " << id_in_graph << std::endl;
-    //     std::optional<Node> n = g->get_node(id_in_graph);
-    //     if (n.has_value()) 
-    //     {
-    //         g->insert_or_assign_attrib_by_name(n.value(), "pos_x", (float) event->scenePos().x());
-    //         g->insert_or_assign_attrib_by_name(n.value(), "pos_y", (float) event->scenePos().y());
-    //         qDebug() << __FUNCTION__ << "record " << (float) event->scenePos().x() << (float) event->scenePos().y();
-    //     }
-    // }
+     if( event->button()== Qt::LeftButton)
+    {
+        auto g = dsr_to_graph_viewer->getGraph();
+        std::cout << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
+        std::optional<Node> n = g->get_node(id_in_graph);
+        if (n.has_value()) {
+            g->add_attrib(n.value().attrs(), "pos_x", (float) event->scenePos().x());
+            g->add_attrib(n.value().attrs(), "pos_y", (float) event->scenePos().y());
+            g->insert_or_assign_node(n.value());
+        }
+    }
+
     QGraphicsItem::mouseReleaseEvent(event);
 }
 
@@ -230,7 +227,7 @@ void GraphNode::keyPressEvent(QKeyEvent *event)
     //         label = nullptr;
     //     }
     // }
-    QGraphicsItem::keyPressEvent(event)
+    QGraphicsItem::keyPressEvent(event);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////7
