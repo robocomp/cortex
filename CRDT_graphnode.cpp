@@ -216,6 +216,7 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     //         qDebug() << __FUNCTION__ << "record " << (float) event->scenePos().x() << (float) event->scenePos().y();
     //     }
     // }
+    QGraphicsItem::mouseReleaseEvent(event);
 }
 
 void GraphNode::keyPressEvent(QKeyEvent *event) 
@@ -229,6 +230,7 @@ void GraphNode::keyPressEvent(QKeyEvent *event)
     //         label = nullptr;
     //     }
     // }
+    QGraphicsItem::keyPressEvent(event)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////7
