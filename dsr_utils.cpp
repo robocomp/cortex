@@ -278,14 +278,12 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
 
     QJsonObject jsonObject;
     jsonObject["DSRModel"] = dsrObject;
-    //writable data
-    QJsonDocument jsonDoc(jsonObject);
-    QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
     //write to file
-    std::ofstream outfile;
-    outfile.open(json_file_path, std::ios_base::out | std::ios_base::trunc);
-    outfile << strJson.toStdString();
-    outfile.close();
+    QJsonDocument jsonDoc(jsonObject);
+    QFile jsonFile(QString::fromStdString(json_file_path));
+    jsonFile.open(QFile::WriteOnly);
+    jsonFile.write(jsonDoc.toJson());
+    jsonFile.close();
     auto now_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::cout << __FILE__ << " " << __FUNCTION__ << "File: " << json_file_path << " written to disk at " << now_c
               << std::endl;
