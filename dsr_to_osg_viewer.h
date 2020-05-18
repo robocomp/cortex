@@ -49,14 +49,14 @@ namespace DSR
     {
         public:
             DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
-            void add_plane();
-            void add_mesh();
-            void add_person();
+            // void add_plane();
+            // void add_mesh();
+            // void add_person();
+            
     
         public slots:   // From G
             void add_or_assign_node_slot(const std::int32_t id, const std::string &type);
             void add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type);
-            void updateX();
             
         protected:  
             //void resizeEvent(QResizeEvent *e) {  qDebug() << "SCAKE" << x() << y(); }; 
@@ -95,6 +95,9 @@ namespace DSR
 
             void add_or_assign_box(Node &node);
             void add_or_assign_mesh(Node &node);
+            void add_or_assign_transform(Node &node);
+
+            void traverse_RT_tree(const Node& node);
     };
 };
 #endif

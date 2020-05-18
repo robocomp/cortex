@@ -478,6 +478,15 @@ bool CRDTGraph::delete_edge_(int from, int to, const std::string& key)
     return false;
 }
 
+std::vector<Edge> CRDTGraph::get_edges_by_type(const Node& node, const std::string& type)
+{
+    std::vector<Edge> edges_;
+    for (auto &[key, edge] : node.fano()) 
+        if( key.type() == type )
+            edges_.emplace_back(edge);
+    return edges_;
+}
+
 std::vector<Edge> CRDTGraph::get_edges_by_type(const std::string& type)
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);

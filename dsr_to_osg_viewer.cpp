@@ -75,16 +75,37 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
    
 }
 
+// We need to go down the tree breadth first
+void DSRtoOSGViewer::traverse_RT_tree(const Node& node)
+{
+    for(auto &edge: G->get_edges_by_type(node, "RT"))
+	{
+        std::cout << "edges " << edge.to() << " " << edge.from() << " " << edge.type() << std::endl;
+        auto child = G->get_node(edge.to());
+        if(child.has_value())
+        {
+            add_or_assign_node_slot(child.value().id(),  child.value().type());
+            traverse_RT_tree(child.value());
+        }
+        else
+            throw std::runtime_error("Unable to traverse the tree at node: " + std::to_string(edge.to()));
+	}
+}
+
 void DSRtoOSGViewer::createGraph()
 {
     try
-    {
-        auto map = G->getCopy();
-		for(const auto &[k, node] : map)
-		    add_or_assign_node_slot(k,  node.type());
-        for(const auto &[k, node] : map)
-            for(const auto &[ek, edge]: node.fano())
-		            add_or_assign_edge_slot(edge.from(), edge.to(), edge.type());
+    {   std::optional<Node> root = G->get_node_root().value();  //HAS TO BE TRANSFORM
+        add_or_assign_transform(root.value());
+       
+        traverse_RT_tree(root.value());
+
+        //auto map = G->getCopy();
+		//for(const auto &[k, node] : map)
+		//    add_or_assign_node_slot(k,  node.type());
+        // for(const auto &[k, node] : map)
+        //     for(const auto &[ek, edge]: node.fano())
+		//             add_or_assign_edge_slot(edge.from(), edge.to(), edge.type());
 		//for(auto node : map) // Aworset
         //   	for(const auto &[k, edges] : node.second.fano())
 		//	    add_or_assign_edge_slot(edges.from(), edges.to(), edges.type());
@@ -93,10 +114,7 @@ void DSRtoOSGViewer::createGraph()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-void DSRtoOSGViewer::updateX()
-{
-    //viewer->frame();
-}
+
 
 void  DSRtoOSGViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const
 {
@@ -144,11 +162,38 @@ void DSRtoOSGViewer::add_or_assign_node_slot(const std::int32_t id, const std::s
          add_or_assign_box(node.value());
         if( tipoIM.value() == "mesh")
          add_or_assign_mesh(node.value());
+        if( tipoIM.value() == "transform")
+         add_or_assign_transform(node.value());
      }
 }
 void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type)
 {
      qDebug() << __FILE__ << __FUNCTION__ ;
+}
+
+////////////////////////////////////////////////////////////////
+
+void DSRtoOSGViewer::add_or_assign_transform(Node &node)
+{
+    qDebug() << __FUNCTION__ ;
+    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
+    if(parent.has_value()) 
+        std::cout << "parent: " << parent.value() << std::endl;
+    else
+        return;
+
+    osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform; 
+    osg::Matrix *mat = new osg::Matrix;		
+    mat->makeIdentity();    
+    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value()) 
+    {  
+        if( auto res = osgObjectsMap.find( parent_node.value().id()); res != osgObjectsMap.end())   
+            std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(transform);
+        else if(parent.value() == 0)
+            root->addChild(transform);
+        else
+            return;  /// MSG
+    }
 }
 
 void DSRtoOSGViewer::add_or_assign_box(Node &node)
@@ -177,19 +222,18 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
     if(py.has_value()) std::cout << py.value() << std::endl;
     auto pz = G->get_attrib_by_name<std::int32_t>(node, "pz");
     if(pz.has_value()) std::cout << pz.value() << std::endl;
-    auto transparency = G->get_attrib_by_name<std::float_t>(node, "transparency");     
-    if(transparency.has_value()) std::cout << transparency.value() << std::endl;
     
     //we are in bussines
+    auto textu = texture.value_or("#000000");
     bool constantColor = false;
-    if (texture.value().size() == 7 and texture.value()[0] == '#')
+    if (textu.size() == 7 and textu[0] == '#')
             constantColor = true;
     // Open image
     osg::ref_ptr<osg::TessellationHints> hints;
     osg::Image *image;
-    if (texture.value().size()>0 and not constantColor)
+    if (textu.size()>0 and not constantColor)
     {
-        if( image = osgDB::readImageFile(texture.value()), image == nullptr)
+        if( image = osgDB::readImageFile(textu), image == nullptr)
             throw std::runtime_error("Couldn't load texture from file: " + texture.value());
     }   
 
@@ -227,7 +271,7 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
 
         // Material
         osg::ref_ptr<osg::Material> material = new osg::Material();
-        material->setTransparency( osg::Material::FRONT_AND_BACK, transparency.value_or(0));
+        //material->setTransparency( osg::Material::FRONT_AND_BACK, 0);
         material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
         // Assign the material and texture to the plane
         osg::StateSet *sphereStateSet = geode->getOrCreateStateSet();
@@ -236,12 +280,20 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
         sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
         sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
     }
-    osgObjectsMap.insert_or_assign(node.id(), geode);
-    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
-        std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(geode);
-    else 
-        root->addChild(geode);
 
+    // osgObjectsMap.insert_or_assign(node.id(), geode);
+    // if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value()) 
+    // {  
+    //     if( auto res = osgObjectsMap.find( parent_node.value().id()); res != osgObjectsMap.end())   
+    //         *res.second->addChild(geode);
+    //     else if(parent.value() == 0)
+    //         root->addChild(geode);
+    //     else
+    //         return;  /// MSG
+    // }
+  
+
+qDebug() << "gdadf";
      //if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
         //    std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(geode);
         
@@ -417,7 +469,6 @@ void DSRtoOSGViewer::mouseReleaseEvent(QMouseEvent* event)
 
 void DSRtoOSGViewer::wheelEvent(QWheelEvent* event)
 {
-    qDebug() << "SHIT";
     int delta = event->delta();
     osgGA::GUIEventAdapter::ScrollingMotion motion = delta > 0 ?
                 osgGA::GUIEventAdapter::SCROLL_UP : osgGA::GUIEventAdapter::SCROLL_DOWN;

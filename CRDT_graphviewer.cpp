@@ -49,12 +49,12 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	// 	graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
 	// settings.endGroup();
 	
-	//this->createGraph();
 	tabWidget->setCurrentIndex(0);
 
 	dsr_to_graph_viewer = std::make_unique<DSR::DSRtoGraphViewer>(G, graphicsView);
-	//dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
+	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
 	//dsr_to_graphicscene_viewer = std::make_unique<DSR::DSRtoGraphicsceneViewer>(G, 1, 1, tab_3);
+
 	   
 }
 

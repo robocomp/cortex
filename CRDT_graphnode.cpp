@@ -33,7 +33,6 @@ void GraphNode::setTag(const std::string &tag_)
 	tag = new QGraphicsSimpleTextItem(c, this);
 	tag->setX(20);	
 	tag->setY(-10);
-    std::cout << " Name" << tag_ << std::endl;
 }
 
 void GraphNode::setType(const std::string &type_)
@@ -170,9 +169,9 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
         case ItemPositionChange:
         {
             QPointF newPos = value.toPointF();
-            qDebug() << newPos << pos();; 
-            // foreach (GraphEdge *edge, edgeList)
-            //     edge->adjust();
+            //qDebug() << newPos << pos() ; 
+            foreach (GraphEdge *edge, edgeList)
+                 edge->adjust();
             // graph_viewer->itemMoved();
             break;
         }

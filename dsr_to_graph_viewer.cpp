@@ -56,7 +56,7 @@ void DSRtoGraphViewer::createGraph()
 //////////////////////////////////////////////////////////////////////////////////////
 void DSRtoGraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 {	
-	qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
+	//qDebug() << __FUNCTION__ << "node id " << id<<", type "<<QString::fromUtf8(type.c_str());
 	GraphNode *gnode;														// CAMBIAR a sharer_ptr
 
     auto name_op = G->get_name_from_id(id);
@@ -146,8 +146,9 @@ void DSRtoGraphViewer::addOrAssignNodeSLOT(int id, const std::string &type)
 
 void DSRtoGraphViewer::addEdgeSLOT(std::int32_t from, std::int32_t to, const std::string &edge_tag)
 {
-	try {
- 		qDebug() << __FUNCTION__ << "edge id " << QString::fromStdString(edge_tag) << from << to;
+	try 
+    {
+ 		//qDebug() << __FUNCTION__ << "edge id " << QString::fromStdString(edge_tag) << from << to;
 		std::tuple<std::int32_t, std::int32_t, std::string> key = std::make_tuple(from, to, edge_tag);
 
 		if(gmap_edges.count(key) == 0) 

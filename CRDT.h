@@ -119,6 +119,7 @@ namespace CRDT
         std::unique_ptr<InnerAPI> get_inner_api() { return std::make_unique<InnerAPI>(this); };
 
         // Nodes
+        std::optional<Node> get_node_root()  { return get_node(100); };  //CHANGE THIS
         std::optional<Node> get_node(const std::string& name);
         std::optional<Node> get_node(int id);
         std::optional<VertexPtr> get_vertex(const std::string& name);
@@ -149,6 +150,7 @@ namespace CRDT
         bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
         bool delete_edge(int from, int t, const std::string& key);
         std::vector<Edge> get_edges_by_type(const std::string& type);
+        std::vector<Edge> get_edges_by_type(const Node& node, const std::string& type);
         std::vector<Edge> get_edges_to_id(int id);
         std::optional<std::map<EdgeKey, Edge>> get_edges(int id);
         Edge get_edge_RT(const Node &n, int to);
