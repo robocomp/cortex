@@ -32,7 +32,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
     QJsonObject jObject = doc.object();
 
     QJsonObject dsrobject = jObject.value("DSRModel").toObject();
-	QJsonObject symbolMap = dsrobject.value("symbol").toObject();
+	QJsonObject symbolMap = dsrobject.value("symbols").toObject();
     QJsonArray linksArray;
     // Read symbols (just symbols, then links in other loop)
     foreach (const QString &key, symbolMap.keys())
@@ -274,7 +274,7 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
         symbol["links"] = nodeLinksArray;
         symbolsMap[QString::number(node.id())] = symbol;
     }
-    dsrObject["symbol"] = symbolsMap;
+    dsrObject["symbols"] = symbolsMap;
 
     QJsonObject jsonObject;
     jsonObject["DSRModel"] = dsrObject;
