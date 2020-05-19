@@ -32,11 +32,11 @@
 namespace DSR
 {
 
-    class DSRtoGraphicsceneViewer : public QWidget
+    class DSRtoGraphicsceneViewer : public QGraphicsView
     {
         Q_OBJECT
         public:
-            DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
+            DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QGraphicsView *parent=0);
 //            void add_plane();
 //            void add_mesh();
 //            void add_person();
@@ -63,7 +63,7 @@ namespace DSR
             
             qreal m_scaleX, m_scaleY;
             QGraphicsScene scene;
-            QGraphicsView *view;
+//            QGraphicsView *view;
             //Hashes
 
             void createGraph();

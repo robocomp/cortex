@@ -2,36 +2,35 @@
 
 using namespace DSR ;
 
-DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent) : 
-                        QWidget(parent)
+DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QGraphicsView *parent) : QGraphicsView(parent)
 {
     G = G_;
     m_scaleX = scaleX;
     m_scaleY = scaleY;
 
     this->resize(parent->width(), parent->height());
-	scene.setItemIndexMethod(QGraphicsScene::NoIndex);
-	scene.setSceneRect(-2500, -2500, 5000, 5000);
-    view = new QGraphicsView(this);
-    view->setScene(&scene);
-	view->setCacheMode(QGraphicsView::CacheBackground);
-	view->setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
-	view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	view->setRenderHint(QPainter::Antialiasing);
-	view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-	view->scale(scaleX, scaleY);
-	view->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
-	view->resize(this->width(), this->height());
-	setMouseTracking(true);
-    view->viewport()->setMouseTracking(true);
-
+    //this->setFrameShape(NoFrame);
+    scene.setItemIndexMethod(QGraphicsScene::NoIndex);
+    scene.setSceneRect(-2500, -2500, 5000, 5000);
+	this->setScene(&scene);
+    this->setCacheMode(QGraphicsView::CacheBackground);
+	this->setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
+	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	this->setRenderHint(QPainter::Antialiasing);
+	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+	//this->setMinimumSize(200, 200);
+	this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
+	
+ 	setMouseTracking(true);
+    this->viewport()->setMouseTracking(true);
     scene.addRect(0,0,500,500, QPen(QColor("red")),QBrush(QColor("red")));
 
-    createGraph();
+//    createGraph();
 }
 
 void DSRtoGraphicsceneViewer::createGraph()
 {
+    innermodel = G->get_inner_api();
     try
     {
         auto map = G->getCopy();
@@ -42,7 +41,7 @@ void DSRtoGraphicsceneViewer::createGraph()
 			    add_or_assign_edge_slot(edges.from(), edges.to(), edges.type());
 */    }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
-    innermodel = G->get_inner_api();
+    
 }
 /*
 ///////////////////////////////////////////////////////////////////////////////////
@@ -118,15 +117,12 @@ void DSRtoGraphicsceneViewer::add_or_assign_box(Node &node)
     if(width.has_value()) std::cout << "width:" << width.value() << std::endl;
     auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
     if(height.has_value()) std::cout << "height: " << height.value() << std::endl;
-    auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
-    if(depth.has_value()) std::cout <<"depth: " << depth.value() << std::endl;
-    auto nx = G->get_attrib_by_name<std::int32_t>(node, "nx");
-    if(nx.has_value()) std::cout <<"nx: "<< nx.value() << std::endl;
-    auto ny = G->get_attrib_by_name<std::int32_t>(node, "ny");
-    if(ny.has_value()) std::cout <<"ny:" << ny.value() << std::endl;
-    auto nz = G->get_attrib_by_name<std::int32_t>(node, "nz");
-    if(nz.has_value()) std::cout <<"nz:" << nz.value() << std::endl;
-    
+
+
+    float nx = G->get_attrib_by_name<std::int32_t>(node, "nx").value_or(0) * M_PI;
+    float ny = G->get_attrib_by_name<std::int32_t>(node, "ny").value_or(0) * M_PI;
+    float nz = G->get_attrib_by_name<std::int32_t>(node, "nz").value_or(0) * M_PI;
+   
     int px = G->get_attrib_by_name<std::int32_t>(node, "px").value_or(0);
     int py = G->get_attrib_by_name<std::int32_t>(node, "py").value_or(0);
     int pz = G->get_attrib_by_name<std::int32_t>(node, "pz").value_or(0);
@@ -135,25 +131,19 @@ void DSRtoGraphicsceneViewer::add_or_assign_box(Node &node)
     //check if has required values
     if(width.has_value() and height.has_value())
     {
-qDebug()<<__LINE__<<QString::fromStdString(node.name());
         // get transfrom to world => to get correct position
-        auto pose = innermodel->transformS("world", QVec::vec3(px, py, pz), node.name());
-qDebug()<<__LINE__;        
+        std::optional<QVec> pose = innermodel->transformS("world", QVec::vec6(px, py, pz, nx, ny, nz), node.name());
         if (pose.has_value())
-{
-    pose.value().print("pose");
-    qDebug()<<__LINE__<<"add rect"<<QString::fromStdString(node.name());        
+        {
+            pose.value().print(QString::fromStdString(node.name()));
             scene.addRect(pose.value().x(), pose.value().z(), width.value(), height.value(), QPen(QColor(color)), QBrush(QColor(color)));
-}
+        }
     }
     else
     {
         std::cout<<"Error drawing "<< node<< " some required attribs has no value"<<std::endl;
     }
     
-//    box->setPos(0);
-//	box->setRotation(0);
-//		boxes.push_back(box);
 
 }
 /*
@@ -282,8 +272,8 @@ void DSRtoGraphicsceneViewer::mouseReleaseEvent(QMouseEvent* event)
 void DSRtoGraphicsceneViewer::wheelEvent(QWheelEvent* event)
 {
 //    qDebug()<<"wheel";
-    const QGraphicsView::ViewportAnchor anchor = view->transformationAnchor();
-	view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    const QGraphicsView::ViewportAnchor anchor = this->transformationAnchor();
+	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	qreal factor;
 	if (event->angleDelta().y() > 0) 
 	{
@@ -297,14 +287,14 @@ void DSRtoGraphicsceneViewer::wheelEvent(QWheelEvent* event)
 		QRectF r = scene.sceneRect();
 		scene.setSceneRect(r);
 	}
-	view->scale(factor, factor);
-	view->setTransformationAnchor(anchor);
+	this->scale(factor, factor);
+	this->setTransformationAnchor(anchor);
 }
 
 void DSRtoGraphicsceneViewer::resizeEvent(QResizeEvent *event)
 {
     qDebug()<<"resize";
-    view->resize(event->size().width(), event->size().height());
+    //view->resize(event->size().width(), event->size().height());
 }
 
 /*

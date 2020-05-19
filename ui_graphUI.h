@@ -38,6 +38,7 @@ public:
     QHBoxLayout *horizontalLayout_2;
     QWidget *tab_3;
     QHBoxLayout *horizontalLayout_4;
+    QGraphicsView *graphicsView_2D;
 
     void setupUi(QWidget *graphDlg)
     {
@@ -81,6 +82,11 @@ public:
         tab_3->setObjectName(QStringLiteral("tab_3"));
         horizontalLayout_4 = new QHBoxLayout(tab_3);
         horizontalLayout_4->setObjectName(QStringLiteral("horizontalLayout_4"));
+        graphicsView_2D = new QGraphicsView(tab_3);
+        graphicsView_2D->setObjectName(QStringLiteral("graphicsView_2D"));
+
+        horizontalLayout_4->addWidget(graphicsView_2D);
+
         tabWidget->addTab(tab_3, QString());
         splitter->addWidget(tabWidget);
 
@@ -89,7 +95,7 @@ public:
 
         retranslateUi(graphDlg);
 
-        tabWidget->setCurrentIndex(0);
+        tabWidget->setCurrentIndex(2);
 
 
         QMetaObject::connectSlotsByName(graphDlg);
