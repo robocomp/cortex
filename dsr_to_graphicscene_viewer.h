@@ -30,6 +30,7 @@
 #include <QGraphicsRectItem>
 #include <QMouseEvent>
 #include <QResizeEvent>
+#include <QScrollBar>
 #include "CRDT.h"
 
 
@@ -52,26 +53,22 @@ namespace DSR
         public slots:   // From G
             void add_or_assign_node_slot(const std::int32_t id, const std::string &type);
             void add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type);
-//            void updateX();
             
         protected:  
-
-//            virtual void paintGL();
-//            virtual void initializeGL();
-//            virtual void mouseMoveEvent(QMouseEvent* event);        
-//            virtual void mousePressEvent(QMouseEvent* event);
-//            virtual void mouseReleaseEvent(QMouseEvent* event);
             virtual void wheelEvent(QWheelEvent* event);
-//            virtual bool event(QEvent* event);
+            virtual void mouseMoveEvent(QMouseEvent *event);
+            virtual void mousePressEvent(QMouseEvent *event);
+            virtual void mouseReleaseEvent(QMouseEvent *event);
+
 
         private:
             std::shared_ptr<CRDT::CRDTGraph> G;
             std::unique_ptr<CRDT::InnerAPI> innermodel;      
             
             qreal m_scaleX, m_scaleY;
+            bool _pan;
+            int _panStartX, _panStartY;
 
-//            QGraphicsView *view;
-            //Hashes
 
             void createGraph();
 

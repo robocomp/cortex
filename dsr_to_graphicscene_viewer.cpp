@@ -11,21 +11,26 @@ DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph
     this->resize(parent->width(), parent->height());
     //this->setFrameShape(NoFrame);
     scene.setItemIndexMethod(QGraphicsScene::NoIndex);
-    scene.setSceneRect(-2500, -2500, 5000, 5000);
+    scene.setSceneRect(-5000, -5000, 10000, 10000);
 	this->setScene(&scene);
     this->setCacheMode(QGraphicsView::CacheBackground);
 	this->setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
 	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	this->setRenderHint(QPainter::Antialiasing);
 	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-	//this->setMinimumSize(200, 200);
 	this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
 	
  	setMouseTracking(true);
     this->viewport()->setMouseTracking(true);
-    scene.addRect(0,0,500,500, QPen(QColor("red")),QBrush(QColor("red")));
 
-    createGraph();
+    //center position
+    scene.addRect(-100, -100, 200, 200, QPen(QColor("orange")),QBrush(QColor("orange")));
+    //edge => x red, z (y) blue
+    scene.addRect(-4000, -4000, 1000, 30, QPen(QColor("red")),QBrush(QColor("red")));
+    scene.addRect(-4000, -4000, 30, 1000, QPen(QColor("blue")),QBrush(QColor("blue")));
+    
+
+  //  createGraph();
 }
 
 void DSRtoGraphicsceneViewer::createGraph()
@@ -91,7 +96,7 @@ void DSRtoGraphicsceneViewer::add_or_assign_node_slot(const std::int32_t id, con
      std::cout << node.value().name() << " " << node.value().id() << std::endl;
      if(node.has_value())
      {
-        if( type == "plane")
+        if( type == "plane" or type == "floor")
          add_or_assign_box(node.value());
 //        if( tipoIM.value() == "mesh")
 //         add_or_assign_mesh(node.value());
@@ -129,7 +134,8 @@ void DSRtoGraphicsceneViewer::add_or_assign_box(Node &node)
         {
             pose.value().print(QString::fromStdString(node.name()));
             QGraphicsRectItem *box = scene.addRect(pose.value().x(), pose.value().z(), width.value(), height.value(), QPen(QColor(color)), QBrush(QColor(color)));
-            box->setRotation(pose.value().ry()*180/M_PI_2);
+            qDebug()<<"rotation"<<pose.value().rx()<<pose.value().ry()<<pose.value().rz();
+            box->setRotation(pose.value().ry()*180/M_PI);
         }
     }
     else
@@ -202,23 +208,6 @@ void  DSRtoGraphicsceneViewer::add_or_assign_mesh(Node &node)
 
 ////////////////////////////////////////////////////////////////
 
-void DSRtoGraphicsceneViewer::paintGL() 
-{
-    _mViewer->frame();
-}
-*/
-
-/*
-void DSRtoGraphicsceneViewer::initializeGL()
-{
-    //osg::Geode* geode = dynamic_cast<osg::Geode*>(_mViewer->getSceneData());
-    //osg::StateSet* stateSet = geode->getOrCreateStateSet();
-    // osg::Material* material = new osg::Material;
-    // material->setColorMode( osg::Material::AMBIENT_AND_DIFFUSE );
-    // stateSet->setAttributeAndModes( material, osg::StateAttribute::ON );
-    // stateSet->setMode( GL_DEPTH_TEST, osg::StateAttribute::ON );
-}     
-
 void DSRtoGraphicsceneViewer::mouseMoveEvent(QMouseEvent* event)
 {
     this->getEventQueue()->mouseMotion(event->x()*m_scaleX, event->y()*m_scaleY);
@@ -284,19 +273,42 @@ void DSRtoGraphicsceneViewer::wheelEvent(QWheelEvent* event)
 	this->setTransformationAnchor(anchor);
 }
 
-/*
-bool DSRtoGraphicsceneViewer::event(QEvent* event)
+void DSRtoGraphicsceneViewer::mousePressEvent(QMouseEvent *event)
 {
-    bool handled = QOpenGLWidget::event(event);
-    this->update();
-    return handled;
+    if (event->button() == Qt::RightButton)
+    {
+        _pan = true;
+        _panStartX = event->x();
+        _panStartY = event->y();
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
+    event->ignore();
 }
 
-osgGA::EventQueue* DSRtoGraphicsceneViewer::getEventQueue() const 
+void DSRtoGraphicsceneViewer::mouseReleaseEvent(QMouseEvent *event)
 {
-    osgGA::EventQueue* eventQueue = _mGraphicsWindow->getEventQueue();
-    // auto center = manipulator->getCenter();
-    // qDebug() << center.x() << center.y() << center.z() ;
-    return eventQueue;
+    if (event->button() == Qt::RightButton)
+    {
+        _pan = false;
+        setCursor(Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+    event->ignore();
 }
-*/
+
+void DSRtoGraphicsceneViewer::mouseMoveEvent(QMouseEvent *event)
+{
+    if (_pan)
+    {
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - (event->x() - _panStartX));
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - (event->y() - _panStartY));
+        _panStartX = event->x();
+        _panStartY = event->y();
+        event->accept();
+        return;
+    }
+    event->ignore();
+}
