@@ -25,7 +25,7 @@ DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph
     this->viewport()->setMouseTracking(true);
     scene.addRect(0,0,500,500, QPen(QColor("red")),QBrush(QColor("red")));
 
-//    createGraph();
+    createGraph();
 }
 
 void DSRtoGraphicsceneViewer::createGraph()
@@ -89,11 +89,9 @@ void DSRtoGraphicsceneViewer::add_or_assign_node_slot(const std::int32_t id, con
      
      auto node = G->get_node(id);
      std::cout << node.value().name() << " " << node.value().id() << std::endl;
-     auto tipoIM = G->get_attrib_by_name<std::string>(node.value(), "imType");
-     std::cout << tipoIM.value() << std::endl;
-     if(node.has_value() and tipoIM.has_value())
+     if(node.has_value())
      {
-        if( tipoIM.value() == "plane")
+        if( type == "plane")
          add_or_assign_box(node.value());
 //        if( tipoIM.value() == "mesh")
 //         add_or_assign_mesh(node.value());
@@ -106,6 +104,7 @@ void DSRtoGraphicsceneViewer::add_or_assign_edge_slot(const std::int32_t from, c
 
 void DSRtoGraphicsceneViewer::add_or_assign_box(Node &node)
 {
+    qDebug() << "********************************";
     qDebug() << __FUNCTION__ ;
     QString color = QString::fromStdString(G->get_attrib_by_name<std::string>(node, "color").value_or("orange"));
     qDebug()<< "color:" << color;
@@ -119,24 +118,18 @@ void DSRtoGraphicsceneViewer::add_or_assign_box(Node &node)
     if(height.has_value()) std::cout << "height: " << height.value() << std::endl;
 
 
-    float nx = G->get_attrib_by_name<std::int32_t>(node, "nx").value_or(0) * M_PI;
-    float ny = G->get_attrib_by_name<std::int32_t>(node, "ny").value_or(0) * M_PI;
-    float nz = G->get_attrib_by_name<std::int32_t>(node, "nz").value_or(0) * M_PI;
-   
-    int px = G->get_attrib_by_name<std::int32_t>(node, "px").value_or(0);
-    int py = G->get_attrib_by_name<std::int32_t>(node, "py").value_or(0);
-    int pz = G->get_attrib_by_name<std::int32_t>(node, "pz").value_or(0);
     
-    
+
     //check if has required values
     if(width.has_value() and height.has_value())
     {
         // get transfrom to world => to get correct position
-        std::optional<QVec> pose = innermodel->transformS("world", QVec::vec6(px, py, pz, nx, ny, nz), node.name());
+        std::optional<QVec> pose = innermodel->transformS6D("world", node.name());
         if (pose.has_value())
         {
             pose.value().print(QString::fromStdString(node.name()));
-            scene.addRect(pose.value().x(), pose.value().z(), width.value(), height.value(), QPen(QColor(color)), QBrush(QColor(color)));
+            QGraphicsRectItem *box = scene.addRect(pose.value().x(), pose.value().z(), width.value(), height.value(), QPen(QColor(color)), QBrush(QColor(color)));
+            box->setRotation(pose.value().ry()*180/M_PI_2);
         }
     }
     else
@@ -289,12 +282,6 @@ void DSRtoGraphicsceneViewer::wheelEvent(QWheelEvent* event)
 	}
 	this->scale(factor, factor);
 	this->setTransformationAnchor(anchor);
-}
-
-void DSRtoGraphicsceneViewer::resizeEvent(QResizeEvent *event)
-{
-    qDebug()<<"resize";
-    //view->resize(event->size().width(), event->size().height());
 }
 
 /*
