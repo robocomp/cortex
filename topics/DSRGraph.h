@@ -152,6 +152,7 @@ public:
                 break;
             case 4:
                 os << "bool: " << (type.m_bl ? " TRUE" : " FALSE");
+                break;
             default:
                 os << "OTRO TIPO";
                 break;

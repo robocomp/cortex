@@ -166,37 +166,31 @@ namespace CRDT
             if (!av.has_value()) return {};
             if constexpr (std::is_same<Ta, std::string>::value)
             {
-                if (av->value()._d() == STRING)
-                    return  av->value().str();
+                return  av->value().str();
             }
             if constexpr (std::is_same<Ta, std::int32_t>::value)
             {
-                if (av->value()._d() == INT)
-                    return av->value().dec();
+                return av->value().dec();
             }
             if constexpr (std::is_same<Ta, float>::value) 
             {
-                if (av->value()._d() == FLOAT)
-                    return av->value().fl();
+                return av->value().fl();
             }
             if constexpr (std::is_same<Ta, std::vector<float>>::value)
             {
-                if (av->value()._d() == FLOAT_VEC)
-                    return av->value().float_vec();
+                return av->value().float_vec();
             }
             if constexpr (std::is_same<Ta, bool>::value)
             {
-                if (av->value()._d() == BOOL)
-                    return av.value().value().bl();
+                return av.value().value().bl();
             }
             if constexpr (std::is_same<Ta, QVec>::value)
             {
-                if (av->value()._d() == FLOAT_VEC) {
-                    const auto &val = av.value().value().float_vec();
-                    if ((key == "translation" or key == "rotation_euler_xyz")
-                        and (val.size() == 3 or val.size() == 6))
-                        return QVec{val};
-                }
+                const auto &val = av.value().value().float_vec();
+                if ((key == "translation" or key == "rotation_euler_xyz")
+                    and (val.size() == 3 or val.size() == 6))
+                    return QVec{val};
+                throw std::runtime_error("vec size mut be 3 or 6 in get_attrib_by_name<QVec>()");
             }
             if constexpr (std::is_same<Ta, QMat>::value)
             {
@@ -205,8 +199,8 @@ namespace CRDT
                     const auto& val = av.value().value().float_vec();
                     return QMat{RMat::Rot3DOX(val[0])*RMat::Rot3DOY(val[1])*RMat::Rot3DOZ(val[2])};
                 }
+                throw std::runtime_error("vec size mut be 3 or 6 in get_attrib_by_name<QVec>()");
             }  //else
-            return {};
             //throw std::runtime_error("Illegal return type in get_attrib_by_name()");
         }       
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>,
@@ -325,9 +319,9 @@ namespace CRDT
         std::optional<N> get(int id);
         bool in(const int &id) const;
         std::optional<N> get_(int id);
-        bool insert_or_assign_node_(const N &node);
-        std::pair<bool, vector<tuple<int, int, std::string>>> delete_node_(int id);
-        bool delete_edge_(int from, int t, const std::string& key);
+        std::pair<bool, std::optional<AworSet>> insert_or_assign_node_(const N &node);
+        std::tuple<bool, vector<tuple<int, int, std::string>>, std::vector<AworSet>> delete_node_(int id);
+        std::pair<bool, std::optional<AworSet>> delete_edge_(int from, int t, const std::string& key);
         std::optional<Edge> get_edge_(int from, int to, const std::string& key);
 
 
@@ -378,14 +372,19 @@ namespace CRDT
                 void operator()(eprosima::fastrtps::Subscriber *sub) { f(sub, work, graph); };
         };
 
+
+        //Threads
+        std::thread delta_thread, fullgraph_thread;
+
         // Threads handlers
         void subscription_thread(bool showReceived);
         void fullgraph_server_thread();
         bool fullgraph_request_thread();
 
+
         // Translators
-        AworSet translateAwCRDTtoIDL(int id, aworset<N, int> &data);
-        aworset<N, int> translateAwIDLtoCRDT(AworSet &data);
+        static AworSet translateAwCRDTtoIDL(int id, aworset<N, int> &data);
+        static aworset<N, int> translateAwIDLtoCRDT(AworSet &data);
 
         // RTSP participant
         DSRParticipant dsrparticipant;

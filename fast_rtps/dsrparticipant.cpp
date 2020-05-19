@@ -44,12 +44,12 @@ std::tuple<bool, eprosima::fastrtps::Participant *> DSRParticipant::init()
     
     //Create a descriptor for the new transport.
     auto custom_transport = std::make_shared<eprosima::fastrtps::rtps::UDPv4TransportDescriptor>();
-    custom_transport->sendBufferSize = 65000;
-    custom_transport->receiveBufferSize = 65000;
+    custom_transport->sendBufferSize = 12582912;
+    custom_transport->receiveBufferSize = 12582912;
     custom_transport->maxMessageSize = 65000;
     custom_transport->interfaceWhiteList.emplace_back("127.0.0.1");
     //custom_transport->interfaceWhiteList.emplace_back("192.168.1.253");
-    
+
 
     //Disable the built-in Transport Layer.
     PParam.rtps.useBuiltinTransports = false;

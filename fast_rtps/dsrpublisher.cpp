@@ -28,6 +28,7 @@
 
 #include <thread>
 #include <chrono>
+
 #include "dsrpublisher.h"
 
 using namespace eprosima::fastrtps;
@@ -55,10 +56,21 @@ bool DSRPublisher::init(eprosima::fastrtps::Participant *mp_participant_, const 
     Wparam.multicastLocatorList.push_back(locator);
     Wparam.qos.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
     Wparam.qos.m_publishMode.kind = eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE;
+
+    // This would be better, but we sent a lots of messages to use it.
+    // Wparam.topic.historyQos.kind = KEEP_ALL_HISTORY_QOS;
+
+    Wparam.topic.historyQos.kind =   KEEP_LAST_HISTORY_QOS;
+    Wparam.topic.historyQos.depth = 20; // Adjust this value if we are losing many messages
+
+
+    // Check ACK for sended messages.
+    Wparam.times.heartbeatPeriod.seconds = 0;
+    Wparam.times.heartbeatPeriod.nanosec = 500000000; //500 ms
+
     Wparam.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
     mp_publisher = eprosima::fastrtps::Domain::createPublisher(mp_participant,Wparam,static_cast<eprosima::fastrtps::PublisherListener*>(&m_listener));
 
-    //Wparam.times.heartbeatPeriod.nanosec = 500000000; //500 ms
     if(mp_publisher == nullptr)
         return false;
     std::cout << "Publisher created, waiting for Subscribers." << std::endl;
@@ -80,7 +92,10 @@ bool DSRPublisher::write(GraphRequest *object) {
 
 
 bool DSRPublisher::write(AworSet *object) {
-    return mp_publisher->write(object);
+    while(true){
+        if (mp_publisher->write(object)) break;
+    }
+    return true;
 }
 
 void DSRPublisher::PubListener::onPublicationMatched(eprosima::fastrtps::Publisher* pub, eprosima::fastrtps::rtps::MatchingInfo& info)
@@ -97,7 +112,7 @@ void DSRPublisher::PubListener::onPublicationMatched(eprosima::fastrtps::Publish
         std::cout << "Publisher unmatched" << info.remoteEndpointGuid <<  std::endl;
     }
 }
-
+/*
 void DSRPublisher::run()
 {
     while(m_listener.n_matched == 0)
@@ -113,4 +128,4 @@ void DSRPublisher::run()
     //     std::cout << "Sending sample, count=" << msgsent << " " << st.load().size() * 4 << std::endl;
     //     std::this_thread::sleep_for(std::chrono::microseconds(1000000)); // Sleep 250 ms
     } while(true);
-}
+}*/
