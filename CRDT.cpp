@@ -117,15 +117,15 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
     return r;
 }
 
-bool CRDTGraph::insert_or_assign_node(const VertexPtr &vertex)
-{
-    return insert_or_assign_node(vertex->get_CRDT_node());
-}
+// bool CRDTGraph::insert_or_assign_node(const VertexPtr &vertex)
+// {
+//     return insert_or_assign_node(vertex->get_CRDT_node());
+// }
 
-bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
-{
-    return insert_or_assign_node(vertex.get_CRDT_node());
-}
+// bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
+// {
+//     return insert_or_assign_node(vertex.get_CRDT_node());
+// }
 
 bool CRDTGraph::insert_or_assign_node_(const N &node)
 {
@@ -538,7 +538,7 @@ Edge CRDTGraph::get_edge_RT(const Node &n, int to)
     
 }
 
-RTMat CRDTGraph::get_edge_RT_as_RTMat(Edge &edge)
+RTMat CRDTGraph::get_edge_RT_as_RTMat(const Edge &edge)
 {
     auto r = get_attrib_by_name<std::vector<float>>(edge, "rotation_euler_xyz");
     auto t = get_attrib_by_name<std::vector<float>>(edge, "translation");
@@ -627,7 +627,7 @@ std::optional<std::int32_t> CRDTGraph::get_node_level(Node& n)
     return get_attrib_by_name<std::int32_t>(n, "level");
 }
 
-std::optional<std::int32_t> CRDTGraph::get_node_parent(Node& n)
+std::optional<std::int32_t> CRDTGraph::get_node_parent(const Node& n)
 {
     return get_attrib_by_name<std::int32_t>(n, "parent");
 }

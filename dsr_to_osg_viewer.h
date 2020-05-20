@@ -55,8 +55,8 @@ namespace DSR
             
     
         public slots:   // From G
-            void add_or_assign_node_slot(const std::int32_t id, const std::string &type);
-            void add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type);
+            void add_or_assign_node_slot(const Node &node, const std::string &type_);
+            void add_or_assign_edge_slot(const Node &from, const Node& to);
             
         protected:  
             //void resizeEvent(QResizeEvent *e) {  qDebug() << "SCAKE" << x() << y(); }; 
@@ -82,6 +82,9 @@ namespace DSR
             //Hashes
             //using OsgTypes = std::variant<osg::, osg::MatrixTransform*>;
             std::map<std::int32_t, osg::Group*> osg_map;
+            //std::map<std::tuple<std::int32_t, std::int32_t>, osg::Group*> osg_transform;
+            //std::map<std::int32_t, std::int32_t>, osg::Group*> osg_transform;
+            
             
             //std::map<std::string, IMVMesh> meshMap;
             osg::Vec3 QVecToOSGVec(const QVec &vec) const ;
@@ -91,169 +94,13 @@ namespace DSR
             void setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const;
             osgGA::TrackballManipulator* manipulator;
 
-            void add_or_assign_box(Node &node);
-            void add_or_assign_mesh(Node &node);
-            void add_or_assign_transform(const Node &node, const Node &parent);
+            void add_or_assign_box(const Node &node, const Node& parent);
+            void add_or_assign_mesh(const Node &node, const Node& parent);
+            void add_or_assign_transform(const Node &node, const Node &parent, const Edge& edge);
+            void add_or_assign_node_transform(const Node &from, const Node& to);
 
             void traverse_RT_tree(const Node& node);
+            void analyse_osg_graph(osg::Node *nd);
     };
 };
 #endif
-
-//class IMVPlane : public osg::Geode
-// {
-//     public: 
-//         IMVPlane(std::string imagenEntrada, osg::Vec4 valoresMaterial, float transparencia) : osg::Geode()
-//         {
-//             data = NULL;
-//             bool constantColor = false;
-//             if (imagenEntrada.size() == 7)
-//                 if (imagenEntrada[0] == '#')
-//                     constantColor = true;
-//             // Open image
-//             image = NULL;
-//             osg::ref_ptr<osg::TessellationHints> hints;
-//             if (imagenEntrada.size()>0 and not constantColor)
-//             {
-//                 if (imagenEntrada == "custom")
-//                     image = new osg::Image();
-//                 else
-//                 {
-//                     image = osgDB::readImageFile(imagenEntrada);
-//                     if (not image)
-//                     {
-//                         qDebug() << "Couldn't load texture:" << imagenEntrada.c_str();
-//                         throw "Couldn't load texture.";
-//                     }
-//                 }
-//             }
-//             hints = new osg::TessellationHints;
-//             hints->setDetailRatio(2.0f);
-//             //osg::ref_ptr<osg::Box> myBox = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), plane->width, -plane->height, plane->depth);
-//             osg::ref_ptr<osg::Box> myBox = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), 10, -10, 1);
-//             planeDrawable = new osg::ShapeDrawable(myBox, hints);
-//             planeDrawable->setColor(htmlStringToOsgVec4(QString::fromStdString(imagenEntrada)));
-//             addDrawable(planeDrawable);
-//             if (not constantColor)
-//             {
-//                 // Texture
-//                 texture = new osg::Texture2D;
-//                 if (image)
-//                 {
-//                     texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-//                     texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-//                     texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-//                     texture->setImage(image);
-//                     texture->setDataVariance(Object::DYNAMIC);
-//                     texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
-//                     texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-//                     texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-//                     texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-//                     texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-//                     texture->setTextureWidth(1);
-//                     texture->setTextureHeight(1);
-//                 }
-//                 texture->setResizeNonPowerOfTwoHint(false);
-//                 // Material
-//                 osg::ref_ptr<osg::Material> material = new osg::Material();
-//                 material->setTransparency( osg::Material::FRONT_AND_BACK, transparencia);
-//                 material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
-//                 // Assign the material and texture to the plane
-//                 osg::StateSet *sphereStateSet = getOrCreateStateSet();
-//                 sphereStateSet->ref();
-//                 sphereStateSet->setAttribute(material);
-//         #ifdef __arm__
-//         #else
-//                 sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
-//         #endif
-//                 sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
-//             }
-//         }
-
-//         void setImage(osg::Image *image_)
-//         {
-//             texture = new osg::Texture2D;
-//             image = image_;
-//             if (image)
-//             {
-//                 texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-//                 texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-//                 texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-//                 texture->setImage(image);
-//                 texture->setDataVariance(Object::DYNAMIC);
-//                 texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
-//                 texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-//                 texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-//                 texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-//                 texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-//                 texture->setTextureWidth(1);
-//                 texture->setTextureHeight(1);
-//             }
-//             texture->setResizeNonPowerOfTwoHint(false);
-//             // Material
-//             osg::ref_ptr<osg::Material> material = new osg::Material();
-//             material->setTransparency( osg::Material::FRONT_AND_BACK, 0);
-//             material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
-//             // Assign the material and texture to the plane
-//             osg::StateSet *sphereStateSet = getOrCreateStateSet();
-//             sphereStateSet->ref();
-//             sphereStateSet->setAttribute(material);
-//             #ifdef __arm__
-//             #else
-//                     sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
-//             #endif
-//                     sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
-//         }
-
-//         void updateBuffer(uint8_t *data_, int32_t width_, int32_t height_)
-//         {
-//             data = data_;
-//             width = width_;
-//             height = height_;
-//             dirty = true;
-//         }
-
-//         void performUpdate()
-//         {
-//             static uint8_t *backData = NULL;
-//             if (dirty)
-//             {
-//                 if (backData != data)
-//                 {
-//                     #ifdef __arm__
-//                                 image->setImage(width, height, 3, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE, data, osg::Image::NO_DELETE, 1);
-//                     #else
-//                                 image->setImage(width, height, 3, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, data, osg::Image::NO_DELETE, 1);
-//                     #endif
-//                 }
-//                 else
-//                     image->dirty();
-//                 dirty = false;
-//                 backData = data;
-//             }
-//         }
-
-//         osg::Vec3 QVecToOSGVec(const QVec &vec)
-//         {
-// 	        return osg::Vec3(vec(0), vec(1), -vec(2));
-//         }
-
-//         osg::Vec4 htmlStringToOsgVec4(QString color)
-//         {
-//             QString red   = QString("00");
-//             QString green = QString("00");
-//             QString blue  = QString("00");
-//             bool ok;
-//             red[0]   = color[1]; red[1]   = color[2];
-//             green[0] = color[3]; green[1] = color[4];
-//             blue[0]  = color[5]; blue[1]  = color[6];
-//             return osg::Vec4(float(red.toInt(&ok, 16))/255., float(green.toInt(&ok, 16))/255., float(blue.toInt(&ok, 16))/255., 0.f);
-//         }
-
-//         uint8_t *data;
-//         bool dirty;
-//         int32_t width, height;
-//         osg::ref_ptr<osg::Texture2D> texture;
-//         osg::ref_ptr<osg::ShapeDrawable> planeDrawable;
-//         osg::ref_ptr<osg::Image> image;
-// };

@@ -60,6 +60,8 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
 	//_mViewer->setSceneData( root.get());
 
 	root = createGraph();
+    //analyse_osg_graph(root.get());
+
     _mViewer->setSceneData( root.get());
 	
     //connect(&timer, &QTimer::timeout, this, &DSRtoOSGViewer::updateX);
@@ -82,11 +84,12 @@ void DSRtoOSGViewer::traverse_RT_tree(const Node& node)
 {
     for(auto &edge: G->get_edges_by_type(node, "RT"))
 	{
-        std::cout << "edges " << edge.to() << " " << edge.from() << " " << edge.type() << std::endl;
+        std::cout << __FUNCTION__ << " edges " << edge.from() << " " << edge.to() << " " << edge.type() << std::endl;
         auto child = G->get_node(edge.to());
         if(child.has_value())
         {
-            add_or_assign_node_slot(child.value().id(),  child.value().type());
+            add_or_assign_edge_slot(node, child.value());
+            add_or_assign_node_slot(child.value(),  child.value().type());
             traverse_RT_tree(child.value());
         }
         else
@@ -100,21 +103,14 @@ osg::ref_ptr<osg::Group> DSRtoOSGViewer::createGraph()
     try
     {   std::optional<Node> g_root = G->get_node_root().value();  //HAS TO BE TRANSFORM
         root = new osg::Group();
+        osg_map.insert_or_assign(g_root.value().id(), root);
 
         traverse_RT_tree(g_root.value());
+        qDebug() << __FUNCTION__ << "Finished reading graph. Waiting for events";
         return root;
-
-        //auto map = G->getCopy();
-		//for(const auto &[k, node] : map)
-		//    add_or_assign_node_slot(k,  node.type());
-        // for(const auto &[k, node] : map)
-        //     for(const auto &[ek, edge]: node.fano())
-		//             add_or_assign_edge_slot(edge.from(), edge.to(), edge.type());
-		//for(auto node : map) // Aworset
-        //   	for(const auto &[k, edges] : node.second.fano())
-		//	    add_or_assign_edge_slot(edges.from(), edges.to(), edges.type());
     }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
+    return osg::ref_ptr<osg::Group>();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -152,74 +148,85 @@ void  DSRtoOSGViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, Ca
 ///// SLOTS
 //////////////////////////////////////////////////////////////////////////////////////
 
-void DSRtoOSGViewer::add_or_assign_node_slot(const std::int32_t id, const std::string &type)
+// To insert a node its parent has to be a transform
+// Transforms are created form RT edges.
+
+void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node, const std::string &type_)
 {
-     qDebug() << __FILE__ << __FUNCTION__ ;
+    qDebug() << __FUNCTION__  << "node " << node.id();
      
-     auto node = G->get_node(id);
-     
-     if(node.has_value())
-     {
-        auto type = node.value().type();
-        std::cout << node.value().name() << " " << node.value().id() << " " << node.value().type() << std::endl;
-        if( type == "plane")
-        add_or_assign_box(node.value());
-        if( type == "mesh")
-        add_or_assign_mesh(node.value());
-        if( type == "transform")
-        add_or_assign_transform(node.value(), node.value());
-    }
+    auto parent_id = G->get_node_parent(node);
+    if (not parent_id.has_value())
+        std::runtime_error("Node cannot be inserted without a parent");
+    auto parent = G->get_node(parent_id.value());
+    auto type = node.type();
+    //std::cout << __FUNCTION__ << " " << node.name() << " " << node.id() << " " << node.type() << std::endl;
+    if( type == "plane")
+        add_or_assign_box(node, parent.value());
+    else if( type == "mesh")
+        add_or_assign_mesh(node, parent.value());
+    else if( type == "transform")
+        add_or_assign_node_transform(node, parent.value());
 }
-void DSRtoOSGViewer::add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type)
+
+void DSRtoOSGViewer::add_or_assign_edge_slot(const Node &from, const Node& to)
 {
-     qDebug() << __FILE__ << __FUNCTION__ ;
+
+    auto edge = G->get_edge_RT(from, to.id());
+    qDebug() << __FUNCTION__ << from.id() << "to " << to.id();
+    add_or_assign_transform(from, to, edge);
+
 }
 
 ////////////////////////////////////////////////////////////////
-
-void DSRtoOSGViewer::add_or_assign_transform(const Node &node, const Node& parent)
+/// RT edge Transform
+////////////////////////////////////////////////////////////////
+void DSRtoOSGViewer::add_or_assign_transform(const Node &from, const Node& to, const Edge& edge)
 {
-   
+    qDebug() << __FUNCTION__  << "node " << from.id() << "parent "  << to.id();
+    auto rtmat = G->get_edge_RT_as_RTMat(edge);
     osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform; 
-    osg::Matrix *mat = new osg::Matrix;		
-    mat->makeIdentity();    
-    // if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value()) 
-    // {  
-    //     if( auto res = osg_map.find( parent_node.value().id()); res != osg_map.end())   
-    //         std::get<osg::*>(osg_map.at(parent_node.value().id()))->addChild(transform);
-    //     else if(parent.value() == 0)
-    //         root->addChild(transform);
-    //     else
-    //         return;  /// MSG
-    // }
+    transform->setMatrix( QMatToOSGMat4(rtmat) );
+
+    if( auto res = osg_map.find(from.id()); res != osg_map.end())   
+    {
+        (*res).second->addChild(transform);
+        osg_map.insert_or_assign(to.id(), transform);
+        qDebug() << __FUNCTION__ << "Added transform, node " << to.id() << "parent "  << from.id();
+    }
+    else
+        std::runtime_error("Transform: OSG parent not found for " + to.name() + "-" + std::to_string(to.id()));
 }
 
-void DSRtoOSGViewer::add_or_assign_box(Node &node)
+void DSRtoOSGViewer::add_or_assign_node_transform(const Node &from, const Node& to)
 {
-    qDebug() << __FUNCTION__ ;
+    qDebug() << __FUNCTION__  << "node " << from.id() << "parent "  << to.id();
+    osg::ref_ptr<osg::MatrixTransform> transform = new osg::MatrixTransform; 
+    osg::Matrix mat;		
+    mat.makeIdentity();    
+    transform->setMatrix(mat);
+    if( auto res = osg_map.find(from.id()); res != osg_map.end())   
+    {
+        (*res).second->addChild(transform);
+        osg_map.insert_or_assign(to.id(), transform);
+        qDebug() << __FUNCTION__ << "Added transform, node " << to.id() << "parent "  << from.id();
+    }
+    else
+        std::runtime_error("Transform: OSG parent not found for " + to.name() + "-" +std::to_string(to.id()));
+}
+
+void DSRtoOSGViewer::add_or_assign_box(const Node &node, const Node& parent)
+{
+    qDebug() << __FUNCTION__ << "node " << node.id() << parent.id();
     std::cout << node.name() << " " << node.id() << std::endl;
     auto texture = G->get_attrib_by_name<std::string>(node, "texture");
     if(texture.has_value()) std::cout << texture.value() << std::endl;
-    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
-    if(parent.has_value()) std::cout << parent.value() << std::endl;
     auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
     if(height.has_value()) std::cout << height.value() << std::endl;
     auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
     if(width.has_value()) std::cout << height.value() << std::endl;
     auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
     if(depth.has_value()) std::cout << depth.value() << std::endl;
-    // auto nx = G->get_attrib_by_name<std::int32_t>(node, "nx");
-    // if(nx.has_value()) std::cout << nx.value() << std::endl;
-    // auto ny = G->get_attrib_by_name<std::int32_t>(node, "ny");
-    // if(ny.has_value()) std::cout << ny.value() << std::endl;
-    // auto nz = G->get_attrib_by_name<std::int32_t>(node, "nz");
-    // if(nz.has_value()) std::cout << nz.value() << std::endl;
-    // auto px = G->get_attrib_by_name<std::int32_t>(node, "px");
-    // if(px.has_value()) std::cout << px.value() << std::endl;
-    // auto py = G->get_attrib_by_name<std::int32_t>(node, "py");
-    // if(py.has_value()) std::cout << py.value() << std::endl;
-    // auto pz = G->get_attrib_by_name<std::int32_t>(node, "pz");
-    // if(pz.has_value()) std::cout << pz.value() << std::endl;
     
     //we are in bussines
     auto textu = texture.value_or("#000000");
@@ -238,16 +245,20 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
     hints = new osg::TessellationHints;
     hints->setDetailRatio(2.0f);
     osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value()/100, height.value()/100, depth.value()/100);
-    // osg::Matrix r;
-	// r.makeRotate(osg::Vec3(0, 0, 1), QVecToOSGVec(QVec::vec3(nx.value(),ny.value(),nz.value())));
-	// osg::Matrix t;
-	// t.makeTranslate(QVecToOSGVec(QVec::vec3(px.value()/100,py.value()/100,pz.value()/100)));
-    // osg::Quat qr; qr.set(r*t);
-	// box->setRotation(qr);
     auto plane_drawable = new osg::ShapeDrawable(box, hints);
     plane_drawable->setColor(htmlStringToOsgVec4(texture.value_or("#FF0000")));
     osg::Geode* geode = new osg::Geode;
     geode->addDrawable(plane_drawable);
+    osg::Group *group = new osg::Group;
+    
+    if( auto res = osg_map.find(parent.id()); res != osg_map.end())   
+    {
+        (*res).second->addChild(group);
+        osg_map.insert_or_assign(node.id(), group);
+        qDebug() << __FUNCTION__ << "Added BOX, node " << node.id() << "parent "  << parent.id();
+    }
+    else
+        std::runtime_error("Transform: OSG parent not found for " + node.name() + "-" +std::to_string(node.id()));
 
     if (not constantColor)
     {
@@ -278,41 +289,11 @@ void DSRtoOSGViewer::add_or_assign_box(Node &node)
         sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
         sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
     }
-
-    // osgObjectsMap.insert_or_assign(node.id(), geode);
-    // if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value()) 
-    // {  
-    //     if( auto res = osgObjectsMap.find( parent_node.value().id()); res != osgObjectsMap.end())   
-    //         *res.second->addChild(geode);
-    //     else if(parent.value() == 0)
-    //         root->addChild(geode);
-    //     else
-    //         return;  /// MSG
-    // }
-  
-
-qDebug() << "gdadf";
-     //if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
-        //    std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(geode);
-        
-        // see if there are RT edges
-        
-        // auto rt_edges_list = node.value().get_edges_RT();
-        // for(auto &rt_edge : rt_edges_list)
-        // {
-        //     osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
-        //     //setOSGMatrixTransformForPlane(mt, plane);
-        //     osgTransformMap.insert_or_assign(std::make_pair(rt_edge.from(), er_edge.to()), mt);
-        //     osg_obj->addChild( osgObjectMap.at(rt_edge.to()) );
-        // }
-	
-        //setOSGMatrixTransformForPlane(mt, plane);
 }
 
-void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
+void  DSRtoOSGViewer::add_or_assign_mesh(const Node &node, const Node& parent)
 {   
-    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
-    if(parent.has_value()) std::cout << parent.value() << std::endl;
+    qDebug() << __FUNCTION__ << "node " << node.id() << parent.id();
     auto color = G->get_attrib_by_name<std::string>(node, "color");
     if(color.has_value()) std::cout << color.value() << std::endl;
     auto filename = G->get_attrib_by_name<std::string>(node, "path");
@@ -324,17 +305,9 @@ void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
     auto scalez = G->get_attrib_by_name<std::int32_t>(node, "scalez");
     if(scalez.has_value()) std::cout << scalez.value() << std::endl;
     
-
-    osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
-    // //if (parent) parent->addChild(mt);
-    // RTMat rtmat = RTMat();
-    // rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
-    // rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
-    // mt->setMatrix(QMatToOSGMat4(rtmat));
-    // osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
-    // smt->setMatrix(osg::Matrix::scale(scalex.value_or(1)/100,scaley.value_or(1)/100,scalez.value_or(1)/100));
-    // mt->addChild(smt);
-    // meshHash[mesh->id].osgmeshPaths = mt;
+    osg::ref_ptr<osg::MatrixTransform> scale_transform = new osg::MatrixTransform; 			
+	scale_transform->setMatrix(osg::Matrix::scale(scalex.value()/10, scaley.value()/100, scalez.value()/10));
+	osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
     osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(filename.value());
     if (!osgMesh)
         throw  std::runtime_error("Could not find nesh file " + filename.value());
@@ -342,21 +315,16 @@ void  DSRtoOSGViewer::add_or_assign_mesh(Node &node)
     polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
     osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
     osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
-    //osg_map.insert_or_assign(node.id(), osgMesh);
-    //  if (auto parent_node = G->get_node(parent.value()); parent_node.has_value() and parent_node.value().type() == "transform") 
-    // {  
-    //     if( auto res = osg_map.find( parent_node.value().id()); res != osg_map.end())   
-    //         std::get<osg::Group*>(osg_map.at(parent_node.value().id()))->addChild(osgMesh);
-    //     else if(parent.value() == 0)
-    //         root->addChild(osgMesh);
-    //     else
-    //         return;  /// MSG
-    // }
-    
-    // //meshHash[mesh->id].osgmeshes = osgMesh;
-    // // //meshHash[mesh->id].meshMts= mt;
-    // // //osgmeshmodes[mesh->id] = polygonMode;
-    // smt->addChild(osgMesh);
+    scale_transform->addChild(osgMesh);
+    if( auto res = osg_map.find(parent.id()); res != osg_map.end())   
+    {
+        (*res).second->addChild(scale_transform);
+        osg_map.insert_or_assign(node.id(), scale_transform);
+        qDebug() << __FUNCTION__ << "Added BOX, node " << node.id() << "parent "  << parent.id();
+    }
+    else
+        std::runtime_error("Transform: OSG parent not found for " + node.name() + "-" +std::to_string(node.id()));
+
 }
 
 /////////////////////////////////////////////////////////////
@@ -479,4 +447,40 @@ osgGA::EventQueue* DSRtoOSGViewer::getEventQueue() const
     // auto center = manipulator->getCenter();
     // qDebug() << center.x() << center.y() << center.z() ;
     return eventQueue;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+void DSRtoOSGViewer::analyse_osg_graph(osg::Node *nd) 
+{
+	/// here you have found a group.
+    osg::Geode *geode = dynamic_cast<osg::Geode *> (nd);
+	if (geode) 
+    { // analyse the geode. If it isnt a geode the dynamic cast gives NULL.
+	    for (unsigned int i=0; i<geode->getNumDrawables(); i++) 
+        {
+		    osg::Drawable *drawable=geode->getDrawable(i);
+		    osg::Geometry *geom=dynamic_cast<osg::Geometry *> (drawable);
+		    for (unsigned int ipr=0; ipr<geom->getNumPrimitiveSets(); ipr++) 
+            {
+			    osg::PrimitiveSet* prset=geom->getPrimitiveSet(ipr);
+			    osg::notify(osg::WARN) << "Primitive Set "<< ipr << std::endl;
+			    //analysePrimSet(prset, dynamic_cast<const osg::Vec3Array*>(geom->getVertexArray()));
+		    }
+	    } 
+    }
+    else 
+    {
+		osg::Group *gp = dynamic_cast<osg::Group *> (nd);
+		if (gp) 
+        {
+			osg::notify(osg::WARN) << "Group "<<  gp->getName() <<std::endl;
+			for (unsigned int ic=0; ic<gp->getNumChildren(); ic++) {
+				analyse_osg_graph(gp->getChild(ic));
+			}
+		} else 
+        {
+			osg::notify(osg::WARN) << "Unknown node "<<  nd <<std::endl;
+		}
+	}
 }
