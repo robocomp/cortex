@@ -18,6 +18,8 @@
 #define DSR_TO_GRAPHCISCENE_VIEWER_H
 
 #include <chrono>
+#include <math.h>
+
 #include <QWidget>
 #include <QApplication>
 #include <QDesktopWidget>
@@ -25,18 +27,25 @@
 #include <QHBoxLayout>
 #include <QGraphicsScene>
 #include <QGraphicsView>
+#include <QGraphicsRectItem>
 #include <QMouseEvent>
 #include <QResizeEvent>
+#include <QScrollBar>
 #include "CRDT.h"
+
 
 namespace DSR
 {
 
-    class DSRtoGraphicsceneViewer : public QWidget
+    class DSRtoGraphicsceneViewer : public QGraphicsView
     {
         Q_OBJECT
         public:
-            DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
+            QGraphicsScene scene;
+
+
+        public:
+            DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QGraphicsView *parent=0);
 //            void add_plane();
 //            void add_mesh();
 //            void add_person();
@@ -44,27 +53,22 @@ namespace DSR
         public slots:   // From G
             void add_or_assign_node_slot(const std::int32_t id, const std::string &type);
             void add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type);
-//            void updateX();
             
         protected:  
-
-//            virtual void paintGL();
-//            virtual void initializeGL();
-//            virtual void mouseMoveEvent(QMouseEvent* event);        
-//            virtual void mousePressEvent(QMouseEvent* event);
-//            virtual void mouseReleaseEvent(QMouseEvent* event);
             virtual void wheelEvent(QWheelEvent* event);
-            virtual void resizeEvent(QResizeEvent *e); 
-//            virtual bool event(QEvent* event);
+            virtual void mouseMoveEvent(QMouseEvent *event);
+            virtual void mousePressEvent(QMouseEvent *event);
+            virtual void mouseReleaseEvent(QMouseEvent *event);
+
 
         private:
             std::shared_ptr<CRDT::CRDTGraph> G;
             std::unique_ptr<CRDT::InnerAPI> innermodel;      
             
             qreal m_scaleX, m_scaleY;
-            QGraphicsScene scene;
-            QGraphicsView *view;
-            //Hashes
+            bool _pan;
+            int _panStartX, _panStartY;
+
 
             void createGraph();
 

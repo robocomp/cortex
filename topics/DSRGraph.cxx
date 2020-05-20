@@ -427,6 +427,7 @@ std::vector<float>& Val::float_vec()
 
     return m_float_vec;
 }
+
 void Val::bl(bool _bl)
 {
     m_bl = _bl;
