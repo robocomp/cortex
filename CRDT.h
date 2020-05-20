@@ -87,10 +87,6 @@ namespace CRDT
         CRDTGraph(int root, std::string name, int id, std::string dsr_input_file = std::string());
         ~CRDTGraph();
 
-        // threads
-        bool start_fullgraph_request_thread();
-        void start_fullgraph_server_thread();
-        void start_subscription_thread(bool showReceived);
 
         //////////////////////////////////////////////////////
         ///  Graph API
@@ -122,8 +118,8 @@ namespace CRDT
         std::optional<Node> get_node_root()  { return get_node(100); };  //CHANGE THIS
         std::optional<Node> get_node(const std::string& name);
         std::optional<Node> get_node(int id);
-        std::optional<VertexPtr> get_vertex(const std::string& name);
-        std::optional<VertexPtr> get_vertex(int id);
+        //std::optional<VertexPtr> get_vertex(const std::string& name);
+        //std::optional<VertexPtr> get_vertex(int id);
         bool insert_or_assign_node(const N &node);
         bool insert_or_assign_node(const VertexPtr &vertex);
         bool insert_or_assign_node(Vertex &vertex);
@@ -135,9 +131,9 @@ namespace CRDT
         std::optional<std::int32_t> get_node_level(Node& n);
         std::optional<std::int32_t> get_node_parent(Node& n);
         std::string get_node_type(Node& n);
-        void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value); //to be deprecated
+        static void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value); //to be deprecated
         void add_attrib(std::int32_t from, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
-        void add_attrib(Node &n, std::int32_t to, std::string key, const Attrib &attr);  // not implemented 
+        void add_attrib(Node &n, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         
         // Edges
         std::optional<Edge> get_edge(const std::string& from, const std::string& to, const std::string& key);
@@ -150,7 +146,7 @@ namespace CRDT
         bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
         bool delete_edge(int from, int t, const std::string& key);
         std::vector<Edge> get_edges_by_type(const std::string& type);
-        std::vector<Edge> get_edges_by_type(const Node& node, const std::string& type);
+        static std::vector<Edge> get_edges_by_type(const Node& node, const std::string& type);
         std::vector<Edge> get_edges_to_id(int id);
         std::optional<std::map<EdgeKey, Edge>> get_edges(int id);
         Edge get_edge_RT(const Node &n, int to);
@@ -358,8 +354,8 @@ namespace CRDT
         class NewMessageFunctor
         {
             public:
-                CRDTGraph *graph;
-                bool *work;
+                CRDTGraph *graph{};
+                bool *work{};
                 std::function<void(eprosima::fastrtps::Subscriber *sub, bool *work, CRDT::CRDTGraph *graph)> f;
 
                 NewMessageFunctor(CRDTGraph *graph_, bool *work_,
@@ -374,6 +370,11 @@ namespace CRDT
 
 
         //Threads
+        // threads
+        bool start_fullgraph_request_thread();
+        void start_fullgraph_server_thread();
+        void start_subscription_thread(bool showReceived);
+
         std::thread delta_thread, fullgraph_thread;
 
         // Threads handlers

@@ -57,17 +57,19 @@ bool DSRPublisher::init(eprosima::fastrtps::Participant *mp_participant_, const 
     Wparam.qos.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
     Wparam.qos.m_publishMode.kind = eprosima::fastrtps::ASYNCHRONOUS_PUBLISH_MODE;
 
-    // This would be better, but we sent a lots of messages to use it.
-    // Wparam.topic.historyQos.kind = KEEP_ALL_HISTORY_QOS;
 
-    Wparam.topic.historyQos.kind =   KEEP_LAST_HISTORY_QOS;
-    Wparam.topic.historyQos.depth = 20; // Adjust this value if we are losing many messages
+    if (std::string_view(topicName) == "DSR") {
+        // This would be better, but we sent a lots of messages to use it.
+        // Wparam.topic.historyQos.kind = KEEP_ALL_HISTORY_QOS;
+        Wparam.topic.historyQos.kind = KEEP_LAST_HISTORY_QOS;
+        Wparam.topic.historyQos.depth = 100; // Adjust this value if we are losing many messages
 
 
-    // Check ACK for sended messages.
-    Wparam.times.heartbeatPeriod.seconds = 0;
-    Wparam.times.heartbeatPeriod.nanosec = 500000000; //500 ms
+        // Check ACK for sended messages.
+        Wparam.times.heartbeatPeriod.seconds = 0;
+        Wparam.times.heartbeatPeriod.nanosec = 250000000; //500 ms
 
+    }
     Wparam.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
     mp_publisher = eprosima::fastrtps::Domain::createPublisher(mp_participant,Wparam,static_cast<eprosima::fastrtps::PublisherListener*>(&m_listener));
 

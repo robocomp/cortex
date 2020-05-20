@@ -6,6 +6,7 @@
 #include <fstream>
 #include <unistd.h>
 #include <algorithm>
+#include <iterator>
 
 #include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/attributes/SubscriberAttributes.h>
@@ -230,38 +231,33 @@ std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGrap
     }
     // Get remove delta.
     auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
-
-    //auto val = translateAwCRDTtoIDL(id, delta);
-    //dsrpub.write(&val);
     aw.emplace_back(translateAwCRDTtoIDL(id, delta));
-
     update_maps_node_delete(id, node.value());
+    cout << "DELETE" << id << endl;
 
     //2. search and remove edges.
     //For each node check if there is an edge to remove.
     for (auto &[k, v] : nodes.getMapRef()) {
         if (edges.find({k, id}) == edges.end()) continue;
+        // Remove all edges between them
+        auto visited_node =  Node(v.dots().ds.rbegin()->second);
         for (const auto &key : edges[{k, id}]) {
-
             EdgeKey ek;
             ek.to(k);
             ek.type(key);
-            auto visited_node =  Node(v.dots().ds.rbegin()->second);
-
             visited_node.fano().erase(ek);
-            auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
             edges_.emplace_back(make_tuple(visited_node.id(), id, key));
-            update_maps_edge_delete(visited_node.id(), id, key);
 
-            // Send changes.
-            aw.emplace_back( translateAwCRDTtoIDL(visited_node.id(), delta));
-
-            //auto val = translateAwCRDTtoIDL(visited_node.id(), delta);
-            //dsrpub.write(&val);
+            edgeType[key].erase({visited_node.id(), id});
         }
+
+        auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
+        aw.emplace_back( translateAwCRDTtoIDL(visited_node.id(), delta));
+
+        //Remove all from cache
+        edges.erase({visited_node.id(), id});
     }
     return make_tuple(true,  edges_, aw);
-    //return make_pair(false, edges_);
 }
 
 std::vector<Node> CRDTGraph::get_nodes_by_type(const std::string& type)
@@ -333,9 +329,7 @@ std::optional<Edge> CRDTGraph::get_edge_(int from, int  to, const std::string& k
     if (in(from) && in(to)) {
         auto n = get_(from);
         if (n.has_value()) {
-            EdgeKey ek;
-            ek.to(to);
-            ek.type(key);
+            EdgeKey ek; ek.to(to); ek.type(key);
             auto edge = n.value().fano().find(ek);
             if (edge != n.value().fano().end()) {
                 return Edge(edge->second);
@@ -359,11 +353,8 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
         {
             auto node = get_(from);
             if (node.has_value()) {
-                EdgeKey ek;
-                ek.to(to);
-                ek.type(attrs.type());
+                EdgeKey ek; ek.to(to); ek.type(attrs.type());
                 node.value().fano().insert_or_assign(ek, attrs);
-
                 node.value().agent_id(agent_id);
                 auto [res, a] = insert_or_assign_node_(node.value());
                 r = res;
@@ -391,6 +382,7 @@ bool CRDTGraph::insert_or_assign_edge(Node& n, const Edge& e)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (in(e.to()))
         {
+            cout << "INSERTANDO EDGE " << e.from() << " " << e.to() << endl;
             EdgeKey ek; ek.to(e.to()); ek.type(e.type());
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
@@ -740,7 +732,8 @@ inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
         nodeType[n.type()].erase(id);
 
     for (const auto &[k,v] : n.fano()) {
-        edges[{k.to(), id}].erase(k.type());
+        edges[{id, v.to()}].erase(k.type());
+        if(edges[{id,k.to()}].empty()) edges.erase({id,k.to()});
         edgeType[k.type()].erase({id, k.to()});
     }
 }
@@ -752,16 +745,19 @@ inline void CRDTGraph::update_maps_node_insert(int id, const Node& n)
     nodeType[n.type()].emplace(id);
 
     for (const auto &[k,v] : n.fano()) {
-        edges[{k.to(), id}].insert(k.type());
+        edges[{id, k.to()}].insert(k.type());
         edgeType[k.type()].insert({id, k.to()});
     }
 }
 
+
 inline void CRDTGraph::update_maps_edge_delete(int from, int to, const std::string& key)
 {
     edges[{from, to}].erase(key);
+    if(edges[{from, to}].empty()) edges.erase({from, to});
     edgeType[key].erase({from, to});
 }
+
 
 std::optional<int> CRDTGraph::get_id_from_name(const std::string &name)
 {
@@ -821,7 +817,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
                     update_maps_node_insert(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second);
                     std::cout << " INSERT" << endl;
                 }
-            }
+            } else {  std::cout << " SKIP DELETED" << endl;}
         }
 
         if (signal) {
