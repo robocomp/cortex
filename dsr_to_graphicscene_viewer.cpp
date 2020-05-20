@@ -12,7 +12,8 @@ DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph
     //this->setFrameShape(NoFrame);
     scene.setItemIndexMethod(QGraphicsScene::NoIndex);
     scene.setSceneRect(-5000, -5000, 10000, 10000);
-	this->setScene(&scene);
+	this->scale(1, -1);
+    this->setScene(&scene);
     this->setCacheMode(QGraphicsView::CacheBackground);
 	this->setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
 	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
@@ -24,13 +25,13 @@ DSRtoGraphicsceneViewer::DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph
     this->viewport()->setMouseTracking(true);
 
     //center position
-    scene.addRect(-100, -100, 200, 200, QPen(QColor("orange")),QBrush(QColor("orange")));
+    scene.addRect(-100, -100, 200, 200, QPen(QColor("black")),QBrush(QColor("black")));
     //edge => x red, z (y) blue
-    scene.addRect(-4000, -4000, 1000, 30, QPen(QColor("red")),QBrush(QColor("red")));
-    scene.addRect(-4000, -4000, 30, 1000, QPen(QColor("blue")),QBrush(QColor("blue")));
-    
+    scene.addRect(-3000, -3000, 1000, 30, QPen(QColor("red")),QBrush(QColor("red")));
+    scene.addRect(-3000, -3000, 30, 1000, QPen(QColor("blue")),QBrush(QColor("blue")));
 
-  //  createGraph();
+
+    createGraph();
 }
 
 void DSRtoGraphicsceneViewer::createGraph()
@@ -41,47 +42,13 @@ void DSRtoGraphicsceneViewer::createGraph()
         auto map = G->getCopy();
 		for(const auto &[k, node] : map)
 		       add_or_assign_node_slot(k,  node.type());
-/*		for(auto node : map) // Aworset
+/*		for(auto node : map) 
            	for(const auto &[k, edges] : node.second.fano())
 			    add_or_assign_edge_slot(edges.from(), edges.to(), edges.type());
 */    }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
     
 }
-/*
-///////////////////////////////////////////////////////////////////////////////////
-void DSRtoGraphicsceneViewer::updateX()
-{
-    //viewer->frame();
-}
-
-void  DSRtoGraphicsceneViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const
-{
-	osg::Quat mRot;
-
-	switch(pov)
-	{
-        case TOP_POV:
-            mRot.makeRotate(-M_PI_2, QVecToOSGVec(QVec::vec3(1,0,0)));
-            break;
-        case BACK_POV:
-            mRot.makeRotate(M_PI_2,  QVecToOSGVec(QVec::vec3(0,0,0)));
-            break;
-        case FRONT_POV:
-            mRot.makeRotate(M_PI,    QVecToOSGVec(QVec::vec3(0,1,0)));
-            break;
-        case LEFT_POV:
-            mRot.makeRotate(M_PI_2,  QVecToOSGVec(QVec::vec3(0,-1,0)));
-            break;
-        case RIGHT_POV:
-            mRot.makeRotate(M_PI_2,  QVecToOSGVec(QVec::vec3(0,1,0)));
-            break;
-        default:
-            qFatal("InnerModelViewer: invalid POV.");
-	}
-	manipulator->setRotation(mRot);
-}
-*/
 
 //////////////////////////////////////////////////////////////////////////////////////
 ///// SLOTS
@@ -89,168 +56,119 @@ void  DSRtoGraphicsceneViewer::setMainCamera(osgGA::TrackballManipulator *manipu
 
 void DSRtoGraphicsceneViewer::add_or_assign_node_slot(const std::int32_t id, const std::string &type)
 {
-     qDebug() << __FUNCTION__ ;
-     qDebug()<<"*************************";
-     
-     auto node = G->get_node(id);
-     std::cout << node.value().name() << " " << node.value().id() << std::endl;
-     if(node.has_value())
-     {
-        if( type == "plane" or type == "floor")
-         add_or_assign_box(node.value());
-//        if( tipoIM.value() == "mesh")
-//         add_or_assign_mesh(node.value());
-     }
+    qDebug() << __FUNCTION__ ;
+    qDebug()<<"*************************";
+    
+    auto node = G->get_node(id);
+    std::cout << node.value().name() << " " << node.value().id() << std::endl;
+    if(node.has_value())
+    {
+    if( type == "plane" )//or type == "floor")
+        add_or_assign_box(node.value());
+    if( type == "mesh")
+        add_or_assign_mesh(node.value());
+    }
 }
 void DSRtoGraphicsceneViewer::add_or_assign_edge_slot(const std::int32_t from, const std::int32_t to, const std::string& type)
 {
-     qDebug() << __FUNCTION__ ;
+    qDebug() << __FUNCTION__ ;
 }
 
 void DSRtoGraphicsceneViewer::add_or_assign_box(Node &node)
 {
     qDebug() << "********************************";
     qDebug() << __FUNCTION__ ;
-    QString color = QString::fromStdString(G->get_attrib_by_name<std::string>(node, "color").value_or("orange"));
-    qDebug()<< "color:" << color;
-    
-    auto filename = G->get_attrib_by_name<std::string>(node, "texture");
-    if(filename.has_value()) std::cout <<"filename: " << filename.value() << std::endl;
-    
+    std::string color = G->get_attrib_by_name<std::string>(node, "color").value_or("orange");
+    std::string filename = G->get_attrib_by_name<std::string>(node, "texture").value_or("");
     auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
-    if(width.has_value()) std::cout << "width:" << width.value() << std::endl;
     auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
+
+
+    if(width.has_value()) std::cout << "width:" << width.value() << std::endl;    
     if(height.has_value()) std::cout << "height: " << height.value() << std::endl;
 
-
-    
 
     //check if has required values
     if(width.has_value() and height.has_value())
     {
-        // get transfrom to world => to get correct position
-        std::optional<QVec> pose = innermodel->transformS6D("world", node.name());
-        if (pose.has_value())
-        {
-            pose.value().print(QString::fromStdString(node.name()));
-            QGraphicsRectItem *box = scene.addRect(pose.value().x(), pose.value().z(), width.value(), height.value(), QPen(QColor(color)), QBrush(QColor(color)));
-            qDebug()<<"rotation"<<pose.value().rx()<<pose.value().ry()<<pose.value().rz();
-            box->setRotation(pose.value().ry()*180/M_PI);
-        }
+        add_or_assign_object(width.value(), height.value(), node.name(), color, filename); 
     }
     else
     {
-        std::cout<<"Error drawing "<< node<< " some required attribs has no value"<<std::endl;
+        std::cout<<"Error drawing "<< node << " width or height required attribs has no value"<<std::endl;
     }
     
 
 }
-/*
+
 void  DSRtoGraphicsceneViewer::add_or_assign_mesh(Node &node)
 {   
-    auto parent = G->get_attrib_by_name<std::int32_t>(node, "parent");
-    if(parent.has_value()) std::cout << parent.value() << std::endl;
-    auto color = G->get_attrib_by_name<std::string>(node, "color");
-    if(color.has_value()) std::cout << color.value() << std::endl;
-    auto filename = G->get_attrib_by_name<std::string>(node, "path");
-    if(filename.has_value()) std::cout << filename.value() << std::endl;
+    qDebug() << "********************************";
+    qDebug() << __FUNCTION__ ;
+    std::string color = G->get_attrib_by_name<std::string>(node, "color").value_or("orange");
+    std::string filename = G->get_attrib_by_name<std::string>(node, "path").value_or("");
     auto scalex = G->get_attrib_by_name<std::int32_t>(node, "scalex");
-    if(scalex.has_value()) std::cout << scalex.value() << std::endl;
     auto scaley = G->get_attrib_by_name<std::int32_t>(node, "scaley");
-    if(scaley.has_value()) std::cout << scaley.value() << std::endl;
     auto scalez = G->get_attrib_by_name<std::int32_t>(node, "scalez");
+
+    if(scalex.has_value()) std::cout << scalex.value() << std::endl;
+    if(scaley.has_value()) std::cout << scaley.value() << std::endl;
     if(scalez.has_value()) std::cout << scalez.value() << std::endl;
-    auto rx = G->get_attrib_by_name<std::int32_t>(node, "rx");
-    if(rx.has_value()) std::cout << rx.value() << std::endl;
-    auto ry = G->get_attrib_by_name<std::int32_t>(node, "ry");
-    if(ry.has_value()) std::cout << ry.value() << std::endl;
-    auto rz = G->get_attrib_by_name<std::int32_t>(node, "rz");
-    if(rz.has_value()) std::cout << rz.value() << std::endl;
-    auto tx = G->get_attrib_by_name<std::int32_t>(node, "tx");
-    if(tx.has_value()) std::cout << tx.value() << std::endl;
-    auto ty = G->get_attrib_by_name<std::int32_t>(node, "ty");
-    if(ty.has_value()) std::cout << ty.value() << std::endl;
-    auto tz = G->get_attrib_by_name<std::int32_t>(node, "tz");
-    if(tz.has_value()) std::cout << tz.value() << std::endl;
 
-    osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
-    // //if (parent) parent->addChild(mt);
-    RTMat rtmat = RTMat();
-    rtmat.setR (rx.value_or(0), ry.value_or(0), rz.value_or(0));
-    rtmat.setTr(tx.value_or(0), ty.value_or(0), tz.value_or(0));
-    mt->setMatrix(QMatToOSGMat4(rtmat));
-    osg::ref_ptr<osg::MatrixTransform> smt = new osg::MatrixTransform; 		
-    smt->setMatrix(osg::Matrix::scale(scalex.value_or(1),scaley.value_or(1),scalez.value_or(1)));
-    mt->addChild(smt);
-    // meshHash[mesh->id].osgmeshPaths = mt;
-    osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(filename.value());
-    if (!osgMesh)
-        throw  "Could not find nesh file " + filename.value();
-    osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
-    polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
-    osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
-    osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
-    smt->addChild(osgMesh);
-    osgObjectsMap.insert_or_assign(node.id(), smt);
-    if (std::optional<Node> parent_node = G->get_node(parent.value()); parent_node.has_value())
-        std::get<osg::Group*>(osgObjectsMap.at(parent_node.value().id()))->addChild(smt);
-    else 
-        root->addChild(smt);
-
-    // //meshHash[mesh->id].osgmeshes = osgMesh;
-    // // //meshHash[mesh->id].meshMts= mt;
-    // // //osgmeshmodes[mesh->id] = polygonMode;
-    // smt->addChild(osgMesh);
-}
-
-/////////////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////////////////
-
-void DSRtoGraphicsceneViewer::mouseMoveEvent(QMouseEvent* event)
-{
-    this->getEventQueue()->mouseMotion(event->x()*m_scaleX, event->y()*m_scaleY);
-}
-
-void DSRtoGraphicsceneViewer::mousePressEvent(QMouseEvent* event)
-{
-    unsigned int button = 0;
-    switch (event->button()){
-    case Qt::LeftButton:
-        button = 1;
-        break;
-    case Qt::MiddleButton:
-        button = 2;
-        break;
-    case Qt::RightButton:
-        button = 3;
-        break;
-    default:
-        break;
+     //check if has required values
+    if(scalex.has_value() and scaley.has_value() and scalez.has_value())
+    {
+        add_or_assign_object(scalex.value(), scalez.value(), node.name(), color, filename);
     }
-    this->getEventQueue()->mouseButtonPress(event->x()*m_scaleX, event->y()*m_scaleY, button);
+    else
+    {
+        std::cout<<"Error drawing "<< node << " scalex, scaley or scalez required attribs has no value"<<std::endl;
+    }
 }
 
-void DSRtoGraphicsceneViewer::mouseReleaseEvent(QMouseEvent* event)
+void  DSRtoGraphicsceneViewer::add_or_assign_object(int width, int height, std::string node_name, std::string color, std::string filename)
 {
-    unsigned int button = 0;
-    switch (event->button()){
-    case Qt::LeftButton:
-        button = 1;
-        break;
-    case Qt::MiddleButton:
-        button = 2;
-        break;
-    case Qt::RightButton:
-        button = 3;
-        break;
-    default:
-        break;
+    // get transfrom to world => to get correct position
+    std::optional<QVec> pose = innermodel->transformS6D("world", node_name);
+    if (pose.has_value())
+    {
+pose.value().print(QString::fromStdString(node_name));
+
+        add_scene_rect(width, height, pose.value(), color, filename);
+qDebug()<<"Node"<<QString::fromStdString(node_name)<<"zvalue"<<pose.value().y();
     }
-    this->getEventQueue()->mouseButtonRelease(event->x()*m_scaleX, event->y()*m_scaleY, button);
+    else
+    {
+        qDebug()<<"Error gettion tranformation from node"<<QString::fromStdString(node_name)<<"to world";
+    }
+    
 }
-*/
+
+void DSRtoGraphicsceneViewer::add_scene_rect(int width, int height, QVec pose, std::string color, std::string texture)
+{
+    std::cout<<"color"<<color;
+    QBrush brush = QBrush(QColor(QString::fromStdString(color)));
+    if (texture != "")
+    {
+        if(std::filesystem::exists(texture))
+            brush = QBrush(QImage(QString::fromStdString(texture)));
+        else
+            brush = QBrush(QColor(QString::fromStdString(texture)));
+    }
+
+    QGraphicsRectItem *box = scene.addRect(pose.x()-width/2 , pose.z() - height/2, width, height, QPen(QString::fromStdString(color)), brush);
+    box->setRotation(pose.ry()*180/M_PI);
+    box->setZValue(pose.y());
+}
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////
+//                  MOUSE                                   //
+//////////////////////////////////////////////////////////////
 void DSRtoGraphicsceneViewer::wheelEvent(QWheelEvent* event)
 {
 //    qDebug()<<"wheel";

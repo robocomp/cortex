@@ -17,21 +17,17 @@
 #ifndef DSR_TO_GRAPHCISCENE_VIEWER_H
 #define DSR_TO_GRAPHCISCENE_VIEWER_H
 
-#include <chrono>
-#include <math.h>
+#include "CRDT.h"
 
-#include <QWidget>
-#include <QApplication>
-#include <QDesktopWidget>
-#include <QGLWidget>
-#include <QHBoxLayout>
+#include <math.h>
+#include <filesystem>
+		
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QGraphicsRectItem>
 #include <QMouseEvent>
-#include <QResizeEvent>
+#include <QGLWidget>
 #include <QScrollBar>
-#include "CRDT.h"
 
 
 namespace DSR
@@ -42,13 +38,18 @@ namespace DSR
         Q_OBJECT
         public:
             QGraphicsScene scene;
+        private:
+            std::shared_ptr<CRDT::CRDTGraph> G;
+            std::unique_ptr<CRDT::InnerAPI> innermodel;      
+            
+            qreal m_scaleX, m_scaleY;
+            bool _pan;
+            int _panStartX, _panStartY;
 
 
         public:
             DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QGraphicsView *parent=0);
-//            void add_plane();
-//            void add_mesh();
-//            void add_person();
+
 
         public slots:   // From G
             void add_or_assign_node_slot(const std::int32_t id, const std::string &type);
@@ -60,20 +61,13 @@ namespace DSR
             virtual void mousePressEvent(QMouseEvent *event);
             virtual void mouseReleaseEvent(QMouseEvent *event);
 
-
         private:
-            std::shared_ptr<CRDT::CRDTGraph> G;
-            std::unique_ptr<CRDT::InnerAPI> innermodel;      
-            
-            qreal m_scaleX, m_scaleY;
-            bool _pan;
-            int _panStartX, _panStartY;
-
-
             void createGraph();
-
             void add_or_assign_box(Node &node);
-            void add_or_assign_mesh(Node &node);
+            void add_or_assign_mesh(Node &node);     
+            void add_or_assign_object(int width, int height, std::string node_name, std::string color, std::string filename);       
+            void add_scene_rect(int width, int height, QVec pose, std::string color, std::string texture);
+
     };
 };
 #endif
