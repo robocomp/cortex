@@ -81,8 +81,8 @@ namespace DSR
 
             //Hashes
             //using OsgTypes = std::variant<osg::, osg::MatrixTransform*>;
-            std::map<std::int32_t, osg::Group*> osg_map;
-            //std::map<std::tuple<std::int32_t, std::int32_t>, osg::Group*> osg_transform;
+            // //std::map<std::int32_t, osg::Group*> osg_map;
+            std::map<std::tuple<std::int32_t, std::int32_t>, osg::Group*> osg_map;
             //std::map<std::int32_t, std::int32_t>, osg::Group*> osg_transform;
             
             
@@ -96,7 +96,6 @@ namespace DSR
 
             void add_or_assign_box(const Node &node, const Node& parent);
             void add_or_assign_mesh(const Node &node, const Node& parent);
-            void add_or_assign_transform(const Node &node, const Node &parent, const Edge& edge);
             void add_or_assign_node_transform(const Node &from, const Node& to);
 
             void traverse_RT_tree(const Node& node);

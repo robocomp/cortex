@@ -290,7 +290,8 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
 }
 
 
-inline void Utilities::print() {
+void Utilities::print() 
+{
     for (const auto &[_,v] : G->getCopy())
     {
         Node node = v;
