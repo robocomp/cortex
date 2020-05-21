@@ -127,15 +127,15 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
     return r;
 }
 
-// bool CRDTGraph::insert_or_assign_node(const VertexPtr &vertex)
-// {
-//     return insert_or_assign_node(vertex->get_CRDT_node());
-// }
+//bool CRDTGraph::insert_or_assign_node(const VertexPtr &vertex)
+//{
+//    return insert_or_assign_node(vertex->get_CRDT_node());
+//}
 
-// bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
-// {
-//     return insert_or_assign_node(vertex.get_CRDT_node());
-// }
+//bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
+//{
+//    return insert_or_assign_node(vertex.get_CRDT_node());
+//}
 
 std::pair<bool, std::optional<AworSet>> CRDTGraph::insert_or_assign_node_(const N &node)
 {
@@ -274,37 +274,6 @@ std::vector<Node> CRDTGraph::get_nodes_by_type(const std::string& type)
     return nodes_;
 }
 
-void CRDTGraph::print_edge(const Edge &edge)
-{
-    std::cout << "------------------------------------" << std::endl;
-    std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
-    for(auto [k, v] : edge.attrs())
-        std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-    std::cout << "------------------------------------" << std::endl;
-}
-void CRDTGraph::print_node(const Node &node)
-{   
-    std::cout << "------------------------------------" << std::endl;
-    std::cout << "Node-> " << node.id() << std::endl;
-    std::cout << "  Type->" << node.type() << std::endl;
-    std::cout << "  Name->" << node.name() << std::endl;
-    std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
-    for(auto [key, val] : node.attrs())
-    std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
-    for(auto [key, val] : node.fano())
-    {
-        std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
-        for(auto [k, v] : val.attrs())
-        std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-    }
-    std::cout << "------------------------------------" << std::endl;
-}
-void CRDTGraph::print_node(int id)
-{
-    auto node = get_node(id);
-    if(node.has_value())
-        print_node(node.value());
-}
 //////////////////////////////////////////////////////////////////////////////////
 // EDGE METHODS
 //////////////////////////////////////////////////////////////////////////////////
@@ -662,26 +631,6 @@ std::map<long,Node> CRDTGraph::getCopy() const
     return keys;
 }
 
-void CRDTGraph::print()
-{
-    for (auto kv : nodes.getMap())
-    {
-        Node node = kv.second.dots().ds.rbegin()->second;
-        std::cout << "Node: " << node.id() << std::endl;
-        std::cout << "  Type:" << node.type() << std::endl;
-        std::cout << "  Name:" << node.name() << std::endl;
-        std::cout << "  Agent_id:" << node.agent_id()  << std::endl;
-        for(auto [key, val] : node.attrs())
-            std::cout << "      [ " << key << ", " << val.type() << ", " << val.value() << " ]"  << std::endl;
-        for(auto [key, val] : node.fano())
-        {
-            std::cout << "          Edge-type->" << val.type() << " from:" << val.from() << " to:" << val.to()  << std::endl;
-            for(auto [k, v] : val.attrs())
-                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
-        }
-    }
-    std::cout << "------------------------------------------------" << std::endl;
-}
 
 //////////////////////////////////////////////////////////////////////////////
 /////  CORE

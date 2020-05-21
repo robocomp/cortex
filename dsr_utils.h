@@ -17,7 +17,10 @@ namespace CRDT
             Utilities(CRDTGraph *G_);
             void read_from_json_file(const std::string &json_file_path);
             void write_to_json_file(const std::string &json_file_path);
-
+            void print();
+            void print_edge(const Edge &edge);
+            void print_node(const Node &node);
+            void print_node(int id);
         private:
             CRDT::CRDTGraph *G;
     };

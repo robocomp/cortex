@@ -53,8 +53,8 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
         n.id(id);
         n.agent_id(G->get_agent_id());
         n.name(name);
-        G->name_map[name] = id;
-        G->id_map[id] = name;
+        //G->name_map[name] = id;
+        //G->id_map[id] = name;
 
         std::map<string, Attrib> attrs;
 /*
@@ -192,8 +192,8 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
     QJsonObject dsrObject;
     QJsonArray linksArray;
     QJsonObject symbolsMap;
-    for (auto kv : G->nodes.getMapRef()) {
-        Node node = kv.second.dots().ds.rbegin()->second;
+    for (auto kv : G->getCopy()) {
+        Node node = kv.second;
         // symbol data
         QJsonObject symbol;
         symbol["id"] = node.id();
@@ -287,4 +287,53 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
     auto now_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::cout << __FILE__ << " " << __FUNCTION__ << "File: " << json_file_path << " written to disk at " << now_c
               << std::endl;
+}
+
+
+inline void Utilities::print() {
+    for (const auto &[_,v] : G->getCopy())
+    {
+        Node node = v;
+        std::cout << "Node: " << node.id() << std::endl;
+        std::cout << "  Type:" << node.type() << std::endl;
+        std::cout << "  Name:" << node.name() << std::endl;
+        std::cout << "  Agent_id:" << node.agent_id()  << std::endl;
+        for(auto [key, val] : node.attrs())
+            std::cout << "      [ " << key << ", " << val.type() << ", " << val.value() << " ]"  << std::endl;
+        for(auto [key, val] : node.fano())
+        {
+            std::cout << "          Edge-type->" << val.type() << " from:" << val.from() << " to:" << val.to()  << std::endl;
+            for(auto [k, v] : val.attrs())
+                std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+        }
+    }
+    std::cout << "------------------------------------------------" << std::endl;
+}
+inline void Utilities::print_edge(const Edge &edge) {
+    std::cout << "------------------------------------" << std::endl;
+    std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
+    for(auto [k, v] : edge.attrs())
+        std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+    std::cout << "------------------------------------" << std::endl;
+}
+inline void Utilities::print_node(const Node &node) {
+    std::cout << "------------------------------------" << std::endl;
+    std::cout << "Node-> " << node.id() << std::endl;
+    std::cout << "  Type->" << node.type() << std::endl;
+    std::cout << "  Name->" << node.name() << std::endl;
+    std::cout << "  Agent_id->" << node.agent_id()  << std::endl;
+    for(auto [key, val] : node.attrs())
+        std::cout << "      Key->" << key << " Type->" << val.type() << " Value->" << val.value()  << std::endl;
+    for(auto [key, val] : node.fano())
+    {
+        std::cout << "          Edge-type->" << val.type() << " from->" << val.from() << " to->" << val.to()  << std::endl;
+        for(auto [k, v] : val.attrs())
+            std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
+    }
+    std::cout << "------------------------------------" << std::endl;
+}
+inline void Utilities::print_node(int id) {
+    auto node = G->get_node(id);
+    if(node.has_value())
+        print_node(node.value());
 }

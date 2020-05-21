@@ -100,10 +100,10 @@ namespace CRDT
         std::vector<long> getKeys() const ;   
         inline int32_t get_agent_id() const        { return agent_id; };
         inline std::string get_agent_name() const  { return agent_name; };
-        void print();
-        void print_edge(const Edge &edge);
-        void print_node(const Node &node);
-        void print_node(int id);
+        void print() { utils->print(); };
+        void print_edge(const Edge &edge) { utils->print_edge(edge); };
+        void print_node(const Node &node) { utils->print_node(node);} ;
+        void print_node(int id) { utils->print_node(id);};
         void write_to_json_file(const std::string &file) const { utils->write_to_json_file(file); };
         void read_from_json_file(const std::string &file) const { utils->read_from_json_file(file); };
 
@@ -131,7 +131,7 @@ namespace CRDT
         std::optional<std::int32_t> get_node_level(Node& n);
         std::optional<std::int32_t> get_node_parent(const Node& n);
         std::string get_node_type(Node& n);
-        static void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value); //to be deprecated
+        void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value); //to be deprecated
         void add_attrib(std::int32_t from, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         void add_attrib(Node &n, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         
@@ -146,7 +146,7 @@ namespace CRDT
         bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
         bool delete_edge(int from, int t, const std::string& key);
         std::vector<Edge> get_edges_by_type(const std::string& type);
-        static std::vector<Edge> get_edges_by_type(const Node& node, const std::string& type);
+        std::vector<Edge> get_edges_by_type(const Node& node, const std::string& type);
         std::vector<Edge> get_edges_to_id(int id);
         std::optional<std::map<EdgeKey, Edge>> get_edges(int id);
         Edge get_edge_RT(const Node &n, int to);
@@ -279,9 +279,11 @@ namespace CRDT
         int count = 0;
 
     //private:
-        Nodes nodes;
+//        Nodes nodes;
     
     private:
+        Nodes nodes;
+
         int graph_root;
         bool work;
         mutable std::shared_mutex _mutex;
@@ -295,10 +297,10 @@ namespace CRDT
         // Cache maps
         ///////////////////////////////////////////////////////////////////////////
         std::unordered_set<int> deleted;     // deleted nodes, used to avoid insertion after remove.
-        public:
+        //public:
             std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
             std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
-        private:
+        //private:
         std::unordered_map<pair<int, int>, std::unordered_set<std::string>, pair_hash> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<std::string, std::unordered_set<pair<int, int>, pair_hash>> edgeType;  // collection with all edge types.
         std::unordered_map<std::string, std::unordered_set<int>> nodeType;  // collection with all node types.
