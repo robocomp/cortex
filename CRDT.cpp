@@ -46,11 +46,11 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
             qFatal("Aborting program. Cannot continue without intial file");
         }
         start_fullgraph_server_thread();
-        start_subscription_thread(true);
+        start_subscription_thread(false);
     }
     else
     {    
-        start_subscription_thread(true);     // regular subscription to deltas
+        start_subscription_thread(false);     // regular subscription to deltas
         bool res = start_fullgraph_request_thread();    // for agents that want to request the graph for other agent
         if(res == false) {
             eprosima::fastrtps::Domain::removeParticipant(participant_handle); // Remove a Participant and all associated publishers and subscribers.
@@ -744,7 +744,7 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
                 } else {
                     signal = true;
                     update_maps_node_insert(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second);
-                    std::cout << "JOIN INSERT: " << aworSet.id() << endl;
+                    //std::cout << "JOIN INSERT: " << aworSet.id() << endl;
                 }
             } else {  std::cout << " SKIP DELETED" << endl;}
         }
