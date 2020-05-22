@@ -263,7 +263,6 @@ namespace CRDT
             //    throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
         }
 
-        //For testing
 
         void reset() {
             nodes.reset();
@@ -276,7 +275,7 @@ namespace CRDT
         }
 
         //For debug
-        int count = 0;
+        //int count = 0;
 
     //private:
 //        Nodes nodes;
@@ -298,8 +297,8 @@ namespace CRDT
         ///////////////////////////////////////////////////////////////////////////
         std::unordered_set<int> deleted;     // deleted nodes, used to avoid insertion after remove.
         //public:
-            std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
-            std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
+        std::unordered_map<string, int> name_map;     // mapping between name and id of nodes.
+        std::unordered_map<int, string> id_map;       // mapping between id and name of nodes.
         //private:
         std::unordered_map<pair<int, int>, std::unordered_set<std::string>, pair_hash> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<std::string, std::unordered_set<pair<int, int>, pair_hash>> edgeType;  // collection with all edge types.

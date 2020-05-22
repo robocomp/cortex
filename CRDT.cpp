@@ -92,17 +92,6 @@ std::optional<Node> CRDTGraph::get_node(int id)
     return get_(id);
 }
 
-// std::optional<VertexPtr> CRDTGraph::get_vertex(const std::string& name)
-// {
-//     auto n = get_node(name);
-//     return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
-// }
-
-// std::optional<VertexPtr> CRDTGraph::get_vertex(int id)
-// {
-//     auto n = get_node(id);
-//     return n.has_value() ?  std::make_optional(std::make_shared<Vertex>(n.value())) : std::nullopt;
-// }
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
 {
@@ -112,6 +101,9 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
     std::optional<AworSet> aw;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
+        if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())
+            or ( name_map.find(node.name())  != name_map.end() and name_map[node.name()] != node.id() ))
+            throw CRDT::DSRException("Cannot insert node in G, id mut be unique");
         auto [res, a] = insert_or_assign_node_(node);
         r = res;
         aw = std::move(a);
@@ -127,15 +119,6 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
     return r;
 }
 
-//bool CRDTGraph::insert_or_assign_node(const VertexPtr &vertex)
-//{
-//    return insert_or_assign_node(vertex->get_CRDT_node());
-//}
-
-//bool CRDTGraph::insert_or_assign_node(Vertex &vertex)
-//{
-//    return insert_or_assign_node(vertex.get_CRDT_node());
-//}
 
 std::pair<bool, std::optional<AworSet>> CRDTGraph::insert_or_assign_node_(const N &node)
 {
@@ -233,7 +216,6 @@ std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGrap
     auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
     aw.emplace_back(translateAwCRDTtoIDL(id, delta));
     update_maps_node_delete(id, node.value());
-    cout << "DELETE" << id << endl;
 
     //2. search and remove edges.
     //For each node check if there is an edge to remove.
@@ -242,9 +224,7 @@ std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGrap
         // Remove all edges between them
         auto visited_node =  Node(v.dots().ds.rbegin()->second);
         for (const auto &key : edges[{k, id}]) {
-            EdgeKey ek;
-            ek.to(k);
-            ek.type(key);
+            EdgeKey ek; ek.to(k); ek.type(key);
             visited_node.fano().erase(ek);
             edges_.emplace_back(make_tuple(visited_node.id(), id, key));
 
@@ -554,7 +534,7 @@ std::vector<Edge> CRDTGraph::get_edges_to_id(int id) {
     std::vector<Edge> edges_;
     for (const auto &[key, types] : edges)
     {
-        auto [to, from] = key;
+        auto [from, to] = key;
         if (to == id) {
             for (const std::string& type : types) {
                 auto n = get_edge_(from, to, type);
@@ -751,20 +731,20 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             if (deleted.find(aworSet.id()) == deleted.end()) {
-                std::cout << "JOINING " << aworSet.id();
+
                 Node nd = (nodes[aworSet.id()].dots().ds.rbegin() == nodes[aworSet.id()].dots().ds.rend()) ? Node()
                                                                                                            : nodes[aworSet.id()].dots().ds.rbegin()->second;
                 for (const auto &[k, v] : nd.fano())
                     remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
 
                 nodes[aworSet.id()].join_replace(d);
-                if (nodes[aworSet.id()].dots().ds.size() == 0) {
+                if (nodes[aworSet.id()].dots().ds.size() == 0 or aworSet.dk().ds().size() == 0) {
                     update_maps_node_delete(aworSet.id(), nd);
-                    std::cout << " REMOVE" << endl;
+                    std::cout << "JOIN REMOVE: " << aworSet.id() << endl;
                 } else {
                     signal = true;
                     update_maps_node_insert(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second);
-                    std::cout << " INSERT" << endl;
+                    std::cout << "JOIN INSERT: " << aworSet.id() << endl;
                 }
             } else {  std::cout << " SKIP DELETED" << endl;}
         }
@@ -908,8 +888,7 @@ void CRDTGraph::subscription_thread(bool showReceived)
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
                     if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
                         if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
-                            //std::cout << " Received: node " << sample << " from " << m_info.sample_identity.writer_guid() << std::endl;
-                            std::cout << " Received:" << sample.id() << " node from: " << m_info.sample_identity.writer_guid() << std::endl;
+                            if (showReceived)  std::cout << " Received:" << sample.id() << " node from: " << m_info.sample_identity.writer_guid() << std::endl;
                             graph->join_delta_node(sample);
                         }
                     }
