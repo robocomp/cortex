@@ -16,61 +16,66 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
 {
     G = G_;
     this->resize(parent->width(), parent->height());
-    
     osg::Camera* camera = new osg::Camera;
     camera->setViewport( 0, 0, this->width(), this->height() );
     camera->setClearColor( osg::Vec4( 0.9f, 0.9f, 1.f, 1.f ) );
     float aspectRatio = static_cast<float>( this->width()) / static_cast<float>( this->height() );
     camera->setProjectionMatrixAsPerspective(55.0f, aspectRatio, 0.000001, 100000.0);
-    //camera->setProjectionMatrixAsPerspective( 30.f, aspectRatio, 1.f, 1000.f );
     camera->setGraphicsContext( _mGraphicsWindow );
     _mViewer->setCamera(camera);
     manipulator = new osgGA::TrackballManipulator;
-    manipulator->setAllowThrow( false );
-    this->setMouseTracking(true);
-    // osg::Vec3d eye(osg::Vec3(1.,1.,1000.));
-    // osg::Vec3d center(osg::Vec3(0.,0.,-0.));
-    // osg::Vec3d up(osg::Vec3(0.,1.,0.));
-    // manipulator->setHomePosition(eye, center, up, true);
-    // manipulator->setByMatrix(osg::Matrixf::lookAt(eye,center,up));
-    // manipulator->setHomePosition(osg::Vec3(0,0,0),osg::Vec3(0.f,0.,-40.),osg::Vec3(0.0f,1.f,0.0f), false);
+    //manipulator->setAllowThrow( false );
+    //this->setMouseTracking(true);
+    osg::Vec3d eye(osg::Vec3(4000.,4000.,1000.));
+    osg::Vec3d center(osg::Vec3(0.,0.,-0.));
+    osg::Vec3d up(osg::Vec3(0.,1.,0.));
+    manipulator->setHomePosition(eye, center, up, true);
+    manipulator->setByMatrix(osg::Matrixf::lookAt(eye,center,up));
     _mViewer->setCameraManipulator(manipulator);
     _mViewer->setThreadingModel(osgViewer::Viewer::SingleThreaded);
-	
- 	//global stateset
+    //_mViewer->addEventHandler(new osgGA::GUIEventHandler());
+ 	
+     //global stateset
 	osg::StateSet *globalStateSet = new osg::StateSet;
 	globalStateSet->setGlobalDefaults();
 	globalStateSet->setMode(GL_DEPTH_TEST, osg::StateAttribute::ON);
 
-	// // enable lighting
+	// enable lighting
 	globalStateSet->setMode(GL_LIGHTING, osg::StateAttribute::ON);
-	// osg::Light* light = _mViewer->getLight();
-	// light->setAmbient(  osg::Vec4( 0.4f,    0.4f, 0.4f,  1.f ));
-	// light->setDiffuse(  osg::Vec4( 0.8f,    0.8f, 0.8f,  1.f ));
-	// light->setSpecular( osg::Vec4( 0.2f,    0.2f, 0.2f,  1.f ));
-	// light->setPosition( osg::Vec4( 0.0f, 3000.0f, 0.0f,  1.f));
-    // light->setDirection(osg::Vec3(0.0f, -1.0f, 0.0f));
-	// osg::ref_ptr<osg::LightSource> lightSource = new osg::LightSource;
-	// lightSource->setLight(light);
-	// lightSource->setLocalStateSetModes(osg::StateAttribute::ON);
-	// lightSource->setStateSetModes(*globalStateSet,osg::StateAttribute::ON);
-	//root->addChild(lightSource.get() );
+	osg::Light* light = _mViewer->getLight();
+	//light->setAmbient(  osg::Vec4( 0.4f,    0.4f, 0.4f,  1.f ));
+	//light->setDiffuse(  osg::Vec4( 0.8f,    0.8f, 0.8f,  1.f ));
+	//light->setSpecular( osg::Vec4( 0.2f,    0.2f, 0.2f,  1.f ));
+	//light->setPosition( osg::Vec4( 0.0f, 3000.0f, 0.0f,  1.f));
+    //light->setDirection(osg::Vec3(0.0f, -1.0f, 0.0f));
+	_mViewer->getLight()->setPosition(osg::Vec4(1,-1, 1, 0)); // make 4th coord 1 for point
+	_mViewer->getLight()->setAmbient(osg::Vec4(0.2, 0.2, 0.2, 1.0));
+	_mViewer->getLight()->setSpecular(osg::Vec4(1.0, 1.0, 1.0, 1.0));
 
-    //add_cylinder(root);
-	//_mViewer->setSceneData( root.get());
+    osg::ref_ptr<osg::LightSource> lightSource = new osg::LightSource;
+	lightSource->setLight(light);
+	lightSource->setLocalStateSetModes(osg::StateAttribute::ON);
+	lightSource->setStateSetModes(*globalStateSet,osg::StateAttribute::ON);
 
 	root = createGraph();
+    root->addChild(lightSource.get() );
 
     analyse_osg_graph(root.get());
     qDebug()<< "End analyse";
 
     _mViewer->setSceneData( root.get());
 	
-    //timer.start(100);
-    
     //connect(G.get(), &CRDT::CRDTGraph::update_node_signal, this, &DSRtoOSGViewer::add_or_assign_node_slot);
 	//connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, this, &DSRtoOSGViewer::add_or_assign_edge_slot);
-
+    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, 
+        [this](auto id, auto type){ auto node = G->get_node(id).value(); add_or_assign_node_slot(node);});
+	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, 
+        [this](auto from, auto to, auto type){ 
+                                                auto parent = G->get_node(from); 
+                                                auto node = G->get_node(to);
+                                                if(parent.has_value() and node.has_value())
+                                                    add_or_assign_edge_slot(parent.value(), node.value());
+                                                });
 	//connect(G.get(), &CRDT::CRDTGraph::del_edge_signal, this, &DSRtoOSGViewer::delEdgeSLOT);
 	//connect(G.get(), &CRDT::CRDTGraph::del_node_signal, this, &DSRtoOSGViewer::delNodeSLOT);
 
@@ -90,7 +95,7 @@ void DSRtoOSGViewer::traverse_RT_tree(const Node& node)
         if(child.has_value())
         {
             add_or_assign_edge_slot(node, child.value());
-            add_or_assign_node_slot(child.value(),  child.value().type());
+            add_or_assign_node_slot(child.value());
             traverse_RT_tree(child.value());
         }
         else
@@ -152,7 +157,7 @@ void  DSRtoOSGViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, Ca
 // To insert a node its parent has to be a transform
 // Transforms are created form RT edges.
 
-void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node, const std::string &type_)
+void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node)
 {
     qDebug() << __FUNCTION__  << "node " << node.id();
      
@@ -162,7 +167,7 @@ void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node, const std::string
     auto parent = G->get_node(parent_id.value());
     auto type = node.type();
     std::cout << __FUNCTION__ << " " << node.name() << " " << node.id() << " " << node.type() << std::endl;
-    if( type == "plane")
+    if( type == "plane" )
         add_or_assign_box(node, parent.value());
     else if( type == "mesh")
         add_or_assign_mesh(node, parent.value());
@@ -182,6 +187,7 @@ void DSRtoOSGViewer::add_or_assign_edge_slot(const Node &from, const Node& to)
     transform->setMatrix( QMatToOSGMat4(rtmat) );
     transform->setName(std::to_string(from.id())+"-"+std::to_string(to.id()));
     
+    // Insert
     if( auto res = osg_map.find(std::make_tuple(from.id(), from.id())); res != osg_map.end())   
     {
         (*res).second->addChild(transform);
@@ -227,30 +233,25 @@ void DSRtoOSGViewer::add_or_assign_box(const Node &node, const Node& parent)
     auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
     if(depth.has_value()) std::cout << depth.value() << std::endl;
     
-    //we are in bussines
+    // Check valid ranges
     auto textu = texture.value_or("#000000");
     bool constantColor = false;
     if (textu.size() == 7 and textu[0] == '#')
             constantColor = true;
-    // Open image
-    osg::ref_ptr<osg::TessellationHints> hints;
-    osg::Image *image;
-    if (textu.size()>0 and not constantColor)
-    {
-        if( image = osgDB::readImageFile(textu), image == nullptr)
-            throw std::runtime_error("Couldn't load texture from file: " + texture.value());
-    }   
 
-    hints = new osg::TessellationHints;
-    hints->setDetailRatio(2.0f);
-    osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value()/100, height.value()/100, depth.value()/100);
-    auto plane_drawable = new osg::ShapeDrawable(box, hints);
-    plane_drawable->setColor(htmlStringToOsgVec4(texture.value_or("#FF0000")));
+    // Create object
+    // osg::ref_ptr<osg::TessellationHints> hints;
+    // hints->setDetailRatio(2.0f);
+    osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value(), height.value(), depth.value());
+    //auto plane_drawable = new osg::ShapeDrawable(box, hints);
+    auto plane_drawable = new osg::ShapeDrawable(box);
     osg::Geode* geode = new osg::Geode;
     geode->addDrawable(plane_drawable);
     osg::Group *group = new osg::Group;
     group->setName(std::to_string(node.id())+"-"+std::to_string(node.id()));
+    group->addChild(geode);
     
+    // Insert
     if( auto res = osg_map.find(std::make_tuple(parent.id(), node.id())); res != osg_map.end())   
     {
         (*res).second->addChild(group);
@@ -260,9 +261,17 @@ void DSRtoOSGViewer::add_or_assign_box(const Node &node, const Node& parent)
     else
         throw std::runtime_error("Transform: OSG parent not found for " + node.name() + "-" +std::to_string(node.id()));
 
-    if (not constantColor)
+    // add texture 
+    if (constantColor)
+        plane_drawable->setColor(htmlStringToOsgVec4(textu));
+    else
     {
-        // Texture
+        // image
+        osg::Image *image;
+        if (textu.size()>0 and not constantColor)
+            if( image = osgDB::readImageFile(textu), image == nullptr)
+                throw std::runtime_error("Couldn't load texture from file: " + texture.value());
+        // texture
         auto texture = new osg::Texture2D;
         texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
         texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
@@ -277,7 +286,6 @@ void DSRtoOSGViewer::add_or_assign_box(const Node &node, const Node& parent)
         texture->setTextureWidth(1);
         texture->setTextureHeight(1);
         texture->setResizeNonPowerOfTwoHint(false);
-
         // Material
         osg::ref_ptr<osg::Material> material = new osg::Material();
         //material->setTransparency( osg::Material::FRONT_AND_BACK, 0);
@@ -305,17 +313,22 @@ void  DSRtoOSGViewer::add_or_assign_mesh(const Node &node, const Node& parent)
     auto scalez = G->get_attrib_by_name<std::int32_t>(node, "scalez");
     if(scalez.has_value()) std::cout << scalez.value() << std::endl;
     
+    // Check valid ranges
+    
+    // Create object
     osg::ref_ptr<osg::MatrixTransform> scale_transform = new osg::MatrixTransform; 			
-	scale_transform->setMatrix(osg::Matrix::scale(scalex.value()/1000, scaley.value()/100, scalez.value()/10));
+	scale_transform->setMatrix(osg::Matrix::scale(scalex.value(), scaley.value(), scalez.value()));
 	osg::ref_ptr<osg::MatrixTransform> mt = new osg::MatrixTransform;
-    osg::ref_ptr<osg::Node> osgMesh = osgDB::readNodeFile(filename.value());
-    if (!osgMesh)
+    osg::ref_ptr<osg::Node> osg_mesh = osgDB::readNodeFile(filename.value());
+    if (!osg_mesh)
         throw  std::runtime_error("Could not find nesh file " + filename.value());
     osg::ref_ptr<osg::PolygonMode> polygonMode = new osg::PolygonMode();
     polygonMode->setMode(osg::PolygonMode::FRONT_AND_BACK, osg::PolygonMode::FILL);
-    osgMesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
-    osgMesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
-    scale_transform->addChild(osgMesh);
+    osg_mesh->getOrCreateStateSet()->setAttributeAndModes(polygonMode, osg::StateAttribute::OVERRIDE | osg::StateAttribute::ON);
+    osg_mesh->getOrCreateStateSet()->setMode( GL_RESCALE_NORMAL, osg::StateAttribute::ON );
+    scale_transform->addChild(osg_mesh);
+
+    // Insert
     if( auto res = osg_map.find(std::make_tuple(parent.id(), node.id())); res != osg_map.end())   
     {
         (*res).second->addChild(scale_transform);
@@ -373,15 +386,10 @@ void DSRtoOSGViewer::resizeGL( int width, int height )
     camera->setViewport(0, 0, this->width()*m_scaleX, this->height()* m_scaleY);
 }
 
-void DSRtoOSGViewer::initializeGL()
-{
-    //osg::Geode* geode = dynamic_cast<osg::Geode*>(_mViewer->getSceneData());
-    //osg::StateSet* stateSet = geode->getOrCreateStateSet();
-    // osg::Material* material = new osg::Material;
-    // material->setColorMode( osg::Material::AMBIENT_AND_DIFFUSE );
-    // stateSet->setAttributeAndModes( material, osg::StateAttribute::ON );
-    // stateSet->setMode( GL_DEPTH_TEST, osg::StateAttribute::ON );
-}     
+// void DSRtoOSGViewer::initializeGL()
+// {
+   
+// }     
 
 void DSRtoOSGViewer::mouseMoveEvent(QMouseEvent* event)
 {
@@ -444,8 +452,6 @@ bool DSRtoOSGViewer::event(QEvent* event)
 osgGA::EventQueue* DSRtoOSGViewer::getEventQueue() const 
 {
     osgGA::EventQueue* eventQueue = _mGraphicsWindow->getEventQueue();
-    // auto center = manipulator->getCenter();
-    // qDebug() << center.x() << center.y() << center.z() ;
     return eventQueue;
 }
 
@@ -457,16 +463,17 @@ void DSRtoOSGViewer::analyse_osg_graph(osg::Node *nd)
     osg::Geode *geode = dynamic_cast<osg::Geode *> (nd);
 	if (geode) 
     { // analyse the geode. If it isnt a geode the dynamic cast gives NULL.
+        osg::notify(osg::WARN) << " Geode "<<  geode->getName() <<std::endl;
 	    for (unsigned int i=0; i<geode->getNumDrawables(); i++) 
         {
-		    osg::Drawable *drawable=geode->getDrawable(i);
-		    osg::Geometry *geom=dynamic_cast<osg::Geometry *> (drawable);
-		    for (unsigned int ipr=0; ipr<geom->getNumPrimitiveSets(); ipr++) 
-            {
-			    osg::PrimitiveSet* prset=geom->getPrimitiveSet(ipr);
-			    osg::notify(osg::WARN) << "Primitive Set "<< ipr << std::endl;
-			    //analysePrimSet(prset, dynamic_cast<const osg::Vec3Array*>(geom->getVertexArray()));
-		    }
+		    // osg::Drawable *drawable=geode->getDrawable(i);
+		    // osg::Geometry *geom=dynamic_cast<osg::Geometry *> (drawable);
+		    // for (unsigned int ipr=0; ipr<geom->getNumPrimitiveSets(); ipr++) 
+            // {
+			//     osg::PrimitiveSet* prset=geom->getPrimitiveSet(ipr);
+			//     osg::notify(osg::WARN) << "Primitive Set "<< ipr << std::endl;
+			//     //analysePrimSet(prset, dynamic_cast<const osg::Vec3Array*>(geom->getVertexArray()));
+		    // }
 	    } 
     }
     else 
@@ -484,3 +491,21 @@ void DSRtoOSGViewer::analyse_osg_graph(osg::Node *nd)
 		}
 	}
 }
+
+// void OsgView::keyReleaseEvent( QKeyEvent* event )
+// {
+// 	if(event->key() == Qt::Key_Control)
+// 	{
+// 		flag1 = 0;
+// 	}
+// 	if(event->key() == Qt::Key_Q)
+// 	{
+// 		flag1 = 0;
+// 		osg::Vec3 eye, center, up; 
+// 		this->getCamera()->getViewMatrixAsLookAt( eye, center, up ); 
+// 		setHomePosition(eye,osg::Vec3(0.f,0.,-40.),up, false);
+
+// 	}
+// 	emit keyRelease(event->text());
+//     _gw->getEventQueue()->keyRelease( (osgGA::GUIEventAdapter::KeySymbol) *(event->text().toLatin1().data() ) );
+// }

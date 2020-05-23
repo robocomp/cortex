@@ -59,7 +59,8 @@ namespace DSR
 			 	auto gl =tab_2->findChildren<QOpenGLWidget*>();
 			 	if(gl.size()>0)
 			 		gl[0]->resize(e->size().width(), e->size().height());
-				dsr_to_graphicscene_viewer->resize(graphicsView_2D->size());
+				if(dsr_to_graphicscene_viewer)
+					dsr_to_graphicscene_viewer->resize(graphicsView_2D->size());
 			 };
 			
 		private:

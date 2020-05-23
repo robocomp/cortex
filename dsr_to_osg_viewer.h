@@ -54,15 +54,12 @@ namespace DSR
             // void add_person();
             
     
-        public slots:   // From G
-            void add_or_assign_node_slot(const Node &node, const std::string &type_);
-            void add_or_assign_edge_slot(const Node &from, const Node& to);
-            
+        
         protected:  
             //void resizeEvent(QResizeEvent *e) {  qDebug() << "SCAKE" << x() << y(); }; 
             virtual void paintGL();
             virtual void resizeGL( int width, int height );
-            virtual void initializeGL();
+            // virtual void initializeGL();
             virtual void mouseMoveEvent(QMouseEvent* event);        
             virtual void mousePressEvent(QMouseEvent* event);
             virtual void mouseReleaseEvent(QMouseEvent* event);
@@ -93,6 +90,9 @@ namespace DSR
             osg::ref_ptr<osg::Group> createGraph();
             void setMainCamera(osgGA::TrackballManipulator *manipulator, CameraView pov) const;
             osgGA::TrackballManipulator* manipulator;
+
+            void add_or_assign_node_slot(const Node &node);
+            void add_or_assign_edge_slot(const Node &from, const Node& to);
 
             void add_or_assign_box(const Node &node, const Node& parent);
             void add_or_assign_mesh(const Node &node, const Node& parent);
