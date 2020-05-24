@@ -39,7 +39,10 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
      if(dsr_input_file != std::string())
     {
         try
-        {   utils->read_from_json_file(dsr_input_file);  }
+        {   
+            utils->read_from_json_file(dsr_input_file); 
+            qDebug() << __FUNCTION__ << "Warning, graph read from file " << QString::fromStdString(dsr_input_file);     
+        }
         catch(const CRDT::DSRException& e)
         {  
             std::cout << e.what() << '\n';  

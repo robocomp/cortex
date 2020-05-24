@@ -49,23 +49,17 @@ namespace DSR
     {
         public:
             DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
-            // void add_plane();
-            // void add_mesh();
-            // void add_person();
-            
-    
         
         protected:  
             //void resizeEvent(QResizeEvent *e) {  qDebug() << "SCAKE" << x() << y(); }; 
-            virtual void paintGL();
+            inline void paintGL() override;
             virtual void resizeGL( int width, int height );
             // virtual void initializeGL();
-            virtual void mouseMoveEvent(QMouseEvent* event);        
-            virtual void mousePressEvent(QMouseEvent* event);
-            virtual void mouseReleaseEvent(QMouseEvent* event);
-            virtual void wheelEvent(QWheelEvent* event);
-            virtual bool event(QEvent* event);
-            virtual void resizeEvent(QResizeEvent *event){};
+            void mouseMoveEvent(QMouseEvent* event) override;        
+            void mousePressEvent(QMouseEvent* event) override;
+            void mouseReleaseEvent(QMouseEvent* event) override;
+            void wheelEvent(QWheelEvent* event) override;
+            bool event(QEvent* event) override;
 
         private:
             std::shared_ptr<CRDT::CRDTGraph> G;
@@ -96,7 +90,7 @@ namespace DSR
 
             void add_or_assign_box(const Node &node, const Node& parent);
             void add_or_assign_mesh(const Node &node, const Node& parent);
-            void add_or_assign_node_transform(const Node &from, const Node& to);
+            void add_or_assign_transform(const Node &from, const Node& to);
 
             void traverse_RT_tree(const Node& node);
             void analyse_osg_graph(osg::Node *nd);

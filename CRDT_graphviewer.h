@@ -57,8 +57,10 @@ namespace DSR
 				dsr_to_graph_viewer->resize(graphicsView->size());
 				dsr_to_graph_viewer->fitInView(dsr_to_graph_viewer->scene.sceneRect(), Qt::KeepAspectRatio );
 			 	auto gl =tab_2->findChildren<QOpenGLWidget*>();
-			 	if(gl.size()>0)
-			 		gl[0]->resize(e->size().width(), e->size().height());
+			 	//if(gl.size()>0)
+			 	//	gl[0]->resize(e->size().width(), e->size().height());
+				if(dsr_to_osg_viewer)
+				 	dsr_to_osg_viewer->resize(tab_2->size());			 
 				if(dsr_to_graphicscene_viewer)
 					dsr_to_graphicscene_viewer->resize(graphicsView_2D->size());
 			 };

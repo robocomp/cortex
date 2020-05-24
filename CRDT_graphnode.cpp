@@ -187,7 +187,7 @@ void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
     if( event->button()== Qt::RightButton)
     {
         static std::unique_ptr<QWidget> do_stuff;
-        if(tag->text().contains("laser"))
+        if(type=="laser")
             do_stuff = std::make_unique<DoLaserStuff>(graph, id_in_graph);
         else if(tag->text().contains("rgdb"))
             do_stuff = std::make_unique<DoRGBDStuff>(graph, id_in_graph);

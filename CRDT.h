@@ -143,6 +143,8 @@ namespace CRDT
         bool insert_or_assign_edge(Node& n, const Edge& e);   
         void insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, const std::vector<float>& rot_euler);
         void insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& trans, std::vector<float>&& rot_euler);
+        //void insert_or_assign_edge_RT(int from, int to, std::vector<float>&& trans, std::vector<float>&& rot_euler);
+        //void insert_or_assign_edge_RT(std::string from, std::string to, std::vector<float>&& trans, std::vector<float>&& rot_euler);
         bool delete_edge(const std::string& from, const std::string& t, const std::string& key);
         bool delete_edge(int from, int t, const std::string& key);
         std::vector<Edge> get_edges_by_type(const std::string& type);
