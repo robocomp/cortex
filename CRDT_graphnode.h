@@ -74,20 +74,16 @@ class DoLaserStuff : public QGraphicsView
       {
         std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
         std::optional<Node> n = graph->get_node(id);
-        if (n.has_value()) {
+        if (n.has_value()) 
+        {
             const auto lAngles = graph->get_attrib_by_name<vector<float>>(n.value(),"laser_data_angles");
             const auto lDists = graph->get_attrib_by_name<vector<float>>(n.value(), "laser_data_dists");
-
-            if (lAngles.has_value() and lDists.has_value()) {
+            if (lAngles.has_value() and lDists.has_value()) 
+            {
                 QPolygonF polig;
-                for (const auto v : lAngles.value())
-                    std::cout << v;
-                cout << std::endl;
-                for (const auto v : lDists.value())
-                    std::cout << v;
-                cout << std::endl;
-                for (const auto &[dist, angle] : iter::zip(lDists.value(), lAngles.value())) {
-                    std::cout << dist << "," << angle << std::endl;
+                for (const auto &[dist, angle] : iter::zip(lDists.value(), lAngles.value())) 
+                {
+                    //std::cout << dist << "," << angle << std::endl;
                     polig << QPointF(dist * sin(angle), dist * cos(angle));
                 }
                 scene.clear();
