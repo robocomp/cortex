@@ -31,6 +31,10 @@ namespace { char dummy; }
 using namespace eprosima::fastcdr::exception;
 
 #include <utility>
+#include <iostream>
+#include <string>
+
+static constexpr std::array<std::string_view, 5> TYPENAMES_IDL_UNION = { "STRING", "INT", "FLOAT", "FLOAT_VEC", "BOOL" };
 
 Val::Val()
 {
@@ -261,7 +265,7 @@ const std::string& Val::str() const
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException( ("STRING is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_str;
@@ -281,7 +285,7 @@ std::string& Val::str()
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("STRING is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_str;
@@ -306,7 +310,7 @@ int32_t Val::dec() const
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("INT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_dec;
@@ -326,7 +330,7 @@ int32_t& Val::dec()
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("INT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_dec;
@@ -351,7 +355,7 @@ float Val::fl() const
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_fl;
@@ -371,7 +375,7 @@ float& Val::fl()
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_fl;
@@ -402,7 +406,7 @@ const std::vector<float>& Val::float_vec() const
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("VECTOR_FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_float_vec;
@@ -422,7 +426,7 @@ std::vector<float>& Val::float_vec()
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("VECTOR_FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_float_vec;
@@ -448,7 +452,7 @@ bool Val::bl() const
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("BOOL is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_bl;
@@ -468,7 +472,7 @@ bool& Val::bl()
     }
     if(!b)
     {
-        throw BadParamException("This member is not been selected");
+        throw BadParamException(("BOOL is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
     }
 
     return m_bl;
