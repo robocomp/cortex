@@ -728,38 +728,54 @@ bool CRDTGraph::empty(const int &id)
 void CRDTGraph::join_delta_node(AworSet aworSet)
 {
     try{
-        vector<tuple<int, int , std::string>> remove;
+        //vector<tuple<int, int, std::string>> remove;
         bool signal = false;
         auto d = translateAwIDLtoCRDT(aworSet);
+        Node nd;
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             if (deleted.find(aworSet.id()) == deleted.end()) {
 
-                Node nd = (nodes[aworSet.id()].dots().ds.rbegin() == nodes[aworSet.id()].dots().ds.rend()) ? Node()
-                                                                                                           : nodes[aworSet.id()].dots().ds.rbegin()->second;
-                for (const auto &[k, v] : nd.fano())
-                    remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
+                (nodes[aworSet.id()].dots().ds.rbegin() != nodes[aworSet.id()].dots().ds.rend()) ?
+                    nd = nodes[aworSet.id()].dots().ds.rbegin()->second : Node();
+
+                //for (const auto &[k, v] : nd.fano())
+                //    remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
 
                 nodes[aworSet.id()].join_replace(d);
                 if (nodes[aworSet.id()].dots().ds.size() == 0 or aworSet.dk().ds().size() == 0) {
                     update_maps_node_delete(aworSet.id(), nd);
-                    std::cout << "JOIN REMOVE: " << aworSet.id() << endl;
+                    //std::cout << "JOIN REMOVE: " << aworSet.id() << endl;
                 } else {
                     signal = true;
                     update_maps_node_insert(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second);
                     //std::cout << "JOIN INSERT: " << aworSet.id() << endl;
                 }
-            } else {  std::cout << " SKIP DELETED" << endl;}
+            } //else {  std::cout << " SKIP DELETED" << endl;}
         }
 
         if (signal) {
-            emit update_node_signal(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second.type());
+            //check what change is joined
+            if (nd.attrs() != nodes[aworSet.id()].dots().ds.rbegin()->second.attrs()) {
+                emit update_node_signal(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second.type());
+            } else {
+                std::map<EdgeKey, Edge> diff_remove;
+                std::set_difference(nd.fano().begin(), nd.fano().end(),
+                              nodes[aworSet.id()].dots().ds.rbegin()->second.fano().begin(),
+                              nodes[aworSet.id()].dots().ds.rbegin()->second.fano().end(),
+                                    std::inserter(diff_remove, diff_remove.begin()));
+                std::map<EdgeKey, Edge> diff_insert;
+                std::set_difference(nodes[aworSet.id()].dots().ds.rbegin()->second.fano().begin(),
+                                    nodes[aworSet.id()].dots().ds.rbegin()->second.fano().end(),
+                                    nd.fano().begin(), nd.fano().end(),
+                                    std::inserter(diff_insert, diff_insert.begin()));
 
-            for (const auto &[from, to, type] : remove)
-                emit del_edge_signal(from, to, type);
+                for (const auto &[k,v] : diff_remove)
+                        emit del_edge_signal(aworSet.id(), k.to(), k.type());
 
-            for (const auto &[k,v] : nodes[aworSet.id()].dots().ds.rbegin()->second.fano()) {
-                emit update_edge_signal(aworSet.id(), k.to(), k.type());
+                for (const auto &[k,v] : diff_insert) {
+                    emit update_edge_signal(aworSet.id(), k.to(), k.type());
+                }
             }
         }
         else {
