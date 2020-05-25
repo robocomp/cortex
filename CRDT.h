@@ -134,7 +134,8 @@ namespace CRDT
         void add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value); //to be deprecated
         void add_attrib(std::int32_t from, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         void add_attrib(Node &n, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
-        
+        template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
+        void remove_attrib(Type& elem, const std::string &new_name) {elem.attrs().erase(new_name); }
         // Edges
         std::optional<Edge> get_edge(const std::string& from, const std::string& to, const std::string& key);
         std::optional<Edge> get_edge(int from, int to, const std::string& key);
@@ -252,8 +253,7 @@ namespace CRDT
                 if(node.has_value())
                 {
                     elem.attrs().insert_or_assign(new_name, at);
-                    insert_or_assign_edge(node.value(), elem);
-                    if(insert_or_assign_node(node.value()))
+                    if(insert_or_assign_edge(node.value(), elem))
                         return;
                     else
                         throw std::runtime_error("Could not insert Node " + std::to_string(elem.from()) + " in G in add_attrib_by_name()");
@@ -265,6 +265,34 @@ namespace CRDT
             //    throw std::runtime_error("Node or Edge type not valid for add_attrib_by_name()");
         }
 
+        template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
+        void remove_attrib_by_name(Type& elem, const std::string &new_name) {
+            elem.attrs().erase(new_name);
+
+            // insert in node
+            if constexpr (std::is_same<Node,  Type>::value)
+            {
+                if(insert_or_assign_node(elem))
+                    return;
+                else
+                    throw std::runtime_error("Could not insert Node " + std::to_string(elem.id()) + " in G in remove_attrib_by_name()");
+            }
+                // insert in edge
+            else if constexpr (std::is_same<Edge,  Type>::value)
+            {
+                auto node = get_node(elem.from());
+                if(node.has_value())
+                {
+                    bool r = insert_or_assign_edge(node.value(), elem);
+                    if(r)
+                        return;
+                    else
+                        throw std::runtime_error("Could not insert Node " + std::to_string(elem.from()) + " in G in add_attrib_by_name()");
+                }
+                else
+                    throw std::runtime_error("Node " + std::to_string(elem.from()) + " not found in remove_attrib_by_name()");
+            }
+        }
 
         void reset() {
             nodes.reset();
