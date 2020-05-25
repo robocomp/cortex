@@ -135,11 +135,15 @@ namespace CRDT
         void add_attrib(std::int32_t from, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         void add_attrib(Node &n, std::int32_t to, std::string key, const Attrib &attr);  // not implemented
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
-        void remove_attrib(Type& elem, const std::string &new_name) {elem.attrs().erase(new_name); }
+        void remove_attrib(Type& elem, const std::string &new_name) { elem.attrs().erase(new_name); }
+
         // Edges
         std::optional<Edge> get_edge(const std::string& from, const std::string& to, const std::string& key);
         std::optional<Edge> get_edge(int from, int to, const std::string& key);
-        std::optional<Edge> get_edge(const Node &n, int to, const std::string& key);   // not implemented
+        std::optional<Edge> get_edge(const Node &n, int to, const std::string& key) {
+            EdgeKey ek; ek.to(to); ek.type(key);
+            return (n.fano().find(ek) != n.fano().end()) ?  std::make_optional(n.fano().find(ek)->second) : std::nullopt;
+        };
         bool insert_or_assign_edge(const Edge& attrs);
         bool insert_or_assign_edge(Node& n, const Edge& e);   
         void insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, const std::vector<float>& rot_euler);
