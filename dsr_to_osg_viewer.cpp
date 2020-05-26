@@ -61,7 +61,7 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
     _mViewer->setSceneData( root.get());
 	
     connect(G.get(), &CRDT::CRDTGraph::update_node_signal, 
-        [this](auto id, auto type){ auto node = G->get_node(id).value(); add_or_assign_node_slot(node);});
+        [this](auto id, auto type){ auto node = G->get_node(id); if (node.has_value()) add_or_assign_node_slot(node.value());});
 	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, 
         [this](auto from, auto to, auto type){ 
                                                 auto parent = G->get_node(from); 
@@ -172,31 +172,30 @@ void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node)
 void DSRtoOSGViewer::add_or_assign_edge_slot(const Node &from, const Node& to)
 {
     std::cout << __FUNCTION__ << "from " << from.id() << " to " << to.id() << std::endl;
-    auto edge = G->get_edge_RT(from, to.id());
-    auto rtmat = G->get_edge_RT_as_RTMat(edge);
-    rtmat.print("rtmat");
-    auto mat = QMatToOSGMat4(rtmat);
-    
-    // Insert
-    if( auto res = osg_map.find(std::make_tuple(from.id(), from.id())); res != osg_map.end())   
+    auto edge = G->get_edge(from.id(), to.id(), "RT");
+    if (edge.has_value())
     {
-        if( auto anterior = osg_map.find(std::make_tuple(from.id(), to.id())); anterior != osg_map.end())
-        {
-            if( auto old_trans = dynamic_cast<osg::MatrixTransform*>((*anterior).second); old_trans != nullptr)
-                old_trans->setMatrix(mat);
-            else
-                throw std::runtime_error("Exception: dynamic_cast to MatrixTransform failed");
-        }
-        else
-        {
-            osg::MatrixTransform* transform = new osg::MatrixTransform(mat);
-            (*res).second->addChild(transform);
-            osg_map.insert_or_assign(std::make_tuple(from.id(), to.id()), transform);
-        }
-        qDebug() << __FUNCTION__ << "Added transform, node " << to.id() << "parent "  << from.id();
+        //auto edge = G->get_edge_RT(from, to.id());
+        auto rtmat = G->get_edge_RT_as_RTMat(edge.value());
+        rtmat.print("rtmat");
+        auto mat = QMatToOSGMat4(rtmat);
+
+        // Insert
+        if (auto res = osg_map.find(std::make_tuple(from.id(), from.id())); res != osg_map.end()) {
+            if (auto anterior = osg_map.find(std::make_tuple(from.id(), to.id())); anterior != osg_map.end()) {
+                if (auto old_trans = dynamic_cast<osg::MatrixTransform *>((*anterior).second); old_trans != nullptr)
+                    old_trans->setMatrix(mat);
+                else
+                    throw std::runtime_error("Exception: dynamic_cast to MatrixTransform failed");
+            } else {
+                osg::MatrixTransform *transform = new osg::MatrixTransform(mat);
+                (*res).second->addChild(transform);
+                osg_map.insert_or_assign(std::make_tuple(from.id(), to.id()), transform);
+            }
+            qDebug() << __FUNCTION__ << "Added transform, node " << to.id() << "parent " << from.id();
+        } else
+            throw std::runtime_error("Exception: parent " + from.name() + " not found for node " + to.name());
     }
-    else 
-        throw std::runtime_error("Exception: parent " + from.name() + " not found for node " + to.name());
 }
 
 ////////////////////////////////////////////////////////////////
