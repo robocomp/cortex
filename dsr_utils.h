@@ -10,7 +10,6 @@
 namespace CRDT
 {
     class CRDTGraph;
-
     class Utilities
     {
         public:
@@ -21,8 +20,12 @@ namespace CRDT
             void print_edge(const Edge &edge);
             void print_node(const Node &node);
             void print_node(int id);
+            void print_RT(std::int32_t root);
+    
         private:
             CRDT::CRDTGraph *G;
+            void print_RT(const Node& node);
+
     };
 };
 

@@ -107,7 +107,7 @@ osg::ref_ptr<osg::Group> DSRtoOSGViewer::createGraph()
         qDebug() << __FUNCTION__ << "Finished reading graph. Waiting for events";
         return root;
     }
-	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
+	catch(const std::exception &e) { std::cout << e.what() << " Error in method "<< __FUNCTION__<<" : " << std::endl;}
     return osg::ref_ptr<osg::Group>();
 }
 
@@ -224,83 +224,87 @@ void DSRtoOSGViewer::add_or_assign_transform(const Node &node, const Node& paren
 
 void DSRtoOSGViewer::add_or_assign_box(const Node &node, const Node& parent)
 {
-    std::cout << __FUNCTION__ << "node " << node.id() << parent.id() << std::endl;
-    std::cout << node.name() << " " << node.id() << std::endl;
-    auto texture = G->get_attrib_by_name<std::string>(node, "texture");
-    if(texture.has_value()) std::cout << texture.value() << std::endl;
-    auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
-    if(height.has_value()) std::cout << height.value() << std::endl;
-    auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
-    if(width.has_value()) std::cout << height.value() << std::endl;
-    auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
-    if(depth.has_value()) std::cout << depth.value() << std::endl;
-    
-    // Check valid ranges
-    auto textu = texture.value_or("#000000");
-    bool constantColor = false;
-    if (textu.size() == 7 and textu[0] == '#')
-            constantColor = true;
-
-    // Create object
-    osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value(), height.value(), depth.value());
-    auto plane_drawable = new osg::ShapeDrawable(box);
-    osg::Geode* geode = new osg::Geode;
-    geode->addDrawable(plane_drawable);
-    osg::Group *group = new osg::Group;
-    group->setName(std::to_string(node.id())+"-"+std::to_string(node.id()));
-    group->addChild(geode);
-    
-    // Insert
-    if( auto res = osg_map.find(std::make_tuple(parent.id(), node.id())); res != osg_map.end())   
+    std::cout << __FUNCTION__ << ": node " <<  node.name() << "-" << node.id()<< " Parent: " << parent.id() << std::endl;
+    try
     {
-        if( auto anterior = osg_map.find(std::make_tuple(node.id(), node.id())); anterior == osg_map.end())
+        auto texture = G->get_attrib_by_name<std::string>(node, "texture");
+        if(texture.has_value()) std::cout << texture.value() << std::endl;
+        auto height = G->get_attrib_by_name<std::int32_t>(node, "height");
+        if(height.has_value()) std::cout << height.value() << std::endl;
+        auto width = G->get_attrib_by_name<std::int32_t>(node, "width");
+        if(width.has_value()) std::cout << height.value() << std::endl;
+        auto depth = G->get_attrib_by_name<std::int32_t>(node, "depth");
+        if(depth.has_value()) std::cout << depth.value() << std::endl;
+   
+        // Check valid ranges
+        auto textu = texture.value_or("#000000");
+        bool constantColor = false;
+        if (textu.size() == 7 and textu[0] == '#')
+                constantColor = true;
+
+        // Create object
+        osg::ref_ptr<osg::Box> box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value(), height.value(), depth.value());
+        auto plane_drawable = new osg::ShapeDrawable(box);
+        osg::Geode* geode = new osg::Geode;
+        geode->addDrawable(plane_drawable);
+        osg::Group *group = new osg::Group;
+        group->setName(std::to_string(node.id())+"-"+std::to_string(node.id()));
+        group->addChild(geode);
+        
+        // Insert
+        if( auto res = osg_map.find(std::make_tuple(parent.id(), node.id())); res != osg_map.end())   
         {
-            (*res).second->addChild(group);
-            osg_map.insert_or_assign(std::make_tuple(node.id(), node.id()), group);
-            qDebug() << __FUNCTION__ << "Added transform, node " << node.id() << "parent "  << parent.id();
+            if( auto anterior = osg_map.find(std::make_tuple(node.id(), node.id())); anterior == osg_map.end())
+            {
+                (*res).second->addChild(group);
+                osg_map.insert_or_assign(std::make_tuple(node.id(), node.id()), group);
+                qDebug() << __FUNCTION__ << "Added transform, node " << node.id() << "parent "  << parent.id();
+            }
+            // Already exists. Just modify it
         }
-        // Already exists. Just modify it
-    }
-    else
-        throw std::runtime_error("Transform: OSG parent not found for " + node.name() + "-" +std::to_string(node.id()));
+        else
+            throw std::runtime_error("Transform: OSG parent not found for " + node.name() + "-" +std::to_string(node.id()));
 
-    // All these depending on new or mod
-    // add texture 
-    if (constantColor)
-        plane_drawable->setColor(htmlStringToOsgVec4(textu));
-    else
-    {
-        // image
-        osg::Image *image;
-        if (textu.size()>0 and not constantColor)
-            if( image = osgDB::readImageFile(textu), image == nullptr)
-                throw std::runtime_error("Couldn't load texture from file: " + texture.value());
-        // texture
-        auto texture = new osg::Texture2D;
-        texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-        texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-        texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-        texture->setImage(image);
-        //texture->setDataVariance(Object::DYNAMIC);
-        texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
-        texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
-        texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-        texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
-        texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-        texture->setTextureWidth(1);
-        texture->setTextureHeight(1);
-        texture->setResizeNonPowerOfTwoHint(false);
-        // Material
-        osg::ref_ptr<osg::Material> material = new osg::Material();
-        //material->setTransparency( osg::Material::FRONT_AND_BACK, 0);
-        material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
-        // Assign the material and texture to the plane
-        osg::StateSet *sphereStateSet = geode->getOrCreateStateSet();
-        sphereStateSet->ref();
-        sphereStateSet->setAttribute(material);
-        sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
-        sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
-    }
+        // All these depending on new or mod
+        // add texture 
+        if (constantColor)
+            plane_drawable->setColor(htmlStringToOsgVec4(textu));
+        else
+        {
+            // image
+            osg::Image *image;
+            if (textu.size()>0 and not constantColor)
+                if( image = osgDB::readImageFile(textu), image == nullptr)
+                    throw std::runtime_error("Couldn't load texture from file: " + texture.value());
+            // texture
+            auto texture = new osg::Texture2D;
+            texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+            texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+            texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+            texture->setImage(image);
+            //texture->setDataVariance(Object::DYNAMIC);
+            texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR);
+            texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+            texture->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+            texture->setWrap(osg::Texture::WRAP_R, osg::Texture::REPEAT);
+            texture->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+            texture->setTextureWidth(1);
+            texture->setTextureHeight(1);
+            texture->setResizeNonPowerOfTwoHint(false);
+            // Material
+            osg::ref_ptr<osg::Material> material = new osg::Material();
+            //material->setTransparency( osg::Material::FRONT_AND_BACK, 0);
+            material->setEmission(osg::Material::FRONT, osg::Vec4(0.8, 0.8, 0.8, 0.5));
+            // Assign the material and texture to the plane
+            osg::StateSet *sphereStateSet = geode->getOrCreateStateSet();
+            sphereStateSet->ref();
+            sphereStateSet->setAttribute(material);
+            sphereStateSet->setTextureMode(0, GL_TEXTURE_GEN_R, osg::StateAttribute::ON);
+            sphereStateSet->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
+        }
+     }
+    catch(const std::exception &e)
+    { std::cout << "Exception at insert_or_assign_box " << e.what() <<  std::endl; throw e; }
 }
 
 void  DSRtoOSGViewer::add_or_assign_mesh(const Node &node, const Node& parent)

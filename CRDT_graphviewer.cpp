@@ -27,7 +27,7 @@
 
 using namespace DSR;
 
-GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_) 
+GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, std::list<View> options) 
 {
 	G = G_;
     qRegisterMetaType<std::int32_t>("std::int32_t");
@@ -50,13 +50,16 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_)
 	// settings.endGroup();
 	
 	tabWidget->setCurrentIndex(0);
-
-	dsr_to_graph_viewer = std::make_unique<DSR::DSRtoGraphViewer>(G, graphicsView);
-	//dsr_to_tree_viewer = std::make_unique<DSR::DSRtoTreeViewer>(G, treeWidget);
-	
-	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
-	//dsr_to_graphicscene_viewer = std::make_unique<DSR::DSRtoGraphicsceneViewer>(G, 1, 1, graphicsView_2D);
-	   
+	for(auto option: options)
+	{
+		if(option == View::Scene)
+		 	dsr_to_graph_viewer = std::make_unique<DSR::DSRtoGraphViewer>(G, graphicsView);
+		// //dsr_to_tree_viewer = std::make_unique<DSR::DSRtoTreeViewer>(G, treeWidget);
+		if(option == View::OSG)
+		 	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1, tab_2);
+		// if(option == View::Graph)
+		// 	dsr_to_graphicscene_viewer = std::make_unique<DSR::DSRtoGraphicsceneViewer>(G, 1, 1, graphicsView_2D);
+	}
 }
 
 GraphViewer::~GraphViewer()

@@ -289,7 +289,6 @@ void Utilities::write_to_json_file(const std::string &json_file_path)
               << std::endl;
 }
 
-
 void Utilities::print() 
 {
     for (const auto &[_,v] : G->getCopy())
@@ -310,14 +309,16 @@ void Utilities::print()
     }
     std::cout << "------------------------------------------------" << std::endl;
 }
-inline void Utilities::print_edge(const Edge &edge) {
+
+void Utilities::print_edge(const Edge &edge) {
     std::cout << "------------------------------------" << std::endl;
     std::cout << "Edge-type->" << edge.type() << " from->" << edge.from() << " to->" << edge.to()  << std::endl;
     for(auto [k, v] : edge.attrs())
         std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
     std::cout << "------------------------------------" << std::endl;
 }
-inline void Utilities::print_node(const Node &node) {
+
+void Utilities::print_node(const Node &node) {
     std::cout << "------------------------------------" << std::endl;
     std::cout << "Node-> " << node.id() << std::endl;
     std::cout << "  Type->" << node.type() << std::endl;
@@ -331,10 +332,41 @@ inline void Utilities::print_node(const Node &node) {
         for(auto [k, v] : val.attrs())
             std::cout << "              Key->" << k << " Type->" << v.type() << " Value->" << v.value()  << std::endl;
     }
-    std::cout << "------------------------------------" << std::endl;
 }
-inline void Utilities::print_node(int id) {
+
+void Utilities::print_node(const std::int32_t id) 
+{
     auto node = G->get_node(id);
     if(node.has_value())
         print_node(node.value());
 }
+
+void Utilities::print_RT(const std::int32_t id)
+{   
+    std::cout << "-------------- Printing RT tree ------------------" << std::endl;
+    auto node = G->get_node(id);
+    if(node.has_value())
+    {
+        print_node(node.value());
+        print_RT(node.value());
+    }
+    else
+        throw std::runtime_error("Print_RT. Unable to traverse the tree at node: " + std::to_string(id));
+    std::cout << "-------------- End printing RT tree ------------------" << std::endl;
+}
+
+void Utilities::print_RT(const Node& node)
+{   
+    for(auto &edge: G->get_edges_by_type(node, "RT"))
+	{
+        auto child = G->get_node(edge.to());
+        if(child.has_value())
+        {
+            print_node(child.value());
+            print_RT(child.value());
+        }
+        else
+            throw std::runtime_error("Unable to traverse the tree at node: " + std::to_string(edge.to()));
+	}
+}
+

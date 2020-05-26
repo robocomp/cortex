@@ -43,7 +43,8 @@ namespace DSR
 	{
 		Q_OBJECT
 		public:
-			GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G);
+			enum class View {Graph, OSG, Scene};	
+			GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G, std::list<View> options=std::list<View>());
 			~GraphViewer();
 			void itemMoved();
 			void createGraph();
