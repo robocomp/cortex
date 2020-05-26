@@ -376,35 +376,6 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
     return true;
 }
 
-bool CRDTGraph::insert_or_assign_edge(Node& n, const Edge& e)
-{
-    bool r = false;
-    std::optional<AworSet> aw;
-    {
-        std::unique_lock<std::shared_mutex> lock(_mutex);
-        if (in(e.to()))
-        {
-            cout << "INSERTANDO EDGE " << e.from() << " " << e.to() << endl;
-            EdgeKey ek; ek.to(e.to()); ek.type(e.type());
-            n.fano().insert_or_assign(ek, e);
-            n.agent_id(agent_id);
-            auto [res, a] = insert_or_assign_node_(n);
-            r = res;
-            aw = std::move(a);
-        } else
-        {
-            std::cout << __FUNCTION__ <<":" << __LINE__ <<" Error. ID:"<< e.from() <<" or "<< e.to() <<" not found. Cant update. "<< std::endl;
-            return false;
-        }
-    }
-    if (r)
-        emit update_edge_signal( e.from(),  e.to(), e.type());
-    if (aw.has_value())
-        dsrpub.write(&aw.value());
-
-    return true;
-}
-
 void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& trans, std::vector<float>&& rot_euler)
 {
     bool r = false;
@@ -1111,37 +1082,5 @@ std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const 
               [](std::string a) -> std::tuple<std::string, std::string, int>	{ return  make_tuple("string", a,1); },
               [](auto a) -> std::tuple<std::string, std::string, int>			{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
       }, t);
-}
-
-void CRDTGraph::add_attrib(std::map<string, Attrib> &v, std::string att_name, CRDT::MTypes att_value) 
-{
-
-    Attrib av;
-    av.type(att_value.index());
-
-    Val value;
-    switch(att_value.index()) {
-        case 0:
-            value.str(std::get<std::string>(att_value));
-            av.value( value);
-            break;
-        case 1:
-            value.dec(std::get<std::int32_t>(att_value));
-            av.value( value);
-            break;
-        case 2:
-            value.fl(std::get<float>(att_value));
-            av.value( value);
-            break;
-        case 3:
-            value.float_vec(std::get<std::vector<float>>(att_value));
-            av.value( value);
-            break;
-        case 4:
-            value.bl(std::get<bool>(att_value));
-            av.value( value);
-            break;
-    }
-    v[att_name] = av;
 }
 
