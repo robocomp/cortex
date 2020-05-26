@@ -98,7 +98,6 @@ std::optional<Node> CRDTGraph::get_node(int id)
 
 bool CRDTGraph::insert_or_assign_node(const N &node)
 {
-
     if (node.id() == -1) return false;
     bool r;
     std::optional<AworSet> aw;
@@ -106,7 +105,7 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())
             or ( name_map.find(node.name())  != name_map.end() and name_map[node.name()] != node.id() ))
-            throw CRDT::DSRException("Cannot insert node in G, id mut be unique");
+            throw std::runtime_error("Cannot insert node in G, id mut be unique");
         auto [res, a] = insert_or_assign_node_(node);
         r = res;
         aw = std::move(a);

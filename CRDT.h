@@ -188,7 +188,6 @@ namespace CRDT
             v[att_name] = at;
         }
 
-
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>, typename Ta , typename = std::enable_if_t<allowed_types<Ta>>>
         void add_attrib(Type &v, const std::string& att_name, const Ta& att_value) {
             add_attrib(v.attrs(), att_name, att_value);

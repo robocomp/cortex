@@ -60,8 +60,15 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
 
     _mViewer->setSceneData( root.get());
 	
-    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, 
-        [this](auto id, auto type){ auto node = G->get_node(id); if (node.has_value()) add_or_assign_node_slot(node.value());});
+    connect(G.get(), &CRDT::CRDTGraph::update_node_signal, [this](auto id, auto type)
+        { try
+          { 
+            auto node = G->get_node(id); 
+            if (node.has_value()) 
+                add_or_assign_node_slot(node.value());
+          }
+          catch(const std::exception &e){ std::cout << e.what() << std::endl; throw e;};
+        });
 	connect(G.get(), &CRDT::CRDTGraph::update_edge_signal, 
         [this](auto from, auto to, auto type){ 
                                                 auto parent = G->get_node(from); 
@@ -152,21 +159,32 @@ void  DSRtoOSGViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, Ca
 void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node)
 {
     std::cout << __FUNCTION__  << " node " << node.id() << " " << std::endl;
-     
-    auto parent_id = G->get_node_parent(node);
-    if (not parent_id.has_value())
-        throw std::runtime_error("Node cannot be inserted without a parent");
-    auto parent = G->get_node(parent_id.value());
-    auto type = node.type();
-    std::cout << "      " << node.name() << " " << node.id() << " " << node.type() << std::endl;
-    if( type == "plane" )
-        add_or_assign_box(node, parent.value());
-    else if( type == "mesh")
-        add_or_assign_mesh(node, parent.value());
-    else if( type == "transform")
-        add_or_assign_transform(node, parent.value());
-    else if( type == "differentialRobot" or type == "laser" or type == "rgbd")
-        add_or_assign_transform(node, parent.value());
+    try
+    {
+        if(node.id() == G->get_node_root().value().id())
+            return;
+        auto parent_id = G->get_node_parent(node);
+        if (not parent_id.has_value())
+            throw std::runtime_error("Node cannot be inserted without a parent");
+        auto parent = G->get_node(parent_id.value());
+        if (not parent.has_value())
+            throw std::runtime_error("Non existing node: " + std::to_string(parent_id.value()));
+        auto type = node.type();
+        std::cout << "      " << node.name() << " " << node.id() << " " << node.type() << std::endl;
+        if( type == "plane" )
+            add_or_assign_box(node, parent.value());
+        else if( type == "mesh")
+            add_or_assign_mesh(node, parent.value());
+        else if( type == "transform")
+            add_or_assign_transform(node, parent.value());
+        else if( type == "differentialRobot" or type == "laser" or type == "rgbd")
+            add_or_assign_transform(node, parent.value());
+    }
+    catch(const std::exception& e)
+    {  
+        std::cout << "Exception in " << __FUNCTION__ << " " << e.what() << std::endl; 
+        throw e;  
+    }
 }
 
 void DSRtoOSGViewer::add_or_assign_edge_slot(const Node &from, const Node& to)
