@@ -247,7 +247,7 @@ namespace CRDT
             if constexpr (std::is_same<Node,  Type>::value)
             {
                 elem.attrs().insert_or_assign(new_name, at);
-                if(insert_or_assign_node(elem))
+                if(update_node(elem))
                     return;
                 else
                     throw std::runtime_error("Could not insert Node " + std::to_string(elem.id()) + " in G in add_attrib_by_name()");
@@ -278,7 +278,7 @@ namespace CRDT
             // insert in node
             if constexpr (std::is_same<Node,  Type>::value)
             {
-                if(insert_or_assign_node(elem))
+                if(update_node(elem))
                     return;
                 else
                     throw std::runtime_error("Could not insert Node " + std::to_string(elem.id()) + " in G in remove_attrib_by_name()");
