@@ -139,6 +139,56 @@ std::pair<bool, std::optional<AworSet>> CRDTGraph::insert_or_assign_node_(const 
     return {false, {} };
 }
 
+std::optional<uint32_t> CRDTGraph::insert_node(const Node& node) {
+    if (node.id() == -1) return {};
+    std::optional<AworSet> aw;
+    bool r = false;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if (id_map.find(node.id()) == id_map.end() and name_map.find(node.name())  == name_map.end()) {
+            //TODO: Poner id con el proxy
+            auto [res, a] = insert_or_assign_node_(node);
+            r = res;
+            aw = std::move(a);
+        } else throw CRDT::DSRException("Cannot insert node in G, a node with the same id already exists");
+    }
+    if (r) {
+        if (aw.has_value())
+            dsrpub.write(&aw.value());
+
+        emit update_node_signal(node.id(), node.type());
+        for (const auto &[k,v]: node.fano())
+                emit update_edge_signal(node.id(), k.to(), v.type());
+
+        return node.id();
+    }
+    return {};
+}
+
+bool CRDTGraph::update_node(const N &node)
+{
+    if (node.id() == -1) return false;
+    bool r = false;
+    std::optional<AworSet> aw;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())  or (name_map.find(node.name()) != name_map.end() and name_map[node.name()] != node.id()))
+            throw CRDT::DSRException("Cannot update node in G, id and name must be unique");
+        auto[res, a] = insert_or_assign_node_(node);
+        r = res;
+        aw = std::move(a);
+
+    }
+    if (r) {
+        if (aw.has_value())
+            dsrpub.write(&aw.value());
+
+        emit update_node_signal(node.id(), node.type());
+    }
+    return r;
+}
+
+
 bool CRDTGraph::delete_node(const std::string& name)
 {
     bool result = false;

@@ -120,7 +120,9 @@ namespace CRDT
         std::optional<Node> get_node(int id);
         //std::optional<VertexPtr> get_vertex(const std::string& name);
         //std::optional<VertexPtr> get_vertex(int id);
-        bool insert_or_assign_node(const N &node);
+        [[deprecated]] bool insert_or_assign_node(const N &node);
+        std::optional<uint32_t> insert_node(const Node& node);
+        bool update_node(const Node& node);
         //bool insert_or_assign_node(const VertexPtr &vertex);
         //bool insert_or_assign_node(Vertex &vertex);
         bool delete_node(const std::string &name);
@@ -312,7 +314,7 @@ namespace CRDT
         //int count = 0;
 
     //private:
-//        Nodes nodes;
+    //Nodes nodes;
     
     private:
         Nodes nodes;
