@@ -37,7 +37,7 @@ class DoRTStuff : public  QTableWidget
         graph(graph_), from(from_), to(to_), label(label_)
     {
       qRegisterMetaType<CRDT::IDType>("DSR::IDType");
-      qRegisterMetaType<CRDT::AttribsMap>("DSR::Attribs");
+//      qRegisterMetaType<CRDT::AttribsMap>("DSR::Attribs");
 
       std::optional<Node> n = graph->get_node(from);
       std::optional<Node> n2 = graph->get_node(to);

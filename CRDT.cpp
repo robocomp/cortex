@@ -395,8 +395,8 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& t
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
             Node to_n = get_(to).value();
-            add_attrib(to_n.attrs(), "parent", n.id());
-            add_attrib(to_n.attrs(), "level",  get_node_level(n).value() + 1 );
+            add_attrib(to_n, "parent", n.id());
+            add_attrib(to_n, "level",  get_node_level(n).value() + 1 );
 
             auto [r1, aw1] = insert_or_assign_node_(n);
             auto [r2, aw2] = insert_or_assign_node_(to_n);
@@ -439,8 +439,8 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
             Node to_n = get_(to).value();
-            add_attrib(to_n.attrs(), "parent", n.id());
-            add_attrib(to_n.attrs(), "level",  get_node_level(n).value() + 1 );
+            add_attrib(to_n, "parent", n.id());
+            add_attrib(to_n, "level",  get_node_level(n).value() + 1 );
 
             auto [r1, aw1] = insert_or_assign_node_(n);
             auto [r2, aw2] = insert_or_assign_node_(to_n);
@@ -1066,7 +1066,7 @@ aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data)
     return aw;
 }
 
-std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const MTypes &t)
+/*std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const MTypes &t)
 {
     return std::visit(overload
       {
@@ -1081,5 +1081,5 @@ std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const 
               [](std::string a) -> std::tuple<std::string, std::string, int>	{ return  make_tuple("string", a,1); },
               [](auto a) -> std::tuple<std::string, std::string, int>			{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
       }, t);
-}
+}*/
 

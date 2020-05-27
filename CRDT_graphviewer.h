@@ -87,6 +87,6 @@ namespace DSR
 
 Q_DECLARE_METATYPE(std::int32_t);
 Q_DECLARE_METATYPE(std::string);
-Q_DECLARE_METATYPE(CRDT::AttribsMap);
+//Q_DECLARE_METATYPE(CRDT::AttribsMap);
 
 #endif // GRAPHVIEWER_H
