@@ -395,8 +395,10 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& t
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
             Node to_n = get_(to).value();
-            add_attrib(to_n, "parent", n.id());
-            add_attrib(to_n, "level",  get_node_level(n).value() + 1 );
+            bool res1 = modify_attrib(to_n, "parent", n.id());
+            if (!res1) (void) add_attrib(to_n, "parent", n.id());
+            bool res2 = modify_attrib(to_n, "level",  get_node_level(n).value() + 1 );
+            if (!res2) (void) add_attrib(to_n, "level",  get_node_level(n).value() + 1 );
 
             auto [r1, aw1] = insert_or_assign_node_(n);
             auto [r2, aw2] = insert_or_assign_node_(to_n);
@@ -439,8 +441,10 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
             n.fano().insert_or_assign(ek, e);
             n.agent_id(agent_id);
             Node to_n = get_(to).value();
-            add_attrib(to_n, "parent", n.id());
-            add_attrib(to_n, "level",  get_node_level(n).value() + 1 );
+            bool res1 = modify_attrib(to_n, "parent", n.id());
+            if (!res1) (void) add_attrib(to_n, "parent", n.id());
+            bool res2 = modify_attrib(to_n, "level",  get_node_level(n).value() + 1 );
+            if (!res2) (void) add_attrib(to_n, "level",  get_node_level(n).value() + 1 );
 
             auto [r1, aw1] = insert_or_assign_node_(n);
             auto [r2, aw2] = insert_or_assign_node_(to_n);
@@ -807,8 +811,8 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
 {
-    vector<tuple<bool, int, std::string>> updates;
-    vector<tuple<int, int , std::string>> remove;
+    vector<tuple<bool, int, std::string, Node>> updates;
+    //vector<tuple<int, int , std::string>> remove;
 
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -822,18 +826,18 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
         {
             auto awor = translateAwIDLtoCRDT(val);
             Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
-            for (const auto &[k,v] : nd.fano() )
-                remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
+            //for (const auto &[k,v] : nd.fano() )
+                //remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
 
             if (deleted.find(k) == deleted.end()) {
                 nodes[k].join_replace(awor);
                 if (awor.dots().ds.size() == 0) {
                     update_maps_node_delete(k, nd);
-                    updates.emplace_back(make_tuple(false, k, ""));
+                    updates.emplace_back(make_tuple(false, k, "", nd));
                 } else {
                     if (!nodes[k].dots().ds.empty()) {
                         update_maps_node_insert(k, awor.dots().ds.begin()->second);
-                        updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type()));
+                        updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type(), nd));
                     } else {
                         update_maps_node_delete(k, nd);
                     }
@@ -843,15 +847,29 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
 
 
     }
-    for (auto &[signal, id, type] : updates)
+    for (auto &[signal, id, type, nd] : updates)
         if (signal) {
-            emit update_node_signal(id, type);
+            //check what change is joined
+            if (nd.attrs() != nodes[id].dots().ds.rbegin()->second.attrs()) {
+                emit update_node_signal(id, nodes[id].dots().ds.rbegin()->second.type());
+            } else {
+                std::map<EdgeKey, Edge> diff_remove;
+                std::set_difference(nd.fano().begin(), nd.fano().end(),
+                                    nodes[id].dots().ds.rbegin()->second.fano().begin(),
+                                    nodes[id].dots().ds.rbegin()->second.fano().end(),
+                                    std::inserter(diff_remove, diff_remove.begin()));
+                std::map<EdgeKey, Edge> diff_insert;
+                std::set_difference(nodes[id].dots().ds.rbegin()->second.fano().begin(),
+                                    nodes[id].dots().ds.rbegin()->second.fano().end(),
+                                    nd.fano().begin(), nd.fano().end(),
+                                    std::inserter(diff_insert, diff_insert.begin()));
 
-            for (const auto &[from, to, type] : remove)
-                emit del_edge_signal(from, to, type);
+                for (const auto &[k,v] : diff_remove)
+                        emit del_edge_signal(id, k.to(), k.type());
 
-            for (const auto &[k,v] : nodes[id].dots().ds.rbegin()->second.fano()) {
-                emit update_edge_signal(id, k.to(), k.type());
+                for (const auto &[k,v] : diff_insert) {
+                    emit update_edge_signal(id, k.to(), k.type());
+                }
             }
         }
         else {

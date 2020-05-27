@@ -140,7 +140,8 @@ namespace CRDT
         std::optional<Node> get_node(int id);
         //std::optional<VertexPtr> get_vertex(const std::string& name);
         //std::optional<VertexPtr> get_vertex(int id);
-        [[deprecated]] bool insert_or_assign_node(const N &node);
+        [[deprecated ("You should be using \"insert_node\" to insert new nodes and \"update_node\" to update them")]]
+        bool insert_or_assign_node(const N &node);
         std::optional<uint32_t> insert_node(const Node& node);
         bool update_node(const Node& node);
         //bool insert_or_assign_node(const VertexPtr &vertex);
@@ -155,7 +156,7 @@ namespace CRDT
         std::string get_node_type(Node& n);
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>, typename Ta , typename = std::enable_if_t<allowed_types<Ta>>>
-        bool add_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
+         bool add_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
             if (elem.attrs().find(att_name) != elem.attrs().end()) return false;
 
             Attrib at;  Val value;
@@ -191,7 +192,7 @@ namespace CRDT
         };
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
-        bool add_attrib(Type &elem, const std::string& att_name, const Attrib &attr) {
+         bool add_attrib(Type &elem, const std::string& att_name, const Attrib &attr) {
             if (elem.attrs().find(att_name) != elem.attrs().end()) return false;
             elem.attrs()[att_name] = attr;
             return true;
@@ -199,9 +200,7 @@ namespace CRDT
 
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>, typename Ta , typename = std::enable_if_t<allowed_types<Ta>>>
-        bool modify_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
-
-
+         bool modify_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
             if (elem.attrs().find(att_name) == elem.attrs().end()) return false;
                 //throw DSRException(("Cannot update attribute. Attribute: " + att_name + " does not exist. " + __FUNCTION__).data());
 
@@ -238,7 +237,7 @@ namespace CRDT
         };
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
-        bool modify_attrib(Type &elem, const std::string& att_name, const Attrib &attr) {
+         bool modify_attrib(Type &elem, const std::string& att_name, const Attrib &attr) {
             if (elem.attrs().find(att_name) == elem.attrs().end()) return false;
                 //throw DSRException(("Cannot update attribute. Attribute: " + att_name + " does not exist. " + __FUNCTION__).data());
             elem.attrs()[att_name] = attr;
@@ -325,7 +324,8 @@ namespace CRDT
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>,
                 typename Va, typename = std::enable_if_t<allowed_types<Va>>>
-        [[deprecated]] void insert_or_assign_attrib_by_name(Type& elem, const std::string &att_name, const Va &new_val)
+        [[deprecated ("You should be using \"insert_attrib_by_name\" to insert new attributes and \"update_attrib_by_name\" to update them")]]
+        void insert_or_assign_attrib_by_name(Type& elem, const std::string &att_name, const Va &new_val)
         {
             add_attrib(elem, att_name, new_val);
 
@@ -357,7 +357,7 @@ namespace CRDT
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>,
                   typename Va, typename = std::enable_if_t<allowed_types<Va>>>
-        bool insert_attrib_by_name(Type& elem, const std::string &att_name, const Va &new_val)
+         bool insert_attrib_by_name(Type& elem, const std::string &att_name, const Va &new_val)
         {
             //if (elem.attrs().find(new_name) != elem.attrs().end()) return false;
                 //throw DSRException(("Cannot update attribute. Attribute: " + elem + " does not exist. " + __FUNCTION__).data());

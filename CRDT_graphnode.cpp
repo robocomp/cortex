@@ -207,9 +207,11 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         std::cout << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph << std::endl;
         std::optional<Node> n = g->get_node(id_in_graph);
         if (n.has_value()) {
-            g->add_attrib(n.value(), "pos_x", (float) event->scenePos().x());
-            g->add_attrib(n.value(), "pos_y", (float) event->scenePos().y());
-            g->insert_or_assign_node(n.value());
+            bool r = g->modify_attrib(n.value(), "pos_x", (float) event->scenePos().x());
+            if (!r) r = g->add_attrib(n.value(), "pos_x", (float) event->scenePos().x());
+            r = g->modify_attrib(n.value(), "pos_y", (float) event->scenePos().y());
+            if (!r) r = g->add_attrib(n.value(), "pos_y", (float) event->scenePos().y());
+            g->update_node(n.value());
         }
     }
 

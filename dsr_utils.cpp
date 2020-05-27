@@ -56,7 +56,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
         //G->name_map[name] = id;
         //G->id_map[id] = name;
 
-        std::map<string, Attrib> attrs;
+        //std::map<string, Attrib> attrs;
 /*
  * THIS INFORMATION MUST BE ON JSON FILE 
         G->insert_or_assign_attrib_by_name(n, "level", std::int32_t(0));
@@ -90,33 +90,33 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
 
             switch (attr_type) {
                 case 0:
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toString().toStdString());
+                    G->add_attrib(n, attr_key, attr_value.toString().toStdString());
                     break;
                 case 1:
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toInt());
+                    G->add_attrib(n, attr_key, attr_value.toInt());
                     break;
                 case 2:
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toFloat());
+                    G->add_attrib(n, attr_key, attr_value.toFloat());
                     break;
                 case 3: 
                 {
                     std::vector<float> v;
                     foreach (const QVariant& value, attr_value.toList())
                         v.push_back(value.toFloat());    
-                    G->insert_or_assign_attrib_by_name(n, attr_key, v);
+                    G->add_attrib(n, attr_key, v);
                     break;
                 }
                 case 4: 
                 {
-                    G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toBool());
+                    G->add_attrib(n, attr_key, attr_value.toBool());
                     break;
                 }
                 default:
-                   G->insert_or_assign_attrib_by_name(n, attr_key, attr_value.toString().toStdString());
+                   G->add_attrib(n, attr_key, attr_value.toString().toStdString());
             }
         }
         //n.attrs(attrs);
-        G->insert_or_assign_node(n);
+        G->insert_node(n);
         // get links
         QJsonArray nodeLinksArray = sym_obj.value("links").toArray();
         std::copy(nodeLinksArray.begin(), nodeLinksArray.end(), std::back_inserter(linksArray));
@@ -150,17 +150,17 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
             {
                 case 0:
                 {
-                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toString().toStdString());
+                    G->add_attrib(edge, attr_key, attr_value.toString().toStdString());
                     break;
                 }
                 case 1:
                 {
-                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toInt());
+                    G->add_attrib(edge, attr_key, attr_value.toInt());
                     break;
                 }
                 case 2:
                 {
-                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toString().replace(",", ".").toFloat());
+                    G->add_attrib(edge, attr_key, attr_value.toString().replace(",", ".").toFloat());
                     break;
                 }
                 case 3: 
@@ -168,12 +168,12 @@ void Utilities::read_from_json_file(const std::string &json_file_path)
                     std::vector<float> v;
                     foreach (const QVariant& value, attr_value.toList())
                         v.push_back(value.toFloat());    
-                    G->insert_or_assign_attrib_by_name(edge, attr_key, v);
+                    G->add_attrib(edge, attr_key, v);
                     break;
                 }
                 case 4: 
                 {
-                    G->insert_or_assign_attrib_by_name(edge, attr_key, attr_value.toBool());
+                    G->add_attrib(edge, attr_key, attr_value.toBool());
                     break;
                 }
             }
