@@ -3,13 +3,11 @@
 //
 
 #include "CRDT.h"
-#include <fstream>
+#include <iostream>
 #include <unistd.h>
 #include <algorithm>
-#include <iterator>
 
 #include <fastrtps/subscriber/Subscriber.h>
-#include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
 #include <fastrtps/Domain.h>
 
@@ -105,10 +103,8 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())
             or ( name_map.find(node.name())  != name_map.end() and name_map[node.name()] != node.id() ))
-            throw std::runtime_error("Cannot insert node in G, id mut be unique");
-        auto [res, a] = insert_or_assign_node_(node);
-        r = res;
-        aw = std::move(a);
+            throw std::runtime_error((std::string("Cannot insert node in G, id mut be unique ") + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+        std::tie(r, aw) = insert_or_assign_node_(node);
     }
     if (r) {
         if (aw.has_value())
@@ -130,8 +126,6 @@ std::pair<bool, std::optional<AworSet>> CRDTGraph::insert_or_assign_node_(const 
         }
         aworset<Node, int> delta = nodes[node.id()].add(node, node.id());
         update_maps_node_insert(node.id(), node);
-        //auto val = translateAwCRDTtoIDL(node.id(), delta);
-        //dsrpub.write(&val);
 
         return { true, translateAwCRDTtoIDL(node.id(), delta) };
     }
@@ -145,11 +139,10 @@ std::optional<uint32_t> CRDTGraph::insert_node(const Node& node) {
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (id_map.find(node.id()) == id_map.end() and name_map.find(node.name())  == name_map.end()) {
-            //TODO: Poner id con el proxy
-            auto [res, a] = insert_or_assign_node_(node);
-            r = res;
-            aw = std::move(a);
-        } else throw CRDT::DSRException("Cannot insert node in G, a node with the same id already exists");
+            //TODO: Poner id con el proxy y generar el nombre
+            std::tie(r, aw) = insert_or_assign_node_(node);
+        } else throw std::runtime_error((std::string("Cannot insert node in G, a node with the same id already exists ")
+                                         + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
     }
     if (r) {
         if (aw.has_value())
@@ -172,11 +165,8 @@ bool CRDTGraph::update_node(const N &node)
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())  or (name_map.find(node.name()) != name_map.end() and name_map[node.name()] != node.id()))
-            throw CRDT::DSRException("Cannot update node in G, id and name must be unique");
-        auto[res, a] = insert_or_assign_node_(node);
-        r = res;
-        aw = std::move(a);
-
+            throw std::runtime_error((std::string("Cannot update node in G, id and name must be unique")  + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+        std::tie(r, aw) = insert_or_assign_node_(node);
     }
     if (r) {
         if (aw.has_value())
@@ -197,13 +187,9 @@ bool CRDTGraph::delete_node(const std::string& name)
     std::optional<int> id = {};
     {
         std::unique_lock<std::shared_mutex>  lock(_mutex);
-
         id = get_id_from_name(name);
         if(id.has_value()) {
-            auto[r, e, aw] = delete_node_(id.value());
-            result = r;
-            edges_ = std::move(e);
-            aw_ = std::move(aw);
+            std::tie(result, edges_, aw_) = delete_node_(id.value());
         } else {
             return false;
         }
@@ -230,10 +216,7 @@ bool CRDTGraph::delete_node(int id)
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (in(id)) {
-            auto[r, e, aw] = delete_node_(id);
-            result = r;
-            edges_ = std::move(e);
-            aw_ = std::move(aw);
+            std::tie(result, edges_, aw_) = delete_node_(id);
         } else { return false; }
     }
 
@@ -242,10 +225,9 @@ bool CRDTGraph::delete_node(int id)
 
         for (auto &a  : aw_)
             dsrpub.write(&a);
-
-
         for (auto &[id0, id1, label] : edges_)
-                emit del_edge_signal(id0, id1, label);
+            emit del_edge_signal(id0, id1, label);
+
         return true;
     }
     return false;
@@ -253,7 +235,6 @@ bool CRDTGraph::delete_node(int id)
 
 std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGraph::delete_node_(int id)
 {
-    // std::cout << "Tomando lock único para borrar un nodo" << std::endl;
     vector<tuple<int,int, std::string>> edges_;
     vector<AworSet> aw;
 
@@ -357,9 +338,7 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
                 EdgeKey ek; ek.to(to); ek.type(attrs.type());
                 node.value().fano().insert_or_assign(ek, attrs);
                 node.value().agent_id(agent_id);
-                auto [res, a] = insert_or_assign_node_(node.value());
-                r = res;
-                aw = std::move(a);
+                std::tie(r, aw) = insert_or_assign_node_(node.value());
             }
         } else
         {
@@ -409,9 +388,9 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& t
                 awor2 = std::move(aw2);
             }
             else
-                throw std::runtime_error("Could not insert Node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT()");
+                throw std::runtime_error("Could not insert Node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT() " +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
         } else
-            throw std::runtime_error("Destination node " + std::to_string(n.id()) + " not found in G in insert_or_assign_edge_RT()");
+            throw std::runtime_error("Destination node " + std::to_string(n.id()) + " not found in G in insert_or_assign_edge_RT() "  +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
     }
     if (r)
         emit update_edge_signal( n.id(),  to, "RT");
@@ -455,9 +434,9 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
                 awor2 = std::move(aw2);
             }
             else
-                throw std::runtime_error("Could not insert node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT()");
+                throw std::runtime_error("Could not insert node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT() "  +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
         } else
-            throw std::runtime_error("Destination node " + std::to_string(n.id()) + " not found in G in insert_or_assign_edge_RT()");
+            throw std::runtime_error("Destination node " + std::to_string(n.id()) + " not found in G in insert_or_assign_edge_RT() " +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
     }
     if (r)
         emit update_edge_signal( n.id(),  to, "RT");
@@ -474,9 +453,7 @@ bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (!in(from) || !in(to)) return false;
-        auto [res, a] = delete_edge_(from, to, key);
-        result = res;
-        aw = std::move(a);
+        std::tie(result, aw) = delete_edge_(from, to, key);
     }
     if (result)
             emit del_edge_signal(from, to, key);
@@ -499,9 +476,7 @@ bool CRDTGraph::delete_edge(const std::string& from, const std::string& to, cons
         id_to = get_id_from_name(to);
 
         if (id_from.has_value() && id_to.has_value()) {
-            auto [res, a] = delete_edge_(id_from.value(), id_to.value(), key);
-            result = res;
-            aw = std::move(a);
+            std::tie(result, aw) = delete_edge_(id_from.value(), id_to.value(), key);
         }
     }
 
@@ -587,7 +562,7 @@ Edge CRDTGraph::get_edge_RT(const Node &n, int to)
     if (res != edges.end())
         return res->second;
     else
-        throw std::runtime_error("Could not find edge " + std::to_string(key.to()) + " in node " + std::to_string(n.id()) + " in edge_to_RTMat()");
+        throw std::runtime_error("Could not find edge " + std::to_string(key.to()) + " in node " + std::to_string(n.id()) + " in edge_to_RTMat() " +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
     
 }
 
@@ -598,7 +573,7 @@ RTMat CRDTGraph::get_edge_RT_as_RTMat(const Edge &edge)
     if( r.has_value() and t.has_value() )
         return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
     else
-        throw std::runtime_error("Could not find required attributes in node " + edge.type() + " " + std::to_string(edge.to()) + " in get_edge_RT as_RTMat()");
+        throw std::runtime_error("Could not find required attributes in node " + edge.type() + " " + std::to_string(edge.to()) + " in get_edge_RT as_RTMat() " +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
    
 }
 
@@ -609,7 +584,7 @@ RTMat CRDTGraph::get_edge_RT_as_RTMat(const Edge &edge)
     if( r.has_value() and t.has_value() )
         return RTMat { r.value()[0], r.value()[1], r.value()[2], t.value()[0], t.value()[1], t.value()[2] } ;
     else
-        throw std::runtime_error("Could not find required attributes in node " + edge.type() + " " + std::to_string(edge.to()) + " in get_edge_RT as_RTMat()");
+        throw std::runtime_error("Could not find required attributes in node " + edge.type() + " " + std::to_string(edge.to()) + " in get_edge_RT as_RTMat() "  +  __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
  } 
      
 
@@ -763,19 +738,14 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
                 (nodes[aworSet.id()].dots().ds.rbegin() != nodes[aworSet.id()].dots().ds.rend()) ?
                     nd = nodes[aworSet.id()].dots().ds.rbegin()->second : Node();
 
-                //for (const auto &[k, v] : nd.fano())
-                //    remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
-
                 nodes[aworSet.id()].join_replace(d);
                 if (nodes[aworSet.id()].dots().ds.size() == 0 or aworSet.dk().ds().size() == 0) {
                     update_maps_node_delete(aworSet.id(), nd);
-                    //std::cout << "JOIN REMOVE: " << aworSet.id() << endl;
                 } else {
                     signal = true;
                     update_maps_node_insert(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second);
-                    //std::cout << "JOIN INSERT: " << aworSet.id() << endl;
                 }
-            } //else {  std::cout << " SKIP DELETED" << endl;}
+            }
         }
 
         if (signal) {
@@ -812,8 +782,6 @@ void CRDTGraph::join_delta_node(AworSet aworSet)
 void CRDTGraph::join_full_graph(OrMap full_graph) 
 {
     vector<tuple<bool, int, std::string, Node>> updates;
-    //vector<tuple<int, int , std::string>> remove;
-
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         auto m = static_cast<map<int, int>>(full_graph.cbase().cc());
@@ -821,13 +789,10 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
         for (auto &v : full_graph.cbase().dc())
             s.emplace(std::make_pair(v.first(), v.second()));
 
-        //ormap<int, aworset<Node, int>> ma;
-        for (auto &[k, val] : full_graph.m()) 
+        for (auto &[k, val] : full_graph.m())
         {
             auto awor = translateAwIDLtoCRDT(val);
             Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
-            //for (const auto &[k,v] : nd.fano() )
-                //remove.emplace_back(make_tuple(v.from(), k.to(), k.type()));
 
             if (deleted.find(k) == deleted.end()) {
                 nodes[k].join_replace(awor);
@@ -885,13 +850,11 @@ bool CRDTGraph::start_fullgraph_request_thread()
 void CRDTGraph::start_fullgraph_server_thread() 
 {
     fullgraph_thread = std::thread(&CRDTGraph::fullgraph_server_thread, this);
-    //fullgraph_server_thread();
 }
 
 void CRDTGraph::start_subscription_thread(bool showReceived) 
 {
     delta_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
-    //subscription_thread(showReceived);
 }
 
 int CRDTGraph::id() 
@@ -1083,21 +1046,3 @@ aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data)
     aw.dots().set(ds_aux);
     return aw;
 }
-
-/*std::tuple<std::string, std::string, int> CRDTGraph::nativetype_to_string(const MTypes &t)
-{
-    return std::visit(overload
-      {
-              [](RMat::RTMat m) -> std::tuple<std::string, std::string, int> { return make_tuple("RTMat", m.serializeAsString(),m.getDataSize()); },
-              [](std::vector<float> a)-> std::tuple<std::string, std::string, int>
-              {
-                  std::string str;
-                  for(auto &f : a)
-                      str += std::to_string(f) + " ";
-                  return make_tuple("vector<float>",  str += "\n",a.size());
-              },
-              [](std::string a) -> std::tuple<std::string, std::string, int>	{ return  make_tuple("string", a,1); },
-              [](auto a) -> std::tuple<std::string, std::string, int>			{ return make_tuple(typeid(a).name(), std::to_string(a),1);}
-      }, t);
-}*/
-
