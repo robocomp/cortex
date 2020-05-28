@@ -499,7 +499,7 @@ public:
                 // dot in both
 
                 if constexpr(is_same<T, Node>::value) {
-                    cout << "CONFLICTO " << endl;
+                    //cout << "CONFLICTO " << endl;
                     //replace in case of conflict if the agent id has a lower value
                     if (it->second.agent_id() > ito->second.agent_id() && *it != *ito) {
                         ds.erase(it);
