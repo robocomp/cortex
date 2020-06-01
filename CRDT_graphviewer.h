@@ -18,14 +18,13 @@
 #define GRAPHVIEWER_H
 
 #include <memory>
+#include <QMainWindow>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QListView>
 #include "CRDT.h"
 #include <typeinfo>
-#include "ui_graphUI.h"
-#include <QResizeEvent>
-#include <QOpenGLWidget>
+#include <QDockWidget>
 #include "../../../graph-related-classes/dsr_to_osg_viewer.h"
 #include "../../../graph-related-classes/dsr_to_graphicscene_viewer.h"
 #include "../../../graph-related-classes/dsr_to_graph_viewer.h"
@@ -38,12 +37,11 @@ namespace DSR
 	/// Drawing controller to display the graph in real-time using RTPS 
 	//////////////////////////////////////////////////////////////////////////////////////////////77
 	
-	//class GraphViewer : public QGraphicsView 
-	class GraphViewer : public QWidget, public Ui_graphDlg
+	class GraphViewer : public QMainWindow
 	{
 		Q_OBJECT
 		public:
-			enum class View {Graph, OSG, Scene};	
+			enum class View {Graph, OSG, Scene, Tree};	
 			GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G, std::list<View> options=std::list<View>());
 			~GraphViewer();
 			void itemMoved();
@@ -52,20 +50,7 @@ namespace DSR
 		protected:
 			virtual void keyPressEvent(QKeyEvent *event);
 			virtual void timerEvent(QTimerEvent *event);
-			// Resize tabs. The event does not propagate for some reason
-			virtual void resizeEvent(QResizeEvent *e) 
-			{  
-				dsr_to_graph_viewer->resize(graphicsView->size());
-				dsr_to_graph_viewer->fitInView(dsr_to_graph_viewer->scene.sceneRect(), Qt::KeepAspectRatio );
-			 	auto gl =tab_2->findChildren<QOpenGLWidget*>();
-			 	//if(gl.size()>0)
-			 	//	gl[0]->resize(e->size().width(), e->size().height());
-				if(dsr_to_osg_viewer)
-				 	dsr_to_osg_viewer->resize(tab_2->size());			 
-				if(dsr_to_graphicscene_viewer)
-					dsr_to_graphicscene_viewer->resize(graphicsView_2D->size());
-			 };
-			
+		
 		private:
 			std::shared_ptr<CRDT::CRDTGraph> G;
 			int timerId = 0;

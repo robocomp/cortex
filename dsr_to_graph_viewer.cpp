@@ -8,13 +8,11 @@
 
 using namespace DSR ;
 
-DSRtoGraphViewer::DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QGraphicsView *parent) :  QGraphicsView(parent)
+DSRtoGraphViewer::DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QWidget *parent) :  QGraphicsView(parent)
 {
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
     G = G_;
-    this->resize(parent->width(), parent->height());
-    //this->setFrameShape(NoFrame);
     scene.setItemIndexMethod(QGraphicsScene::NoIndex);
 	scene.setSceneRect(-200, -200, 400, 400);
 	this->setScene(&scene);
@@ -23,7 +21,7 @@ DSRtoGraphViewer::DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QGraphic
 	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	this->setRenderHint(QPainter::Antialiasing);
 	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-	//this->setMinimumSize(200, 200);
+	this->setMinimumSize(400, 400);
 	this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio );
 	this->adjustSize();
  	setMouseTracking(true);
@@ -253,3 +251,9 @@ void DSRtoGraphViewer::wheelEvent(QWheelEvent* event)
 	this->scale(factor, factor);
 	this->setTransformationAnchor(anchor);
 }
+
+void DSRtoGraphViewer::resizeEvent(QResizeEvent *e)
+{  
+//	qDebug() << "resize_graph_view" << x() << y()<<e->size(); 
+	this->resize(e->size());
+} 

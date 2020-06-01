@@ -30,6 +30,7 @@ namespace DSR
 {
     class DSRtoTreeViewer : public QTreeWidget
     {
+        Q_OBJECT
         public:
             DSRtoTreeViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QTreeWidget *parent=0);
             std::shared_ptr<CRDT::CRDTGraph> getGraph()  			  	{return G;};
@@ -42,7 +43,7 @@ namespace DSR
             
         protected:  
             virtual void wheelEvent(QWheelEvent* event);
-    
+            virtual void resizeEvent(QResizeEvent* event);
         private:
             std::shared_ptr<CRDT::CRDTGraph> G;
             void createGraph();

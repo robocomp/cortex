@@ -62,7 +62,7 @@ bool DSRPublisher::init(eprosima::fastrtps::Participant *mp_participant_, const 
         // This would be better, but we sent a lots of messages to use it.
         //Wparam.topic.historyQos.kind = KEEP_ALL_HISTORY_QOS;
         Wparam.topic.historyQos.kind = KEEP_LAST_HISTORY_QOS;
-        Wparam.topic.historyQos.depth = 100; // Adjust this value if we are losing  messages
+        Wparam.topic.historyQos.depth = 150; // Adjust this value if we are losing  messages
 
         // Check ACK for sended messages.
         Wparam.times.heartbeatPeriod.seconds = 0;

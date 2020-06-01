@@ -25,6 +25,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QGraphicsRectItem>
+#include <QGraphicsItem>
 #include <QMouseEvent>
 #include <QGLWidget>
 #include <QScrollBar>
@@ -46,6 +47,8 @@ namespace DSR
             bool _pan;
             int _panStartX, _panStartY;
 
+            std::map<int, QGraphicsItem*> sceneMap;
+            std::map<std::string,std::vector<int>> edgeMap;
 
         public:
             DSRtoGraphicsceneViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QGraphicsView *parent=0);
@@ -60,14 +63,16 @@ namespace DSR
             virtual void mouseMoveEvent(QMouseEvent *event);
             virtual void mousePressEvent(QMouseEvent *event);
             virtual void mouseReleaseEvent(QMouseEvent *event);
+            virtual void resizeEvent(QResizeEvent *event);
 
         private:
             void createGraph();
+            void create_parent_list(std::int32_t node_id);
             void add_or_assign_box(Node &node);
             void add_or_assign_mesh(Node &node);     
-            void add_or_assign_object(int width, int height, std::string node_name, std::string color, std::string filename);       
-            void add_scene_rect(int width, int height, QVec pose, std::string color, std::string texture);
-
+            void add_or_assign_object(std::int32_t node_id, std::int32_t width, std::int32_t height, std::string node_name, std::string color, std::string filename);       
+            void add_scene_rect(std::int32_t node_id, std::int32_t width, std::int32_t height, QVec pose, std::string color, std::string texture);
+            void update_scene_rect_pose(std::int32_t node_id);
     };
 };
 #endif

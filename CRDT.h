@@ -156,8 +156,8 @@ namespace CRDT
         std::string get_node_type(Node& n);
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>, typename Ta , typename = std::enable_if_t<allowed_types<Ta>>>
-         bool add_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
-            if (elem.attrs().find(att_name) != elem.attrs().end()) return false;
+        void add_or_modify(Type &elem, const std::string& att_name, const Ta& att_value) {
+
 
             Attrib at;  Val value;
             if constexpr (std::is_same<std::string,  Ta>::value || std::is_same<std::string_view,  Ta>::value || std::is_same<const string&,  Ta>::value)
@@ -188,6 +188,13 @@ namespace CRDT
 
             at.value( value);
             elem.attrs()[att_name] = at;
+
+        }
+
+        template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>, typename Ta , typename = std::enable_if_t<allowed_types<Ta>>>
+         bool add_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
+            if (elem.attrs().find(att_name) != elem.attrs().end()) return false;
+            add_or_modify(elem, att_name, att_value);
             return true;
         };
 
@@ -203,36 +210,7 @@ namespace CRDT
          bool modify_attrib(Type &elem, const std::string& att_name, const Ta& att_value) {
             if (elem.attrs().find(att_name) == elem.attrs().end()) return false;
                 //throw DSRException(("Cannot update attribute. Attribute: " + att_name + " does not exist. " + __FUNCTION__).data());
-
-            Attrib at;  Val value;
-            if constexpr (std::is_same<std::string,  Ta>::value || std::is_same<std::string_view,  Ta>::value)
-            {
-                at.type(STRING);
-                value.str(att_value);
-            }
-            else if constexpr (std::is_same<std::int32_t,  Ta>::value)
-            {
-                at.type(INT);
-                value.dec(att_value);
-            }
-            else if constexpr (std::is_same<float,  Ta>::value || std::is_same<double,  Ta>::value)
-            {
-                at.type(FLOAT);
-                value.fl(att_value);
-            }
-            else if constexpr (std::is_same<std::vector<float_t>,  Ta>::value)
-            {
-                at.type(FLOAT_VEC);
-                value.float_vec(att_value);
-            }
-            else if constexpr (std::is_same<bool,  Ta>::value)
-            {
-                at.type(BOOL);
-                value.bl(att_value);
-            }
-
-            at.value( value);
-            elem.attrs()[att_name] = at;
+            add_or_modify(elem, att_name, att_value);
             return true;
         };
 
@@ -324,10 +302,9 @@ namespace CRDT
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>,
                 typename Va, typename = std::enable_if_t<allowed_types<Va>>>
-        [[deprecated ("You should be using \"insert_attrib_by_name\" to insert new attributes and \"update_attrib_by_name\" to update them")]]
         void insert_or_assign_attrib_by_name(Type& elem, const std::string &att_name, const Va &new_val)
         {
-            add_attrib(elem, att_name, new_val);
+            add_or_modify(elem, att_name, new_val);
 
             // insert in node
             if constexpr (std::is_same<Node,  Type>::value)

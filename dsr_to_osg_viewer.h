@@ -38,6 +38,7 @@
 #include <osgViewer/Viewer>
 #include <osgViewer/GraphicsWindow>
 #include <QOpenGLWidget>
+#include <QResizeEvent>
 #include "CRDT.h"
 
 using namespace std::chrono_literals;
@@ -51,7 +52,7 @@ namespace DSR
             DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX, float scaleY, QWidget *parent=0);
         
         protected:  
-            //void resizeEvent(QResizeEvent *e) {  qDebug() << "SCAKE" << x() << y(); }; 
+            virtual void resizeEvent(QResizeEvent *e); 
             inline void paintGL() override;
             virtual void resizeGL( int width, int height );
             // virtual void initializeGL();

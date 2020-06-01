@@ -55,7 +55,16 @@ bool DSRSubscriber::init(eprosima::fastrtps::Participant *mp_participant_,
     Rparam.multicastLocatorList.push_back(locator);
     Rparam.qos.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
     Rparam.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-    m_listener.participant_ID = mp_participant->getGuid(); 
+
+    /*
+    if (std::string_view(topicName) == "DSR") {
+        // This would be better, but we sent a lots of messages to use it.
+        //Wparam.topic.historyQos.kind = KEEP_ALL_HISTORY_QOS;
+        Rparam.topic.historyQos.kind = KEEP_LAST_HISTORY_QOS;
+        Rparam.topic.historyQos.depth = 50; // Adjust this value if we are losing  messages
+    }
+     */
+    m_listener.participant_ID = mp_participant->getGuid();
     m_listener.f = f_;
 
     mp_subscriber = Domain::createSubscriber(mp_participant, Rparam, static_cast<SubscriberListener*>(&m_listener));
