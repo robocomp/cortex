@@ -23,6 +23,7 @@
 #include <QGraphicsView>
 #include <QMouseEvent>
 #include <QGLWidget>
+#include <QResizeEvent>
 #include "CRDT.h"
 
 class GraphNode;
@@ -32,8 +33,9 @@ namespace DSR
 {
     class DSRtoGraphViewer : public QGraphicsView
     {
+        Q_OBJECT
         public:
-            DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QGraphicsView *parent=0);
+            DSRtoGraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QWidget *parent=0);
             std::shared_ptr<CRDT::CRDTGraph> getGraph()  			  	{return G;};
 			std::map<std::int32_t, GraphNode*> getGMap() const 			{return gmap;};
             QGraphicsEllipseItem* getCentralPoint() const 				{return central_point;};
@@ -44,12 +46,13 @@ namespace DSR
             void add_or_assign_edge_SLOT(const std::int32_t from, const std::int32_t to, const std::string& type);
 			void del_edge_SLOT(const std::int32_t from, const std::int32_t to,  const std::string &edge_tag);
 			void del_node_SLOT(int id);
-            void save_graph_SLOT();		
-			void toggle_simulation_SLOT();
+//            void save_graph_SLOT();		
+//			void toggle_simulation_SLOT();
             
         protected:  
             virtual void wheelEvent(QWheelEvent* event);
-    
+            virtual void resizeEvent(QResizeEvent *e);
+
         private:
             std::shared_ptr<CRDT::CRDTGraph> G;
             std::map<std::int32_t, GraphNode*> gmap;

@@ -15,7 +15,7 @@ DSRtoOSGViewer::DSRtoOSGViewer(std::shared_ptr<CRDT::CRDTGraph> G_, float scaleX
                         _mViewer(new osgViewer::Viewer), m_scaleX(scaleX), m_scaleY(scaleY)
 {
     G = G_;
-    this->resize(parent->width(), parent->height());
+    this->setMinimumSize(400, 400);
     osg::Camera* camera = new osg::Camera;
     camera->setViewport( 0, 0, this->width(), this->height() );
     camera->setClearColor( osg::Vec4( 0.9f, 0.9f, 1.f, 1.f ) );
@@ -422,6 +422,12 @@ void DSRtoOSGViewer::resizeGL( int width, int height )
     camera->setViewport(0, 0, this->width()*m_scaleX, this->height()* m_scaleY);
 }
 
+
+void DSRtoOSGViewer::resizeEvent(QResizeEvent *e)
+{  
+//    qDebug() << "OSG => SCALE" << x() << y(); 
+    this->resize(e->size());
+} 
 
 void DSRtoOSGViewer::mouseMoveEvent(QMouseEvent* event)
 {

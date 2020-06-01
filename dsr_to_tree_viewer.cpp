@@ -13,7 +13,7 @@ DSRtoTreeViewer::DSRtoTreeViewer(std::shared_ptr<CRDT::CRDTGraph> G_, QTreeWidge
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
     G = G_;
-    this->resize(parent->width(), parent->height());
+    this->setMinimumSize(400, 400);
     //this->setFrameShape(NoFrame);
 	//this->adjustSize();
  	setMouseTracking(true);
@@ -72,4 +72,9 @@ void DSRtoTreeViewer::del_node_SLOT(int id)
 void DSRtoTreeViewer::wheelEvent(QWheelEvent* event)
 {
     
+}
+
+void DSRtoTreeViewer::resizeEvent(QResizeEvent* event)
+{
+    this->resize(event->size());
 }
