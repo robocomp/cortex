@@ -76,8 +76,8 @@ class DoLaserStuff : public QGraphicsView
         std::optional<Node> n = graph->get_node(id);
         if (n.has_value()) 
         {
-            const auto lAngles = graph->get_attrib_by_name<vector<float>>(n.value(),"laser_data_angles");
-            const auto lDists = graph->get_attrib_by_name<vector<float>>(n.value(), "laser_data_dists");
+            const auto lAngles = graph->get_attrib_by_name<vector<float>>(n.value(),"angles");
+            const auto lDists = graph->get_attrib_by_name<vector<float>>(n.value(), "dists");
             if (lAngles.has_value() and lDists.has_value()) 
             {
                 QPolygonF polig;
@@ -95,7 +95,7 @@ class DoLaserStuff : public QGraphicsView
             }
         }
       }
-      catch(const std::exception &e){ std::cout << "Node " << node_id << " problem. "<<e.what() << std::endl;};
+      catch(const std::exception &e){ std::cout << "Node " << node_id << " problem. " << e.what() << std::endl;};
     };
   private:
     QGraphicsScene scene;

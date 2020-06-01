@@ -152,7 +152,7 @@ namespace CRDT
         std::optional<std::string> get_name_from_id(std::int32_t id);  // caché
         std::optional<int> get_id_from_name(const std::string &name);  // caché
         std::optional<std::int32_t> get_node_level(Node& n);
-        std::optional<std::int32_t> get_node_parent(const Node& n);
+        std::optional<std::int32_t> get_node_parent(const Node& n);  //debería ser get_parent_id(node)->int y get_parent_node(node)->node
         std::string get_node_type(Node& n);
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>, typename Ta , typename = std::enable_if_t<allowed_types<Ta>>>
