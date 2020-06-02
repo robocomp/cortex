@@ -643,13 +643,29 @@ std::optional<std::int32_t> CRDTGraph::get_node_parent(const Node& n)
     return get_attrib_by_name<std::int32_t>(n, "parent");
 }
 
+std::optional<std::int32_t> CRDTGraph::get_parent_id(const Node& n)
+{
+    return get_attrib_by_name<std::int32_t>(n, "parent");
+}
+
+std::optional<Node> CRDTGraph::get_parent_node(const Node &n)
+{
+    auto p =  get_attrib_by_name<std::int32_t>(n, "parent");
+    if (p.has_value()) {
+        std::shared_lock<std::shared_mutex> lock(_mutex);
+        return get_(p.value());
+    }
+    return {};
+}
+
+
 std::string CRDTGraph::get_node_type(Node& n)
 {
-    try {
+    //try {
         return n.type();
-    } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
-    return "error";
+    //} catch(const std::exception &e){
+    //    std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+    //return "error";
 }
 
 inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
