@@ -44,7 +44,7 @@ private:
 	eprosima::fastrtps::Participant *mp_participant; 
     eprosima::fastrtps::Publisher *mp_publisher; //"DSR"
 	eprosima::fastrtps::Subscriber *mp_subscriber; //"DSR"
- 	AworSetPubSubType dsrgraphType;
+ 	MvregPubSubType dsrgraphType;
 
 	eprosima::fastrtps::Subscriber *mp_subscriber_graph_request; // "DSR_GRAPH_REQUEST"
 	GraphRequestPubSubType graphrequestType;

@@ -41,7 +41,7 @@
 namespace CRDT
 {
     using N = Node;
-    using Nodes = ormap<int, aworset<N,  int >, int>;
+    using Nodes = ormap<int, mvreg<N,  int >, int>;
     //using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, bool, RMat::RTMat>;
     using IDType = std::int32_t;
     //using AttribsMap = std::unordered_map<std::string, MTypes>;
@@ -128,8 +128,8 @@ namespace CRDT
         void read_from_json_file(const std::string &file) const { utils->read_from_json_file(file); };
 
         // not working yet
-        typename std::map<int, aworset<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
-        typename std::map<int, aworset<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
+        typename std::map<int, mvreg<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
+        typename std::map<int, mvreg<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
         // Innermodel API
         std::unique_ptr<InnerAPI> get_inner_api() { return std::make_unique<InnerAPI>(this); };
@@ -486,9 +486,9 @@ namespace CRDT
         std::optional<N> get(int id);
         bool in(const int &id) const;
         std::optional<N> get_(int id);
-        std::pair<bool, std::optional<AworSet>> insert_or_assign_node_(const N &node);
-        std::tuple<bool, vector<tuple<int, int, std::string>>, std::vector<AworSet>> delete_node_(int id);
-        std::pair<bool, std::optional<AworSet>> delete_edge_(int from, int t, const std::string& key);
+        std::pair<bool, std::optional<Mvreg>> insert_or_assign_node_(const N &node);
+        std::tuple<bool, vector<tuple<int, int, std::string>>, std::vector<Mvreg>> delete_node_(int id);
+        std::pair<bool, std::optional<Mvreg>> delete_edge_(int from, int t, const std::string& key);
         std::optional<Edge> get_edge_(int from, int to, const std::string& key);
 
 
@@ -497,7 +497,7 @@ namespace CRDT
         //////////////////////////////////////////////////////////////////////////
         int id();
         DotContext context();
-        std::map<int, AworSet> Map();
+        std::map<int, Mvreg> Map();
 
 
         template <typename T, typename = std::enable_if_t<node_or_edge<T>>>
@@ -519,7 +519,7 @@ namespace CRDT
             return {};
         }
 
-        void join_delta_node(AworSet aworSet);
+        void join_delta_node(Mvreg mvreg);
         void join_full_graph(OrMap full_graph);
 
         class NewMessageFunctor
@@ -555,8 +555,8 @@ namespace CRDT
 
 
         // Translators
-        static AworSet translateAwCRDTtoIDL(int id, aworset<N, int> &data);
-        static aworset<N, int> translateAwIDLtoCRDT(AworSet &data);
+        Mvreg translateMvCRDTtoIDL(int id, mvreg<N, int> &data);
+        mvreg<N, int> translateMvIDLtoCRDT(Mvreg &data);
 
         // RTSP participant
         DSRParticipant dsrparticipant;

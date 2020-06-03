@@ -72,14 +72,15 @@
         DotContext cbase;
     };
 
-    struct AworSet {
+    struct Mvreg {
         long id;
         DotKernel dk;
+        long agent_id; // to skip messages from the same agent in multithread.
     };
 
     struct OrMap {
         long id;
-        map<long, AworSet> m;
+        map<long, Mvreg> m;
         DotContext cbase;
     };
 

@@ -67,7 +67,7 @@ qDebug() << __FUNCTION__ ;
 qDebug()<<"*************************";
     
     auto node = G->get_node(id);
-std::cout << node.value().name() << " " << node.value().id() << std::endl;
+    //std::cout << node.value().name() << " " << node.value().id() << std::endl;
     if(node.has_value())
     { 
         if( type == "plane" )
@@ -144,7 +144,7 @@ void  DSRtoGraphicsceneViewer::add_or_assign_object(std::int32_t node_id, std::i
     std::optional<QVec> pose = innermodel->transformS6D("world", node_name);
     if (pose.has_value())
     {
-pose.value().print(QString::fromStdString(node_name));
+        pose.value().print(QString::fromStdString(node_name));
 
         add_scene_rect(node_id, width, height, pose.value(), color, filename);
 //qDebug()<<"Node"<<QString::fromStdString(node_name)<<"zvalue"<<pose.value().y();

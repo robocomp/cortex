@@ -92,7 +92,7 @@ bool DSRPublisher::write(GraphRequest *object) {
 }
 
 
-bool DSRPublisher::write(AworSet *object) {
+bool DSRPublisher::write(Mvreg *object) {
     while(true){
         if (mp_publisher->write(object)) break;
     }

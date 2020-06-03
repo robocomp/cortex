@@ -445,7 +445,7 @@ bool NodePubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5
 GraphRequestPubSubType::GraphRequestPubSubType()
 {
     setName("GraphRequest");
-    m_typeSize = 264 ;//static_cast<uint32_t>(GraphRequest::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
+    m_typeSize = 264; //static_cast<uint32_t>(GraphRequest::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
     m_isGetKeyDefined = GraphRequest::isKeyDefined();
     size_t keyLength = GraphRequest::getKeyMaxCdrSerializedSize()>16 ? GraphRequest::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));
@@ -854,25 +854,25 @@ bool DotKernelPubSubType::getKey(void *data, InstanceHandle_t* handle, bool forc
     return true;
 }
 
-AworSetPubSubType::AworSetPubSubType()
+MvregPubSubType::MvregPubSubType()
 {
-    setName("AworSet");
-    m_typeSize = 684136020; //static_cast<uint32_t>(AworSet::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
-    m_isGetKeyDefined = AworSet::isKeyDefined();
-    size_t keyLength = AworSet::getKeyMaxCdrSerializedSize()>16 ? AworSet::getKeyMaxCdrSerializedSize() : 16;
+    setName("Mvreg");
+    m_typeSize = 684136024; //static_cast<uint32_t>(Mvreg::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
+    m_isGetKeyDefined = Mvreg::isKeyDefined();
+    size_t keyLength = Mvreg::getKeyMaxCdrSerializedSize()>16 ? Mvreg::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));
     memset(m_keyBuffer, 0, keyLength);
 }
 
-AworSetPubSubType::~AworSetPubSubType()
+MvregPubSubType::~MvregPubSubType()
 {
     if(m_keyBuffer!=nullptr)
         free(m_keyBuffer);
 }
 
-bool AworSetPubSubType::serialize(void *data, SerializedPayload_t *payload)
+bool MvregPubSubType::serialize(void *data, SerializedPayload_t *payload)
 {
-    AworSet *p_type = static_cast<AworSet*>(data);
+    Mvreg *p_type = static_cast<Mvreg*>(data);
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->max_size); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that serializes the data.
@@ -893,9 +893,9 @@ bool AworSetPubSubType::serialize(void *data, SerializedPayload_t *payload)
     return true;
 }
 
-bool AworSetPubSubType::deserialize(SerializedPayload_t* payload, void* data)
+bool MvregPubSubType::deserialize(SerializedPayload_t* payload, void* data)
 {
-    AworSet* p_type = static_cast<AworSet*>(data); //Convert DATA to pointer of your type
+    Mvreg* p_type = static_cast<Mvreg*>(data); //Convert DATA to pointer of your type
     eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(payload->data), payload->length); // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr deser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN,
             eprosima::fastcdr::Cdr::DDS_CDR); // Object that deserializes the data.
@@ -915,33 +915,33 @@ bool AworSetPubSubType::deserialize(SerializedPayload_t* payload, void* data)
     return true;
 }
 
-std::function<uint32_t()> AworSetPubSubType::getSerializedSizeProvider(void* data)
+std::function<uint32_t()> MvregPubSubType::getSerializedSizeProvider(void* data)
 {
     return [data]() -> uint32_t
     {
-        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<AworSet*>(data))) + 4 /*encapsulation*/;
+        return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<Mvreg*>(data))) + 4 /*encapsulation*/;
     };
 }
 
-void* AworSetPubSubType::createData()
+void* MvregPubSubType::createData()
 {
-    return reinterpret_cast<void*>(new AworSet());
+    return reinterpret_cast<void*>(new Mvreg());
 }
 
-void AworSetPubSubType::deleteData(void* data)
+void MvregPubSubType::deleteData(void* data)
 {
-    delete(reinterpret_cast<AworSet*>(data));
+    delete(reinterpret_cast<Mvreg*>(data));
 }
 
-bool AworSetPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
+bool MvregPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_md5)
 {
     if(!m_isGetKeyDefined)
         return false;
-    AworSet* p_type = static_cast<AworSet*>(data);
-    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),AworSet::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
+    Mvreg* p_type = static_cast<Mvreg*>(data);
+    eprosima::fastcdr::FastBuffer fastbuffer(reinterpret_cast<char*>(m_keyBuffer),Mvreg::getKeyMaxCdrSerializedSize());     // Object that manages the raw buffer.
     eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::BIG_ENDIANNESS);     // Object that serializes the data.
     p_type->serializeKey(ser);
-    if(force_md5 || AworSet::getKeyMaxCdrSerializedSize()>16)    {
+    if(force_md5 || Mvreg::getKeyMaxCdrSerializedSize()>16)    {
         m_md5.init();
         m_md5.update(m_keyBuffer, static_cast<unsigned int>(ser.getSerializedDataLength()));
         m_md5.finalize();
@@ -960,7 +960,7 @@ bool AworSetPubSubType::getKey(void *data, InstanceHandle_t* handle, bool force_
 OrMapPubSubType::OrMapPubSubType()
 {
     setName("OrMap");
-    m_typeSize = 3989094180; // static_cast<uint32_t>(OrMap::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
+    m_typeSize = 3989094580; //static_cast<uint32_t>(OrMap::getMaxCdrSerializedSize()) + 4 /*encapsulation*/;
     m_isGetKeyDefined = OrMap::isKeyDefined();
     size_t keyLength = OrMap::getKeyMaxCdrSerializedSize()>16 ? OrMap::getKeyMaxCdrSerializedSize() : 16;
     m_keyBuffer = reinterpret_cast<unsigned char*>(malloc(keyLength));

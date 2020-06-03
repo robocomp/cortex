@@ -426,7 +426,6 @@ public:
         output << "Type: "<<av_.type()<<", Value["<<av_.value()<<"]: "<<av_.value()<<", ";
         return output;
     };
-
     /*!
      * @brief Default constructor.
      */
@@ -611,7 +610,6 @@ public:
         output<<"]]";
         return output;
     };
-
     /*!
      * @brief Default constructor.
      */
@@ -793,6 +791,7 @@ class EdgeKey
 {
 public:
 
+
     friend std::ostream &operator<<(std::ostream &os, const EdgeKey &key) {
         os << "[ to: " << key.m_to << "- type: " << key.m_type <<" ]";
         return os;
@@ -826,6 +825,7 @@ public:
     bool operator>=(const EdgeKey &rhs) const {
         return !(*this < rhs);
     }
+
     /*!
      * @brief Default constructor.
      */
@@ -1403,6 +1403,7 @@ public:
         output <<"("<<pi_.first()<<","<<pi_.second()<<")";
         return output;
     }
+
     /*!
      * @brief Default constructor.
      */
@@ -1535,6 +1536,7 @@ private:
 class DotContext
 {
 public:
+
 
     friend std::ostream &operator<<(std::ostream &output, const DotContext &dc_) {
         output << ", CC: [";
@@ -1689,6 +1691,7 @@ class DotKernel
 {
 public:
 
+
     friend std::ostream &operator<<(std::ostream &output, const DotKernel &dk_) {
         for (const auto & kv : dk_.ds())
             output << kv.first << "-->" << kv.second<< ", ";
@@ -1831,50 +1834,50 @@ private:
     DotContext m_cbase;
 };
 /*!
- * @brief This class represents the structure AworSet defined by the user in the IDL file.
+ * @brief This class represents the structure Mvreg defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class AworSet
+class Mvreg
 {
 public:
 
-    friend std::ostream &operator<<(std::ostream &output, const AworSet &as_) {
+    friend std::ostream &operator<<(std::ostream &output, const Mvreg &as_) {
         output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
         return output;
     }
     /*!
      * @brief Default constructor.
      */
-    eProsima_user_DllExport AworSet();
+    eProsima_user_DllExport Mvreg();
 
     /*!
      * @brief Default destructor.
      */
-    eProsima_user_DllExport ~AworSet();
+    eProsima_user_DllExport ~Mvreg();
 
     /*!
      * @brief Copy constructor.
-     * @param x Reference to the object AworSet that will be copied.
+     * @param x Reference to the object Mvreg that will be copied.
      */
-    eProsima_user_DllExport AworSet(const AworSet &x);
+    eProsima_user_DllExport Mvreg(const Mvreg &x);
 
     /*!
      * @brief Move constructor.
-     * @param x Reference to the object AworSet that will be copied.
+     * @param x Reference to the object Mvreg that will be copied.
      */
-    eProsima_user_DllExport AworSet(AworSet &&x);
+    eProsima_user_DllExport Mvreg(Mvreg &&x);
 
     /*!
      * @brief Copy assignment.
-     * @param x Reference to the object AworSet that will be copied.
+     * @param x Reference to the object Mvreg that will be copied.
      */
-    eProsima_user_DllExport AworSet& operator=(const AworSet &x);
+    eProsima_user_DllExport Mvreg& operator=(const Mvreg &x);
 
     /*!
      * @brief Move assignment.
-     * @param x Reference to the object AworSet that will be copied.
+     * @param x Reference to the object Mvreg that will be copied.
      */
-    eProsima_user_DllExport AworSet& operator=(AworSet &&x);
+    eProsima_user_DllExport Mvreg& operator=(Mvreg &&x);
 
     /*!
      * @brief This function sets a value in member id
@@ -1917,6 +1920,24 @@ public:
      * @return Reference to member dk
      */
     eProsima_user_DllExport DotKernel& dk();
+    /*!
+     * @brief This function sets a value in member agent_id
+     * @param _agent_id New value for member agent_id
+     */
+    eProsima_user_DllExport void agent_id(int32_t _agent_id);
+
+    /*!
+     * @brief This function returns the value of member agent_id
+     * @return Value of member agent_id
+     */
+    eProsima_user_DllExport int32_t agent_id() const;
+
+    /*!
+     * @brief This function returns a reference to member agent_id
+     * @return Reference to member agent_id
+     */
+    eProsima_user_DllExport int32_t& agent_id();
+
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -1932,7 +1953,7 @@ public:
      * @param current_alignment Buffer alignment.
      * @return Serialized size.
      */
-    eProsima_user_DllExport static size_t getCdrSerializedSize(const AworSet& data, size_t current_alignment = 0);
+    eProsima_user_DllExport static size_t getCdrSerializedSize(const Mvreg& data, size_t current_alignment = 0);
 
 
     /*!
@@ -1971,6 +1992,7 @@ public:
 private:
     int32_t m_id;
     DotKernel m_dk;
+    int32_t m_agent_id;
 };
 /*!
  * @brief This class represents the structure OrMap defined by the user in the IDL file.
@@ -2043,25 +2065,25 @@ public:
      * @brief This function copies the value in member m
      * @param _m New value to be copied in member m
      */
-    eProsima_user_DllExport void m(const std::map<int32_t, AworSet> &_m);
+    eProsima_user_DllExport void m(const std::map<int32_t, Mvreg> &_m);
 
     /*!
      * @brief This function moves the value in member m
      * @param _m New value to be moved in member m
      */
-    eProsima_user_DllExport void m(std::map<int32_t, AworSet> &&_m);
+    eProsima_user_DllExport void m(std::map<int32_t, Mvreg> &&_m);
 
     /*!
      * @brief This function returns a constant reference to member m
      * @return Constant reference to member m
      */
-    eProsima_user_DllExport const std::map<int32_t, AworSet>& m() const;
+    eProsima_user_DllExport const std::map<int32_t, Mvreg>& m() const;
 
     /*!
      * @brief This function returns a reference to member m
      * @return Reference to member m
      */
-    eProsima_user_DllExport std::map<int32_t, AworSet>& m();
+    eProsima_user_DllExport std::map<int32_t, Mvreg>& m();
     /*!
      * @brief This function copies the value in member cbase
      * @param _cbase New value to be copied in member cbase
@@ -2138,7 +2160,7 @@ public:
 
 private:
     int32_t m_id;
-    std::map<int32_t, AworSet> m_m;
+    std::map<int32_t, Mvreg> m_m;
     DotContext m_cbase;
 };
 

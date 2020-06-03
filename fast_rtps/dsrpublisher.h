@@ -36,7 +36,7 @@ public:
 	void run();
 	eprosima::fastrtps::rtps::GUID_t getParticipantID() const ;
 	bool write(OrMap* object);
-	bool write(AworSet* object);
+	bool write(Mvreg* object);
 	bool write(GraphRequest* object);
 
 private:

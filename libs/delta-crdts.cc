@@ -498,14 +498,14 @@ public:
                 //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << " " << o << endl;
                 // dot in both
 
-                if constexpr(is_same<T, Node>::value) {
+                //if constexpr(is_same<T, Node>::value) {
                     //cout << "CONFLICTO " << endl;
                     //replace in case of conflict if the agent id has a lower value
                     if (it->second.agent_id() > ito->second.agent_id() && *it != *ito) {
                         ds.erase(it);
                         ds.insert(*ito);
                     }
-                }
+                //}
                 ++it;
                 ++ito;
             }
@@ -1321,10 +1321,11 @@ template<typename V, typename K=string>
 class mvreg    // Multi-value register, Optimized
 {
 private:
-    dotkernel<V,K> dk; // Dot kernel
     K id;
 
 public:
+    dotkernel<V,K> dk; // Dot kernel
+
     mvreg() {} // Only for deltas and those should not be mutated
     mvreg(K k) : id(k) {} // Mutable replicas need a unique id
     mvreg(K k, dotcontext<K> &jointc) : id(k), dk(jointc) {}
@@ -1358,6 +1359,12 @@ public:
         return s;
     }
 
+    V& read_reg ()
+    {
+        return *dk.ds.begin();
+    }
+
+
     mvreg<V,K> reset()
     {
         mvreg<V,K> r;
@@ -1386,7 +1393,7 @@ public:
 
     void join (mvreg<V,K> o)
     {
-        dk.join(o.dk);
+        dk.join_replace_conflict(o.dk);
     }
 };
 

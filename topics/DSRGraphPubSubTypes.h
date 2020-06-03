@@ -203,16 +203,16 @@ public:
     unsigned char* m_keyBuffer;
 };
 /*!
- * @brief This class represents the TopicDataType of the type AworSet defined by the user in the IDL file.
+ * @brief This class represents the TopicDataType of the type Mvreg defined by the user in the IDL file.
  * @ingroup DSRGRAPH
  */
-class AworSetPubSubType : public eprosima::fastrtps::TopicDataType {
+class MvregPubSubType : public eprosima::fastrtps::TopicDataType {
 public:
-    typedef AworSet type;
+    typedef Mvreg type;
 
-    eProsima_user_DllExport AworSetPubSubType();
+    eProsima_user_DllExport MvregPubSubType();
 
-    eProsima_user_DllExport virtual ~AworSetPubSubType();
+    eProsima_user_DllExport virtual ~MvregPubSubType();
     eProsima_user_DllExport virtual bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override;
     eProsima_user_DllExport virtual bool deserialize(eprosima::fastrtps::rtps::SerializedPayload_t *payload, void *data) override;
     eProsima_user_DllExport virtual std::function<uint32_t()> getSerializedSizeProvider(void* data) override;

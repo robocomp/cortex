@@ -80,7 +80,7 @@ std::optional<Node> CRDTGraph::get_node(const std::string& name)
     if (name.empty()) return {};
     int id = get_id_from_name(name).value_or(-1);
     if (in(id)) {
-        auto n = &nodes[id].dots().ds.rbegin()->second;
+        auto n = nodes[id].read().begin();
         if (n->name() == name) return Node(*n);
     }
 
@@ -98,7 +98,7 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
 {
     if (node.id() == -1) return false;
     bool r;
-    std::optional<AworSet> aw;
+    std::optional<Mvreg> aw;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())
@@ -118,23 +118,23 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
 }
 
 
-std::pair<bool, std::optional<AworSet>> CRDTGraph::insert_or_assign_node_(const N &node)
+std::pair<bool, std::optional<Mvreg>> CRDTGraph::insert_or_assign_node_(const N &node)
 {
     if (deleted.find(node.id()) == deleted.end()) {
-        if (!nodes[node.id()].dots().ds.empty() and nodes[node.id()].dots().ds.rbegin()->second == node) {
+        if (!nodes[node.id()].read().empty() and *nodes[node.id()].read().begin() == node) {
             return {true, {} };
         }
-        aworset<Node, int> delta = nodes[node.id()].add(node, node.id());
+        mvreg<Node, int> delta = nodes[node.id()].write(node);
         update_maps_node_insert(node.id(), node);
 
-        return { true, translateAwCRDTtoIDL(node.id(), delta) };
+        return { true, translateMvCRDTtoIDL(node.id(), delta) };
     }
     return {false, {} };
 }
 
 std::optional<uint32_t> CRDTGraph::insert_node(const Node& node) {
     if (node.id() == -1) return {};
-    std::optional<AworSet> aw;
+    std::optional<Mvreg> aw;
     bool r = false;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -161,7 +161,7 @@ bool CRDTGraph::update_node(const N &node)
 {
     if (node.id() == -1) return false;
     bool r = false;
-    std::optional<AworSet> aw;
+    std::optional<Mvreg> aw;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())  or (name_map.find(node.name()) != name_map.end() and name_map[node.name()] != node.id()))
@@ -182,7 +182,7 @@ bool CRDTGraph::delete_node(const std::string& name)
 {
     bool result = false;
     vector<tuple<int,int, std::string>> edges_;
-    vector<AworSet> aw_;
+    vector<Mvreg> aw_;
 
     std::optional<int> id = {};
     {
@@ -212,7 +212,7 @@ bool CRDTGraph::delete_node(int id)
 {
     bool result;
     vector<tuple<int,int, std::string>> edges_;
-    vector<AworSet> aw_;
+    vector<Mvreg> aw_;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (in(id)) {
@@ -233,10 +233,10 @@ bool CRDTGraph::delete_node(int id)
     return false;
 }
 
-std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGraph::delete_node_(int id)
+std::tuple<bool, vector<tuple<int, int, std::string>>, vector<Mvreg>> CRDTGraph::delete_node_(int id)
 {
     vector<tuple<int,int, std::string>> edges_;
-    vector<AworSet> aw;
+    vector<Mvreg> aw;
 
     //1. Get and remove node.
     auto node = get_(id);
@@ -246,8 +246,8 @@ std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGrap
          edges_.emplace_back(make_tuple(id, v.first.to(), v.first.type()));
     }
     // Get remove delta.
-    auto delta = nodes[id].rmv(nodes[id].dots().ds.rbegin()->second);
-    aw.emplace_back(translateAwCRDTtoIDL(id, delta));
+    auto delta = nodes[id].reset();
+    aw.emplace_back(translateMvCRDTtoIDL(id, delta));
     update_maps_node_delete(id, node.value());
 
     //2. search and remove edges.
@@ -255,7 +255,7 @@ std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGrap
     for (auto &[k, v] : nodes.getMapRef()) {
         if (edges.find({k, id}) == edges.end()) continue;
         // Remove all edges between them
-        auto visited_node =  Node(v.dots().ds.rbegin()->second);
+        auto visited_node =  Node(*v.read().begin());
         for (const auto &key : edges[{k, id}]) {
             EdgeKey ek; ek.to(k); ek.type(key);
             visited_node.fano().erase(ek);
@@ -264,8 +264,8 @@ std::tuple<bool, vector<tuple<int, int, std::string>>, vector<AworSet>> CRDTGrap
             edgeType[key].erase({visited_node.id(), id});
         }
 
-        auto delta = nodes[visited_node.id()].add(visited_node, visited_node.id());
-        aw.emplace_back( translateAwCRDTtoIDL(visited_node.id(), delta));
+        auto delta = nodes[visited_node.id()].write(visited_node);
+        aw.emplace_back( translateMvCRDTtoIDL(visited_node.id(), delta));
 
         //Remove all from cache
         edges.erase({visited_node.id(), id});
@@ -325,7 +325,7 @@ std::optional<Edge> CRDTGraph::get_edge_(int from, int  to, const std::string& k
 bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
 {
     bool r = false;
-    std::optional<AworSet> aw;
+    std::optional<Mvreg> aw;
 
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -358,8 +358,8 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& t
 {
     bool r = false;
 
-    std::optional<AworSet> awor1;
-    std::optional<AworSet> awor2;
+    std::optional<Mvreg> awor1;
+    std::optional<Mvreg> awor2;
 
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -404,8 +404,8 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
 {
     bool r = false;
 
-    std::optional<AworSet> awor1;
-    std::optional<AworSet> awor2;
+    std::optional<Mvreg> awor1;
+    std::optional<Mvreg> awor2;
 
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -449,7 +449,7 @@ void CRDTGraph::insert_or_assign_edge_RT(Node& n, int to, const std::vector<floa
 bool CRDTGraph::delete_edge(int from, int to, const std::string& key)
 {
     bool result;
-    std::optional<AworSet> aw;
+    std::optional<Mvreg> aw;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (!in(from) || !in(to)) return false;
@@ -468,7 +468,7 @@ bool CRDTGraph::delete_edge(const std::string& from, const std::string& to, cons
 {
     std::optional<int> id_from = {};
     std::optional<int> id_to = {};
-    std::optional<AworSet> aw;
+    std::optional<Mvreg> aw;
     bool result = false;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -489,7 +489,7 @@ bool CRDTGraph::delete_edge(const std::string& from, const std::string& to, cons
     return result;
 }
 
-std::pair<bool, std::optional<AworSet>> CRDTGraph::delete_edge_(int from, int to, const std::string& key)
+std::pair<bool, std::optional<Mvreg>> CRDTGraph::delete_edge_(int from, int to, const std::string& key)
 {
     auto node = get_(from);
     if (node.has_value()) {
@@ -597,7 +597,7 @@ std::map<long,Node> CRDTGraph::getCopy() const
     std::map<long,Node> mymap;
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     for (auto &[key, val] : nodes.getMap())
-        mymap[key] = val.dots().ds.rbegin()->second;
+        mymap[key] = *val.read().begin();
 
     return mymap;
 }
@@ -626,8 +626,8 @@ std::optional<Node> CRDTGraph::get(int id) {
 std::optional<Node> CRDTGraph::get_(int id) {
 
     if (in(id)) {
-        if (!nodes[id].dots().ds.empty()) {
-            return nodes[id].dots().ds.rbegin()->second;
+        if (!nodes[id].read().empty()) {
+            return *nodes[id].read().begin();
         }
     }
     return {};
@@ -735,61 +735,61 @@ bool CRDTGraph::empty(const int &id)
 {
     if (nodes.in(id)) 
     {
-        return nodes[id].dots().ds.empty();
+        return nodes[id].read().empty();
     } else
         return false;
 }
 
-void CRDTGraph::join_delta_node(AworSet aworSet)
+void CRDTGraph::join_delta_node(Mvreg mvreg)
 {
     try{
         //vector<tuple<int, int, std::string>> remove;
         bool signal = false;
-        auto d = translateAwIDLtoCRDT(aworSet);
+        auto d = translateMvIDLtoCRDT(mvreg);
         Node nd;
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
-            if (deleted.find(aworSet.id()) == deleted.end()) {
+            if (deleted.find(mvreg.id()) == deleted.end()) {
 
-                (nodes[aworSet.id()].dots().ds.rbegin() != nodes[aworSet.id()].dots().ds.rend()) ?
-                    nd = nodes[aworSet.id()].dots().ds.rbegin()->second : Node();
+                nd = (nodes[mvreg.id()].read().empty()) ?
+                      Node() :  *nodes[mvreg.id()].read().begin() ;
 
-                nodes[aworSet.id()].join_replace(d);
-                if (nodes[aworSet.id()].dots().ds.size() == 0 or aworSet.dk().ds().size() == 0) {
-                    update_maps_node_delete(aworSet.id(), nd);
+                nodes[mvreg.id()].join(d);
+                if (nodes[mvreg.id()].read().empty() or mvreg.dk().ds().empty()) {
+                    update_maps_node_delete(mvreg.id(), nd);
                 } else {
                     signal = true;
-                    update_maps_node_insert(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second);
+                    update_maps_node_insert(mvreg.id(), *nodes[mvreg.id()].read().begin());
                 }
             }
         }
 
         if (signal) {
             //check what change is joined
-            if (nd.attrs() != nodes[aworSet.id()].dots().ds.rbegin()->second.attrs()) {
-                emit update_node_signal(aworSet.id(), nodes[aworSet.id()].dots().ds.rbegin()->second.type());
+            if (nd.attrs() != nodes[mvreg.id()].read().begin()->attrs()) {
+                emit update_node_signal(mvreg.id(), nodes[mvreg.id()].read().begin()->type());
             } else {
                 std::map<EdgeKey, Edge> diff_remove;
                 std::set_difference(nd.fano().begin(), nd.fano().end(),
-                              nodes[aworSet.id()].dots().ds.rbegin()->second.fano().begin(),
-                              nodes[aworSet.id()].dots().ds.rbegin()->second.fano().end(),
+                              nodes[mvreg.id()].read().begin()->fano().begin(),
+                              nodes[mvreg.id()].read().begin()->fano().end(),
                                     std::inserter(diff_remove, diff_remove.begin()));
                 std::map<EdgeKey, Edge> diff_insert;
-                std::set_difference(nodes[aworSet.id()].dots().ds.rbegin()->second.fano().begin(),
-                                    nodes[aworSet.id()].dots().ds.rbegin()->second.fano().end(),
+                std::set_difference(nodes[mvreg.id()].read().begin()->fano().begin(),
+                                    nodes[mvreg.id()].read().begin()->fano().end(),
                                     nd.fano().begin(), nd.fano().end(),
                                     std::inserter(diff_insert, diff_insert.begin()));
 
                 for (const auto &[k,v] : diff_remove)
-                        emit del_edge_signal(aworSet.id(), k.to(), k.type());
+                        emit del_edge_signal(mvreg.id(), k.to(), k.type());
 
                 for (const auto &[k,v] : diff_insert) {
-                    emit update_edge_signal(aworSet.id(), k.to(), k.type());
+                    emit update_edge_signal(mvreg.id(), k.to(), k.type());
                 }
             }
         }
         else {
-            emit del_node_signal(aworSet.id());
+            emit del_node_signal(mvreg.id());
         }
 
     } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
@@ -807,18 +807,18 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
 
         for (auto &[k, val] : full_graph.m())
         {
-            auto awor = translateAwIDLtoCRDT(val);
-            Node nd = (nodes[k].dots().ds.rbegin() == nodes[k].dots().ds.rend()) ? Node() : nodes[k].dots().ds.rbegin()->second;
+            auto mv = translateMvIDLtoCRDT(val);
+            Node nd = (nodes[k].read().empty()) ? Node() : *nodes[k].read().begin();
 
             if (deleted.find(k) == deleted.end()) {
-                nodes[k].join_replace(awor);
-                if (awor.dots().ds.size() == 0) {
+                nodes[k].join(mv);
+                if (mv.read().empty()) {
                     update_maps_node_delete(k, nd);
                     updates.emplace_back(make_tuple(false, k, "", nd));
                 } else {
-                    if (!nodes[k].dots().ds.empty()) {
-                        update_maps_node_insert(k, awor.dots().ds.begin()->second);
-                        updates.emplace_back(make_tuple(true, k, nodes[k].dots().ds.begin()->second.type(), nd));
+                    if (!nodes[k].read().empty()) {
+                        update_maps_node_insert(k, *mv.read().begin());
+                        updates.emplace_back(make_tuple(true, k, nodes[k].read().begin()->type(), nd));
                     } else {
                         update_maps_node_delete(k, nd);
                     }
@@ -831,17 +831,17 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
     for (auto &[signal, id, type, nd] : updates)
         if (signal) {
             //check what change is joined
-            if (nd.attrs() != nodes[id].dots().ds.rbegin()->second.attrs()) {
-                emit update_node_signal(id, nodes[id].dots().ds.rbegin()->second.type());
+            if (nd.attrs() != nodes[id].read().begin()->attrs()) {
+                emit update_node_signal(id, nodes[id].read().begin()->type());
             } else {
                 std::map<EdgeKey, Edge> diff_remove;
                 std::set_difference(nd.fano().begin(), nd.fano().end(),
-                                    nodes[id].dots().ds.rbegin()->second.fano().begin(),
-                                    nodes[id].dots().ds.rbegin()->second.fano().end(),
+                                    nodes[id].read().begin()->fano().begin(),
+                                    nodes[id].read().begin()->fano().end(),
                                     std::inserter(diff_remove, diff_remove.begin()));
                 std::map<EdgeKey, Edge> diff_insert;
-                std::set_difference(nodes[id].dots().ds.rbegin()->second.fano().begin(),
-                                    nodes[id].dots().ds.rbegin()->second.fano().end(),
+                std::set_difference(nodes[id].read().begin()->fano().begin(),
+                                    nodes[id].read().begin()->fano().end(),
                                     nd.fano().begin(), nd.fano().end(),
                                     std::inserter(diff_insert, diff_insert.begin()));
 
@@ -895,18 +895,19 @@ DotContext CRDTGraph::context()
     return om_dotcontext;
 }
 
-std::map<int,AworSet> CRDTGraph::Map() 
+std::map<int,Mvreg> CRDTGraph::Map()
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
-    std::map<int,AworSet>  m;
+    std::map<int,Mvreg>  m;
     for (auto kv : nodes.getMapRef()) 
     { 
-        aworset<Node, int> n;
+        mvreg<Node, int> n;
 
-        auto last = *kv.second.dots().ds.rbegin();
-        n.dots().ds.insert(last);
-        n.dots().c = kv.second.dots().c;
-        m[kv.first] = translateAwCRDTtoIDL(kv.first, n);
+        auto last = *kv.second.read().begin();
+        //cout << last << endl;
+        n.write(last);
+        //n.dots().c = kv.second.dots().c;
+        m[kv.first] = translateMvCRDTtoIDL(kv.first, n);
     }
     return m;
 }
@@ -918,12 +919,13 @@ void CRDTGraph::subscription_thread(bool showReceived)
         if (*work) {
             try {
                 eprosima::fastrtps::SampleInfo_t m_info;
-                AworSet sample;
+                Mvreg sample;
                 //std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
                 //read or take?
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
                     if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
-                        if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
+                        //if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
+                        if (sample.agent_id() != agent_id) {
                             if (showReceived)  std::cout << " Received:" << sample.id() << " node from: " << m_info.sample_identity.writer_guid() << std::endl;
                             graph->join_delta_node(sample);
                         }
@@ -1016,10 +1018,10 @@ bool CRDTGraph::fullgraph_request_thread()
     return sync;
 }
 
-AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data) 
+Mvreg CRDTGraph::translateMvCRDTtoIDL(int id, mvreg<N, int> &data)
 {
-    AworSet delta_crdt;
-    for (auto &kv_dots : data.dots().ds) {
+    Mvreg delta_crdt;
+    for (auto &kv_dots : data.dk.ds) {
         PairInt pi;
         pi.first(kv_dots.first.first);
         pi.second(kv_dots.first.second);
@@ -1037,10 +1039,11 @@ AworSet CRDTGraph::translateAwCRDTtoIDL(int id, aworset<N, int> &data)
         delta_crdt.dk().cbase().dc().push_back(pi);
     }
     delta_crdt.id(id);
+    delta_crdt.agent_id(agent_id);
     return delta_crdt;
 }
 
-aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data) 
+mvreg<N, int> CRDTGraph::translateMvIDLtoCRDT(Mvreg &data)
 {
     // Context
     dotcontext<int> dotcontext_aux;
@@ -1057,8 +1060,8 @@ aworset<N, int> CRDTGraph::translateAwIDLtoCRDT(AworSet &data)
     for (auto &[k,v] : data.dk().ds())
         ds_aux[pair<int, int>(k.first(), k.second())] = v;
     // Join
-    aworset<N, int> aw = aworset<N, int>(data.id());
-    aw.setContext(dotcontext_aux);
-    aw.dots().set(ds_aux);
+    mvreg<N, int> aw = mvreg<N, int>(data.id());
+    aw.dk.c = dotcontext_aux;
+    aw.dk.set(ds_aux);
     return aw;
 }
