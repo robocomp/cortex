@@ -183,7 +183,7 @@ void DSRtoOSGViewer::add_or_assign_node_slot(const Node &node)
     catch(const std::exception& e)
     {  
         std::cout << "Exception in " << __FUNCTION__ << " " << e.what() << std::endl; 
-        throw e;  
+        throw e;
     }
 }
 

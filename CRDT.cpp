@@ -765,6 +765,7 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
         }
 
         if (signal) {
+
             //check what change is joined
             if (nd.attrs() != nodes[mvreg.id()].read().begin()->attrs()) {
                 emit update_node_signal(mvreg.id(), nodes[mvreg.id()].read().begin()->type());
@@ -787,12 +788,14 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
                     emit update_edge_signal(mvreg.id(), k.to(), k.type());
                 }
             }
+
         }
         else {
             emit del_node_signal(mvreg.id());
         }
 
-    } catch(const std::exception &e){std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+    } catch(const std::exception &e){
+        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
