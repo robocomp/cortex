@@ -749,8 +749,10 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
                 if (nodes[mvreg.id()].read().empty() or mvreg.dk().ds().empty()) {
                     update_maps_node_delete(mvreg.id(), nd);
                 } else {
-                    signal = true;
-                    update_maps_node_insert(mvreg.id(), *nodes[mvreg.id()].read().begin());
+                    //if (nd != *nodes[mvreg.id()].read().begin()) {
+                        signal = true;
+                        update_maps_node_insert(mvreg.id(), *nodes[mvreg.id()].read().begin());
+                    //}
                 }
             }
         }
@@ -762,17 +764,21 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
                 emit update_node_signal(mvreg.id(), nodes[mvreg.id()].read().begin()->type());
             } else {
                 std::map<EdgeKey, Edge> diff_remove;
-                std::set_difference(nd.fano().begin(), nd.fano().end(),
+                if (!nodes[mvreg.id()].read().begin()->fano().empty()) {
+
+                    std::set_difference(nd.fano().begin(), nd.fano().end(),
                                         nodes[mvreg.id()].read().begin()->fano().begin(),
                                         nodes[mvreg.id()].read().begin()->fano().end(),
                                         std::inserter(diff_remove, diff_remove.begin()));
-
+                }
                 std::map<EdgeKey, Edge> diff_insert;
-                std::set_difference(nodes[mvreg.id()].read().begin()->fano().begin(),
+                if (!nd.fano().empty()) {
+
+                    std::set_difference(nodes[mvreg.id()].read().begin()->fano().begin(),
                                         nodes[mvreg.id()].read().begin()->fano().end(),
                                         nd.fano().begin(), nd.fano().end(),
                                         std::inserter(diff_insert, diff_insert.begin()));
-
+                }
                 for (const auto &[k,v] : diff_remove)
                         emit del_edge_signal(mvreg.id(), k.to(), k.type());
 

@@ -53,7 +53,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, std::list<View> op
 	dsr_to_graph_viewer = std::make_unique<DSR::DSRtoGraphViewer>(G);	
 	this->setCentralWidget(dsr_to_graph_viewer.get());
 
-
+    /*
 	//3D
 	QDockWidget *osg_widget = new QDockWidget("3D");
 	dsr_to_osg_viewer = std::make_unique<DSR::DSRtoOSGViewer>(G, 1, 1);
@@ -85,7 +85,7 @@ GraphViewer::GraphViewer(std::shared_ptr<CRDT::CRDTGraph> G_, std::list<View> op
     action2D->setCheckable(true);
     action2D->setChecked(true);
 	connect(action2D, SIGNAL(triggered(bool)), scene_widget, SLOT(setVisible(bool)));
-
+    */
 
 
 /*	for(auto option: options)

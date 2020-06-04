@@ -504,6 +504,7 @@ public:
                     if (it->second.agent_id() > ito->second.agent_id() && *it != *ito) {
                         ds.erase(it);
                         ds.insert(*ito);
+                        cout << "CONFLICTO" << endl;
                     }
                 //}
                 ++it;
@@ -1405,7 +1406,8 @@ public:
     void join (mvreg<V,K> o)
     {
         dk.join_replace_conflict(o.dk);
-        rsv();
+        //rsv();
+        dk.clean();
     }
 };
 
