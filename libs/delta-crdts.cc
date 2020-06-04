@@ -1391,9 +1391,21 @@ public:
         return r;
     }
 
+    // Remove all but the last dotkernel element
+    void rsv()
+    {
+        if (dk.ds.empty()) return;
+        auto b = dk.ds.begin();
+        auto e = --dk.ds.end();
+        while (b != e) {
+            b = dk.ds.erase(b);
+        }
+    }
+
     void join (mvreg<V,K> o)
     {
         dk.join_replace_conflict(o.dk);
+        rsv();
     }
 };
 

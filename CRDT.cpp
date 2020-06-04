@@ -661,11 +661,11 @@ std::optional<Node> CRDTGraph::get_parent_node(const Node &n)
 
 std::string CRDTGraph::get_node_type(Node& n)
 {
-    //try {
+    try {
         return n.type();
-    //} catch(const std::exception &e){
-    //    std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
-    //return "error";
+    } catch(const std::exception &e){
+        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+    return "error";
 }
 
 inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
@@ -772,14 +772,15 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
             } else {
                 std::map<EdgeKey, Edge> diff_remove;
                 std::set_difference(nd.fano().begin(), nd.fano().end(),
-                              nodes[mvreg.id()].read().begin()->fano().begin(),
-                              nodes[mvreg.id()].read().begin()->fano().end(),
-                                    std::inserter(diff_remove, diff_remove.begin()));
+                                        nodes[mvreg.id()].read().begin()->fano().begin(),
+                                        nodes[mvreg.id()].read().begin()->fano().end(),
+                                        std::inserter(diff_remove, diff_remove.begin()));
+
                 std::map<EdgeKey, Edge> diff_insert;
                 std::set_difference(nodes[mvreg.id()].read().begin()->fano().begin(),
-                                    nodes[mvreg.id()].read().begin()->fano().end(),
-                                    nd.fano().begin(), nd.fano().end(),
-                                    std::inserter(diff_insert, diff_insert.begin()));
+                                        nodes[mvreg.id()].read().begin()->fano().end(),
+                                        nd.fano().begin(), nd.fano().end(),
+                                        std::inserter(diff_insert, diff_insert.begin()));
 
                 for (const auto &[k,v] : diff_remove)
                         emit del_edge_signal(mvreg.id(), k.to(), k.type());
@@ -838,16 +839,19 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
                 emit update_node_signal(id, nodes[id].read().begin()->type());
             } else {
                 std::map<EdgeKey, Edge> diff_remove;
-                std::set_difference(nd.fano().begin(), nd.fano().end(),
-                                    nodes[id].read().begin()->fano().begin(),
-                                    nodes[id].read().begin()->fano().end(),
-                                    std::inserter(diff_remove, diff_remove.begin()));
+                if (!nodes[id].read().begin()->fano().empty()) {
+                    std::set_difference(nd.fano().begin(), nd.fano().end(),
+                                        nodes[id].read().begin()->fano().begin(),
+                                        nodes[id].read().begin()->fano().end(),
+                                        std::inserter(diff_remove, diff_remove.begin()));
+                }
                 std::map<EdgeKey, Edge> diff_insert;
-                std::set_difference(nodes[id].read().begin()->fano().begin(),
-                                    nodes[id].read().begin()->fano().end(),
-                                    nd.fano().begin(), nd.fano().end(),
-                                    std::inserter(diff_insert, diff_insert.begin()));
-
+                if (!nd.fano().empty()) {
+                    std::set_difference(nodes[id].read().begin()->fano().begin(),
+                                        nodes[id].read().begin()->fano().end(),
+                                        nd.fano().begin(), nd.fano().end(),
+                                        std::inserter(diff_insert, diff_insert.begin()));
+                }
                 for (const auto &[k,v] : diff_remove)
                         emit del_edge_signal(id, k.to(), k.type());
 
@@ -907,9 +911,8 @@ std::map<int,Mvreg> CRDTGraph::Map()
         mvreg<Node, int> n;
 
         auto last = *kv.second.read().begin();
-        //cout << last << endl;
         n.write(last);
-        //n.dots().c = kv.second.dots().c;
+        n.dk.c = kv.second.dk.c;
         m[kv.first] = translateMvCRDTtoIDL(kv.first, n);
     }
     return m;
