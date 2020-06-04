@@ -79,12 +79,7 @@ std::optional<Node> CRDTGraph::get_node(const std::string& name)
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     if (name.empty()) return {};
     int id = get_id_from_name(name).value_or(-1);
-    if (in(id)) {
-        auto n = nodes[id].read().begin();
-        if (n->name() == name) return Node(*n);
-    }
-
-    return {};
+    return get_(id);
 }
 
 std::optional<Node> CRDTGraph::get_node(int id)
@@ -661,11 +656,7 @@ std::optional<Node> CRDTGraph::get_parent_node(const Node &n)
 
 std::string CRDTGraph::get_node_type(Node& n)
 {
-    try {
-        return n.type();
-    } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
-    return "error";
+    return n.type();
 }
 
 inline void CRDTGraph::update_maps_node_delete(int id, const Node& n)
