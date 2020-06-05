@@ -84,11 +84,17 @@ eprosima::fastrtps::rtps::GUID_t DSRPublisher::getParticipantID() const
 }
 
 bool DSRPublisher::write(OrMap *object) {
-    return mp_publisher->write(object);
-}
+    while (true) {
+        if (mp_publisher->write(object)) break;
+    }
+    return true;}
 
 bool DSRPublisher::write(GraphRequest *object) {
-    return mp_publisher->write(object);
+    while (true) {
+        if (mp_publisher->write(object)) break;
+        std::cout << "ERROR ESCRIBIENDO" << std::endl;
+    }
+    return true;
 }
 
 

@@ -757,11 +757,9 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
                     update_maps_node_delete(mvreg.id(), nd);
                 } else {
                     std::cout << "JOIN INSERT/UPDATE" << std::endl;
-                    //if (nd != *nodes[mvreg.id()].read().begin()) {
-                        signal = true;
-                        newnd = *nodes[mvreg.id()].read().begin();
-                        update_maps_node_insert(mvreg.id(), newnd);
-                    //}
+                    signal = true;
+                    newnd = *nodes[mvreg.id()].read().begin();
+                    update_maps_node_insert(mvreg.id(), newnd);
                 }
             }
         }
@@ -776,13 +774,11 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
                 std::map<EdgeKey, Edge> diff_insert;
 
                 if (!newnd.fano().empty()) {
-                    std::cout << "DIFF REMOVE" << std::endl;
                     std::set_difference(nd.fano().begin(), nd.fano().end(),
                                         newnd.fano().begin(), newnd.fano().end(),
                                         std::inserter(diff_remove, diff_remove.begin()));
                 }
                 if (!nd.fano().empty()) {
-                    std::cout << "DIFF INSERT" << std::endl;
                     std::set_difference(newnd.fano().begin(), newnd.fano().end(),
                                         nd.fano().begin(), nd.fano().end(),
                                         std::inserter(diff_insert, diff_insert.begin()));
@@ -794,8 +790,6 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
                 for (const auto &[k,v] : diff_insert) {
                     emit update_edge_signal(mvreg.id(), k.to(), k.type());
                 }
-                std::cout << "SEÑALES ENVIADAS" << std::endl;
-
             }
 
         }
@@ -929,8 +923,6 @@ void CRDTGraph::subscription_thread(bool showReceived)
             try {
                 eprosima::fastrtps::SampleInfo_t m_info;
                 Mvreg sample;
-                //std::cout << "Unreaded: " << sub->get_unread_count() << std::endl;
-                //read or take?
                 if (sub->takeNextData(&sample, &m_info)) { // Get sample
                     if(m_info.sampleKind == eprosima::fastrtps::rtps::ALIVE) {
                         //if( m_info.sample_identity.writer_guid().is_on_same_process_as(sub->getGuid()) == false) {
