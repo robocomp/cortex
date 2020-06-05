@@ -141,9 +141,9 @@ namespace CRDT
         //std::optional<VertexPtr> get_vertex(const std::string& name);
         //std::optional<VertexPtr> get_vertex(int id);
         [[deprecated ("You should be using \"insert_node\" to insert new nodes and \"update_node\" to update them")]]
-        bool insert_or_assign_node(const N &node);
-        std::optional<uint32_t> insert_node(const Node& node);
-        bool update_node(const Node& node);
+        bool insert_or_assign_node(Node &node);
+        std::optional<uint32_t> insert_node(Node& node);
+        bool update_node(Node& node);
         //bool insert_or_assign_node(const VertexPtr &vertex);
         //bool insert_or_assign_node(Vertex &vertex);
         bool delete_node(const std::string &name);

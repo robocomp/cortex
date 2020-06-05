@@ -89,7 +89,7 @@ std::optional<Node> CRDTGraph::get_node(int id)
 }
 
 
-bool CRDTGraph::insert_or_assign_node(const N &node)
+bool CRDTGraph::insert_or_assign_node(Node &node)
 {
     if (node.id() == -1) return false;
     bool r;
@@ -99,6 +99,7 @@ bool CRDTGraph::insert_or_assign_node(const N &node)
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())
             or ( name_map.find(node.name())  != name_map.end() and name_map[node.name()] != node.id() ))
             throw std::runtime_error((std::string("Cannot insert node in G, id mut be unique ") + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+        node.agent_id(agent_id);
         std::tie(r, aw) = insert_or_assign_node_(node);
     }
     if (r) {
@@ -127,7 +128,7 @@ std::pair<bool, std::optional<Mvreg>> CRDTGraph::insert_or_assign_node_(const N 
     return {false, {} };
 }
 
-std::optional<uint32_t> CRDTGraph::insert_node(const Node& node) {
+std::optional<uint32_t> CRDTGraph::insert_node(Node& node) {
     if (node.id() == -1) return {};
     std::optional<Mvreg> aw;
     bool r = false;
@@ -135,6 +136,7 @@ std::optional<uint32_t> CRDTGraph::insert_node(const Node& node) {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if (id_map.find(node.id()) == id_map.end() and name_map.find(node.name())  == name_map.end()) {
             //TODO: Poner id con el proxy y generar el nombre
+            node.agent_id(agent_id);
             std::tie(r, aw) = insert_or_assign_node_(node);
         } else throw std::runtime_error((std::string("Cannot insert node in G, a node with the same id already exists ")
                                          + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
@@ -152,7 +154,7 @@ std::optional<uint32_t> CRDTGraph::insert_node(const Node& node) {
     return {};
 }
 
-bool CRDTGraph::update_node(const N &node)
+bool CRDTGraph::update_node(N &node)
 {
     if (node.id() == -1) return false;
     bool r = false;
@@ -161,6 +163,7 @@ bool CRDTGraph::update_node(const N &node)
         std::unique_lock<std::shared_mutex> lock(_mutex);
         if ((id_map.find(node.id()) != id_map.end() and id_map[node.id()] != node.name())  or (name_map.find(node.name()) != name_map.end() and name_map[node.name()] != node.id()))
             throw std::runtime_error((std::string("Cannot update node in G, id and name must be unique")  + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+        node.agent_id(agent_id);
         std::tie(r, aw) = insert_or_assign_node_(node);
     }
     if (r) {
@@ -331,8 +334,10 @@ bool CRDTGraph::insert_or_assign_edge(const Edge& attrs)
             auto node = get_(from);
             if (node.has_value()) {
                 EdgeKey ek; ek.to(to); ek.type(attrs.type());
-                node.value().fano().insert_or_assign(ek, attrs);
-                node.value().agent_id(agent_id);
+                std::cout << ek << " --------- " << attrs << std::endl;
+
+                node->fano().insert_or_assign(ek, attrs);
+                node->agent_id(agent_id);
                 std::tie(r, aw) = insert_or_assign_node_(node.value());
             }
         } else
@@ -738,6 +743,7 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
         bool signal = false;
         auto d = translateMvIDLtoCRDT(mvreg);
         Node nd;
+        Node newnd;
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             if (deleted.find(mvreg.id()) == deleted.end()) {
@@ -747,11 +753,14 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
 
                 nodes[mvreg.id()].join(d);
                 if (nodes[mvreg.id()].read().empty() or mvreg.dk().ds().empty()) {
+                    std::cout << "JOIN REMOVE" << std::endl;
                     update_maps_node_delete(mvreg.id(), nd);
                 } else {
+                    std::cout << "JOIN INSERT/UPDATE" << std::endl;
                     //if (nd != *nodes[mvreg.id()].read().begin()) {
                         signal = true;
-                        update_maps_node_insert(mvreg.id(), *nodes[mvreg.id()].read().begin());
+                        newnd = *nodes[mvreg.id()].read().begin();
+                        update_maps_node_insert(mvreg.id(), newnd);
                     //}
                 }
             }
@@ -762,29 +771,31 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
             //check what change is joined
             if (nd.attrs() != nodes[mvreg.id()].read().begin()->attrs()) {
                 emit update_node_signal(mvreg.id(), nodes[mvreg.id()].read().begin()->type());
-            } else {
+            } else if (nd != *nodes[mvreg.id()].read().begin()){
                 std::map<EdgeKey, Edge> diff_remove;
-                if (!nodes[mvreg.id()].read().begin()->fano().empty()) {
+                std::map<EdgeKey, Edge> diff_insert;
 
+                if (!newnd.fano().empty()) {
+                    std::cout << "DIFF REMOVE" << std::endl;
                     std::set_difference(nd.fano().begin(), nd.fano().end(),
-                                        nodes[mvreg.id()].read().begin()->fano().begin(),
-                                        nodes[mvreg.id()].read().begin()->fano().end(),
+                                        newnd.fano().begin(), newnd.fano().end(),
                                         std::inserter(diff_remove, diff_remove.begin()));
                 }
-                std::map<EdgeKey, Edge> diff_insert;
                 if (!nd.fano().empty()) {
-
-                    std::set_difference(nodes[mvreg.id()].read().begin()->fano().begin(),
-                                        nodes[mvreg.id()].read().begin()->fano().end(),
+                    std::cout << "DIFF INSERT" << std::endl;
+                    std::set_difference(newnd.fano().begin(), newnd.fano().end(),
                                         nd.fano().begin(), nd.fano().end(),
                                         std::inserter(diff_insert, diff_insert.begin()));
-                }
+                    }
+
                 for (const auto &[k,v] : diff_remove)
                         emit del_edge_signal(mvreg.id(), k.to(), k.type());
 
                 for (const auto &[k,v] : diff_insert) {
                     emit update_edge_signal(mvreg.id(), k.to(), k.type());
                 }
+                std::cout << "SEÑALES ENVIADAS" << std::endl;
+
             }
 
         }
@@ -793,7 +804,7 @@ void CRDTGraph::join_delta_node(Mvreg mvreg)
         }
 
     } catch(const std::exception &e){
-        std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
+         std::cout <<"EXCEPTION: "<<__FILE__ << " " << __FUNCTION__ <<":"<<__LINE__<< " "<< e.what() << std::endl;};
 }
 
 void CRDTGraph::join_full_graph(OrMap full_graph) 
@@ -834,7 +845,7 @@ void CRDTGraph::join_full_graph(OrMap full_graph)
             //check what change is joined
             if (nd.attrs() != nodes[id].read().begin()->attrs()) {
                 emit update_node_signal(id, nodes[id].read().begin()->type());
-            } else {
+            } else if (nd != *nodes[id].read().begin()){
                 std::map<EdgeKey, Edge> diff_remove;
                 if (!nodes[id].read().begin()->fano().empty()) {
                     std::set_difference(nd.fano().begin(), nd.fano().end(),
