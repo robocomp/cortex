@@ -903,14 +903,9 @@ std::map<int,Mvreg> CRDTGraph::Map()
 {
     std::shared_lock<std::shared_mutex>  lock(_mutex);
     std::map<int,Mvreg>  m;
-    for (auto kv : nodes.getMapRef()) 
-    { 
-        mvreg<Node, int> n;
-
-        auto last = *kv.second.read().begin();
-        n.write(last);
-        n.dk.c = kv.second.dk.c;
-        m[kv.first] = translateMvCRDTtoIDL(kv.first, n);
+    for (auto kv : nodes.getMapRef())
+    {
+        m[kv.first] = translateMvCRDTtoIDL(kv.first, kv.second);
     }
     return m;
 }
