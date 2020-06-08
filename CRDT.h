@@ -27,7 +27,7 @@
 #include "fast_rtps/dsrpublisher.h"
 #include "fast_rtps/dsrsubscriber.h"
 #include "topics/DSRGraphPubSubTypes.h"
-//#include "vertex.h"
+#include "topics/CRDT_types.h"
 #include "inner_api.h"
 #include "dsr_utils.h"
 
@@ -41,7 +41,7 @@
 namespace CRDT
 {
     using N = Node;
-    using Nodes = ormap<int, mvreg<N,  int >, int>;
+    using Nodes = ormap<int, mvreg<CRDT::node,  int >, int>;
     //using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, bool, RMat::RTMat>;
     using IDType = std::int32_t;
     //using AttribsMap = std::unordered_map<std::string, MTypes>;

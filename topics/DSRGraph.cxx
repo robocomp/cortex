@@ -31,24 +31,22 @@ namespace { char dummy; }
 using namespace eprosima::fastcdr::exception;
 
 #include <utility>
-#include <iostream>
-#include <string>
-
-static constexpr std::array<std::string_view, 5> TYPENAMES_IDL_UNION = { "STRING", "INT", "FLOAT", "FLOAT_VEC", "BOOL" };
 
 Val::Val()
 {
     m__d = 0;
-    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@306279ee
+    // m_str com.eprosima.idl.parser.typecode.StringTypeCode@4cf4d528
     m_str ="";
-    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@545997b1
+    // m_dec com.eprosima.idl.parser.typecode.PrimitiveTypeCode@77846d2c
     m_dec = 0;
-    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4cf4d528
+    // m_fl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@548ad73b
     m_fl = 0.0;
-    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@77846d2c
+    // m_float_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@4c762604
 
-    // m_bl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@548ad73b
+    // m_bl com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2641e737
     m_bl = false;
+    // m_byte_vec com.eprosima.idl.parser.typecode.SequenceTypeCode@727803de
+
 }
 
 Val::~Val()
@@ -62,22 +60,25 @@ Val::Val(const Val &x)
     switch(m__d)
     {
         case 0:
-            m_str = x.m_str;
-            break;
+        m_str = x.m_str;
+        break;
         case 1:
-            m_dec = x.m_dec;
-            break;
+        m_dec = x.m_dec;
+        break;
         case 2:
-            m_fl = x.m_fl;
-            break;
+        m_fl = x.m_fl;
+        break;
         case 3:
-            m_float_vec = x.m_float_vec;
-            break;
+        m_float_vec = x.m_float_vec;
+        break;
         case 4:
-            m_bl = x.m_bl;
-            break;
+        m_bl = x.m_bl;
+        break;
+        case 5:
+        m_byte_vec = x.m_byte_vec;
+        break;
         default:
-            break;
+        break;
     }
 }
 
@@ -88,22 +89,25 @@ Val::Val(Val &&x)
     switch(m__d)
     {
         case 0:
-            m_str = std::move(x.m_str);
-            break;
+        m_str = std::move(x.m_str);
+        break;
         case 1:
-            m_dec = x.m_dec;
-            break;
+        m_dec = x.m_dec;
+        break;
         case 2:
-            m_fl = x.m_fl;
-            break;
+        m_fl = x.m_fl;
+        break;
         case 3:
-            m_float_vec = std::move(x.m_float_vec);
-            break;
+        m_float_vec = std::move(x.m_float_vec);
+        break;
         case 4:
-            m_bl = x.m_bl;
-            break;
+        m_bl = x.m_bl;
+        break;
+        case 5:
+        m_byte_vec = std::move(x.m_byte_vec);
+        break;
         default:
-            break;
+        break;
     }
 }
 
@@ -114,22 +118,25 @@ Val& Val::operator=(const Val &x)
     switch(m__d)
     {
         case 0:
-            m_str = x.m_str;
-            break;
+        m_str = x.m_str;
+        break;
         case 1:
-            m_dec = x.m_dec;
-            break;
+        m_dec = x.m_dec;
+        break;
         case 2:
-            m_fl = x.m_fl;
-            break;
+        m_fl = x.m_fl;
+        break;
         case 3:
-            m_float_vec = x.m_float_vec;
-            break;
+        m_float_vec = x.m_float_vec;
+        break;
         case 4:
-            m_bl = x.m_bl;
-            break;
+        m_bl = x.m_bl;
+        break;
+        case 5:
+        m_byte_vec = x.m_byte_vec;
+        break;
         default:
-            break;
+        break;
     }
 
     return *this;
@@ -142,22 +149,25 @@ Val& Val::operator=(Val &&x)
     switch(m__d)
     {
         case 0:
-            m_str = std::move(x.m_str);
-            break;
+        m_str = std::move(x.m_str);
+        break;
         case 1:
-            m_dec = x.m_dec;
-            break;
+        m_dec = x.m_dec;
+        break;
         case 2:
-            m_fl = x.m_fl;
-            break;
+        m_fl = x.m_fl;
+        break;
         case 3:
-            m_float_vec = std::move(x.m_float_vec);
-            break;
+        m_float_vec = std::move(x.m_float_vec);
+        break;
         case 4:
-            m_bl = x.m_bl;
-            break;
+        m_bl = x.m_bl;
+        break;
+        case 5:
+        m_byte_vec = std::move(x.m_byte_vec);
+        break;
         default:
-            break;
+        break;
     }
 
     return *this;
@@ -170,55 +180,65 @@ void Val::_d(int32_t __d)
     switch(m__d)
     {
         case 0:
-            switch(__d)
-            {
-                case 0:
-                    b = true;
-                    break;
-                default:
-                    break;
-            }
+        switch(__d)
+        {
+            case 0:
+            b = true;
             break;
+            default:
+            break;
+        }
+        break;
         case 1:
-            switch(__d)
-            {
-                case 1:
-                    b = true;
-                    break;
-                default:
-                    break;
-            }
+        switch(__d)
+        {
+            case 1:
+            b = true;
             break;
+            default:
+            break;
+        }
+        break;
         case 2:
-            switch(__d)
-            {
-                case 2:
-                    b = true;
-                    break;
-                default:
-                    break;
-            }
+        switch(__d)
+        {
+            case 2:
+            b = true;
             break;
+            default:
+            break;
+        }
+        break;
         case 3:
-            switch(__d)
-            {
-                case 3:
-                    b = true;
-                    break;
-                default:
-                    break;
-            }
+        switch(__d)
+        {
+            case 3:
+            b = true;
             break;
+            default:
+            break;
+        }
+        break;
         case 4:
-            switch(__d)
-            {
-                case 4:
-                    b = true;
-                    break;
-                default:
-                    break;
-            }
+        switch(__d)
+        {
+            case 4:
+            b = true;
             break;
+            default:
+            break;
+        }
+        break;
+        case 5:
+        switch(__d)
+        {
+            case 5:
+            b = true;
+            break;
+            default:
+            break;
+        }
+        break;
     }
 
     if(!b)
@@ -258,14 +278,14 @@ const std::string& Val::str() const
     switch(m__d)
     {
         case 0:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException( ("STRING is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_str;
@@ -278,14 +298,14 @@ std::string& Val::str()
     switch(m__d)
     {
         case 0:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("STRING is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_str;
@@ -303,14 +323,14 @@ int32_t Val::dec() const
     switch(m__d)
     {
         case 1:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("INT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_dec;
@@ -323,14 +343,14 @@ int32_t& Val::dec()
     switch(m__d)
     {
         case 1:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("INT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_dec;
@@ -348,14 +368,14 @@ float Val::fl() const
     switch(m__d)
     {
         case 2:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_fl;
@@ -368,14 +388,14 @@ float& Val::fl()
     switch(m__d)
     {
         case 2:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_fl;
@@ -399,14 +419,14 @@ const std::vector<float>& Val::float_vec() const
     switch(m__d)
     {
         case 3:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("VECTOR_FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_float_vec;
@@ -419,19 +439,18 @@ std::vector<float>& Val::float_vec()
     switch(m__d)
     {
         case 3:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("VECTOR_FLOAT is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_float_vec;
 }
-
 void Val::bl(bool _bl)
 {
     m_bl = _bl;
@@ -445,14 +464,14 @@ bool Val::bl() const
     switch(m__d)
     {
         case 4:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("BOOL is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_bl;
@@ -465,17 +484,68 @@ bool& Val::bl()
     switch(m__d)
     {
         case 4:
-            b = true;
-            break;
+        b = true;
+        break;
         default:
-            break;
+        break;
     }
     if(!b)
     {
-        throw BadParamException(("BOOL is not selected, selected is " + std::string(TYPENAMES_IDL_UNION[m__d])).data());
+        throw BadParamException("This member is not been selected");
     }
 
     return m_bl;
+}
+void Val::byte_vec(const std::vector<uint8_t> &_byte_vec)
+{
+    m_byte_vec = _byte_vec;
+    m__d = 5;
+}
+
+void Val::byte_vec(std::vector<uint8_t> &&_byte_vec)
+{
+    m_byte_vec = std::move(_byte_vec);
+    m__d = 5;
+}
+
+const std::vector<uint8_t>& Val::byte_vec() const
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 5:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_byte_vec;
+}
+
+std::vector<uint8_t>& Val::byte_vec()
+{
+    bool b = false;
+
+    switch(m__d)
+    {
+        case 5:
+        b = true;
+        break;
+        default:
+        break;
+    }
+    if(!b)
+    {
+        throw BadParamException("This member is not been selected");
+    }
+
+    return m_byte_vec;
 }
 
 size_t Val::getMaxCdrSerializedSize(size_t current_alignment)
@@ -534,6 +604,18 @@ size_t Val::getMaxCdrSerializedSize(size_t current_alignment)
             union_max_size_serialized = reset_alignment;
 
         
+        reset_alignment = current_alignment;
+
+        reset_alignment += 4 + eprosima::fastcdr::Cdr::alignment(reset_alignment, 4);
+
+        reset_alignment += (100 * 1) + eprosima::fastcdr::Cdr::alignment(reset_alignment, 1);
+
+
+
+        if(union_max_size_serialized < reset_alignment)
+            union_max_size_serialized = reset_alignment;
+
+        
 
     return union_max_size_serialized - initial_alignment;
 }
@@ -570,6 +652,13 @@ size_t Val::getCdrSerializedSize(const Val& data, size_t current_alignment)
         current_alignment += 1 + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
         break;
+        case 5:
+        current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
+
+        current_alignment += (data.byte_vec().size() * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
+
+
+        break;
         default:
         break;
     }
@@ -597,6 +686,8 @@ void Val::serialize(eprosima::fastcdr::Cdr &scdr) const
         case 4:
         scdr << m_bl;
         break;
+        case 5:
+        scdr << m_byte_vec;break;
         default:
         break;
     }
@@ -622,6 +713,8 @@ void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
         case 4:
         dcdr >> m_bl;
         break;
+        case 5:
+        dcdr >> m_byte_vec;break;
         default:
         break;
     }
@@ -631,15 +724,18 @@ void Val::deserialize(eprosima::fastcdr::Cdr &dcdr)
 
 Attrib::Attrib()
 {
-    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@473b46c3
+    // m_type com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6a472554
     m_type = 0;
-    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@646be2c3
+    // m_value com.eprosima.idl.parser.typecode.UnionTypeCode@7ff2a664
 
+    // m_timestamp com.eprosima.idl.parser.typecode.PrimitiveTypeCode@525b461a
+    m_timestamp = 0;
 
 }
 
 Attrib::~Attrib()
 {
+
 
 
 }
@@ -648,12 +744,14 @@ Attrib::Attrib(const Attrib &x)
 {
     m_type = x.m_type;
     m_value = x.m_value;
+    m_timestamp = x.m_timestamp;
 }
 
 Attrib::Attrib(Attrib &&x)
 {
     m_type = x.m_type;
     m_value = std::move(x.m_value);
+    m_timestamp = x.m_timestamp;
 }
 
 Attrib& Attrib::operator=(const Attrib &x)
@@ -661,6 +759,7 @@ Attrib& Attrib::operator=(const Attrib &x)
 
     m_type = x.m_type;
     m_value = x.m_value;
+    m_timestamp = x.m_timestamp;
 
     return *this;
 }
@@ -670,6 +769,7 @@ Attrib& Attrib::operator=(Attrib &&x)
 
     m_type = x.m_type;
     m_value = std::move(x.m_value);
+    m_timestamp = x.m_timestamp;
 
     return *this;
 }
@@ -683,6 +783,9 @@ size_t Attrib::getMaxCdrSerializedSize(size_t current_alignment)
 
 
     current_alignment += Val::getMaxCdrSerializedSize(current_alignment);
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
 
     return current_alignment - initial_alignment;
 }
@@ -697,6 +800,9 @@ size_t Attrib::getCdrSerializedSize(const Attrib& data, size_t current_alignment
 
 
     current_alignment += Val::getCdrSerializedSize(data.value(), current_alignment);
+    current_alignment += 8 + eprosima::fastcdr::Cdr::alignment(current_alignment, 8);
+
+
 
     return current_alignment - initial_alignment;
 }
@@ -706,6 +812,7 @@ void Attrib::serialize(eprosima::fastcdr::Cdr &scdr) const
 
     scdr << m_type;
     scdr << m_value;
+    scdr << m_timestamp;
 }
 
 void Attrib::deserialize(eprosima::fastcdr::Cdr &dcdr)
@@ -713,6 +820,7 @@ void Attrib::deserialize(eprosima::fastcdr::Cdr &dcdr)
 
     dcdr >> m_type;
     dcdr >> m_value;
+    dcdr >> m_timestamp;
 }
 
 /*!
@@ -777,10 +885,38 @@ Val& Attrib::value()
 {
     return m_value;
 }
+/*!
+ * @brief This function sets a value in member timestamp
+ * @param _timestamp New value for member timestamp
+ */
+void Attrib::timestamp(uint64_t _timestamp)
+{
+m_timestamp = _timestamp;
+}
+
+/*!
+ * @brief This function returns the value of member timestamp
+ * @return Value of member timestamp
+ */
+uint64_t Attrib::timestamp() const
+{
+    return m_timestamp;
+}
+
+/*!
+ * @brief This function returns a reference to member timestamp
+ * @return Reference to member timestamp
+ */
+uint64_t& Attrib::timestamp()
+{
+    return m_timestamp;
+}
+
 
 size_t Attrib::getKeyMaxCdrSerializedSize(size_t current_alignment)
 {
     size_t current_align = current_alignment;
+
 
 
 
@@ -799,17 +935,18 @@ void Attrib::serializeKey(eprosima::fastcdr::Cdr &scdr) const
     (void) scdr;
      
      
+     
 }
 
 Edge::Edge()
 {
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7364985f
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@429bd883
     m_to = 0;
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@5d20e46
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@4d49af10
     m_type ="";
-    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@709ba3fb
+    // m_from com.eprosima.idl.parser.typecode.PrimitiveTypeCode@4450d156
     m_from = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@3d36e4cd
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@4461c7e3
 
 
 }
@@ -1088,9 +1225,9 @@ void Edge::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 EdgeKey::EdgeKey()
 {
-    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@5a4aa2f2
+    // m_to com.eprosima.idl.parser.typecode.PrimitiveTypeCode@255b53dc
     m_to = 0;
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@6591f517
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@1dd92fe2
     m_type ="";
 
 }
@@ -1262,17 +1399,17 @@ void EdgeKey::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Node::Node()
 {
-    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@77e4c80f
+    // m_type com.eprosima.idl.parser.typecode.StringTypeCode@176d53b2
     m_type ="";
-    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@35fc6dc4
+    // m_name com.eprosima.idl.parser.typecode.StringTypeCode@971d0d8
     m_name ="";
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7fe8ea47
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@51931956
     m_id = 0;
-    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@226a82c4
+    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@2b4a2ec7
     m_agent_id = 0;
-    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@731f8236
+    // m_attrs com.eprosima.idl.parser.typecode.MapTypeCode@564718df
 
-    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@255b53dc
+    // m_fano com.eprosima.idl.parser.typecode.MapTypeCode@51b7e5df
 
 
 }
@@ -1663,7 +1800,7 @@ void Node::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 GraphRequest::GraphRequest()
 {
-    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@971d0d8
+    // m_from com.eprosima.idl.parser.typecode.StringTypeCode@c540f5a
     m_from ="";
 
 }
@@ -1789,9 +1926,9 @@ void GraphRequest::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 PairInt::PairInt()
 {
-    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@564718df
+    // m_first com.eprosima.idl.parser.typecode.PrimitiveTypeCode@77e9807f
     m_first = 0;
-    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@62e136d3
+    // m_second com.eprosima.idl.parser.typecode.PrimitiveTypeCode@448ff1a8
     m_second = 0;
 
 }
@@ -1957,9 +2094,9 @@ void PairInt::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotContext::DotContext()
 {
-    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@4206a205
+    // m_cc com.eprosima.idl.parser.typecode.MapTypeCode@44a664f2
 
-    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@29ba4338
+    // m_dc com.eprosima.idl.parser.typecode.SequenceTypeCode@7f9fcf7f
 
 
 }
@@ -2171,9 +2308,9 @@ void DotContext::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 DotKernel::DotKernel()
 {
-    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@448ff1a8
+    // m_ds com.eprosima.idl.parser.typecode.MapTypeCode@41ee392b
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@1a38c59b
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@1e67a849
 
 
 }
@@ -2365,11 +2502,11 @@ void DotKernel::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 Mvreg::Mvreg()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@7f9fcf7f
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@36f0f1be
     m_id = 0;
-    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@2357d90a
+    // m_dk com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@157632c9
 
-    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6328d34a
+    // m_agent_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@6ee12bac
     m_agent_id = 0;
 
 }
@@ -2581,11 +2718,11 @@ void Mvreg::serializeKey(eprosima::fastcdr::Cdr &scdr) const
 
 OrMap::OrMap()
 {
-    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@8b96fde
+    // m_id com.eprosima.idl.parser.typecode.PrimitiveTypeCode@400cff1a
     m_id = 0;
-    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@2d2e5f00
+    // m_m com.eprosima.idl.parser.typecode.MapTypeCode@275710fc
 
-    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@1a38c59b
+    // m_cbase com.eprosima.fastrtps.idl.parser.typecode.StructTypeCode@1e67a849
 
 
 }

@@ -30,7 +30,6 @@
 #include <vector>
 #include <map>
 #include <bitset>
-#include <iostream>
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
@@ -73,92 +72,6 @@ class Val
 {
 public:
 
-
-
-    bool operator<(const Val &rhs) const {
-
-        if (m__d != rhs.m__d) return false;
-
-        switch(m__d) {
-            case 0:
-                return m_str < rhs.m_str;
-            case 1:
-                return m_dec < rhs.m_dec;
-            case 2:
-                return m_fl < rhs.m_fl;
-            case 3:
-                return m_float_vec < rhs.m_float_vec;
-            case 4:
-                return m_bl < rhs.m_bl;
-            default:
-                return false;
-        }
-    }
-
-    bool operator>(const Val &rhs) const {
-        return rhs < *this;
-    }
-
-    bool operator<=(const Val &rhs) const {
-        return !(rhs < *this);
-    }
-
-    bool operator>=(const Val &rhs) const {
-        return !(*this < rhs);
-    }
-
-    bool operator==(const Val &rhs) const {
-
-        if (m__d != rhs.m__d) return false;
-
-        switch(m__d) {
-            case 0:
-                return m_str == rhs.m_str;
-            case 1:
-                return m_dec == rhs.m_dec;
-            case 2:
-                return m_fl == rhs.m_fl;
-            case 3:
-                return m_float_vec == rhs.m_float_vec;
-            case 4:
-                return m_bl == rhs.m_bl;
-            default:
-                return false;
-        }
-    }
-
-    bool operator!=(const Val &rhs) const {
-        return !(rhs == *this);
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const Val &type) {
-
-        int d = type._d();
-        switch (d) {
-            case 0:
-                os << " str: " << type.m_str;
-                break;
-            case 1:
-                os << " dec: " << type.m_dec;
-                break;
-            case 2:
-                os << " float: " << type.m_fl;
-                break;
-            case 3:
-                os << " float_vec: [ ";
-                for (auto &k: type.m_float_vec)
-                    os << k << ", ";
-                os << "] ";
-                break;
-            case 4:
-                os << "bool: " << (type.m_bl ? " TRUE" : " FALSE");
-                break;
-            default:
-                os << "OTRO TIPO";
-                break;
-        }
-        return os;
-    }
     /*!
      * @brief Default constructor.
      */
@@ -322,6 +235,31 @@ public:
      */
     eProsima_user_DllExport bool& bl();
 
+    /*!
+     * @brief This function copies the value in member byte_vec
+     * @param _byte_vec New value to be copied in member byte_vec
+     */
+    eProsima_user_DllExport void byte_vec(const std::vector<uint8_t> &_byte_vec);
+
+    /*!
+     * @brief This function moves the value in member byte_vec
+     * @param _byte_vec New value to be moved in member byte_vec
+     */
+    eProsima_user_DllExport void byte_vec(std::vector<uint8_t> &&_byte_vec);
+
+    /*!
+     * @brief This function returns a constant reference to member byte_vec
+     * @return Constant reference to member byte_vec
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport const std::vector<uint8_t>& byte_vec() const;
+
+    /*!
+     * @brief This function returns a reference to member byte_vec
+     * @return Reference to member byte_vec
+     * @exception eprosima::fastcdr::BadParamException This exception is thrown if the requested union member is not the current selection.
+     */
+    eProsima_user_DllExport std::vector<uint8_t>& byte_vec();
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -363,6 +301,7 @@ private:
     float m_fl;
     std::vector<float> m_float_vec;
     bool m_bl;
+    std::vector<uint8_t> m_byte_vec;
 };
 /*!
  * @brief This class represents the enumeration Types defined by the user in the IDL file.
@@ -374,7 +313,8 @@ enum Types : uint32_t
     INT,
     FLOAT,
     FLOAT_VEC,
-    BOOL
+    BOOL,
+    BYTE_VEC
 };
 /*!
  * @brief This class represents the structure Attrib defined by the user in the IDL file.
@@ -384,48 +324,6 @@ class Attrib
 {
 public:
 
-
-    bool operator==(const Attrib &av_) const {
-        if (this == &av_) {
-            return true;
-        }
-        if (type() != av_.type() || value() != av_.value() ) {
-            return false;
-        }
-        return true;
-    }
-    bool operator<(const Attrib &av_) const {
-        if (this == &av_) {
-            return false;
-        }
-        if (value() < av_.value()) {
-            return true;
-        } else if (av_.value() < value()) {
-            return false;
-        }
-        return false;
-    }
-
-    bool operator!=(const Attrib &av_) const {
-        return !operator==(av_);
-    }
-
-    bool operator<=(const Attrib &av_) const {
-        return operator<(av_) || operator==(av_);
-    }
-
-    bool operator>(const Attrib &av_) const {
-        return !operator<(av_) && !operator==(av_);
-    }
-
-    bool operator>=(const Attrib &av_) const {
-        return !operator<(av_);
-    }
-
-    friend std::ostream &operator<<(std::ostream &output, const Attrib &av_) {
-        output << "Type: "<<av_.type()<<", Value["<<av_.value()<<"]: "<<av_.value()<<", ";
-        return output;
-    };
     /*!
      * @brief Default constructor.
      */
@@ -501,6 +399,24 @@ public:
      * @return Reference to member value
      */
     eProsima_user_DllExport Val& value();
+    /*!
+     * @brief This function sets a value in member timestamp
+     * @param _timestamp New value for member timestamp
+     */
+    eProsima_user_DllExport void timestamp(uint64_t _timestamp);
+
+    /*!
+     * @brief This function returns the value of member timestamp
+     * @return Value of member timestamp
+     */
+    eProsima_user_DllExport uint64_t timestamp() const;
+
+    /*!
+     * @brief This function returns a reference to member timestamp
+     * @return Reference to member timestamp
+     */
+    eProsima_user_DllExport uint64_t& timestamp();
+
 
     /*!
      * @brief This function returns the maximum serialized size of an object
@@ -555,6 +471,7 @@ public:
 private:
     int32_t m_type;
     Val m_value;
+    uint64_t m_timestamp;
 };
 /*!
  * @brief This class represents the structure Edge defined by the user in the IDL file.
@@ -564,52 +481,6 @@ class Edge
 {
 public:
 
-
-    bool operator==(const Edge &eA_) const {
-        if (this == &eA_) {
-            return true;
-        }
-        if (m_type != eA_.m_type || from() != eA_.from() || to() != eA_.to() || attrs() != eA_.attrs()) {
-            return false;
-        }
-        return true;
-    }
-
-    bool operator<(const Edge &eA_) const {
-        if (this == &eA_) {
-            return false;
-        }
-        if (m_type < eA_.m_type) {
-            return true;
-        } else if (eA_.m_type < m_type) {
-            return false;
-        }
-        return false;
-    }
-
-    bool operator!=(const Edge &eA_) const {
-        return !operator==(eA_);
-    }
-
-    bool operator<=(const Edge &eA_) const {
-        return operator<(eA_) || operator==(eA_);
-    }
-
-    bool operator>(const Edge &eA_) const {
-        return !operator<(eA_) && !operator==(eA_);
-    }
-
-    bool operator>=(const Edge &eA_) const {
-        return !operator<(eA_);
-    }
-
-    friend std::ostream &operator<<(std::ostream &output, const Edge &ea_) {
-        output << "EdgeAttribs["<<ea_.m_type<<", from:" << ea_.from() << "-> to:"<<ea_.to()<<" Attribs:[";
-        for (auto v : ea_.attrs())
-            output << v.first <<":"<< v.second <<" - ";
-        output<<"]]";
-        return output;
-    };
     /*!
      * @brief Default constructor.
      */
@@ -791,41 +662,6 @@ class EdgeKey
 {
 public:
 
-
-    friend std::ostream &operator<<(std::ostream &os, const EdgeKey &key) {
-        os << "[ to: " << key.m_to << "- type: " << key.m_type <<" ]";
-        return os;
-    }
-
-    bool operator==(const EdgeKey &rhs) const {
-        return m_to == rhs.m_to &&
-               m_type == rhs.m_type;
-    }
-
-    bool operator!=(const EdgeKey &rhs) const {
-        return !(rhs == *this);
-    }
-
-    bool operator<(const EdgeKey &rhs) const {
-        if (m_to < rhs.m_to)
-            return true;
-        if (rhs.m_to < m_to)
-            return false;
-        return m_type < rhs.m_type;
-    }
-
-    bool operator>(const EdgeKey &rhs) const {
-        return rhs < *this;
-    }
-
-    bool operator<=(const EdgeKey &rhs) const {
-        return !(rhs < *this);
-    }
-
-    bool operator>=(const EdgeKey &rhs) const {
-        return !(*this < rhs);
-    }
-
     /*!
      * @brief Default constructor.
      */
@@ -964,56 +800,6 @@ class Node
 {
 public:
 
-
-    bool operator==(const Node &n_) const {
-        if (this == &n_) {
-            return true;
-        }
-        if (id() != n_.id() || type() != n_.type() || attrs() != n_.attrs() || fano() != n_.fano()) {
-            return false;
-        }
-        return true;
-    }
-
-
-    bool operator<(const Node &n_) const {
-        if (this == &n_) {
-            return false;
-        }
-        if (id() < n_.id()) {
-            return true;
-        } else if (n_.id() < id()) {
-            return false;
-        }
-        return false;
-    }
-
-    bool operator!=(const Node &n_) const {
-        return !operator==(n_);
-    }
-
-    bool operator<=(const Node &n_) const {
-        return operator<(n_) || operator==(n_);
-    }
-
-    bool operator>(const Node &n_) const {
-        return !operator<(n_) && !operator==(n_);
-    }
-
-    bool operator>=(const Node &n_) const {
-        return !operator<(n_);
-    }
-
-    friend std::ostream &operator<<(std::ostream &output, const Node &n_) {
-        output <<"Node:["<<n_.id()<<"," << n_.name() <<"," << n_.type() <<"], Attribs:[";
-        for (auto v : n_.attrs())
-            output << v.first <<":("<< v.second <<");";
-        output<<"], FanOut:[";
-        for (auto v : n_.fano())
-            output << "[ "<< v.first.to() << " "<< v.first.type() << "] " <<":("<< v.second <<");";
-        output << "]";
-        return output;
-    }
     /*!
      * @brief Default constructor.
      */
@@ -1362,48 +1148,6 @@ class PairInt
 {
 public:
 
-    bool operator==(const PairInt &pi_) const {
-        if (this == &pi_) {
-            return true;
-        }
-        if (first() != pi_.first() || second() != pi_.second()) {
-            return false;
-        }
-        return true;
-    }
-
-    bool operator<(const PairInt &pi_) const {
-        if (this == &pi_) {
-            return false;
-        }
-        if ( (first()+second()) < (pi_.first()+pi_.second())) {
-            return true;
-        } else if ((first()+second()) > (pi_.first()+pi_.second())) {
-            return false;
-        }
-        return false;
-    }
-
-    bool operator!=(const PairInt &pi_) const {
-        return !operator==(pi_);
-    }
-
-    bool operator<=(const PairInt &pi_) const {
-        return operator<(pi_) || operator==(pi_);
-    }
-
-    bool operator>(const PairInt &pi_) const {
-        return !operator<(pi_) && !operator==(pi_);
-    }
-
-    bool operator>=(const PairInt &pi_) const {
-        return !operator<(pi_);
-    }
-    friend std::ostream &operator<<(std::ostream &output, const PairInt &pi_) {
-        output <<"("<<pi_.first()<<","<<pi_.second()<<")";
-        return output;
-    }
-
     /*!
      * @brief Default constructor.
      */
@@ -1537,17 +1281,6 @@ class DotContext
 {
 public:
 
-
-    friend std::ostream &operator<<(std::ostream &output, const DotContext &dc_) {
-        output << ", CC: [";
-        for (const auto & kv : dc_.cc())
-            output <<" "<< kv.first << ":" << kv.second;
-        output << "] , DC: [";
-        for (const auto & kv : dc_.dc())
-            output <<" "<< kv.first() << ":" << kv.second();
-        output << "] ";
-        return output;
-    }
     /*!
      * @brief Default constructor.
      */
@@ -1691,13 +1424,6 @@ class DotKernel
 {
 public:
 
-
-    friend std::ostream &operator<<(std::ostream &output, const DotKernel &dk_) {
-        for (const auto & kv : dk_.ds())
-            output << kv.first << "-->" << kv.second<< ", ";
-        output <<dk_.cbase();
-        return output;
-    }
     /*!
      * @brief Default constructor.
      */
@@ -1841,10 +1567,6 @@ class Mvreg
 {
 public:
 
-    friend std::ostream &operator<<(std::ostream &output, const Mvreg &as_) {
-        output <<"RoboCompDSR::AworSet: ID:["<<as_.id()<<"], Data: ["<<as_.dk()<<"] ";
-        return output;
-    }
     /*!
      * @brief Default constructor.
      */
@@ -2002,13 +1724,6 @@ class OrMap
 {
 public:
 
-    friend std::ostream &operator<<(std::ostream &output, const OrMap &om_) {
-        output <<"RoboCompDSR::OrMap:"<<om_.id()<<"\nMap: ";
-        for (const auto & kv : om_.m())
-            output << kv.first << "->" << kv.second << "\n";
-        output << "\nContext: "<<om_.cbase();
-        return output;
-    }
     /*!
      * @brief Default constructor.
      */

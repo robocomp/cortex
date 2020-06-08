@@ -8,10 +8,10 @@
         float fl;
       case 3:
         sequence<float>  float_vec;
-      //case 4:
-      // sequence<float> rtmat;
       case 4:
         boolean bl;
+      case 5:
+        sequence<octet> byte_vec;
     };
 
     enum Types
@@ -20,7 +20,8 @@
         _INT,
         _FLOAT,
         _FLOAT_VEC,
-        _BOOL
+        _BOOL,
+        _BYTE_VEC
        // _RT_MAT
     };
 
@@ -28,6 +29,7 @@
     {
         long type;
         Val value;
+        unsigned long long timestamp;
     };
 
     struct Edge {

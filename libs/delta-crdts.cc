@@ -1694,6 +1694,29 @@ public:
         return *this;
     }
 
+    ormap<N,V,K> & operator=(ormap<N,V,K> && o)
+    {
+        if (&o == this) return *this;
+        if (&c != &o.c) c=std::move(o.c);
+        m= std::move(o.m);
+        id=o.id;
+        return *this;
+    }
+
+
+    bool operator==(const ormap<N,V,K> & o) const
+    {
+        if (&o == this) return true;
+        if (m == o.m) return true ;
+
+        return false;
+    }
+
+    bool operator!=(const ormap<N,V,K> & o) const
+    {
+       return !operator==(o);
+    }
+
     dotcontext<K> & context() const
     {
         return c;
