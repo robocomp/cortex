@@ -27,7 +27,7 @@
 #include "fast_rtps/dsrpublisher.h"
 #include "fast_rtps/dsrsubscriber.h"
 #include "topics/DSRGraphPubSubTypes.h"
-#include "topics/CRDT_types.h"
+#include "CRDT_types.h"
 #include "inner_api.h"
 #include "dsr_utils.h"
 
@@ -40,8 +40,8 @@
 
 namespace CRDT
 {
-    using N = Node;
-    using Nodes = ormap<int, mvreg<CRDT::node,  int >, int>;
+    using N = CRDT::Node;
+    using Nodes = ormap<int, mvreg<CRDT::Node,  int >, int>;
     //using MTypes = std::variant<std::string, std::int32_t, float , std::vector<float>, bool, RMat::RTMat>;
     using IDType = std::int32_t;
     //using AttribsMap = std::unordered_map<std::string, MTypes>;
@@ -63,16 +63,18 @@ namespace CRDT
                                           std::is_same<std::float_t, Va>::value ||
                                           std::is_same<std::double_t , Va>::value ||
                                           std::is_same<std::vector<float_t>, Va>::value ||
+                                          std::is_same<std::vector<byte>, Va>::value ||
                                           std::is_same<bool, Va>::value;
     template <typename Va>
-    static bool constexpr node_or_edge = std::is_same<Node, Va>::value ||
-                                         std::is_same<Edge, Va>::value ;
+    static bool constexpr node_or_edge = std::is_same<CRDT::Node, Va>::value ||
+                                         std::is_same<CRDT::Edge, Va>::value ;
 
     template <typename Va>
     static bool constexpr allowed_return_types = std::is_same<std::int32_t, Va>::value ||
                                           std::is_same<std::string, Va>::value ||
                                           std::is_same<std::float_t, Va>::value ||
                                           std::is_same<std::vector<float_t>, Va>::value ||
+                                          std::is_same<std::vector<byte>, Va>::value ||
                                           std::is_same<bool, Va>::value ||
                                           std::is_same<QVec, Va>::value ||
                                           std::is_same<QMat, Va>::value;
@@ -115,7 +117,7 @@ namespace CRDT
 
         }; //Used by viewer
 
-        std::map<long, Node> getCopy() const;   
+        std::map<long, Node> getCopy() const;
         std::vector<long> getKeys() const ;   
         inline int32_t get_agent_id() const                     { return agent_id; };
         inline std::string get_agent_name() const               { return agent_name; };
@@ -128,8 +130,8 @@ namespace CRDT
         void read_from_json_file(const std::string &file) const { utils->read_from_json_file(file); };
 
         // not working yet
-        typename std::map<int, mvreg<N,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
-        typename std::map<int, mvreg<N,int>>::const_iterator end() const { return nodes.getMap().end(); };
+        typename std::map<int, mvreg<Node,int>>::const_iterator begin() const { return nodes.getMap().begin(); };
+        typename std::map<int, mvreg<Node,int>>::const_iterator end() const { return nodes.getMap().end(); };
 
         // Innermodel API
         std::unique_ptr<InnerAPI> get_inner_api() { return std::make_unique<InnerAPI>(this); };
@@ -162,7 +164,7 @@ namespace CRDT
         void add_or_modify(Type &elem, const std::string& att_name, const Ta& att_value) {
 
 
-            Attrib at;  Val value;
+            Attribute at;  Value value;
             if constexpr (std::is_same<std::string,  Ta>::value || std::is_same<std::string_view,  Ta>::value || std::is_same<const string&,  Ta>::value)
             {
                 at.type(STRING);
@@ -189,7 +191,7 @@ namespace CRDT
                 value.bl(att_value);
             }
 
-            at.value( value);
+            at.val( std::move(value));
             elem.attrs()[att_name] = at;
 
         }
@@ -202,7 +204,7 @@ namespace CRDT
         };
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
-         bool add_attrib(Type &elem, const std::string& att_name, const Attrib &attr) {
+         bool add_attrib(Type &elem, const std::string& att_name, const Attribute &attr) {
             if (elem.attrs().find(att_name) != elem.attrs().end()) return false;
             elem.attrs()[att_name] = attr;
             return true;
@@ -218,7 +220,7 @@ namespace CRDT
         };
 
         template <typename Type, typename = std::enable_if_t<node_or_edge<Type>>>
-         bool modify_attrib(Type &elem, const std::string& att_name, const Attrib &attr) {
+         bool modify_attrib(Type &elem, const std::string& att_name, const Attribute &attr) {
             if (elem.attrs().find(att_name) == elem.attrs().end()) return false;
                 //throw DSRException(("Cannot update attribute. Attribute: " + att_name + " does not exist. " + __FUNCTION__).data());
             elem.attrs()[att_name] = attr;
@@ -238,7 +240,7 @@ namespace CRDT
         std::optional<Edge> get_edge(int from, int to, const std::string& key);
         std::optional<Edge> get_edge(const Node &n, int to, const std::string& key) {
             EdgeKey ek; ek.to(to); ek.type(key);
-            return (n.fano().find(ek) != n.fano().end()) ?  std::make_optional(n.fano().find(ek)->second) : std::nullopt;
+            return (n.fano().getMapRef().find(make_pair{to, key}) != n.fano().end()) ?  std::make_optional(n.fano().find(ek)->second) : std::nullopt;
         };
         bool insert_or_assign_edge(const Edge& attrs);
         //bool insert_or_assign_edge(Node& n, const Edge& e);
@@ -544,25 +546,42 @@ namespace CRDT
         // threads
         bool start_fullgraph_request_thread();
         void start_fullgraph_server_thread();
-        void start_subscription_thread(bool showReceived);
+        void start_subscription_threads(bool showReceived);
 
-        std::thread delta_thread, fullgraph_thread;
+        std::thread delta_node_thread, delta_edge_thread, delta_node_attrs_thread, delta_edge_attrs_thread, fullgraph_thread;
 
         // Threads handlers
-        void subscription_thread(bool showReceived);
+        void node_subscription_thread(bool showReceived);
+        void edge_subscription_thread(bool showReceived);
+        void node_attrs_subscription_thread(bool showReceived);
+        void edge_attrs_subscription_thread(bool showReceived);
+
         void fullgraph_server_thread();
         bool fullgraph_request_thread();
 
 
         // Translators
-        Mvreg translateMvCRDTtoIDL(int id, mvreg<N, int> &data);
-        mvreg<N, int> translateMvIDLtoCRDT(Mvreg &data);
+        IDL::Mvreg translateMvCRDTtoIDL(int id, mvreg<N, int> &data);
+        mvreg<N, int> translateMvIDLtoCRDT(IDL::Mvreg &data);
 
         // RTSP participant
         DSRParticipant dsrparticipant;
-        DSRPublisher dsrpub;
-        DSRSubscriber dsrsub;
-        NewMessageFunctor dsrpub_call;
+        DSRPublisher dsrpub_node;
+        DSRSubscriber dsrsub_node;
+        NewMessageFunctor dsrpub_call_node;
+
+
+        DSRPublisher dsrpub_edge;
+        DSRSubscriber dsrsub_edge;
+        NewMessageFunctor dsrpub_call_edge;
+
+        DSRPublisher dsrpub_node_attrs;
+        DSRSubscriber dsrsub_node_attrs;
+        NewMessageFunctor dsrpub_call_node_attrs;
+
+        DSRPublisher dsrpub_edge_attrs;
+        DSRSubscriber dsrsub_edge_attrs;
+        NewMessageFunctor dsrpub_call_edge_attrs;
 
         DSRSubscriber dsrsub_graph_request;
         DSRPublisher dsrpub_graph_request;

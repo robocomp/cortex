@@ -5,8 +5,12 @@
 #ifndef CRDT_RTPS_DSR_TESTS_CRDT_NODE_H
 #define CRDT_RTPS_DSR_TESTS_CRDT_NODE_H
 
-#include "../libs/delta-crdts.cc"
+#include "libs/delta-crdts.cc"
 #include <iostream>
+#include "unordered_map"
+#include "variant"
+#include "map"
+#include "CRDT.h"
 
 namespace CRDT {
 
@@ -23,15 +27,15 @@ namespace CRDT {
     };
 
 
-    class value
+    class Value
     {
         public:
 
-            value() = default;
+            Value() = default;
 
-            ~value()= default;
+            ~Value()= default;
 
-            explicit value(Val &&x)
+            explicit Value(IDL::Val &&x)
             {
 
                 switch(x._d())
@@ -59,19 +63,22 @@ namespace CRDT {
                 }
             }
 
-            value& operator=(const value &x)
+            Value& operator=(const Value &x)
             {
-                if(this != &x)
-                    val = x.val;
+
+                if(this == &x) return *this;
+                val = x.val;
+                return *this;
             }
 
-            value& operator=(value &&x)
+            Value& operator=(Value &&x)
             {
-                if(this != &x)
-                    val = std::move(x.val);
+                if(this == &x) return *this;
+                val = std::move(x.val);
+                return *this;
             }
 
-            bool operator<(const value &rhs) const {
+            bool operator<(const Value &rhs) const {
 
                 if (val.index() != rhs.selected()) return false;
 
@@ -93,29 +100,29 @@ namespace CRDT {
                 }
             }
 
-            bool operator>(const value &rhs) const {
+            bool operator>(const Value &rhs) const {
                 return rhs < *this;
             }
 
-            bool operator<=(const value &rhs) const {
+            bool operator<=(const Value &rhs) const {
                 return !(rhs < *this);
             }
 
-            bool operator>=(const value &rhs) const {
+            bool operator>=(const Value &rhs) const {
                 return !(*this < rhs);
             }
 
-            bool operator==(const value &rhs) const {
+            bool operator==(const Value &rhs) const {
 
                 if (val.index() != rhs.selected()) return false;
                 return val == rhs.val;
             }
 
-            bool operator!=(const value &rhs) const {
+            bool operator!=(const Value &rhs) const {
                 return !(rhs == *this);
             }
 
-            friend std::ostream &operator<<(std::ostream &os, const value &type) {
+            friend std::ostream &operator<<(std::ostream &os, const Value &type) {
 
                 switch (type.selected()) {
                     case 0:
@@ -152,7 +159,7 @@ namespace CRDT {
                 return os;
             }
 
-            int32_t selected() const
+            [[nodiscard]] int32_t selected() const
             {
                 return val.index();
             }
@@ -166,7 +173,7 @@ namespace CRDT {
 
             }
 
-            const std::string& str() const
+            [[nodiscard]] const std::string& str() const
             {
                 if (auto pval = std::get_if<std::string>(&val)) {
                     return *pval;
@@ -180,7 +187,7 @@ namespace CRDT {
                 val = _dec;
             }
 
-            int32_t dec() const
+            [[nodiscard]] int32_t dec() const
             {
                 if (auto pval = std::get_if<int32_t>(&val)) {
                     return *pval;
@@ -194,7 +201,7 @@ namespace CRDT {
                 val = _fl;
             }
 
-            float fl() const
+            [[nodiscard]] float fl() const
             {
                 if (auto pval = std::get_if<float>(&val)) {
                     return *pval;
@@ -213,7 +220,7 @@ namespace CRDT {
                 val = std::move(_float_vec);
             }
 
-            const std::vector<float>& float_vec() const
+            [[nodiscard]] const std::vector<float>& float_vec() const
             {
                 if (auto pval = std::get_if<vector<float>>(&val)) {
                     return *pval;
@@ -235,7 +242,7 @@ namespace CRDT {
                 val = _bl;
             }
 
-            bool bl() const {
+            [[nodiscard]] bool bl() const {
 
                 if (auto pval = std::get_if<bool>(&val)){
                     return *pval;
@@ -253,7 +260,7 @@ namespace CRDT {
                 val = std::move(_float_vec);
             }
 
-            const std::vector<byte>& byte_vec() const
+            [[nodiscard]] const std::vector<byte>& byte_vec() const
             {
                 if (auto pval = std::get_if<vector<byte>>(&val)) {
                     return *pval;
@@ -274,48 +281,46 @@ namespace CRDT {
     };
 
 
-    class attribute {
+    class Attribute {
         public:
 
-
-
-        attribute()
+        Attribute()
         {
             m_type = 0;
             m_timestamp = 0;
         }
 
-        ~attribute(){}
+        ~Attribute()= default;
 
 
-        attribute(Attrib &&x)
+        explicit Attribute(IDL::Attrib &&x)
         {
             m_type = x.type();
             m_timestamp = x.timestamp();
-            m_value = value(std::move(x.value()));
+            m_Value = Value(std::move(x.value()));
         }
 
-        /*attribute& operator=(const Attrib &x)
+        /*Attribute& operator=(const Attrib &x)
         {
 
             m_type = x.type();
-            m_value = x.value();
+            m_Value = x.Value();
             m_timestamp = x.timestamp();
 
             return *this;
         }*/
 
-        attribute& operator=(Attrib &&x)
+        Attribute& operator=(IDL::Attrib &&x)
         {
 
             m_type = x.type();
             m_timestamp = x.timestamp();
-            m_value = value(std::move(x.value()));
+            m_Value = Value(std::move(x.value()));
 
             return *this;
         }
 
-            bool operator==(const attribute &av_) const {
+            bool operator==(const Attribute &av_) const {
                 if (this == &av_) {
                     return true;
                 }
@@ -324,35 +329,35 @@ namespace CRDT {
                 }
                 return true;
             }
-            bool operator<(const attribute &av_) const {
+            bool operator<(const Attribute &av_) const {
                 if (this == &av_) {
                     return false;
                 }
-                if (value() < av_.val()) {
+                if (Value() < av_.val()) {
                     return true;
-                } else if (av_.val() < value()) {
+                } else if (av_.val() < Value()) {
                     return false;
                 }
                 return false;
             }
 
-            bool operator!=(const attribute &av_) const {
+            bool operator!=(const Attribute &av_) const {
                 return !operator==(av_);
             }
 
-            bool operator<=(const attribute &av_) const {
+            bool operator<=(const Attribute &av_) const {
                 return operator<(av_) || operator==(av_);
             }
 
-            bool operator>(const attribute &av_) const {
+            bool operator>(const Attribute &av_) const {
                 return !operator<(av_) && !operator==(av_);
             }
 
-            bool operator>=(const attribute &av_) const {
+            bool operator>=(const Attribute &av_) const {
                 return !operator<(av_);
             }
 
-            friend std::ostream &operator<<(std::ostream &output, const attribute &av_) {
+            friend std::ostream &operator<<(std::ostream &output, const Attribute &av_) {
                 output << "Type: "<<av_.type()<<", Value["<<av_.val()<<"]: "<<av_.val()<<", ";
                 return output;
             };
@@ -365,7 +370,7 @@ namespace CRDT {
             }
 
 
-            int32_t type() const
+            [[nodiscard]] int32_t type() const
             {
                 return m_type;
             }
@@ -376,75 +381,70 @@ namespace CRDT {
             }
 
 
-            uint64_t timestamp() const
+            [[nodiscard]] uint64_t timestamp() const
             {
                 return m_timestamp;
             }
 
 
-            void val(Val &&_value)
+            void val(IDL::Val &&_Value)
             {
-                m_value = value(std::move(_value));
+                m_Value = Value(std::move(_Value));
             }
 
-
-            const value& val() const
+            void val(Value &&_Value)
             {
-                return m_value;
+                m_Value = std::move(_Value);
             }
 
-            value& val()
+            [[nodiscard]] const Value& val() const
             {
-                return m_value;
+                return m_Value;
+            }
+
+            Value& val()
+            {
+                return m_Value;
             }
 
         private:
             int32_t m_type;
-            value m_value;
+            Value m_Value;
             uint64_t m_timestamp;
     };
 
 
 
-    class edge {
+    class Edge {
         public:
 
 
 
-        edge()
+        Edge()
             {
                 m_to = 0;
                 m_type ="";
                 m_from = 0;
             }
 
-            ~edge()  {}
+            ~Edge()  = default;
 
-            edge(Edge &&x)
+            explicit Edge(IDL::Edge &&x)
             {
                 m_to = x.to();
                 m_type = std::move(x.type());
                 m_from = x.from();
 
                 for (auto& [k,v] : x.attrs()) {
-                    mvreg<attribute, int> mv(0);
-                    mv.write(attribute(std::move(v)));
+                    mvreg<Attribute, int> mv(0);
+                    mv.write(Attribute(std::move(v)));
                     m_attrs[k] = mv;
                 }
             }
 
-            edge& operator=(const edge &x)
-            {
+            Edge& operator=(const Edge &x) = default;
 
-                m_to = x.m_to;
-                m_type = x.m_type;
-                m_from = x.m_from;
-                m_attrs = x.m_attrs;
-
-                return *this;
-            }
-
-            edge& operator=(edge &&x)
+            Edge& operator=(Edge &&x) noexcept
             {
 
                 m_to = x.m_to;
@@ -455,7 +455,7 @@ namespace CRDT {
                 return *this;
             }
 
-            bool operator==(const edge &eA_) const {
+            bool operator==(const Edge &eA_) const {
                 if (this == &eA_) {
                     return true;
                 }
@@ -465,7 +465,7 @@ namespace CRDT {
                 return true;
             }
 
-            bool operator<(const edge &eA_) const {
+            bool operator<(const Edge &eA_) const {
                 if (this == &eA_) {
                     return false;
                 }
@@ -477,25 +477,25 @@ namespace CRDT {
                 return false;
             }
 
-            bool operator!=(const edge &eA_) const {
+            bool operator!=(const Edge &eA_) const {
                 return !operator==(eA_);
             }
 
-            bool operator<=(const edge &eA_) const {
+            bool operator<=(const Edge &eA_) const {
                 return operator<(eA_) || operator==(eA_);
             }
 
-            bool operator>(const edge &eA_) const {
+            bool operator>(const Edge &eA_) const {
                 return !operator<(eA_) && !operator==(eA_);
             }
 
-            bool operator>=(const edge &eA_) const {
+            bool operator>=(const Edge &eA_) const {
                 return !operator<(eA_);
             }
 
-            friend std::ostream &operator<<(std::ostream &output,  edge &ea_) {
-                output << "EdgeAttribs["<<ea_.m_type<<", from:" << ea_.from() << "-> to:"<<ea_.to()<<" Attribs:[";
-                for (const auto& v : ea_.attrs().getMapRef())
+            friend std::ostream &operator<<(std::ostream &output,  Edge &ea_) {
+                output << "IDL::EdgeAttribs["<<ea_.m_type<<", from:" << ea_.from() << "-> to:"<<ea_.to()<<" Attribs:[";
+                for (const auto& v : ea_.attrs())
                     output << v.first <<":"<< v.second <<" - ";
                 output<<"]]";
                 return output;
@@ -508,7 +508,7 @@ namespace CRDT {
             m_to = _to;
         }
 
-        int32_t to() const
+        [[nodiscard]] int32_t to() const
         {
             return m_to;
         }
@@ -524,7 +524,7 @@ namespace CRDT {
             m_type = std::move(_type);
         }
 
-        const std::string& type() const
+        [[nodiscard]] const std::string& type() const
         {
             return m_type;
         }
@@ -539,28 +539,28 @@ namespace CRDT {
             m_from = _from;
         }
 
-        int32_t from() const
+        [[nodiscard]] int32_t from() const
         {
             return m_from;
         }
 
-        void attrs(const  ormap<std::string, mvreg<attribute, int>> &_attrs)
+        void attrs(const  std::unordered_map<std::string, mvreg<Attribute, int>> &_attrs)
         {
             m_attrs = _attrs;
         }
 
-        void attrs( ormap<std::string, mvreg<attribute, int>> &&_attrs)
+        void attrs(std::unordered_map<std::string, mvreg<Attribute, int>> &&_attrs)
         {
             m_attrs = std::move(_attrs);
         }
 
-        const  ormap<std::string, mvreg<attribute, int>>& attrs() const
+        const  std::unordered_map<std::string, mvreg<Attribute, int>>& attrs() const
         {
             return m_attrs;
         }
 
 
-        ormap<std::string, mvreg<attribute, int>>& attrs()
+        std::unordered_map<std::string, mvreg<Attribute, int>>& attrs()
         {
             return m_attrs;
         }
@@ -569,14 +569,14 @@ namespace CRDT {
             int32_t m_to;
             std::string m_type;
             int32_t m_from;
-            ormap<std::string, mvreg<attribute, int>> m_attrs;
+            std::unordered_map<std::string, mvreg<Attribute, int>> m_attrs;
     };
 
-    class node {
+    class Node {
 
         public:
 
-            node()
+            Node()
             {
                 m_type ="";
                 m_name ="";
@@ -584,40 +584,29 @@ namespace CRDT {
                 m_agent_id = 0;
                }
 
-            ~node(){}
+            ~Node()= default;
 
-            node(Node &&x)
+            explicit Node(IDL::Node &&x)
             {
                 m_type = std::move(x.type());
                 m_name = std::move(x.name());
                 m_id = x.id();
                 m_agent_id = x.agent_id();
                 for (auto& [k,v] : x.attrs()) {
-                    mvreg<attribute, int> mv(0);
-                    mv.write(attribute(std::move(v)));
+                    mvreg<Attribute, int> mv(0);
+                    mv.write(Attribute(std::move(v)));
                     m_attrs[k] = mv;
                 }
                 for (auto& [k,v] : x.fano()) {
-                    mvreg<edge, int> mv(0);
-                    mv.write(edge(std::move(v)));
+                    mvreg<Edge, int> mv(0);
+                    mv.write(Edge(std::move(v)));
                     m_fano[make_pair(k.to(), k.type())] = mv;
                 }
             }
 
-            node& operator=(const node &x)
-            {
+            Node& operator=(const Node &x) = default;
 
-                m_type = x.m_type;
-                m_name = x.m_name;
-                m_id = x.m_id;
-                m_agent_id = x.m_agent_id;
-                m_attrs = x.m_attrs;
-                m_fano = x.m_fano;
-
-                return *this;
-            }
-
-            node& operator=(node &&x)
+            Node& operator=(Node &&x) noexcept
             {
 
                 m_type = std::move(x.m_type);
@@ -631,7 +620,7 @@ namespace CRDT {
             }
 
 
-            bool operator==(const node &n_) const {
+            bool operator==(const Node &n_) const {
                 if (this == &n_) {
                     return true;
                 }
@@ -642,7 +631,7 @@ namespace CRDT {
             }
 
 
-            bool operator<(const node &n_) const {
+            bool operator<(const Node &n_) const {
                 if (this == &n_) {
                     return false;
                 }
@@ -654,28 +643,28 @@ namespace CRDT {
                 return false;
             }
 
-            bool operator!=(const node &n_) const {
+            bool operator!=(const Node &n_) const {
                 return !operator==(n_);
             }
 
-            bool operator<=(const node &n_) const {
+            bool operator<=(const Node &n_) const {
                 return operator<(n_) || operator==(n_);
             }
 
-            bool operator>(const node &n_) const {
+            bool operator>(const Node &n_) const {
                 return !operator<(n_) && !operator==(n_);
             }
 
-            bool operator>=(const node &n_) const {
+            bool operator>=(const Node &n_) const {
                 return !operator<(n_);
             }
 
-            friend std::ostream &operator<<(std::ostream &output,  node &n_) {
-                output <<"Node:["<<n_.id()<<"," << n_.name() <<"," << n_.type() <<"], Attribs:[";
-                for (const auto& v : n_.attrs().getMapRef())
+            friend std::ostream &operator<<(std::ostream &output,  Node &n_) {
+                output <<"IDL::Node:["<<n_.id()<<"," << n_.name() <<"," << n_.type() <<"], Attribs:[";
+                for (const auto& v : n_.attrs())
                     output << v.first <<":("<< v.second <<");";
                 output<<"], FanOut:[";
-                for (auto& v : n_.fano().getMapRef())
+                for (auto& v : n_.fano())
                     output << "[ "<< v.first.first << " "<< v.first.second << "] " <<":("<< v.second <<");";
                 output << "]";
                 return output;
@@ -693,7 +682,7 @@ namespace CRDT {
                 m_type = std::move(_type);
             }
 
-            const std::string& type() const
+            [[nodiscard]] const std::string& type() const
             {
                 return m_type;
             }
@@ -713,7 +702,7 @@ namespace CRDT {
                 m_name = std::move(_name);
             }
 
-            const std::string& name() const
+            [[nodiscard]] const std::string& name() const
             {
                 return m_name;
             }
@@ -728,7 +717,7 @@ namespace CRDT {
                 m_id = _id;
             }
 
-            int32_t id() const
+            [[nodiscard]] int32_t id() const
             {
                 return m_id;
             }
@@ -738,47 +727,47 @@ namespace CRDT {
                 m_agent_id = _agent_id;
             }
 
-            int32_t agent_id() const
+            [[nodiscard]] int32_t agent_id() const
             {
                 return m_agent_id;
             }
 
-            void attrs(const ormap<std::string, mvreg<attribute, int>> &_attrs)
+            void attrs(const std::unordered_map<std::string, mvreg<Attribute, int>> &_attrs)
             {
                 m_attrs = _attrs;
             }
 
-            void attrs(ormap<std::string, mvreg<attribute, int>> &&_attrs)
+            void attrs(std::unordered_map<std::string, mvreg<Attribute, int>> &&_attrs)
             {
                 m_attrs = std::move(_attrs);
             }
 
-            const ormap<std::string, mvreg<attribute, int>> & attrs() const
+            const std::unordered_map<std::string, mvreg<Attribute, int>> & attrs() const
             {
                 return m_attrs;
             }
 
-            ormap<std::string, mvreg<attribute, int>>& attrs()
+            std::unordered_map<std::string, mvreg<Attribute, int>>& attrs()
             {
                 return m_attrs;
             }
 
-            void fano(const ormap<std::pair<int32_t, std::string>, mvreg<edge, int>> &_fano)
+            void fano(const std::unordered_map<std::pair<int32_t, std::string>, mvreg<Edge, int>, CRDT::pair_hash> &_fano)
             {
                 m_fano = _fano;
             }
 
-            void fano(ormap<std::pair<int32_t, std::string>, mvreg<edge, int>>  &&_fano)
+            void fano(std::unordered_map<std::pair<int32_t, std::string>, mvreg<Edge, int>, CRDT::pair_hash>  &&_fano)
             {
                 m_fano = std::move(_fano);
             }
 
-            const ormap<std::pair<int32_t, std::string>, mvreg<edge, int>> & fano() const
+            const std::unordered_map<std::pair<int32_t, std::string>, mvreg<Edge, int>, CRDT::pair_hash> & fano() const
             {
                 return m_fano;
             }
 
-            ormap<std::pair<int32_t, std::string>, mvreg<edge, int>> & fano()
+            std::unordered_map<std::pair<int32_t, std::string>, mvreg<Edge, int>, CRDT::pair_hash> & fano()
             {
                 return m_fano;
             }
@@ -788,8 +777,8 @@ namespace CRDT {
                 std::string m_name;
                 int32_t m_id;
                 int32_t m_agent_id;
-                ormap<std::string, mvreg<attribute, int>> m_attrs;
-                ormap<std::pair<int32_t, std::string>, mvreg<edge, int>> m_fano;
+                std::unordered_map<std::string, mvreg<Attribute, int>> m_attrs;
+                std::unordered_map<std::pair<int32_t, std::string>, mvreg<Edge, int>, CRDT::pair_hash> m_fano;
         };
 
 

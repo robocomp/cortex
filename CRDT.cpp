@@ -29,7 +29,11 @@ CRDTGraph::CRDTGraph(int root, std::string name, int id, std::string dsr_input_f
     auto [suc, participant_handle] = dsrparticipant.init();
 
     // RTPS Initialize publisher with general topic
-    dsrpub.init(participant_handle, "DSR", dsrparticipant.getDSRTopicName());
+    dsrpub_node.init(participant_handle, "DSR_NODE", dsrparticipant.getDSRTopicName());
+    dsrpub_node_attrs.init(participant_handle, "DSR_NODE_ATTRS", dsrparticipant.getDSRTopicName());
+    dsrpub_edge.init(participant_handle, "DSR_EDGE", dsrparticipant.getDSRTopicName());
+    dsrpub_edge_attrs.init(participant_handle, "DSR_EDGE_ATTRS", dsrparticipant.getDSRTopicName());
+
     dsrpub_graph_request.init(participant_handle, "DSR_GRAPH_REQUEST", dsrparticipant.getRequestTopicName());
     dsrpub_request_answer.init(participant_handle, "DSR_GRAPH_ANSWER", dsrparticipant.getAnswerTopicName());
 
@@ -877,9 +881,9 @@ void CRDTGraph::start_fullgraph_server_thread()
     fullgraph_thread = std::thread(&CRDTGraph::fullgraph_server_thread, this);
 }
 
-void CRDTGraph::start_subscription_thread(bool showReceived) 
+void CRDTGraph::start_subscription_threads(bool showReceived)
 {
-    delta_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
+    delta_node_thread = std::thread(&CRDTGraph::subscription_thread, this, showReceived);
 }
 
 int CRDTGraph::id() 

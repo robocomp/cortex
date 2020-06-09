@@ -1337,6 +1337,7 @@ public:
     }
 
 
+
     friend ostream &operator<<( ostream &output, const mvreg<V,K>& o)
     {
         output << "MVReg:" << o.dk;
