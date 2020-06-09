@@ -91,7 +91,7 @@
     };
 
     struct DotKernelEdge {
-        map<PairInt, Attrib> ds;
+        map<PairInt, Edge> ds;
         DotContextEdge cbase;
     };
 

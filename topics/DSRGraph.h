@@ -64,8 +64,6 @@ namespace eprosima
 }
 
 namespace IDL {
-
-
 /*!
  * @brief This class represents the union Val defined by the user in the IDL file.
  * @ingroup DSRGRAPH
@@ -416,6 +414,7 @@ namespace IDL {
         bool operator>=(const Attrib &av_) const {
             return !operator<(av_);
         }
+
         /*!
          * @brief Default constructor.
          */
@@ -573,6 +572,34 @@ namespace IDL {
     class PairInt {
     public:
 
+        bool operator==(const PairInt &rhs) const {
+            return m_first == rhs.m_first &&
+                   m_second == rhs.m_second;
+        }
+
+        bool operator!=(const PairInt &rhs) const {
+            return !(rhs == *this);
+        }
+
+        bool operator<(const PairInt &rhs) const {
+            if (m_first < rhs.m_first)
+                return true;
+            if (rhs.m_first < m_first)
+                return false;
+            return m_second < rhs.m_second;
+        }
+
+        bool operator>(const PairInt &rhs) const {
+            return rhs < *this;
+        }
+
+        bool operator<=(const PairInt &rhs) const {
+            return !(rhs < *this);
+        }
+
+        bool operator>=(const PairInt &rhs) const {
+            return !(*this < rhs);
+        }
         /*!
          * @brief Default constructor.
          */
@@ -694,35 +721,6 @@ namespace IDL {
          */
         eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
-        bool operator==(const PairInt &rhs) const {
-            return m_first == rhs.m_first &&
-                   m_second == rhs.m_second;
-        }
-
-        bool operator!=(const PairInt &rhs) const {
-            return !(rhs == *this);
-        }
-
-        bool operator<(const PairInt &rhs) const {
-            if (m_first < rhs.m_first)
-                return true;
-            if (rhs.m_first < m_first)
-                return false;
-            return m_second < rhs.m_second;
-        }
-
-        bool operator>(const PairInt &rhs) const {
-            return rhs < *this;
-        }
-
-        bool operator<=(const PairInt &rhs) const {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const PairInt &rhs) const {
-            return !(*this < rhs);
-        }
-
     private:
         int32_t m_first;
         int32_t m_second;
@@ -735,6 +733,34 @@ namespace IDL {
     class PairAttribInt {
     public:
 
+        bool operator==(const PairAttribInt &rhs) const {
+            return m_first == rhs.m_first &&
+                   m_second == rhs.m_second;
+        }
+
+        bool operator!=(const PairAttribInt &rhs) const {
+            return !(rhs == *this);
+        }
+
+        bool operator<(const PairAttribInt &rhs) const {
+            if (m_first < rhs.m_first)
+                return true;
+            if (rhs.m_first < m_first)
+                return false;
+            return m_second < rhs.m_second;
+        }
+
+        bool operator>(const PairAttribInt &rhs) const {
+            return rhs < *this;
+        }
+
+        bool operator<=(const PairAttribInt &rhs) const {
+            return !(rhs < *this);
+        }
+
+        bool operator>=(const PairAttribInt &rhs) const {
+            return !(*this < rhs);
+        }
         /*!
          * @brief Default constructor.
          */
@@ -862,35 +888,6 @@ namespace IDL {
          */
         eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
-        bool operator==(const PairAttribInt &rhs) const {
-            return m_first == rhs.m_first &&
-                   m_second == rhs.m_second;
-        }
-
-        bool operator!=(const PairAttribInt &rhs) const {
-            return !(rhs == *this);
-        }
-
-        bool operator<(const PairAttribInt &rhs) const {
-            if (m_first < rhs.m_first)
-                return true;
-            if (rhs.m_first < m_first)
-                return false;
-            return m_second < rhs.m_second;
-        }
-
-        bool operator>(const PairAttribInt &rhs) const {
-            return rhs < *this;
-        }
-
-        bool operator<=(const PairAttribInt &rhs) const {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const PairAttribInt &rhs) const {
-            return !(*this < rhs);
-        }
-
     private:
         int32_t m_first;
         Attrib m_second;
@@ -902,6 +899,35 @@ namespace IDL {
  */
     class DotContextAttrs {
     public:
+
+        bool operator<(const DotContextAttrs &rhs) const {
+            if (m_cc < rhs.m_cc)
+                return true;
+            if (rhs.m_cc < m_cc)
+                return false;
+            return m_dc < rhs.m_dc;
+        }
+
+        bool operator>(const DotContextAttrs &rhs) const {
+            return rhs < *this;
+        }
+
+        bool operator<=(const DotContextAttrs &rhs) const {
+            return !(rhs < *this);
+        }
+
+        bool operator>=(const DotContextAttrs &rhs) const {
+            return !(*this < rhs);
+        }
+
+        bool operator==(const DotContextAttrs &rhs) const {
+            return m_cc == rhs.m_cc &&
+                   m_dc == rhs.m_dc;
+        }
+
+        bool operator!=(const DotContextAttrs &rhs) const {
+            return !(rhs == *this);
+        }
 
         /*!
          * @brief Default constructor.
@@ -1035,35 +1061,6 @@ namespace IDL {
          */
         eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
-        bool operator<(const DotContextAttrs &rhs) const {
-            if (m_cc < rhs.m_cc)
-                return true;
-            if (rhs.m_cc < m_cc)
-                return false;
-            return m_dc < rhs.m_dc;
-        }
-
-        bool operator>(const DotContextAttrs &rhs) const {
-            return rhs < *this;
-        }
-
-        bool operator<=(const DotContextAttrs &rhs) const {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const DotContextAttrs &rhs) const {
-            return !(*this < rhs);
-        }
-
-        bool operator==(const DotContextAttrs &rhs) const {
-            return m_cc == rhs.m_cc &&
-                   m_dc == rhs.m_dc;
-        }
-
-        bool operator!=(const DotContextAttrs &rhs) const {
-            return !(rhs == *this);
-        }
-
     private:
         std::map<Attrib, int32_t> m_cc;
         std::vector<PairAttribInt> m_dc;
@@ -1075,6 +1072,35 @@ namespace IDL {
  */
     class DotKernelAttr {
     public:
+
+        bool operator==(const DotKernelAttr &rhs) const {
+            return m_ds == rhs.m_ds &&
+                   m_cbase == rhs.m_cbase;
+        }
+
+        bool operator!=(const DotKernelAttr &rhs) const {
+            return !(rhs == *this);
+        }
+
+        bool operator<(const DotKernelAttr &rhs) const {
+            if (m_ds < rhs.m_ds)
+                return true;
+            if (rhs.m_ds < m_ds)
+                return false;
+            return m_cbase < rhs.m_cbase;
+        }
+
+        bool operator>(const DotKernelAttr &rhs) const {
+            return rhs < *this;
+        }
+
+        bool operator<=(const DotKernelAttr &rhs) const {
+            return !(rhs < *this);
+        }
+
+        bool operator>=(const DotKernelAttr &rhs) const {
+            return !(*this < rhs);
+        }
 
         /*!
          * @brief Default constructor.
@@ -1207,35 +1233,6 @@ namespace IDL {
          * @param cdr CDR serialization object.
          */
         eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
-
-        bool operator==(const DotKernelAttr &rhs) const {
-            return m_ds == rhs.m_ds &&
-                   m_cbase == rhs.m_cbase;
-        }
-
-        bool operator!=(const DotKernelAttr &rhs) const {
-            return !(rhs == *this);
-        }
-
-        bool operator<(const DotKernelAttr &rhs) const {
-            if (m_ds < rhs.m_ds)
-                return true;
-            if (rhs.m_ds < m_ds)
-                return false;
-            return m_cbase < rhs.m_cbase;
-        }
-
-        bool operator>(const DotKernelAttr &rhs) const {
-            return rhs < *this;
-        }
-
-        bool operator<=(const DotKernelAttr &rhs) const {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const DotKernelAttr &rhs) const {
-            return !(*this < rhs);
-        }
 
     private:
         std::map<PairInt, Attrib> m_ds;
@@ -1463,6 +1460,7 @@ namespace IDL {
  */
     class Edge {
     public:
+
         bool operator==(const Edge &rhs) const {
             return m_to == rhs.m_to &&
                    m_type == rhs.m_type &&
@@ -1501,6 +1499,7 @@ namespace IDL {
         bool operator>=(const Edge &rhs) const {
             return !(*this < rhs);
         }
+
         /*!
          * @brief Default constructor.
          */
@@ -1681,6 +1680,7 @@ namespace IDL {
  */
     class EdgeKey {
     public:
+
         bool operator==(const EdgeKey &rhs) const {
             return m_to == rhs.m_to &&
                    m_type == rhs.m_type;
@@ -2023,34 +2023,7 @@ namespace IDL {
  */
     class PairEdgeInt {
     public:
-        bool operator==(const PairEdgeInt &rhs) const {
-            return m_first == rhs.m_first &&
-                   m_second == rhs.m_second;
-        }
 
-        bool operator!=(const PairEdgeInt &rhs) const {
-            return !(rhs == *this);
-        }
-
-        bool operator<(const PairEdgeInt &rhs) const {
-            if (m_first < rhs.m_first)
-                return true;
-            if (rhs.m_first < m_first)
-                return false;
-            return m_second < rhs.m_second;
-        }
-
-        bool operator>(const PairEdgeInt &rhs) const {
-            return rhs < *this;
-        }
-
-        bool operator<=(const PairEdgeInt &rhs) const {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const PairEdgeInt &rhs) const {
-            return !(*this < rhs);
-        }
         /*!
          * @brief Default constructor.
          */
@@ -2189,34 +2162,7 @@ namespace IDL {
  */
     class DotContextEdge {
     public:
-        bool operator==(const DotContextEdge &rhs) const {
-            return m_cc == rhs.m_cc &&
-                   m_dc == rhs.m_dc;
-        }
 
-        bool operator!=(const DotContextEdge &rhs) const {
-            return !(rhs == *this);
-        }
-
-        bool operator<(const DotContextEdge &rhs) const {
-            if (m_cc < rhs.m_cc)
-                return true;
-            if (rhs.m_cc < m_cc)
-                return false;
-            return m_dc < rhs.m_dc;
-        }
-
-        bool operator>(const DotContextEdge &rhs) const {
-            return rhs < *this;
-        }
-
-        bool operator<=(const DotContextEdge &rhs) const {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const DotContextEdge &rhs) const {
-            return !(*this < rhs);
-        }
         /*!
          * @brief Default constructor.
          */
@@ -2399,25 +2345,25 @@ namespace IDL {
          * @brief This function copies the value in member ds
          * @param _ds New value to be copied in member ds
          */
-        eProsima_user_DllExport void ds(const std::map<PairInt, Attrib> &_ds);
+        eProsima_user_DllExport void ds(const std::map<PairInt, Edge> &_ds);
 
         /*!
          * @brief This function moves the value in member ds
          * @param _ds New value to be moved in member ds
          */
-        eProsima_user_DllExport void ds(std::map<PairInt, Attrib> &&_ds);
+        eProsima_user_DllExport void ds(std::map<PairInt, Edge> &&_ds);
 
         /*!
          * @brief This function returns a constant reference to member ds
          * @return Constant reference to member ds
          */
-        eProsima_user_DllExport const std::map<PairInt, Attrib> &ds() const;
+        eProsima_user_DllExport const std::map<PairInt, Edge> &ds() const;
 
         /*!
          * @brief This function returns a reference to member ds
          * @return Reference to member ds
          */
-        eProsima_user_DllExport std::map<PairInt, Attrib> &ds();
+        eProsima_user_DllExport std::map<PairInt, Edge> &ds();
         /*!
          * @brief This function copies the value in member cbase
          * @param _cbase New value to be copied in member cbase
@@ -2494,7 +2440,7 @@ namespace IDL {
         eProsima_user_DllExport void serializeKey(eprosima::fastcdr::Cdr &cdr) const;
 
     private:
-        std::map<PairInt, Attrib> m_ds;
+        std::map<PairInt, Edge> m_ds;
         DotContextEdge m_cbase;
     };
 
@@ -3666,6 +3612,5 @@ namespace IDL {
         std::map<int32_t, Mvreg> m_m;
         DotContext m_cbase;
     };
-
 }
 #endif // _DSRGRAPH_H_
