@@ -32,11 +32,40 @@
         unsigned long long timestamp;
     };
 
+    struct PairInt {
+        long first;
+        long second;
+    };
+
+    struct PairAttribInt {
+        long first;
+        Attrib second;
+    };
+
+    struct DotContextAttrs {
+        map<Attrib, long> cc;
+        sequence<PairAttribInt> dc;
+    };
+
+    struct DotKernelAttr {
+        map<PairInt, Attrib> ds;
+        DotContextAttrs cbase;
+    };
+
+    struct MvregEdgeAttr {
+        long id;
+        long from;
+        long to;
+        long type;
+        DotKernelAttr dk;
+        long agent_id; // to skip messages from the same agent in multithread.
+    };
+
     struct Edge {
         long to; //key1
 		string type; //key2
 		long from; // Se mantiene para trabajar más fácilmente con los Edges.
-		map<string, Attrib>    attrs;
+		map<string, MvregEdgeAttr>    attrs;
 	};
 
     struct EdgeKey {
@@ -44,13 +73,44 @@
         string type;
     };
 
+    struct MvregNodeAttr {
+        long id;
+        long node;
+        DotKernelAttr dk;
+        long agent_id; // to skip messages from the same agent in multithread.
+    };
+
+    struct PairEdgeInt {
+        long first;
+        Edge second;
+    };
+
+    struct DotContextEdge {
+        map<Edge, long> cc;
+        sequence<PairEdgeInt> dc;
+    };
+
+    struct DotKernelEdge {
+        map<PairInt, Attrib> ds;
+        DotContextEdge cbase;
+    };
+
+    struct MvregEdge {
+        long id;
+        long from;
+        long to;
+        long type;
+        DotKernelEdge dk;
+        long agent_id; // to skip messages from the same agent in multithread.
+    };
+
     struct Node {
         string type;
         string name;
         long id;
         long agent_id;
-		map<string, Attrib>   attrs;
-		map<EdgeKey, Edge> fano;
+		map<string, MvregNodeAttr>   attrs;
+		map<EdgeKey, MvregEdge> fano;
     };
 
     struct GraphRequest
@@ -58,10 +118,6 @@
         string from;
     };
 
-    struct PairInt {
-        long first;
-        long second;
-    };
 
 
     struct DotContext {
