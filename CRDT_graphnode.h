@@ -72,7 +72,7 @@ class DoLaserStuff : public QGraphicsView
         return;
       try
       {
-        std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
+        //std::cout << __FUNCTION__ <<"-> Node: "<<id<< std::endl;
         std::optional<Node> n = graph->get_node(id);
         if (n.has_value()) 
         {
@@ -81,11 +81,13 @@ class DoLaserStuff : public QGraphicsView
             if (lAngles.has_value() and lDists.has_value()) 
             {
                 QPolygonF polig;
+                polig << QPointF(0,150);
                 for (const auto &[dist, angle] : iter::zip(lDists.value(), lAngles.value())) 
                 {
                     //std::cout << dist << "," << angle << std::endl;
                     polig << QPointF(dist * sin(angle), dist * cos(angle));
                 }
+                polig << QPointF(0,150);
                 scene.clear();
                 QPolygonF robot;
                 robot << QPointF(-200, 0) << QPointF(-100, 150) << QPointF(0, 200) << QPointF(100, 150)
@@ -146,7 +148,8 @@ class DoTableStuff : public  QTableWidget
           setRowCount(n.value().attrs().size());
           setHorizontalHeaderLabels(QStringList{"Key", "Value"});
           int i = 0;
-          for (auto &[k, v] : n.value().attrs()) {
+          for (auto &[k, v] : n.value().attrs()) 
+          {
               setItem(i, 0, new QTableWidgetItem(QString::fromStdString(k)));
               switch (v.value()._d()) {
                   case 0:
@@ -165,7 +168,7 @@ class DoTableStuff : public  QTableWidget
                               std::get<1>(graph_->nativetype_to_string(v.value().float_vec())))));
                       break;
                   case 4:
-                      setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                      setItem(i, 1, new QTableWidgetItem(QString(v.value().bl() ? "true" : "false")));
                       break;
               }
               i++;
@@ -182,6 +185,7 @@ class DoTableStuff : public  QTableWidget
           this->setMinimumWidth(width);
           this->setMinimumHeight(height);
           QObject::connect(graph.get(), &CRDT::CRDTGraph::update_attrs_signal, this, &DoTableStuff::drawSLOT);
+        
           show();
       }
     };
@@ -209,7 +213,7 @@ class DoTableStuff : public  QTableWidget
                         setItem(i, 1, new QTableWidgetItem(QString::fromStdString(std::get<1>(graph->nativetype_to_string(v.value().float_vec())))));
                         break;
                     case 4:
-                        setItem(i, 1, new QTableWidgetItem(QString::fromStdString(v.value().str())));
+                        setItem(i, 1, new QTableWidgetItem(QString(v.value().bl() ? "true" : "false")));
                         break;
                 }
                 i++;

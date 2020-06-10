@@ -498,15 +498,14 @@ public:
                 //cout <<__PRETTY_FUNCTION__<<":"<<__LINE__ << " " << o << endl;
                 // dot in both
 
-                //if constexpr(is_same<T, Node>::value) {
+                if constexpr(is_same<T, Node>::value) {
                     //cout << "CONFLICTO " << endl;
                     //replace in case of conflict if the agent id has a lower value
                     if (it->second.agent_id() > ito->second.agent_id() && *it != *ito) {
                         ds.erase(it);
                         ds.insert(*ito);
-                        cout << "CONFLICTO" << endl;
                     }
-                //}
+                }
                 ++it;
                 ++ito;
             }
@@ -1322,11 +1321,10 @@ template<typename V, typename K=string>
 class mvreg    // Multi-value register, Optimized
 {
 private:
+    dotkernel<V,K> dk; // Dot kernel
     K id;
 
 public:
-    dotkernel<V,K> dk; // Dot kernel
-
     mvreg() {} // Only for deltas and those should not be mutated
     mvreg(K k) : id(k) {} // Mutable replicas need a unique id
     mvreg(K k, dotcontext<K> &jointc) : id(k), dk(jointc) {}
@@ -1335,7 +1333,6 @@ public:
     {
         return dk.c;
     }
-
 
 
     friend ostream &operator<<( ostream &output, const mvreg<V,K>& o)
@@ -1360,12 +1357,6 @@ public:
             s.insert(dse.second);
         return s;
     }
-
-    V& read_reg ()
-    {
-        return *dk.ds.begin();
-    }
-
 
     mvreg<V,K> reset()
     {
@@ -1393,22 +1384,9 @@ public:
         return r;
     }
 
-    // Remove all but the last dotkernel element
-    void rsv()
-    {
-        if (dk.ds.empty()) return;
-        auto b = dk.ds.begin();
-        auto e = --dk.ds.end();
-        while (b != e) {
-            b = dk.ds.erase(b);
-        }
-    }
-
     void join (mvreg<V,K> o)
     {
-        dk.join_replace_conflict(o.dk);
-        //rsv();
-        dk.clean();
+        dk.join(o.dk);
     }
 };
 
@@ -1693,29 +1671,6 @@ public:
         m=o.m;
         id=o.id;
         return *this;
-    }
-
-    ormap<N,V,K> & operator=(ormap<N,V,K> && o)
-    {
-        if (&o == this) return *this;
-        if (&c != &o.c) c=std::move(o.c);
-        m= std::move(o.m);
-        id=o.id;
-        return *this;
-    }
-
-
-    bool operator==(const ormap<N,V,K> & o) const
-    {
-        if (&o == this) return true;
-        if (m == o.m) return true ;
-
-        return false;
-    }
-
-    bool operator!=(const ormap<N,V,K> & o) const
-    {
-       return !operator==(o);
     }
 
     dotcontext<K> & context() const

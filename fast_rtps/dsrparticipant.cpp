@@ -26,33 +26,21 @@
 #include <chrono>
 #include "dsrparticipant.h"
 
+//using namespace eprosima::fastrtps;
+//using namespace eprosima::fastrtps::rtps;
 
-
-DSRParticipant::DSRParticipant() :
-mp_participant(nullptr),
-mp_node_p(nullptr),
-mp_node_s(nullptr),
-mp_subscriber_graph_request(nullptr),
-mp_publisher_topic_answer(nullptr),
-mp_subscriber_topic_answer(nullptr),
-mp_edge_p(nullptr),
-mp_edge_s(nullptr),
-mp_attr_node_p(nullptr),
-mp_attr_node_s(nullptr),
-mp_attr_edge_p(nullptr),
-mp_attr_edge_s(nullptr)
-{}
+DSRParticipant::DSRParticipant() : mp_publisher(nullptr), mp_subscriber(nullptr) {}
 
 DSRParticipant::~DSRParticipant() 
 { 
     eprosima::fastrtps::Domain::removeParticipant(mp_participant);
 }
 
-std::tuple<bool, eprosima::fastrtps::Participant *> DSRParticipant::init(int32_t agent_id)
+std::tuple<bool, eprosima::fastrtps::Participant *> DSRParticipant::init()
 {
     // Create RTPSParticipant     
     eprosima::fastrtps::ParticipantAttributes PParam;
-    PParam.rtps.setName(("Participant_" + std::to_string(agent_id)).data());  //You can put here the name you want
+    PParam.rtps.setName("Participant_Participant");  //You can put here the name you want
     
     //Create a descriptor for the new transport.
     auto custom_transport = std::make_shared<eprosima::fastrtps::rtps::UDPv4TransportDescriptor>();
@@ -80,9 +68,6 @@ std::tuple<bool, eprosima::fastrtps::Participant *> DSRParticipant::init(int32_t
     eprosima::fastrtps::Domain::registerType(mp_participant, static_cast<eprosima::fastrtps::TopicDataType*>(&dsrgraphType));
     eprosima::fastrtps::Domain::registerType(mp_participant, static_cast<eprosima::fastrtps::TopicDataType*>(&graphrequestType));
     eprosima::fastrtps::Domain::registerType(mp_participant, static_cast<eprosima::fastrtps::TopicDataType*>(&graphRequestAnswerType));
-    eprosima::fastrtps::Domain::registerType(mp_participant, static_cast<eprosima::fastrtps::TopicDataType*>(&dsrEdgeType));
-    eprosima::fastrtps::Domain::registerType(mp_participant, static_cast<eprosima::fastrtps::TopicDataType*>(&dsrNodeAttrType));
-    eprosima::fastrtps::Domain::registerType(mp_participant, static_cast<eprosima::fastrtps::TopicDataType*>(&dsrEdgeAttrType));
 
     return std::make_tuple(true, mp_participant);
 }
@@ -97,26 +82,10 @@ eprosima::fastrtps::rtps::GUID_t DSRParticipant::getID() const
     return mp_participant->getGuid();
 }
 
-const char * DSRParticipant::getNodeTopicName() const
+const char * DSRParticipant::getDSRTopicName() const
 {   
     return dsrgraphType.getName();
 }
-
-const char * DSRParticipant::getEdgeTopicName() const
-{
-    return dsrEdgeType.getName();
-}
-
-const char * DSRParticipant::getNodeAttrTopicName() const
-{
-    return dsrNodeAttrType.getName();
-}
-
-const char * DSRParticipant::getEdgeAttrTopicName() const
-{
-    return dsrEdgeAttrType.getName();
-}
-
 
 const char * DSRParticipant::getRequestTopicName() const
 {   
