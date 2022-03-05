@@ -163,19 +163,19 @@ void  OSG3dViewer::setMainCamera(osgGA::TrackballManipulator *manipulator, Camer
 	switch(pov)
 	{
         case TOP_POV:
-            mRot.makeRotate(-M_PI_2, QVecToOSGVec(QVec::vec3(1,0,0)));
+            mRot.makeRotate(-M_PI_2, QVecToOSGVec(Eigen::Vector3f(1,0,0)));
             break;
         case BACK_POV:
-            mRot.makeRotate(M_PI_2,  QVecToOSGVec(QVec::vec3(0,0,0)));
+            mRot.makeRotate(M_PI_2,  QVecToOSGVec(Eigen::Vector3f(0,0,0)));
             break;
         case FRONT_POV:
-            mRot.makeRotate(M_PI,    QVecToOSGVec(QVec::vec3(0,1,0)));
+            mRot.makeRotate(M_PI,    QVecToOSGVec(Eigen::Vector3f(0,1,0)));
             break;
         case LEFT_POV:
-            mRot.makeRotate(M_PI_2,  QVecToOSGVec(QVec::vec3(0,-1,0)));
+            mRot.makeRotate(M_PI_2,  QVecToOSGVec(Eigen::Vector3f(0,-1,0)));
             break;
         case RIGHT_POV:
-            mRot.makeRotate(M_PI_2,  QVecToOSGVec(QVec::vec3(0,1,0)));
+            mRot.makeRotate(M_PI_2,  QVecToOSGVec(Eigen::Vector3f(0,1,0)));
             break;
         default:
             qFatal("InnerModelViewer: invalid POV.");
@@ -323,7 +323,8 @@ void OSG3dViewer::add_or_assign_box(const Node &node, const Node& parent)
         // Create object
         if( auto anterior = osg_map.find(std::make_tuple(node.id(), node.id())); anterior == osg_map.end())
         {
-            osg::Box *box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,0)), width.value(), height.value(), depth.value());
+            osg::Box *box = new osg::Box(QVecToOSGVec(Eigen::Vector3f(0,0,0)), width.value(), height.value(), depth.value());
+
             osg::ShapeDrawable *plane_drawable = new osg::ShapeDrawable(box);
             osg::Geode *geode = new osg::Geode;
             geode->addDrawable(plane_drawable);
@@ -431,27 +432,18 @@ void  OSG3dViewer::add_or_assign_mesh(const Node &node, const Node& parent)
 //////// Auxiliary methods
 /////////////////////////////////////////////////////////////
 
-osg::Vec3 OSG3dViewer::QVecToOSGVec(const QVec &vec) const
+osg::Vec3 OSG3dViewer::QVecToOSGVec(const Eigen::Vector3f &vec) const
 {
 	//return osg::Vec3(vec(0), vec(1), -vec(2));
     return osg::Vec3(vec(0), -vec(1), -vec(2));
 
 }
 
+
+
 osg::Matrix  OSG3dViewer::QMatToOSGMat4(const Mat::RTMat &nodeB)
 {
-	//QVec angles = nodeB.extractAnglesR();
-	//Mat::Rot3D angles = nodeB.rotation();
-	//QVec t = nodeB.getTr();
-	//auto t = nodeB.translation();
-	//RTMat node = RTMat(-angles(0), -angles(1), angles(2), QVec::vec3(t(0), t(1), -t(2)));
-    Mat::RTMat node(nodeB); /*node(Eigen::Translation3d(t(0), -t(1), -t(2))*
-                    Eigen::AngleAxisd(angles(0), Eigen::Vector3d::UnitX()) *
-                    Eigen::AngleAxisd(-angles(1), Eigen::Vector3d::UnitY()) *
-                    Eigen::AngleAxisd(-angles(2), Eigen::Vector3d::UnitZ()));*/
-
-    //RTMat node =RTMat(angles(0), -angles(1), -angles(2), QVec::vec3(t(0), -t(1), -t(2)));
-
+    Mat::RTMat node(nodeB);
     return osg::Matrixd( node(0,0), node(1,0), node(2,0), node(3,0),
 	                     node(0,1), node(1,1), node(2,1), node(3,1),
 	                     node(0,2), node(1,2), node(2,2), node(3,2),
@@ -472,19 +464,19 @@ osg::Vec4 OSG3dViewer::htmlStringToOsgVec4(const std::string &color)
 
 void OSG3dViewer::draw_axis()
 {
-    osg::Box *box = new osg::Box(QVecToOSGVec(QVec::vec3(500,0,0)), 1000, 10, 10);
+    osg::Box *box = new osg::Box(QVecToOSGVec(Eigen::Vector3f(500,0,0)), 1000, 10, 10);
     osg::ShapeDrawable *plane_drawable = new osg::ShapeDrawable(box);
     osg::Geode *geode = new osg::Geode;
     geode->addDrawable(plane_drawable);
     plane_drawable->setColor(htmlStringToOsgVec4("#FF0000"));
     root->addChild(geode);
-    box = new osg::Box(QVecToOSGVec(QVec::vec3(0,500,0)), 10, 1000, 10);
+    box = new osg::Box(QVecToOSGVec(Eigen::Vector3f(0,500,0)), 10, 1000, 10);
     plane_drawable = new osg::ShapeDrawable(box);
     geode = new osg::Geode;
     geode->addDrawable(plane_drawable);
     plane_drawable->setColor(htmlStringToOsgVec4("#00FF00"));
     root->addChild(geode);
-    box = new osg::Box(QVecToOSGVec(QVec::vec3(0,0,500)), 10, 10, 1000);
+    box = new osg::Box(QVecToOSGVec(Eigen::Vector3f(0,0,500)), 10, 10, 1000);
     plane_drawable = new osg::ShapeDrawable(box);
     geode = new osg::Geode;
     geode->addDrawable(plane_drawable);

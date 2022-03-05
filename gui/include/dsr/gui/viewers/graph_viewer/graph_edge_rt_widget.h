@@ -190,7 +190,6 @@ public slots:
                         const double &value_d = value * 180 / M_PI;
                         attrib_widgets[3 + pos]->setText(QString::number(value_d));
                     }
-                    std::cout<<"print values"<<rotation.value()<<translation.value()<<std::endl;
                 }
             }
         }

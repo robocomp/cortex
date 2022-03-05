@@ -54,7 +54,7 @@ target_link_libraries(dsr_gui
         Eigen3::Eigen
         fastcdr
         osgDB osgGA OpenThreads
-        Robocomp::qmat Robocomp::osgviewer Robocomp::dsr_core
+        Robocomp::dsr_core
         PUBLIC
         Qt5::OpenGL
         fastrtps

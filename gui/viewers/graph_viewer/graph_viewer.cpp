@@ -1,6 +1,5 @@
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
-#include <qmat/QMatAll>
 #include <QTableWidget>
 #include <QApplication>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
@@ -168,10 +167,12 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
             posx = G->get_attrib_by_name<pos_x_att>(n.value()).value_or(10);
             posy = G->get_attrib_by_name<pos_y_att>(n.value()).value_or(10);
         }
-        catch (const std::exception &e) {
-            auto rd = QVec::uniformVector(2, -200, 200);
-            posx = rd.x();
-            posy = rd.y();
+        catch (const std::exception &e)
+        {
+            //auto rd = QVec::uniformVector(2, -200, 200);
+            auto rd = Eigen::Vector2f::Random();  // -1..1
+            posx = rd.x() * 200;
+            posy = rd.y() * 200;
         }
         // Avoid to move if it's in the same position or if the node is grabbed
         if ((posx != gnode->x() or posy != gnode->y()) and gnode != scene.mouseGrabberItem()) {

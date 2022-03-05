@@ -83,7 +83,7 @@ namespace DSR
             
             
             //std::map<std::string, IMVMesh> meshMap;
-            osg::Vec3 QVecToOSGVec(const QVec &vec) const ;
+            osg::Vec3 QVecToOSGVec(const Eigen::Vector3f &vec) const ;
             osg::Matrix QMatToOSGMat4(const Mat::RTMat &nodeB);
             osg::Vec4 htmlStringToOsgVec4(const std::string &color);
             osg::ref_ptr<osg::Group> createGraph();
