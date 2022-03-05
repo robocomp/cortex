@@ -23,7 +23,7 @@ CORTEX is a long term effort to build a series of architectural designs around t
 of a group of agents that share a distributed, dynamic representation acting as a working memory. 
 This data structure is called **Deep State Representation (DSR)** due to the hybrid nature 
 of the managed elements, geometric and symbolic, and concrete (laser data) and abstract (logical predicates).
-This software is the new infrastructure that will help in the creation of CORTEX instances. A CORTEX instance is a set of software components, called _agents_, that share a distributed data structured called (_G_)raph playing the role of a working memory. Agents are C++ programs that can be generated using RoboComp's code generator, _robocompdsl_.  Agents are created with an instance of the FastRTPS middleware (by eProsima) configured in reliable multicast mode. A standard graph data structure is defined using FastRTPS's IDL and converted into a C++ class that is part of the agent's core. This class is extended using the _delta mutators_ [CRDT](https://github.com/CBaquero/delta-enabled-crdts) code kindly provided by Carlos Baquero. With this added functionality, all the copies of G held by the participating agents acquire the property of _eventual consistency_. This property entails that all copies, being different at any given moment, will converge to the exact same state in a finite amount of time, after all agents stop editing the graph. With _delta mutators_, modifications made to G by an agent are propagated to all others and integrated in their respective copies. This occurs even if the network cannot guarantee that each packet is delivered exactly once, _causal broadcast_. Note that if operations on the graph were transmitted instead of changes in state, then _exactly once_ semantics would be needed.  Finally, the resulting local graph _G_ is used by the developer through a carefully designed thread safe API, _G_API_.
+This software is the new infrastructure that will help in the creation of CORTEX instances. A CORTEX instance is a set of software components, called _agents_, that share a distributed data structured called (_G_)raph playing the role of a working memory. Agents are C++ or Python programs that can be generated using RoboComp's code generator, _robocompdsl_.  Agents are created with an instance of the FastRTPS middleware (DDS implementation by eProsima) configured in reliable multicast mode. On top of this middleware, each agent holds a local copy of the graph G that can be edited through a simple API, the G API. By using a technology known as *Conflict-Free Replicated Data Types* [Shapiro et al](https://pages.lip6.fr/Marc.Shapiro/papers/RR-7687.pdf), [Lars Hupel's homepage](https://lars.hupel.info/topics/crdt/01-intro/), any edition on the local graph is transmited to all other agents' copies, where the changes are updated. We do not assume that there is a common clock shared by the agents, and messages can be outordered during transmission. Even though, the ensemble acquires the property of *eventual consistency*. This property entails that all copies, being different at any given moment, will converge to the exact same state in a finite amount of time, after all agents stop editing the graph. With _delta mutators_, modifications made to G by an agent are propagated to all others and integrated in their respective copies. This occurs even if the network cannot guarantee that each packet is delivered exactly once, _causal broadcast_. 
 
 <img src="https://user-images.githubusercontent.com/5784096/90373871-e3257d80-e072-11ea-9933-0392ea9ae7f1.png" width="800">
 
@@ -458,7 +458,7 @@ std::optional<std::map<EdgeKey, Edge>> get_edges(int id);
 
 ### RT sub-API
 
-These methods provide specialized access to RT edges.
+These methods provide specialized access to RT edges, which are standard rotation plus translation encodings: euler angles (XYZ-righthand) and 3D vector translation.
 
 The api has to be instantiated with: `auto rt = G->get_rt_api()`;
 
@@ -539,11 +539,11 @@ void read_from_json_file(const std::string &file) const;
 &nbsp;
   
 
-### Innermodel sub-API
+### Geometric transformations sub-API
 
-These methods compute transformation matrices between distant nodes in the so-called RT- tree that is embedded in G. The transformation matrix responds to the following question: how is a point defined in A’s reference frame, seen from B’s reference frame? It also provides backwards compatibility with RobComp’s InnerModel system.
+The methods in this API compute transformation matrices between distant nodes in the RT tree, that is embedded in G. The transformation matrix responds to the following question: how is a point defined in B’s reference frame, seen from A’s reference frame? The target, A, reference frame is the first argument and the origin reference frame, B, the last. The middle argument is the point to be transformed and defined in A. When omitted, the point is taken as (0,0,0).
 
-The api has to be instantiated with: `auto inner = G->get_inner_api();`
+The api has to be instantiated with: `auto inner_eigen = G->get_inner_eigen_api();`
 
 &nbsp;
 ```c++
