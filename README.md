@@ -1,18 +1,27 @@
 # DSR (Deep State Representation)
+- [DSR (Deep State Representation)](#dsr-deep-state-representation)
 - [Description](#description)
 - [Definitions](#definitions)
-- [Dependencies and Installation](#dependencies-and-installation)
-  * [Installing agents](#installing-agents)
+- [Installation](#installation)
+  - [Dependencies](#dependencies)
+    - [Step 1](#step-1)
+    - [Step 2](#step-2)
+  - [Installation](#installation-1)
+  - [Common Issues](#common-issues)
+  - [Installing agents](#installing-agents)
 - [Developer Documentation](#developer-documentation)
-  * [DSR-API (aka G-API)](#dsr-api--aka-g-api-)
-  * [CORE](#core)
-  * [Auxiliary sub-APIs](#auxiliary-sub-apis)
-    + [RT sub-API](#rt-sub-api)
+  - [DSR-API (aka G-API)](#dsr-api-aka-g-api)
+  - [PyDSR (Python wrapper for DSR-API)](#pydsr-python-wrapper-for-dsr-api)
+  - [Common examples](#common-examples)
+  - [Predefined names and types](#predefined-names-and-types)
+  - [CORE](#core)
+  - [Auxiliary sub-APIs](#auxiliary-sub-apis)
+    - [RT sub-API](#rt-sub-api)
       - [Overloaded method using move semantics.](#overloaded-method-using-move-semantics)
-    + [IO sub-API](#io-sub-api)
-    + [Innermodel sub-API](#innermodel-sub-api)
-  * [CRDT- API](#crdt--api)
-  * [Node struct](#node-struct)
+    - [IO sub-API](#io-sub-api)
+    - [Geometric transformations sub-API](#geometric-transformations-sub-api)
+  - [CRDT- API](#crdt--api)
+  - [Node struct](#node-struct)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
@@ -192,6 +201,7 @@ If you want to install the existing agents you can clone the [dsr-graph](https:/
 
 
 # Developer Documentation
+
 ## DSR-API (aka G-API)
 G-API is the user-level access layer to G. It is composed by a set of core methods that access the underlying CRDT and RTPS APIs, and an extendable  set of auxiliary methods added to simplify the user coding tasks. 
 
@@ -207,6 +217,10 @@ The most important features of the G-API are:
 -   To create a new node, a unique identifier is needed. To guarantee this requirement, the node creation method places a RPC call to the special agent idserver, using standard RoboComp communication methods. Idserver returns a unique id that can be safely added to the new node.
 
 -   G can be serialized to a JSON file from any agent but it is better to do it only from the idserver agent, to avoid the spreading of copies of the graph in different states.
+
+## PyDSR (Python wrapper for DSR-API)
+
+Have a look at [PyDSR documentation page](python-wrapper/index.md).
 
 
 ## Common examples
