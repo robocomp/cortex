@@ -23,21 +23,23 @@ Methods
 ### DSRGraph
 
 _DSRGraph_.**get_node**(id: _int_) → _Node_
+
 _DSRGraph_.**get_node**(name: _str_) → _Node_
 :	Return the node with the id or name passed as parameter. Returns None if the node does not exist.
 
 _DSRGraph_.**delete_node**(id: _int_) → _bool_
+
 _DSRGraph_.**delete_node**(name: _str_) → _bool_
 :	Delete the node with the given id. Returns a bool with the result o the operation.
 
 _DSRGraph_.**insert_node**(node: _Node_) → _int_
 :	Insert in the graph the new node passed as parameter. Returns the id of the node or None if the Node alredy exist in the map.
 
-
 _DSRGraph_.**update_node**(node: _Node_) → _bool_
 :	Update the node in the graph. Returns a bool indicating whether the operation was successful.
 
 _DSRGraph_.**get_edge**(from: _int_, to: _int_, type: _str_) → _Edge_
+
 _DSRGraph_.**get_edge**(from: _str_, to: _str_, type: _str_) → _Edge_
 :	Return the edge with the parameters from, to, and type passed as parameter. Returns None if the edge does not exist.
 
@@ -45,6 +47,7 @@ _DSRGraph_.**insert_or_assign_edge**(edge: _Edge_) → _bool_
 :	Insert or updates and edge. Returns a bool indicating whether the operation was successful.
 
 _DSRGraph_.**delete_edge**(from: _int_, to: _int_, type: _str_) → _bool_
+
 _DSRGraph_.**delete_edge**(from: _str_, to: _str_, type: _str_) → _bool_
 :	Return the edge with the parameters from, to, and type passed as parameter. Returns a bool indicating whether the operation was successful.
 
@@ -76,19 +79,15 @@ When the DSR graph is altered, a signal is fired. Handler functions can be _conn
 
 _signals_.**UPDATE_NODE**
 :	**Handler signature:** _int_, _str_ → None
-:	
 
 _signals_.**UPDATE_NODE_ATTR**
 :	**Handler signature:** _int_, [_str_] → None
-:	
 
 _signals_.**UPDATE_EDGE**
 :	**Handler signature:** _int_, _int_, _str_ → None
-:	
 
 _signals_.**UPDATE_EDGE_ATTR**
 :	**Handler signature:** _int_, _int_, [_str_] → None
-:	
 
 _signals_.**DELETE_EDGE**
 :	**Handler signature:** _int_, _int_, _str_ → None
