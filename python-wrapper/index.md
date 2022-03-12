@@ -20,6 +20,42 @@ rt_api = pydsr.rt_api(g)
 Methods
 -------
 
+# Attribute
+
+_Attribute_(v, t: _int_, agent_id: _int_) → _Attribute_
+
+_Attribute_(v, agent_id: _int_) → _Attribute_
+:   Constructor.
+
+_Attribute_.**agent_id**
+:   TODO
+
+_Attribute_.**timestamp**
+:   TODO
+
+_Attribute_.**value**
+:   TODO
+
+# Edge
+
+_Edge_(to: _int_, from: _int_, type: _str_, agent_id: _int_) → _Edge_
+:   Constructor.
+
+_Edge_.**type**
+:   TODO
+
+_Edge_.**origin**
+:   TODO
+
+_Edge_.**destination**
+:   TODO
+
+_Edge_.**agent_id**
+:   TODO
+
+_Edge_.**attrs**
+:   TODO
+
 ### DSRGraph
 
 _DSRGraph_.**get_node**(id: _int_) → _Node_
@@ -71,6 +107,70 @@ _DSRGraph_.**get_edges_to_id**(id: _int_) → [_Edge_]
 
 _DSRGraph_.**write_to_json_file**(file, skip_attrs: [_str_]) → [_Edge_]
 :	Dump the graph to a JSON file, skipping the attributes in skip_attrs.
+
+# InnerEigenAPI
+
+_InnerEigenAPI_.**transform**(orig: _str_, dest: _str_, timestamp: _int_) →
+
+_InnerEigenAPI_.**transform**(orig: _str_, vector, dest: _str_, timestamp: _int_) →
+: TODO
+
+_InnerEigenAPI_.**transform**(orig: _str_, dest: _str_, timestamp: _int_) →
+
+_InnerEigenAPI_.**transform**(orig: _str_, vector, dest: _str_, timestamp: _int_) →
+: TODO
+
+_InnerEigenAPI_.**get_transformation_matrix**(orig: _str_, dest: _str_, timestamp: _int_) →
+: TODO
+
+_InnerEigenAPI_.**get_rotation_matrix**(orig: _str_, dest: _str_, timestamp: _int_) →
+: TODO
+
+_InnerEigenAPI_.**get_translation_vector**(orig: _str_, dest: _str_, timestamp: _int_) →
+: TODO
+
+_InnerEigenAPI_.**get_euler_xyz_angles**(orig: _str_, dest: _str_, timestamp: _int_) →
+: TODO
+
+# Node
+
+_Node_(agent_id: _int_, type: _str_, name: _str_) → _Node_
+:   Constructor.
+
+_Node_.**id**
+:   TODO
+
+_Node_.**name**
+:   TODO
+
+_Node_.**type**
+:   TODO
+
+_Node_.**agent_id**
+:   TODO
+
+_Node_.**attrs**
+:   TODO
+
+_Node_.**edges**
+:   TODO
+
+# RT_API
+
+_RT\_API_.**insert_or_assign_edge_RT**(node: _Node_, to: _int_, translation: _[float]_, rotation_euler: _[float]_) →
+: TODO
+
+_RT\_API_.**get_edge_RT**(node: _Node_, to: _int_) →
+: TODO
+
+_RT\_API_.**get_RT_pose_from_parent**(node: _Node_) →
+: TODO
+
+_RT\_API_.**get_edge_RT_as_rtmat**(edge: _Edge_, t: _int_) →
+: TODO
+
+_RT\_API_.**get_translation**(id: _int_, to: _int_, timestamp: _int_) →
+: TODO
 
 Signals
 -------
