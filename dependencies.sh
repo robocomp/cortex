@@ -48,10 +48,3 @@ cmake --build .
 sudo make install
 sudo ldconfig
 
-cd ~/robocomp/classes/dsr/
-mkdir build
-cd build
-cmake ..
-make -j$(nproc)
-sudo make install
-sudo ldconfig
