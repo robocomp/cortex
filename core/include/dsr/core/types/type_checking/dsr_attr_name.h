@@ -406,6 +406,6 @@ REGISTER_TYPE(test_vec6_type, std::reference_wrapper<const vec6> , false)
 *COMPRESSED
 */
 REGISTER_TYPE(compresssed_id, int, false)
-REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uchar>>, false)
+REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uint8_t>>, false)
 
 #endif //DSR_ATTR_NAME_H
