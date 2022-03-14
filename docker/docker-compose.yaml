@@ -5,3 +5,8 @@ services:
       context: ..
       dockerfile: ./docker/Dockerfile
     image: robocomp/cortex
+  cortex_remote:
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile.remote
+    image: robocomp/cortex
