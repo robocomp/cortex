@@ -1,6 +1,7 @@
-#! bin/bash 
-#Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
+#!/bin/bash 
+# Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
 
+sudo apt install cmake sudo 
 sudo apt install libasio-dev
 sudo apt install libtinyxml2-dev 
 sudo apt install libopencv-dev
@@ -47,4 +48,7 @@ cmake ..
 cmake --build . 
 sudo make install
 sudo ldconfig
+
+echo "installing threadpool.h"
+(curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
 

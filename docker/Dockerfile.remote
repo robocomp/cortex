@@ -7,7 +7,6 @@ RUN echo "Building with branch $Branch"
 # Disable Prompt During Packages Installation
 ARG DEBIAN_FRONTEND=noninteractive
 
-COPY . /cortex/
 # Update Ubuntu Software repository
 RUN apt update && apt install -y \
     cmake \
@@ -21,7 +20,6 @@ RUN apt update && apt install -y \
     sudo \ 
     git 
 #    && rm -rf /var/lib/apt/lists/*
+RUN curl -o- -L https://raw.githubusercontent.com/robocomp/cortex/development/installation.sh | bash -x
 WORKDIR /cortex/
-RUN (curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
-RUN bash -x installation.sh  
 
