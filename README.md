@@ -65,7 +65,8 @@ Conceptually, the DSR represents a network of entities and relations among them.
 
 > This documentation describes the classes that allow the creation of agents to use this Deep State Representation.
 
-# Installation
+# Installation  
+You can take a look into the [installation script](installation.sh) and execute it or you can do the steps described bellow.
 
 ## Dependencies
 
