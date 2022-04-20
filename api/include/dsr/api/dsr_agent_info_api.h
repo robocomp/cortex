@@ -11,7 +11,6 @@
 #include <dsr/api/dsr_api.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
-#include <QtCore>
 
 namespace DSR {
 

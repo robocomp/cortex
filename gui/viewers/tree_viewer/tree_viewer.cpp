@@ -1,5 +1,6 @@
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
+#include <qmat/QMatAll>
 #include <QTreeWidget>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
@@ -188,8 +189,8 @@ void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, st
 	case 1: {
 		QSpinBox* spin = new QSpinBox();
 		spin->setReadOnly(true);
-		spin->setMinimum(-10000);
-		spin->setMaximum(10000);
+		spin->setMinimum(-1000000);
+		spin->setMaximum(1000000);
 		spin->setValue(value.dec());
 		this->setItemWidget(q_attr, 1, spin);
 
@@ -198,8 +199,8 @@ void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, st
 	case 2: {
 		QDoubleSpinBox* spin = new QDoubleSpinBox();
 		spin->setReadOnly(true);
-		spin->setMinimum(-10000);
-		spin->setMaximum(10000);
+		spin->setMinimum(-1000000);
+		spin->setMaximum(1000000);
 		spin->setValue(std::round(static_cast<double>(value.fl())*1000000)/1000000);
 		this->setItemWidget(q_attr, 1, spin);
 	}
@@ -212,8 +213,8 @@ void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, st
 			for (std::size_t i = 0; i<value.float_vec().size(); ++i) {
 				QDoubleSpinBox* spin = new QDoubleSpinBox();
 				spin->setReadOnly(true);
-				spin->setMinimum(-10000);
-				spin->setMaximum(10000);
+				spin->setMinimum(-1000000);
+				spin->setMaximum(1000000);
 				spin->setValue(value.float_vec()[i]);
 				layout->addWidget(spin);
 			}
@@ -236,8 +237,8 @@ void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, st
 	case 6: {
             QSpinBox* spin = new QSpinBox();
             spin->setReadOnly(true);
-            spin->setMinimum(-10000);
-            spin->setMaximum(10000);
+            spin->setMinimum(-1000000);
+            spin->setMaximum(1000000);
             spin->setValue(value.uint());
             this->setItemWidget(q_attr, 1, spin);
 

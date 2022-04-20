@@ -1,27 +1,18 @@
 # DSR (Deep State Representation)
-- [DSR (Deep State Representation)](#dsr-deep-state-representation)
 - [Description](#description)
 - [Definitions](#definitions)
-- [Installation](#installation)
-  - [Dependencies](#dependencies)
-    - [Step 1](#step-1)
-    - [Step 2](#step-2)
-  - [Installation](#installation-1)
-  - [Common Issues](#common-issues)
-  - [Installing agents](#installing-agents)
+- [Dependencies and Installation](#dependencies-and-installation)
+  * [Installing agents](#installing-agents)
 - [Developer Documentation](#developer-documentation)
-  - [DSR-API (aka G-API)](#dsr-api-aka-g-api)
-  - [PyDSR (Python wrapper for DSR-API)](#pydsr-python-wrapper-for-dsr-api)
-  - [Common examples](#common-examples)
-  - [Predefined names and types](#predefined-names-and-types)
-  - [CORE](#core)
-  - [Auxiliary sub-APIs](#auxiliary-sub-apis)
-    - [RT sub-API](#rt-sub-api)
+  * [DSR-API (aka G-API)](#dsr-api--aka-g-api-)
+  * [CORE](#core)
+  * [Auxiliary sub-APIs](#auxiliary-sub-apis)
+    + [RT sub-API](#rt-sub-api)
       - [Overloaded method using move semantics.](#overloaded-method-using-move-semantics)
-    - [IO sub-API](#io-sub-api)
-    - [Geometric transformations sub-API](#geometric-transformations-sub-api)
-  - [CRDT- API](#crdt--api)
-  - [Node struct](#node-struct)
+    + [IO sub-API](#io-sub-api)
+    + [Innermodel sub-API](#innermodel-sub-api)
+  * [CRDT- API](#crdt--api)
+  * [Node struct](#node-struct)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
@@ -29,10 +20,10 @@
 # Description
 
 CORTEX is a long term effort to build a series of architectural designs around the simple idea 
-of a group of agents that share a distributed, dynamic representation acting as a working memory [(Bustos et al. 2021)](https://robolab.unex.es/wp-content/papercite-data/pdf/proposal-latency-bustos.pdf).
+of a group of agents that share a distributed, dynamic representation acting as a working memory. 
 This data structure is called **Deep State Representation (DSR)** due to the hybrid nature 
 of the managed elements, geometric and symbolic, and concrete (laser data) and abstract (logical predicates).
-This software is the new infrastructure that will help in the creation of CORTEX instances. A CORTEX instance is a set of software components, called _agents_, that share a distributed data structured called (_G_)raph playing the role of a working memory. Agents are C++ or Python programs that can be generated using RoboComp's code generator, _robocompdsl_.  Agents are created with an instance of the FastRTPS middleware (DDS implementation by eProsima) configured in reliable multicast mode. On top of this middleware, each agent holds a local copy of the graph G that can be edited through a simple API, the G API. By using a technology known as *Conflict-Free Replicated Data Types* [(Shapiro et al](https://pages.lip6.fr/Marc.Shapiro/papers/RR-7687.pdf), [Lars Hupel's homepage)](https://lars.hupel.info/topics/crdt/01-intro/), any edition on the local graph is transmited to all other agents' copies, where the changes are updated. We do not assume that there is a common clock shared by the agents, and messages can be outordered during transmission. Even though, the ensemble acquires the property of *eventual consistency*. This property entails that all copies, being different at any given moment, will converge to the exact same state in a finite amount of time, after all agents stop editing the graph. With _delta mutators_, modifications made to G by an agent are propagated to all others and integrated in their respective copies. This occurs even if the network cannot guarantee that each packet is delivered exactly once, _causal broadcast_. 
+This software is the new infrastructure that will help in the creation of CORTEX instances. A CORTEX instance is a set of software components, called _agents_, that share a distributed data structured called (_G_)raph playing the role of a working memory. Agents are C++ programs that can be generated using RoboComp's code generator, _robocompdsl_.  Agents are created with an instance of the FastRTPS middleware (by eProsima) configured in reliable multicast mode. A standard graph data structure is defined using FastRTPS's IDL and converted into a C++ class that is part of the agent's core. This class is extended using the _delta mutators_ [CRDT](https://github.com/CBaquero/delta-enabled-crdts) code kindly provided by Carlos Baquero. With this added functionality, all the copies of G held by the participating agents acquire the property of _eventual consistency_. This property entails that all copies, being different at any given moment, will converge to the exact same state in a finite amount of time, after all agents stop editing the graph. With _delta mutators_, modifications made to G by an agent are propagated to all others and integrated in their respective copies. This occurs even if the network cannot guarantee that each packet is delivered exactly once, _causal broadcast_. Note that if operations on the graph were transmitted instead of changes in state, then _exactly once_ semantics would be needed.  Finally, the resulting local graph _G_ is used by the developer through a carefully designed thread safe API, _G_API_.
 
 <img src="https://user-images.githubusercontent.com/5784096/90373871-e3257d80-e072-11ea-9933-0392ea9ae7f1.png" width="800">
 
@@ -65,8 +56,7 @@ Conceptually, the DSR represents a network of entities and relations among them.
 
 > This documentation describes the classes that allow the creation of agents to use this Deep State Representation.
 
-# Installation  
-You can take a look into the [installation script](installation.sh) and execute it or you can do the steps described bellow.
+# Installation
 
 ## Dependencies
 
@@ -202,7 +192,6 @@ If you want to install the existing agents you can clone the [dsr-graph](https:/
 
 
 # Developer Documentation
-
 ## DSR-API (aka G-API)
 G-API is the user-level access layer to G. It is composed by a set of core methods that access the underlying CRDT and RTPS APIs, and an extendable  set of auxiliary methods added to simplify the user coding tasks. 
 
@@ -218,10 +207,6 @@ The most important features of the G-API are:
 -   To create a new node, a unique identifier is needed. To guarantee this requirement, the node creation method places a RPC call to the special agent idserver, using standard RoboComp communication methods. Idserver returns a unique id that can be safely added to the new node.
 
 -   G can be serialized to a JSON file from any agent but it is better to do it only from the idserver agent, to avoid the spreading of copies of the graph in different states.
-
-## PyDSR (Python wrapper for DSR-API)
-
-Have a look at [PyDSR documentation page](python-wrapper/index.md).
 
 
 ## Common examples
@@ -473,7 +458,7 @@ std::optional<std::map<EdgeKey, Edge>> get_edges(int id);
 
 ### RT sub-API
 
-These methods provide specialized access to RT edges, which are standard rotation plus translation encodings: euler angles (XYZ-righthand) and 3D vector translation.
+These methods provide specialized access to RT edges.
 
 The api has to be instantiated with: `auto rt = G->get_rt_api()`;
 
@@ -554,11 +539,11 @@ void read_from_json_file(const std::string &file) const;
 &nbsp;
   
 
-### Geometric transformations sub-API
+### Innermodel sub-API
 
-The methods in this API compute transformation matrices between distant nodes in the RT tree, that is embedded in G. The transformation matrix responds to the following question: how is a point defined in B’s reference frame, seen from A’s reference frame? The target, A, reference frame is the first argument and the origin reference frame, B, the last. The middle argument is the point to be transformed and defined in A. When omitted, the point is taken as (0,0,0).
+These methods compute transformation matrices between distant nodes in the so-called RT- tree that is embedded in G. The transformation matrix responds to the following question: how is a point defined in A’s reference frame, seen from B’s reference frame? It also provides backwards compatibility with RobComp’s InnerModel system.
 
-The api has to be instantiated with: `auto inner_eigen = G->get_inner_eigen_api();`
+The api has to be instantiated with: `auto inner = G->get_inner_api();`
 
 &nbsp;
 ```c++

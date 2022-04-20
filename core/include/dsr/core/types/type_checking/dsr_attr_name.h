@@ -20,6 +20,7 @@
 #include <dsr/core/types/crdt_types.h>
 #include <dsr/core/types/user_types.h>
 #include "type_checker.h"
+#include <qmat/QMatAll>
 
 
 // Attributes
@@ -134,6 +135,7 @@ REGISTER_TYPE(is_ready, bool, false)
 REGISTER_TYPE(person_name, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(person_role, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(person_age, int, false)
+REGISTER_TYPE(person_velocity, std::vector<float>, false)
 
 /*
  * Personal Space
@@ -158,6 +160,7 @@ REGISTER_TYPE(obj_interaction_shape, std::reference_wrapper<const std::string>, 
 REGISTER_TYPE(obj_visible, int, false)
 REGISTER_TYPE(projected_bounding_box, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(unseen_time, int, false)
+REGISTER_TYPE(average_size, std::reference_wrapper<const std::string>, false)
 /*
  * Object affordances
  * 
@@ -406,6 +409,6 @@ REGISTER_TYPE(test_vec6_type, std::reference_wrapper<const vec6> , false)
 *COMPRESSED
 */
 REGISTER_TYPE(compresssed_id, int, false)
-REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uint8_t>>, false)
+REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uchar>>, false)
 
 #endif //DSR_ATTR_NAME_H

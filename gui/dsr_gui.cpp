@@ -16,6 +16,7 @@
 
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
+#include <qmat/QMatAll>
 #include <QDesktopWidget>
 #include <QGLViewer/qglviewer.h>
 #include <QApplication>
