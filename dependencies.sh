@@ -1,5 +1,5 @@
-#! bin/bash 
-#Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
+#!/bin/bash 
+# Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
 
 sudo apt install libasio-dev
 sudo apt install libtinyxml2-dev 
@@ -48,10 +48,4 @@ cmake --build .
 sudo make install
 sudo ldconfig
 
-cd ~/robocomp/classes/dsr/
-mkdir build
-cd build
-cmake ..
-make -j$(nproc)
-sudo make install
-sudo ldconfig
+
