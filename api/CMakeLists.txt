@@ -58,7 +58,6 @@ target_link_libraries(dsr_api
         fastcdr fastrtps
         osgDB OpenThreads
         Qt5::Core
-        Robocomp::qmat Robocomp::dsr_core
         PUBLIC
         Eigen3::Eigen
         ${QT_GEOM}
@@ -100,7 +99,7 @@ install(DIRECTORY include/dsr DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 # This makes the project importable from the install directory
 # Put config file in per-project dir (name MUST match), can also
 # just go into 'cmake'.
-install(EXPORT dsr_apiConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/dsr_api/  NAMESPACE Robocomp::)
+install(EXPORT dsr_apiConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/dsr_api/  NAMESPACE Cortex::)
 
 # This makes the project importable from the build directory
 export(TARGETS dsr_api FILE dsr_apiConfig.cmake)
