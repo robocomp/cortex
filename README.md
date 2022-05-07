@@ -186,12 +186,13 @@ sudo ldconfig
         pip install opencv-python-headless
         ```
 
-## Tutorial on creating my first agent
-path_to_tutorial
+## Tutorials to start creating agents and using existing configurations
+	
+[CORTEX Tutorials] https://github.com/robocomp/cortex/tree/development/tutorials
 	
 
-## Installing agents
-If you want to install the existing agents you can clone the [dsr-graph](https://github.com/robocomp/dsr-graph) repository and read the related documentation.
+## Installing existing agents from the RoboComp repository
+If you want to install and try some existing agents you can clone the [dsr-graph](https://github.com/robocomp/dsr-graph) repository and read the related documentation. Note that agents always are part of a CORTEX configuration. 
 
 
 # Developer Documentation
