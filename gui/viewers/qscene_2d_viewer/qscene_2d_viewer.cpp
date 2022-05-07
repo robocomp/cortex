@@ -149,8 +149,7 @@ void QScene2dViewer::get_2d_projection(const std::string& node_name, std::vector
     {
         for (unsigned int i=0;i< cube_positions.size();i++)
         {
-            //QVec vec = rt.value() * QVec::vec4(size[0]*cube_positions[i][0], size[1]*cube_positions[i][1], size[2]*cube_positions[i][2], 1.0 );
-            Mat::Vector3d vec = rt.value() * Mat::Vector3d (size[0]*cube_positions[i][0], size[1]*cube_positions[i][1], size[2]*cube_positions[i][2] );
+             Mat::Vector3d vec = rt.value() * Mat::Vector3d (size[0]*cube_positions[i][0], size[1]*cube_positions[i][1], size[2]*cube_positions[i][2] );
             polygon_vec.append(QPoint(vec[0], vec[1]));
             if (zvalue < vec[2])
                 zvalue = vec[2];

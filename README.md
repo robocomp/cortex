@@ -220,22 +220,17 @@ auto G = std::make_shared<DSR::DSRGraph>(0, agent_name, agent_id, "", dsrgetid_p
 /*========================================================*/
 /*======== Getting a node and updating attributes ========*/
 
-// Some calculations are done
-zVel = (adv_conv * QVec::vec2(zVel,1.0))[0];  
-rotVel = (rot_conv * QVec::vec2(rotVel,1.0))[0];  
-xVel = (side_conv * QVec::vec2(xVel, 1.0))[0];
-
 // Get the graph node of the robot
 auto robot_node = G->get_node(robot_name);  
 
 // Modify the robot node attributes locally
-G->add_or_modify_attrib_local<ref_adv_speed>(robot_node.value(), (float)xVel);  
-G->add_or_modify_attrib_local<ref_rot_speed>(robot_node.value(), (float)rotVel);  
-G->add_or_modify_attrib_local<ref_side_speed>(robot_node.value(), (float)zVel);  
+float xvel = 2, rotVel = 1, zVel = -1;
+G->add_or_modify_attrib_local<ref_adv_speed>(robot_node.value(), xVel);  
+G->add_or_modify_attrib_local<ref_rot_speed>(robot_node.value(), rotVel);  
+G->add_or_modify_attrib_local<ref_side_speed>(robot_node.value(), zVel);  
 
 // Update the node in the graph to set the modified attributes available
 G->update_node(robot_node.value());
-
 
 
 /*==================================================================*/
@@ -539,30 +534,30 @@ void read_from_json_file(const std::string &file) const;
 &nbsp;
   
 
-### Innermodel sub-API
+### Geometric transformations sub-API using the Eigen library
 
 These methods compute transformation matrices between distant nodes in the so-called RT- tree that is embedded in G. The transformation matrix responds to the following question: how is a point defined in A’s reference frame, seen from B’s reference frame? It also provides backwards compatibility with RobComp’s InnerModel system.
 
-The api has to be instantiated with: `auto inner = G->get_inner_api();`
+The api has to be instantiated with: `auto inner = G->get_inner_eigen_api();`
 
 &nbsp;
 ```c++
-void transformS(std::string to, std::string from);
+Eigen::Vector3f transformS(std::string to, std::string from);
 ```
 
 &nbsp;
 ```c++
-void transformS(const std::string &to, const QVec &point, const std::string &from);
+Eigen::Vector3f transformS(const std::string &to, const Eigen::Vector3f &point, const std::string &from);
 ```
 
 &nbsp;
 ```c++
-void transform(QString to, QString from);
+Eigen::Vector3f transform(QString to, QString from);
 ```
 
 &nbsp;
 ```c++
-void transform(QString to, const QVec &point, QString from);
+Eigen::Vector3f transform(QString to, const Eigen::Vector3f &point, QString from);
 ```
 
 &nbsp;
