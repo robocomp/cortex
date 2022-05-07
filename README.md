@@ -141,7 +141,7 @@ sudo ldconfig
 ```
 
 ## Installation
-Next step is to compile and install the DSR libs. You need to go to ~/robocomp/
+The next step is to compile and install the DSR libs. You need to clone this repo https://github.com/robocomp/cortex under ~/robocomp/components
 and execute this:
 ```bash
 mkdir build
