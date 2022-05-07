@@ -1,4 +1,4 @@
-# DSR (Deep State Representation)
+# CORTEX and DSR (Deep State Representation)
 - [Description](#description)
 - [Definitions](#definitions)
 - [Dependencies and Installation](#dependencies-and-installation)
