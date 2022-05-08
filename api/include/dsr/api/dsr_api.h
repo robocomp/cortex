@@ -17,7 +17,6 @@
 #include <memory>
 #include <vector>
 #include <variant>
-#include <qmat/QMatAll>
 #include <typeinfo>
 #include <optional>
 #include <type_traits>
