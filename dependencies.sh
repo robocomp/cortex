@@ -1,6 +1,7 @@
 #!/bin/bash 
 # Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
 
+sudo apt install -y curl
 sudo apt install qtbase5-dev
 sudo apt-get install -y libopenscenegraph-dev
 sudo apt install libasio-dev
