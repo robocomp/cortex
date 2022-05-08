@@ -20,7 +20,6 @@
 #include <dsr/core/types/crdt_types.h>
 #include <dsr/core/types/user_types.h>
 #include "type_checker.h"
-#include <qmat/QMatAll>
 
 
 // Attributes
