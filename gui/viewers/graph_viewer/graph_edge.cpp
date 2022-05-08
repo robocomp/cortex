@@ -16,7 +16,6 @@
 
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
-#include <qmath.h>
 #include <QPainter>
 #include <QDebug>
 #include <dsr/gui/dsr_gui.h>
