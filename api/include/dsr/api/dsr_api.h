@@ -30,7 +30,6 @@
 #include "dsr/core/types/crdt_types.h"
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/types/translator.h"
-#include "dsr/api/dsr_inner_api.h"
 #include "dsr/api/dsr_agent_info_api.h"
 #include "dsr/api/dsr_inner_eigen_api.h"
 #include "dsr/api/dsr_camera_api.h"
