@@ -348,12 +348,12 @@ class TestInnerAPI(unittest.TestCase):
 
     def test_create_innerapi(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         self.assertIsNotNone(inner)
 
     def test_transform(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         tr = inner.transform("world", "laser",0)
         self.assertIsNotNone(tr)
         tr = inner.transform("world", [1.1, 3.3, 6.6], "laser",0)
@@ -361,7 +361,7 @@ class TestInnerAPI(unittest.TestCase):
 
     def test_transform_axis(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         tr = inner.transform_axis("world", "laser",0)
         self.assertIsNotNone(tr)
         tr = inner.transform_axis("world", [1.1, 3.3, 6.6, 0.0 , 0.0, 0.0], "laser",0)
@@ -369,25 +369,25 @@ class TestInnerAPI(unittest.TestCase):
 
     def test_get_transformation_matrix(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         tr_matrix = inner.transform_axis("world", "laser",0)
         self.assertIsNotNone(tr_matrix)
 
     def test_get_rotation_matrix(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         rot = inner.get_rotation_matrix("world", "laser",0)
         self.assertIsNotNone(rot)
 
     def test_get_translation_vector(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         trans = inner.get_translation_vector("world", "laser",0)
         self.assertIsNotNone(trans)
 
     def test_get_euler_xyz_angles(self):
         g = DSRGraph(int(0), "Prueba", int(12), os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"), True)
-        inner = inner_api(g)
+        inner = inner_eigen_api(g)
         angles = inner.get_euler_xyz_angles("world", "laser", 0)
         self.assertIsNotNone(angles)
 
