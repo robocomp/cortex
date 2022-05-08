@@ -8,11 +8,11 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2.0.0
-    - name: Dependencies
-      run: bash ./dependencies.sh
-      shell: bash
     - name: threadpool
       run: bash (curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
+      shell: bash
+    - name: Dependencies
+      run: bash ./dependencies.sh
       shell: bash
     - name: Build project
       uses: nicledomaS/cmake_build_action@v1.4
