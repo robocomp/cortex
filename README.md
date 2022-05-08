@@ -1,3 +1,6 @@
+[![Build](https://github.com/robocomp/cortex/actions/workflows/build_artifacts.yaml/badge.svg)](https://github.com/robocomp/cortex/actions/workflows/build_artifacts.yaml)
+
+
 # CORTEX and DSR (Deep State Representation)
 - [Description](#description)
 - [Definitions](#definitions)
