@@ -6,12 +6,12 @@ jobs:
   ubuntu-build:
     runs-on: ubuntu-latest
     steps:
-    - name: Dependencies
-      run: sudo curl -sL https://raw.githubusercontent.com/robocomp/robocomp/development/tools/install/resources/robocomp_prerequisites_install.sh | bash -s 
-    - name: Eigen
-      run: sudo ln -s /usr/include/eigen3/Eigen/ /usr/include/Eigen
     - name: Checkout
       uses: actions/checkout@v2.0.0
+    - name: Dependencies
+      run: sudo bash -s dependencies.sh
+    - name: Installation
+      run: sudo 
     - name: Build project
       uses: nicledomaS/cmake_build_action@v1.4
       with:
