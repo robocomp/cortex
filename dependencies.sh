@@ -2,6 +2,7 @@
 # Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
 
 sudo apt install -y curl
+sudo (curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
 sudo apt install qtbase5-dev
 sudo apt-get install -y libopenscenegraph-dev
 sudo apt install libasio-dev
@@ -15,7 +16,6 @@ sudo apt install cmake gcc-10 g++-10
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
 
-sudo bash (curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
 
 echo "Installing third-party software cppitertools"
 sudo git clone https://github.com/ryanhaining/cppitertools /usr/local/include/cppitertools
