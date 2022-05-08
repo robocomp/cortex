@@ -1,4 +1,4 @@
-# DSR (Deep State Representation)
+# CORTEX and DSR (Deep State Representation)
 - [Description](#description)
 - [Definitions](#definitions)
 - [Dependencies and Installation](#dependencies-and-installation)
@@ -140,8 +140,8 @@ Update the system cache of dynamic libraries with
 sudo ldconfig
 ```
 
-## Installation
-Next step is to compile and install the DSR libs. You need to go to ~/robocomp/
+### Step 3
+The next step is to compile and install the DSR libs. You need to clone this repo https://github.com/robocomp/cortex under ~/robocomp/components
 and execute this:
 ```bash
 mkdir build
@@ -186,9 +186,13 @@ sudo ldconfig
         pip install opencv-python-headless
         ```
 
+## Tutorials to start creating agents and using existing configurations
+	
+[CORTEX Tutorials] https://github.com/robocomp/cortex/tree/development/tutorials
+	
 
-## Installing agents
-If you want to install the existing agents you can clone the [dsr-graph](https://github.com/robocomp/dsr-graph) repository and read the related documentation.
+## Installing existing agents from the RoboComp repository
+If you want to install and try some existing agents you can clone the [dsr-graph](https://github.com/robocomp/dsr-graph) repository and read the related documentation. Note that agents always are part of a CORTEX configuration. 
 
 
 # Developer Documentation
