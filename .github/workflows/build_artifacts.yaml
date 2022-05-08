@@ -9,7 +9,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2.0.0
     - name: Dependencies
-      run: sudo bash -s $GITHUB_WORKSPACE/cortex/dependencies.sh
+      run: ./dependencies.sh
+      shell: bash
     - name: Build project
       uses: nicledomaS/cmake_build_action@v1.4
       with:
