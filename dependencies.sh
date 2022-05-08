@@ -2,7 +2,7 @@
 # Please make sure that bin/bash is the location of your bash terminal,if not please replace with your local machine's bash path
 
 sudo apt install -y curl
-sudo (curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
+curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && sudo mkdir -p /usr/include/threadpool && sudo mv threadpool.h /usr/include/threadpool
 sudo apt install qtbase5-dev
 sudo apt-get install -y libopenscenegraph-dev
 sudo apt install libasio-dev
