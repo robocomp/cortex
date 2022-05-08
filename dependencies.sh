@@ -15,6 +15,8 @@ sudo apt install cmake gcc-10 g++-10
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
 
+sudo bash (curl -O https://raw.githubusercontent.com/robocomp/robocomp/development/classes/threadpool/threadpool.h && mkdir -p /usr/include/threadpool && mv threadpool.h /usr/include/threadpool )
+
 echo "Installing third-party software cppitertools"
 sudo git clone https://github.com/ryanhaining/cppitertools /usr/local/include/cppitertools
 cd /usr/local/include/cppitertools
