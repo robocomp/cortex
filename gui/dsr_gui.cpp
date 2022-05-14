@@ -30,7 +30,6 @@
 #include <cstdio>
 #include <cstring>
 #include "sys/times.h"
-#include "sys/vtimes.h"
 
 using namespace DSR;
 
@@ -302,7 +301,7 @@ void DSRViewer::initialize_views(int options, view central){
 		forcesMenu->addAction(new_action);
 		connect(new_action, &QAction::triggered, this, [this](bool state)
 		{
-			qobject_cast<GraphViewer*>(widgets_by_type[view::graph]->widget)->toggle_animation(state==true);
+			qobject_cast<GraphViewer*>(widgets_by_type[view::graph]->widget)->toggle_animation(state);
 		});
 	}
 
@@ -576,8 +575,8 @@ float DSRViewer::get_external_hz() const
 {
     return external_hz;
 }
-void DSRViewer::set_external_hz(float external_hz)
+void DSRViewer::set_external_hz(float external_hz_)
 {
-    this->external_hz = external_hz;
+    this->external_hz = external_hz_;
 }
 

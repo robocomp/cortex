@@ -52,6 +52,8 @@ REGISTER_EDGE_TYPE(interactive)
 REGISTER_EDGE_TYPE(thinks)
 REGISTER_EDGE_TYPE(goto_action)
 REGISTER_EDGE_TYPE(attention_action)
+REGISTER_EDGE_TYPE(following)
+REGISTER_EDGE_TYPE(lost)
 REGISTER_EDGE_TYPE(testtype_e)
 
 #endif //DSR_EDGE_TYPE_H

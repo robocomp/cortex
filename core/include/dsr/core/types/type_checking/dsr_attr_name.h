@@ -135,6 +135,13 @@ REGISTER_TYPE(person_name, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(person_role, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(person_age, int, false)
 REGISTER_TYPE(person_velocity, std::vector<float>, false)
+REGISTER_TYPE(is_followed, bool, false)
+REGISTER_TYPE(is_lost, bool, false)
+REGISTER_TYPE(person_image, std::reference_wrapper<const std::vector<uint8_t>>, true)
+REGISTER_TYPE(person_image_width, int, true)
+REGISTER_TYPE(person_image_height, int, true)
+REGISTER_TYPE(person_pixel_x, int, true)
+REGISTER_TYPE(person_pixel_y, int, true)
 
 /*
  * Personal Space

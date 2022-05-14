@@ -21,12 +21,10 @@
 #include <QDebug>
 #include <dsr/gui/dsr_gui.h>
 #include <QGraphicsSceneMouseEvent>
-#include <iostream>
 #include <cppitertools/range.hpp>
 #include <dsr/gui/viewers/graph_viewer/graph_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge_widget.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge_rt_widget.h>
-//#include <dsr/gui/viewers/graph_viewer/edge_colors.h>
 
 GraphEdge::GraphEdge(GraphNode* sourceNode, GraphNode* destNode, const QString& edge_name)
         :QGraphicsLineItem(), arrowSize(10)

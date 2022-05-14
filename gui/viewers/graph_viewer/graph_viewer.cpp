@@ -1,6 +1,5 @@
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
-#include <QTableWidget>
 #include <QApplication>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>

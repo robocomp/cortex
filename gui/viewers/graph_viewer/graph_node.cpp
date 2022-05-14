@@ -318,7 +318,7 @@ void GraphNode::set_color(const std::string &plain)
 /////////////////////////////////////////////////////////////////////////////////////////7
 ////
 /////////////////////////////////////////////////////////////////////////////////////////
-void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type)
+void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type_)
 {
     if (node_id != this->id_in_graph)
         return;
