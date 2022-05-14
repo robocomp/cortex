@@ -112,7 +112,7 @@ private:
     QPoint * object_position;
     uint64_t object_id;
     float external_fps=-1;
-    float external_hz=-1;
+    float external_hz=1;     //default is active 
     std::map<uint64_t, std::string> agents_names;
     std::map<std::string, LedWidget*> agents_leds;
     QWidget *m_stBar2; 

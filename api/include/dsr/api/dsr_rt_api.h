@@ -2,8 +2,7 @@
 #define RTAPI
 
 #include <cassert>
-#include <QObject>
-#include <qmat/QMatAll>
+#include <QtCore>
 #include <dsr/core/topics/IDLGraphPubSubTypes.h>
 #include <dsr/core/types/user_types.h>
 #include <dsr/core/types/type_checking/dsr_attr_name.h>

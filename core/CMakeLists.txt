@@ -67,7 +67,8 @@ set_target_properties(dsr_core PROPERTIES
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ON)
 
-target_compile_options(dsr_core PUBLIC -g -fmax-errors=5 -std=c++20 )
+target_compile_options(dsr_core PUBLIC -g -fmax-errors=5 -std=c++20 -fno-char8_t
+	)
 
 # 'make install' to the correct locations (provided by GNUInstallDirs).
 install(TARGETS dsr_core EXPORT dsr_coreConfig

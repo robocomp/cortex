@@ -53,7 +53,7 @@ target_link_libraries(dsr_gui
         Qt5::Widgets Qt5::Xml
         Eigen3::Eigen
         fastcdr
-        osgDB osgGA OpenThreads
+        osgViewer osgDB osgGA OpenThreads
         PUBLIC
         Qt5::OpenGL
         fastrtps
@@ -76,7 +76,7 @@ set_target_properties(dsr_gui
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ON)
 
-target_compile_options(dsr_gui PUBLIC -g -fmax-errors=5 -std=c++20 )
+target_compile_options(dsr_gui PUBLIC -g -fmax-errors=5 -std=c++20 -fno-char8_t)
 
 # 'make install' to the correct locations (provided by GNUInstallDirs).
 install(TARGETS dsr_gui EXPORT dsr_guiConfig

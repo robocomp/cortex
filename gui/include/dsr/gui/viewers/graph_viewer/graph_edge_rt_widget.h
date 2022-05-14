@@ -88,7 +88,7 @@ public:
                     }
                     vbox->addLayout(hlayout);
                 }
-                std::cout<<"size"<<pos<<std::endl;
+                //std::cout<<"size"<<pos<<std::endl;
             }
             qDebug()<<__FUNCTION__ <<"update combo";
             update_combo(references_cb->currentText());
@@ -150,11 +150,11 @@ public slots:
             }
         }
         else
-            std::cout<<"Error retriving RT data"<<std::endl;
+            std::cout<<__FUNCTION__<<"Error retriving RT data"<<std::endl;
     };
     void add_or_assign_edge_slot( std::uint64_t from,  std::uint64_t to, const std::string& edge_type)
     {
-        std::cout<<"edge-"<<edge_type<<std::endl;
+        std::cout<<__FUNCTION__<<"edge-"<<edge_type<<std::endl;
         if(edge_type == "RT" or edge_type == "looking-at")
         {
             std::optional<Node> from_node = graph->get_node(from);
@@ -190,7 +190,7 @@ public slots:
                         const double &value_d = value * 180 / M_PI;
                         attrib_widgets[3 + pos]->setText(QString::number(value_d));
                     }
-                    std::cout<<"print values"<<rotation.value()<<translation.value()<<std::endl;
+                    //std::cout<<"print values"<<rotation.value()<<translation.value()<<std::endl;
                 }
             }
         }

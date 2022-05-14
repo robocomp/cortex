@@ -1,6 +1,5 @@
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
-#include <qmat/QMatAll>
 #include <QTableWidget>
 #include <QApplication>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
@@ -139,11 +138,16 @@ void GraphViewer::timerEvent(QTimerEvent *event)
 //////////////////////////////////////////////////////////////////////////////////////
 void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
 {
+    static std::random_device rd;
+    static std::mt19937 mt(rd());
+    static std::uniform_real_distribution<double> unif_dist(-300, 300);
+
     GraphNode *gnode;
     auto name_op = G->get_name_from_id(id);
     auto name = name_op.value_or("No_name");
 	std::optional<Node> n = G->get_node(id);
-    if (n.has_value()) {
+    if (n.has_value())
+    {
         if (gmap.count(id) == 0)    // if node does not exist, create it
         {
             qDebug()<<__FUNCTION__<<"##### New node";
@@ -161,24 +165,20 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
             gnode = gmap.at(id);
 		}
 		gnode->change_detected();
-        float posx = 10;
-        float posy = 10;
-        try
-        {
-            posx = G->get_attrib_by_name<pos_x_att>(n.value()).value_or(10);
-            posy = G->get_attrib_by_name<pos_y_att>(n.value()).value_or(10);
-        }
-        catch (const std::exception &e) {
-            auto rd = QVec::uniformVector(2, -200, 200);
-            posx = rd.x();
-            posy = rd.y();
-        }
+        float posx, posy;
+        if(auto px = G->get_attrib_by_name<pos_x_att>(n.value()); px.has_value())
+            posx = px.value();
+        else
+            posx = unif_dist(mt);
+        if(auto py = G->get_attrib_by_name<pos_y_att>(n.value()); py.has_value())
+            posy = py.value();
+        else
+            posy = unif_dist(mt);
         // Avoid to move if it's in the same position or if the node is grabbed
         if ((posx != gnode->x() or posy != gnode->y()) and gnode != scene.mouseGrabberItem()) {
 			qDebug()<<__FUNCTION__<<"##### posx "<<posx<<" != gnode->x() "<<gnode->x()<<" or posy "<<posy<<" != gnode->y() "<<gnode->y();
 			gnode->setPos(posx, posy);
 		}
-
         //emit G->update_node_attr_signal(id, {});
     }
 }
