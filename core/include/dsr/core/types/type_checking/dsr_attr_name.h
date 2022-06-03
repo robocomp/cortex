@@ -353,6 +353,16 @@ REGISTER_TYPE(imu_sensor_tick, float, false)
 
 
 /*
+ * SERVO
+ * */
+
+REGISTER_TYPE(servo_ref_pos, float, false)
+REGISTER_TYPE(servo_ref_speed, float, false)
+REGISTER_TYPE(servo_pos, float, false)
+REGISTER_TYPE(servo_speed, float, false)
+REGISTER_TYPE(servo_moving, bool, false)
+	
+/*
  * Agents
  * */
 REGISTER_TYPE(timestamp_agent, uint64_t, false)
