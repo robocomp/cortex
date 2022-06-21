@@ -29,6 +29,7 @@ static const double force_velocity_factor = 150.0;
 #include <QDialog>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMessageBox>
 #include <utility>
 #include <cppitertools/zip.hpp>
 
@@ -104,7 +105,9 @@ public slots:
     //void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
     void show_node_widget(const std::string &show_type= "table");
     void update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type_);
-
+    void delete_node();
+signals:
+    void del_node_signal(uint64_t id);
 };
 //Q_DECLARE_METATYPE(DSR::Node);
 #endif // GRAPHNODE_H

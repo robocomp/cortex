@@ -33,6 +33,16 @@ GraphNode::GraphNode(const std::shared_ptr<DSR::GraphViewer>&
     setZValue(-1);
     node_brush.setStyle(Qt::SolidPattern);
 
+    // context menu
+    contextMenu = new QMenu();
+    QAction *delete_node = new QAction("Delete node");
+    contextMenu->addAction(delete_node);
+    connect(delete_node, &QAction::triggered, this, [this](){ this->delete_node();});
+    QAction *table_action = new QAction("View table");
+    contextMenu->addAction(table_action);
+    connect(table_action, &QAction::triggered, this, [this](){ this->show_node_widget("table");});
+
+
     animation = new QPropertyAnimation(this, "node_color");
 	animation->setDuration(animation_time);
 	animation->setStartValue(plain_color);
@@ -54,10 +64,6 @@ void GraphNode::setType(const std::string &type_)
     type = type_;
     if(type == "laser" or type == "rgbd" or type == "person")
     {
-        contextMenu = new QMenu();
-        QAction *table_action = new QAction("View table");
-        contextMenu->addAction(table_action);
-        connect(table_action, &QAction::triggered, this, [this](){ this->show_node_widget("table");});
         QAction *stuff_action = new QAction("View data");
         contextMenu->addAction(stuff_action);
         connect(stuff_action, &QAction::triggered, this, [this, type_](){ this->show_node_widget(type_);});
@@ -244,10 +250,11 @@ void GraphNode::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 //    animation->start();
     if( event->button()== Qt::RightButton)
     {
-        if (contextMenu != nullptr)
-            contextMenu->exec(event->screenPos());
-        else
-            show_node_widget("table");
+// always show menu to allow delete
+//        if (contextMenu != nullptr)
+        contextMenu->exec(event->screenPos());
+//        else
+//            show_node_widget("table");
     }
 //    update();
     QGraphicsEllipseItem::mouseDoubleClickEvent(event);
@@ -318,6 +325,21 @@ void GraphNode::set_color(const std::string &plain)
 /////////////////////////////////////////////////////////////////////////////////////////7
 ////
 /////////////////////////////////////////////////////////////////////////////////////////
+void GraphNode::delete_node()
+{
+    std::cout << "Delete node" << id_in_graph <<  std::endl;
+    //show confirmation dialog
+    QMessageBox msgBox;
+    msgBox.setText("Are you sure you want to delete node?");
+    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    msgBox.setDefaultButton(QMessageBox::No);
+    int reply = msgBox.exec();
+    if (reply == QMessageBox::Yes) {
+        emit del_node_signal(id_in_graph);
+    }
+}
+
+
 void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type_)
 {
     if (node_id != this->id_in_graph)

@@ -50,12 +50,12 @@ namespace DSR
             void add_or_assign_node_SLOT(std::uint64_t id, const std::string &type);
             void add_or_assign_edge_SLOT(std::uint64_t from, std::uint64_t to, const std::string& type);
 			void del_edge_SLOT(std::uint64_t from, std::uint64_t to,  const std::string &edge_tag);
-			void del_node_SLOT(uint64_t id);
+			void del_node_SLOT(uint64_t id);  // remove node from visual graph
 			void hide_show_node_SLOT(uint64_t id, bool visible);
 			// Others
 			void toggle_animation(bool state);
 			void reload(QWidget * widget);
-
+            void remove_node_SLOT(uint64_t id);  // remove node from DSR
 
         protected:
             std::shared_ptr<DSR::DSRGraph> G;

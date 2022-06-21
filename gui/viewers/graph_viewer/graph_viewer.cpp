@@ -191,6 +191,8 @@ GraphNode* GraphViewer::new_visual_node(uint64_t id, const std::string &type, co
     tag += debug?" [" + std::to_string(id) + "]":"";
     gnode->setTag(tag);
     scene.addItem(gnode);
+    // connect delete signal
+    QObject::connect(gnode, &GraphNode::del_node_signal, this, &GraphViewer::remove_node_SLOT, Qt::QueuedConnection);
     return gnode;
 }
 
@@ -261,7 +263,7 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
 
 }
 
-
+// remove node from scene
 void GraphViewer::del_node_SLOT(uint64_t id)
 {
     qDebug()<<__FUNCTION__<<":"<<__LINE__;
@@ -315,4 +317,11 @@ void GraphViewer::reload(QWidget * widget)
 void GraphViewer::showContextMenu(QMouseEvent *event)
 {
     contextMenu->exec(event->globalPos());
+}
+
+// remove node from DSR
+void GraphViewer::remove_node_SLOT(uint64_t node_id)
+{
+    std::cout << "Remove node in graph_viewer class"<<node_id <<std::endl;
+    G->delete_node(node_id);
 }
