@@ -5,6 +5,7 @@
 #include <dsr/core/topics/IDLGraphPubSubTypes.h>
 #include <dsr/api/dsr_eigen_defs.h>
 #include <dsr/api/dsr_rt_api.h>
+#include <optional>
 
 namespace DSR
 {

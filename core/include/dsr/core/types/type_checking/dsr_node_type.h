@@ -24,9 +24,6 @@ struct NodeType {
                                 using x##_node_type = NodeType< x##_type_str >;                      \
                                 \
 
-//typedef NodeType< x##_type_str> x##_type
-
-
 inline std::unordered_set<std::string_view> node_types::set_type_;
 
 

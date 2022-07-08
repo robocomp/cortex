@@ -16,10 +16,10 @@
 namespace DSR {
     static constexpr std::array<std::string_view, 14> TYPENAMES_UNION =
             { "STRING", "INT", "FLOAT",
-          "FLOAT_VEC", "BOOL", "BYTE_VEC",
-          "UINT","UINT64", "DOUBLE",
-          "UINT64_VEC", "FLOAT_VEC2", "FLOAT_VEC3",
-        "FLOAT_VEC4", "FLOAT_VEC6"};
+            "FLOAT_VEC", "BOOL", "BYTE_VEC",
+            "UINT","UINT64", "DOUBLE",
+            "UINT64_VEC", "FLOAT_VEC2", "FLOAT_VEC3",
+            "FLOAT_VEC4", "FLOAT_VEC6"};
 
     using ValType = std::variant<std::string, int32_t, float,
             std::vector<float>, bool, std::vector<uint8_t>,
@@ -53,8 +53,8 @@ namespace DSR {
         Attribute() = default;
         ~Attribute() = default;
 
-        Attribute(const ValType &value_, uint64_t timestamp_, uint32_t agent_id_)
-                : m_value(ValType(value_)), m_timestamp(timestamp_), m_agent_id(agent_id_)
+        Attribute(const ValType &value, uint64_t timestamp, uint32_t agent_id)
+                : m_value(ValType(value)), m_timestamp(timestamp), m_agent_id(agent_id)
         {}
 
         Attribute (const Attribute& attr)
@@ -78,7 +78,7 @@ namespace DSR {
             m_agent_id = x.agent_id();
         }
 
-        Attribute& operator= (const Attribute& attr )
+        Attribute& operator= (const Attribute& attr)
         {
             m_timestamp = attr.timestamp();
             m_agent_id = attr.agent_id();
@@ -102,9 +102,9 @@ namespace DSR {
             return *this;
         }
 
-        [[nodiscard]] IDL::Val toIDLVal();
+        [[nodiscard]] IDL::Val to_IDL_val();
 
-        [[nodiscard]] IDL::Attrib toIDLAttrib();
+        [[nodiscard]] IDL::Attrib to_IDL_attrib();
 
         ///////////////////////
         // Members
@@ -116,16 +116,16 @@ namespace DSR {
 
         [[nodiscard]] uint32_t agent_id() const;
 
-        void agent_id(uint32_t mAgentId);
+        void agent_id(uint32_t agent_id);
 
         [[nodiscard]] std::size_t selected() const;
 
         ///////////////////////
         // Variant
         //////////////////////
-        void value(const ValType &mValue);
+        void value(const ValType &value);
 
-        void value(ValType &&mValue);
+        void value(ValType &&value);
 
         [[nodiscard]] const ValType &value() const;
 
@@ -138,51 +138,51 @@ namespace DSR {
 
         [[nodiscard]] const std::string &str() const;
 
-        void str(const std::string &_str);
+        void str(const std::string &str);
 
-        void str(std::string &&_str);
+        void str(std::string &&str);
 
         ///////////////////////
         // int32
         //////////////////////
-        void dec(int32_t _dec);
+        void dec(int32_t dec);
 
         [[nodiscard]] int32_t dec() const;
 
         ///////////////////////
         // uint32
         //////////////////////
-        void uint(uint32_t _uint);
+        void uint(uint32_t uint);
 
         [[nodiscard]] uint32_t uint() const;
 
         ///////////////////////
         // uint64
         //////////////////////
-        void uint64(uint64_t _uint);
+        void uint64(uint64_t uint);
 
         [[nodiscard]] uint64_t uint64() const;
 
         ///////////////////////
         // float
         //////////////////////
-        void fl(float _fl);
+        void fl(float fl);
 
         [[nodiscard]] float fl() const;
 
         ///////////////////////
         // double
         //////////////////////
-        void dob(double _dob);
+        void dob(double dob);
 
         [[nodiscard]] double dob() const;
 
         ///////////////////////
         // vector<float>
         //////////////////////
-        void float_vec(const std::vector<float> &_float_vec);
+        void float_vec(const std::vector<float> &float_vec);
 
-        void float_vec(std::vector<float> &&_float_vec);
+        void float_vec(std::vector<float> &&float_vec);
 
         [[nodiscard]] const std::vector<float> &float_vec() const;
 
@@ -191,16 +191,16 @@ namespace DSR {
         ///////////////////////
         // bool
         //////////////////////
-        void bl(bool _bl);
+        void bl(bool bl);
 
         [[nodiscard]] bool bl() const;
 
         ///////////////////////
         // vector<uint8>
         //////////////////////
-        void byte_vec(const std::vector<uint8_t> &_float_vec);
+        void byte_vec(const std::vector<uint8_t> &float_vec);
 
-        void byte_vec(std::vector<uint8_t> &&_float_vec);
+        void byte_vec(std::vector<uint8_t> &&float_vec);
 
         [[nodiscard]] const std::vector<uint8_t> &byte_vec() const;
 
@@ -209,9 +209,9 @@ namespace DSR {
         ///////////////////////
         // vector<uint64>
         //////////////////////
-        void u64_vec(const std::vector<uint64_t> &_uint64_vec);
+        void u64_vec(const std::vector<uint64_t> &uint64_vec);
 
-        void u64_vec(std::vector<uint64_t> &&_uint64_vec);
+        void u64_vec(std::vector<uint64_t> &&uint64_vec);
 
         [[nodiscard]] const std::vector<uint64_t> &u64_vec() const;
 
@@ -220,7 +220,7 @@ namespace DSR {
         ///////////////////////
         // array<flaot, 2>
         //////////////////////
-        void vec2(const std::array<float, 2> &_vec_float2);
+        void vec2(const std::array<float, 2> &vec_float2);
 
         [[nodiscard]] const std::array<float, 2> &vec2() const;
 
@@ -229,7 +229,7 @@ namespace DSR {
         ///////////////////////
         // array<flaot, 3>
         //////////////////////
-        void vec3(const std::array<float, 3> &_vec_float3);
+        void vec3(const std::array<float, 3> &vec_float3);
 
         [[nodiscard]] const std::array<float, 3> &vec3() const;
 
@@ -238,7 +238,7 @@ namespace DSR {
         ///////////////////////
         // array<flaot, 4>
         //////////////////////
-        void vec4(const std::array<float, 4> &_vec_float4);
+        void vec4(const std::array<float, 4> &vec_float4);
 
         [[nodiscard]] const std::array<float, 4> &vec4() const;
 
@@ -247,7 +247,7 @@ namespace DSR {
         ///////////////////////
         // array<flaot, 6>
         //////////////////////
-        void vec6(const std::array<float, 6> &_vec_float6);
+        void vec6(const std::array<float, 6> &vec_float6);
 
         [[nodiscard]] const std::array<float, 6> &vec6() const;
 
@@ -428,9 +428,5 @@ namespace DSR {
     };
 
 }
-
-
-
-
 
 #endif //DSR_COMMON_TYPES_H

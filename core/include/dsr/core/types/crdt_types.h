@@ -18,7 +18,6 @@
 
 namespace DSR {
 
-    //using CRDTAttribute = DSR::Attribute;
     typedef DSR::Attribute CRDTAttribute;
 
     class CRDTEdge
@@ -37,82 +36,82 @@ namespace DSR {
 
         [[nodiscard]] uint64_t  to() const;
 
-        void type(const std::string &_type);
+        void type(const std::string &type);
 
-        void type(std::string &&_type);
+        void type(std::string &&type);
 
         [[nodiscard]] const std::string &type() const;
 
         [[nodiscard]] std::string &type();
 
-        void from(uint64_t  _from);
+        void from(uint64_t from);
 
         [[nodiscard]] uint64_t from() const;
 
-        void attrs(const std::map<std::string, mvreg<CRDTAttribute>> &_attrs);
+        void attrs(const std::map<std::string, mvreg<CRDTAttribute>> &attrs);
 
-        void attrs(std::map<std::string, mvreg<CRDTAttribute>> &&_attrs);
+        void attrs(std::map<std::string, mvreg<CRDTAttribute>> &&attrs);
 
         [[nodiscard]] const std::map<std::string, mvreg<CRDTAttribute>> &attrs() const;
 
         [[nodiscard]] std::map<std::string, mvreg<CRDTAttribute>> &attrs();
 
-        void agent_id(uint32_t _agent_id);
+        void agent_id(uint32_t agent_id);
 
         [[nodiscard]] uint32_t agent_id() const;
 
-        [[nodiscard]] IDL::IDLEdge toIDLEdge(uint64_t id);
+        [[nodiscard]] IDL::IDLEdge to_IDL_edge(uint64_t id);
 
 
-        bool operator==(const CRDTEdge &eA_) const
+        bool operator==(const CRDTEdge &rhs) const
         {
-            if (this == &eA_) {
+            if (this == &rhs) {
                 return true;
             }
-            if (m_type != eA_.m_type || from() != eA_.from() || to() != eA_.to() || attrs() != eA_.attrs()) {
+            if (m_type != rhs.m_type || from() != rhs.from() || to() != rhs.to() || attrs() != rhs.attrs()) {
                 return false;
             }
             return true;
         }
 
-        bool operator<(const CRDTEdge &eA_) const
+        bool operator<(const CRDTEdge &rhs) const
         {
-            if (this == &eA_) {
+            if (this == &rhs) {
                 return false;
             }
-            if (m_type < eA_.m_type) {
+            if (m_type < rhs.m_type) {
                 return true;
-            } else if (eA_.m_type < m_type) {
+            } else if (rhs.m_type < m_type) {
                 return false;
             }
             return false;
         }
 
-        bool operator!=(const CRDTEdge &eA_) const
+        bool operator!=(const CRDTEdge &rhs) const
         {
-            return !operator==(eA_);
+            return !operator==(rhs);
         }
 
-        bool operator<=(const CRDTEdge &eA_) const
+        bool operator<=(const CRDTEdge &rhs) const
         {
-            return operator<(eA_) || operator==(eA_);
+            return operator<(rhs) || operator==(rhs);
         }
 
-        bool operator>(const CRDTEdge &eA_) const
+        bool operator>(const CRDTEdge &rhs) const
         {
-            return !operator<(eA_) && !operator==(eA_);
+            return !operator<(rhs) && !operator==(rhs);
         }
 
-        bool operator>=(const CRDTEdge &eA_) const
+        bool operator>=(const CRDTEdge &rhs) const
         {
-            return !operator<(eA_);
+            return !operator<(rhs);
         }
 
-        friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &ea_)
+        friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs)
         {
-            output << "IDL::EdgeAttribs[" << ea_.m_type << ", from:" << std::to_string(ea_.from()) << "-> to:" << std::to_string(ea_.to())
+            output << "IDL::EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from()) << "-> to:" << std::to_string(rhs.to())
                    << " Attribs:[";
-            for (const auto &v : ea_.attrs())
+            for (const auto &v : rhs.attrs())
                 output << v.first << ":" << v.second << " - ";
             output << "]]";
             return output;
@@ -146,99 +145,99 @@ namespace DSR {
 
         explicit CRDTNode(IDL::IDLNode &&x);
 
-        void type(const std::string &_type);
+        void type(const std::string &type);
 
-        void type(std::string &&_type);
+        void type(std::string &&type);
 
         [[nodiscard]] const std::string &type() const;
 
         [[nodiscard]] std::string &type();
 
-        void name(const std::string &_name);
+        void name(const std::string &name);
 
-        void name(std::string &&_name);
+        void name(std::string &&name);
 
         [[nodiscard]] const std::string &name() const;
 
         [[nodiscard]] std::string &name();
 
-        void id(uint64_t _id);
+        void id(uint64_t id);
 
         [[nodiscard]] uint64_t id() const;
 
-        void agent_id(uint32_t _agent_id);
+        void agent_id(uint32_t agent_id);
 
         [[nodiscard]] uint32_t agent_id() const;
 
-        void attrs(const std::map<std::string, mvreg<CRDTAttribute>> &_attrs);
+        void attrs(const std::map<std::string, mvreg<CRDTAttribute>> &attrs);
 
-        void attrs(std::map<std::string, mvreg<CRDTAttribute>> &&_attrs);
+        void attrs(std::map<std::string, mvreg<CRDTAttribute>> &&attrs);
 
         [[nodiscard]] std::map<std::string, mvreg<CRDTAttribute>> &attrs() &;
 
         [[nodiscard]] const std::map<std::string, mvreg<CRDTAttribute>> &attrs() const &;
 
-        void fano(const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &_fano);
+        void fano(const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano);
 
-        void fano(std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &&_fano);
+        void fano(std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &&fano);
 
         [[nodiscard]] std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano();
 
         [[nodiscard]] const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano() const;
 
-        [[nodiscard]] IDL::IDLNode toIDLNode(uint64_t id);
+        [[nodiscard]] IDL::IDLNode to_IDL_node(uint64_t id);
 
-        bool operator==(const CRDTNode &n_) const
+        bool operator==(const CRDTNode &rhs) const
         {
-            if (this == &n_) {
+            if (this == &rhs) {
                 return true;
             }
-            if (id() != n_.id() || type() != n_.type() || attrs() != n_.attrs() || fano() != n_.fano()) {
+            if (id() != rhs.id() || type() != rhs.type() || attrs() != rhs.attrs() || fano() != rhs.fano()) {
                 return false;
             }
             return true;
         }
 
-        bool operator<(const CRDTNode &n_) const
+        bool operator<(const CRDTNode &rhs) const
         {
-            if (this == &n_) {
+            if (this == &rhs) {
                 return false;
             }
-            if (id() < n_.id()) {
+            if (id() < rhs.id()) {
                 return true;
-            } else if (n_.id() < id()) {
+            } else if (rhs.id() < id()) {
                 return false;
             }
             return false;
         }
 
-        bool operator!=(const CRDTNode &n_) const
+        bool operator!=(const CRDTNode &rhs) const
         {
-            return !operator==(n_);
+            return !operator==(rhs);
         }
 
-        bool operator<=(const CRDTNode &n_) const
+        bool operator<=(const CRDTNode &rhs) const
         {
-            return operator<(n_) || operator==(n_);
+            return operator<(rhs) || operator==(rhs);
         }
 
-        bool operator>(const CRDTNode &n_) const
+        bool operator>(const CRDTNode &rhs) const
         {
-            return !operator<(n_) && !operator==(n_);
+            return !operator<(rhs) && !operator==(rhs);
         }
 
-        bool operator>=(const CRDTNode &n_) const
+        bool operator>=(const CRDTNode &rhs) const
         {
-            return !operator<(n_);
+            return !operator<(rhs);
         }
 
-        friend std::ostream &operator<<(std::ostream &output, CRDTNode &n_)
+        friend std::ostream &operator<<(std::ostream &output, CRDTNode &rhs)
         {
-            output << "IDL::Node:[" << std::to_string(n_.id()) << "," << n_.name() << "," << n_.type() << "], Attribs:[";
-            for (const auto &v : n_.attrs())
+            output << "IDL::Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type() << "], Attribs:[";
+            for (const auto &v : rhs.attrs())
                 output << v.first << ":(" << v.second << ");";
             output << "], FanOut:[";
-            for (auto &v : n_.fano())
+            for (auto &v : rhs.fano())
                 output << "[ " << std::to_string(v.first.first) << " " << v.first.second << "] " << ":(" << v.second << ");";
             output << "]";
             return output;

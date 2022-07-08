@@ -11,17 +11,16 @@ namespace DSR {
     /// Attribute
     ////////////////////////////////////////////////////
 
-    IDL::Attrib Attribute::toIDLAttrib()
-    {
+    IDL::Attrib Attribute::to_IDL_attrib() {
         IDL::Attrib att;
         att.timestamp(m_timestamp);
         att.type(m_value.index());
-        att.value(std::move(toIDLVal()));
+        att.value(std::move(to_IDL_val()));
         att.agent_id(m_agent_id);
         return att;
     }
 
-    IDL::Val Attribute::toIDLVal()
+    IDL::Val Attribute::to_IDL_val()
     {
         IDL::Val value;
 
@@ -102,19 +101,19 @@ namespace DSR {
         m_timestamp = t;
     }
 
-    void Attribute::value(const ValType &mValue)
+    void Attribute::value(const ValType &value)
     {
-        m_value = mValue;
+        m_value = value;
     }
 
-    void Attribute::value(ValType &&mValue)
+    void Attribute::value(ValType &&value)
     {
-        m_value = std::move(mValue);
+        m_value = std::move(value);
     }
 
-    void Attribute::agent_id(uint32_t mAgentId)
+    void Attribute::agent_id(uint32_t agentId)
     {
-        m_agent_id = mAgentId;
+        m_agent_id = agentId;
     }
 
 
@@ -143,19 +142,19 @@ namespace DSR {
 
     }
 
-    void Attribute::str(const std::string &_str)
+    void Attribute::str(const std::string &str)
     {
-        m_value = _str;
+        m_value = str;
     }
 
-    void Attribute::str(std::string &&_str)
+    void Attribute::str(std::string &&str)
     {
-        m_value = std::move(_str);
+        m_value = std::move(str);
     }
 
-    void Attribute::dec(int32_t _dec)
+    void Attribute::dec(int32_t dec)
     {
-        m_value = _dec;
+        m_value = dec;
     }
 
     [[nodiscard]] int32_t Attribute::dec() const
@@ -168,9 +167,9 @@ namespace DSR {
 
     }
 
-    void Attribute::uint(uint32_t _uint)
+    void Attribute::uint(uint32_t uint)
     {
-        m_value = _uint;
+        m_value = uint;
     }
 
     [[nodiscard]] uint32_t Attribute::uint() const
@@ -183,9 +182,9 @@ namespace DSR {
 
     }
 
-    void Attribute::uint64(uint64_t _uint)
+    void Attribute::uint64(uint64_t uint)
     {
-        m_value = _uint;
+        m_value = uint;
     }
 
     [[nodiscard]] uint64_t Attribute::uint64() const
@@ -198,9 +197,9 @@ namespace DSR {
 
     }
 
-    void Attribute::fl(float _fl)
+    void Attribute::fl(float fl)
     {
-        m_value = _fl;
+        m_value = fl;
     }
 
     [[nodiscard]] float Attribute::fl() const
@@ -213,9 +212,9 @@ namespace DSR {
                 ("FLOAT is not selected, selected is " + std::string(TYPENAMES_UNION[m_value.index()])).data());
     }
 
-    void Attribute::dob(double _dob)
+    void Attribute::dob(double dob)
     {
-        m_value = _dob;
+        m_value = dob;
     }
 
     [[nodiscard]] double Attribute::dob() const
@@ -228,14 +227,14 @@ namespace DSR {
                 ("DOUBLE is not selected, selected is " + std::string(TYPENAMES_UNION[m_value.index()])).data());
     }
 
-    void Attribute::float_vec(const std::vector<float> &_float_vec)
+    void Attribute::float_vec(const std::vector<float> &float_vec)
     {
-        m_value = _float_vec;
+        m_value = float_vec;
     }
 
-    void Attribute::float_vec(std::vector<float> &&_float_vec)
+    void Attribute::float_vec(std::vector<float> &&float_vec)
     {
-        m_value = std::move(_float_vec);
+        m_value = std::move(float_vec);
     }
 
     const std::vector<float> &Attribute::float_vec() const
@@ -257,9 +256,9 @@ namespace DSR {
                 ("VECTOR_FLOAT is not selected, selected is " + std::string(TYPENAMES_UNION[m_value.index()])).data());
     }
 
-    void Attribute::bl(bool _bl)
+    void Attribute::bl(bool bl)
     {
-        m_value = _bl;
+        m_value = bl;
     }
 
     [[nodiscard]] bool Attribute::bl() const
@@ -272,14 +271,14 @@ namespace DSR {
                 ("BOOL is not selected, selected is " + std::string(TYPENAMES_UNION[m_value.index()])).data());
     }
 
-    void Attribute::byte_vec(const std::vector<uint8_t> &_float_vec)
+    void Attribute::byte_vec(const std::vector<uint8_t> &float_vec)
     {
-        m_value = _float_vec;
+        m_value = float_vec;
     }
 
-    void Attribute::byte_vec(std::vector<uint8_t> &&_float_vec)
+    void Attribute::byte_vec(std::vector<uint8_t> &&float_vec)
     {
-        m_value = std::move(_float_vec);
+        m_value = std::move(float_vec);
     }
 
     [[nodiscard]] const std::vector<uint8_t> &Attribute::byte_vec() const
@@ -303,14 +302,14 @@ namespace DSR {
 
 
 
-    void Attribute::u64_vec(const std::vector<uint64_t> &_uint64_vec)
+    void Attribute::u64_vec(const std::vector<uint64_t> &uint64_vec)
     {
-        m_value = _uint64_vec;
+        m_value = uint64_vec;
     }
 
-    void Attribute::u64_vec(std::vector<uint64_t> &&_uint64_vec)
+    void Attribute::u64_vec(std::vector<uint64_t> &&uint64_vec)
     {
-        m_value = std::move(_uint64_vec);
+        m_value = std::move(uint64_vec);
     }
 
     [[nodiscard]] const std::vector<uint64_t> &Attribute::u64_vec() const
@@ -334,9 +333,9 @@ namespace DSR {
 
 
 
-    void Attribute::vec2(const std::array<float, 2> &_vec_float2)
+    void Attribute::vec2(const std::array<float, 2> &vec_float2)
     {
-        m_value = _vec_float2;
+        m_value = vec_float2;
     }
 
     [[nodiscard]] const std::array<float, 2> &Attribute::vec2() const
@@ -361,9 +360,9 @@ namespace DSR {
 
 
 
-    void Attribute::vec3(const std::array<float, 3> &_vec_float3)
+    void Attribute::vec3(const std::array<float, 3> &vec_float3)
     {
-        m_value = _vec_float3;
+        m_value = vec_float3;
     }
 
     [[nodiscard]] const std::array<float, 3> &Attribute::vec3() const
@@ -388,9 +387,9 @@ namespace DSR {
     }
 
 
-    void Attribute::vec4(const std::array<float, 4> &_vec_float4)
+    void Attribute::vec4(const std::array<float, 4> &vec_float4)
     {
-        m_value = _vec_float4;
+        m_value = vec_float4;
     }
 
     [[nodiscard]] const std::array<float, 4> &Attribute::vec4() const
@@ -416,9 +415,9 @@ namespace DSR {
     }
 
 
-    void Attribute::vec6(const std::array<float, 6> &_vec_float6)
+    void Attribute::vec6(const std::array<float, 6> &vec_float6)
     {
-        m_value = _vec_float6;
+        m_value = vec_float6;
     }
 
 

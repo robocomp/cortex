@@ -75,16 +75,8 @@ private:
                 eprosima::fastdds::dds::DomainParticipant* participant,
                 eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&& info) override
         {
-            /*if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
-            {
-                //Nothing to do here at the moment.
-            }
-            else if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
-                     info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
-            {*/
             //Callback
             f(std::forward<eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&>(info));
-            /*}*/
         }
 
 

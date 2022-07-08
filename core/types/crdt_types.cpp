@@ -49,14 +49,14 @@ namespace DSR {
         return m_to;
     }
 
-    void CRDTEdge::type(const std::string &_type) 
+    void CRDTEdge::type(const std::string &type)
     {
-        m_type = _type;
+        m_type = type;
     }
 
-    void CRDTEdge::type(std::string &&_type) 
+    void CRDTEdge::type(std::string &&type)
     {
-        m_type = std::move(_type);
+        m_type = std::move(type);
     }
 
     const std::string &CRDTEdge::type() const 
@@ -69,9 +69,9 @@ namespace DSR {
         return m_type;
     }
 
-    void CRDTEdge::from(uint64_t  _from)
+    void CRDTEdge::from(uint64_t from)
     {
-        m_from = _from;
+        m_from = from;
     }
 
     uint64_t  CRDTEdge::from() const
@@ -79,14 +79,14 @@ namespace DSR {
         return m_from;
     }
 
-    void CRDTEdge::attrs(const std::map<std::string, mvreg<CRDTAttribute>> &_attrs)
+    void CRDTEdge::attrs(const std::map<std::string, mvreg<CRDTAttribute>> &attrs)
     {
-        m_attrs = _attrs;
+        m_attrs = attrs;
     }
 
-    void CRDTEdge::attrs(std::map<std::string, mvreg<CRDTAttribute>> &&_attrs)
+    void CRDTEdge::attrs(std::map<std::string, mvreg<CRDTAttribute>> &&attrs)
     {
-        m_attrs = std::move(_attrs);
+        m_attrs = std::move(attrs);
     }
 
     const std::map<std::string, mvreg<CRDTAttribute>> &CRDTEdge::attrs() const
@@ -99,9 +99,9 @@ namespace DSR {
         return m_attrs;
     }
 
-    void CRDTEdge::agent_id(uint32_t _agent_id)
+    void CRDTEdge::agent_id(uint32_t agent_id)
     {
-        m_agent_id = _agent_id;
+        m_agent_id = agent_id;
     }
 
     uint32_t CRDTEdge::agent_id() const
@@ -109,8 +109,7 @@ namespace DSR {
         return m_agent_id;
     }
 
-    IDL::IDLEdge CRDTEdge::toIDLEdge(uint64_t id)
-    {
+    IDL::IDLEdge CRDTEdge::to_IDL_edge(uint64_t id) {
         IDL::IDLEdge edge;
         edge.from(m_from);
         edge.to(m_to);
@@ -124,7 +123,7 @@ namespace DSR {
                 pi.first(kv_dots.first.first);
                 pi.second(kv_dots.first.second);
 
-                edgeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.toIDLAttrib()));
+                edgeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
                 edgeAttr.dk().cbase().cc().emplace(kv_dots.first);
 
             }
@@ -156,14 +155,14 @@ namespace DSR {
         }
     }
 
-    void CRDTNode::type(const std::string &_type)
+    void CRDTNode::type(const std::string &type)
     {
-        m_type = _type;
+        m_type = type;
     }
 
-    void CRDTNode::type(std::string &&_type)
+    void CRDTNode::type(std::string &&type)
     {
-        m_type = std::move(_type);
+        m_type = std::move(type);
     }
 
     const std::string &CRDTNode::type() const
@@ -176,14 +175,14 @@ namespace DSR {
         return m_type;
     }
 
-    void CRDTNode::name(const std::string &_name)
+    void CRDTNode::name(const std::string &name)
     {
-        m_name = _name;
+        m_name = name;
     }
 
-    void CRDTNode::name(std::string &&_name)
+    void CRDTNode::name(std::string &&name)
     {
-        m_name = std::move(_name);
+        m_name = std::move(name);
     }
 
     const std::string &CRDTNode::name() const
@@ -196,9 +195,9 @@ namespace DSR {
         return m_name;
     }
 
-    void CRDTNode::id(uint64_t _id)
+    void CRDTNode::id(uint64_t id)
     {
-        m_id = _id;
+        m_id = id;
     }
 
     uint64_t CRDTNode::id() const
@@ -206,9 +205,9 @@ namespace DSR {
         return m_id;
     }
 
-    void CRDTNode::agent_id(uint32_t _agent_id)
+    void CRDTNode::agent_id(uint32_t agent_id)
     {
-        m_agent_id = _agent_id;
+        m_agent_id = agent_id;
     }
 
     uint32_t CRDTNode::agent_id() const
@@ -216,14 +215,14 @@ namespace DSR {
         return m_agent_id;
     }
 
-    void CRDTNode::attrs(const std::map<std::string, mvreg<CRDTAttribute>> &_attrs)
+    void CRDTNode::attrs(const std::map<std::string, mvreg<CRDTAttribute>> &attrs)
     {
-        m_attrs = _attrs;
+        m_attrs = attrs;
     }
 
-    void CRDTNode::attrs(std::map<std::string, mvreg<CRDTAttribute>> &&_attrs)
+    void CRDTNode::attrs(std::map<std::string, mvreg<CRDTAttribute>> &&attrs)
     {
-        m_attrs = std::move(_attrs);
+        m_attrs = std::move(attrs);
     }
 
     std::map<std::string, mvreg<CRDTAttribute>> &CRDTNode::attrs() &
@@ -236,14 +235,14 @@ namespace DSR {
         return m_attrs;
     }
 
-    void CRDTNode::fano(const std::map<std::pair<uint64_t , std::string>, mvreg<CRDTEdge>> &_fano)
+    void CRDTNode::fano(const std::map<std::pair<uint64_t , std::string>, mvreg<CRDTEdge>> &fano)
     {
-        m_fano = _fano;
+        m_fano = fano;
     }
 
-    void CRDTNode::fano(std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &&_fano)
+    void CRDTNode::fano(std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &&fano)
     {
-        m_fano = std::move(_fano);
+        m_fano = std::move(fano);
     }
 
     std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &CRDTNode::fano()
@@ -257,8 +256,7 @@ namespace DSR {
     }
 
 
-    IDL::IDLNode CRDTNode::toIDLNode(uint64_t id)
-    {
+    IDL::IDLNode CRDTNode::to_IDL_node(uint64_t id) {
         IDL::IDLNode node;
         node.id(m_id);
         node.name(m_name);
@@ -271,7 +269,7 @@ namespace DSR {
                 pi.first(kv_dots.first.first);
                 pi.second(kv_dots.first.second);
 
-                nodeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.toIDLAttrib()));
+                nodeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
                 nodeAttr.dk().cbase().cc().emplace(kv_dots.first);
             }
 
@@ -288,7 +286,7 @@ namespace DSR {
                 pi.first(kv_dots.first.first);
                 pi.second(kv_dots.first.second);
 
-                mvregCRDTEdge.dk().ds().emplace(std::make_pair(pi, kv_dots.second.toIDLEdge(id)));
+                mvregCRDTEdge.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_edge(id)));
                 mvregCRDTEdge.dk().cbase().cc().emplace(kv_dots.first);
 
             }

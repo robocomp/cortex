@@ -27,9 +27,7 @@ public:
     bool write(IDL::MvregEdge *object);
     bool write(std::vector<IDL::MvregEdgeAttr> *object);
     bool write(std::vector<IDL::MvregNodeAttr> *object);
-    //bool write(IDL::MvregNodeAttr *object);
-    //bool write(IDL::MvregEdgeAttr *object);
-    //void remove_publisher();
+
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;
     eprosima::fastdds::dds::Publisher *mp_publisher;

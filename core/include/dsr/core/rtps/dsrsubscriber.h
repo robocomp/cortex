@@ -21,10 +21,9 @@ public:
 				   const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
 				   std::mutex& mtx,
 				   bool isStreamData = false);
-	//void run();
+
     eprosima::fastdds::dds::Subscriber *getSubscriber();
     eprosima::fastdds::dds::DataReader *getDataReader();
-    //void remove_subscriber();
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;

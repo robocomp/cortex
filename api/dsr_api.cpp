@@ -24,7 +24,7 @@ using namespace std::literals;
 ///// PUBLIC METHODS
 /////////////////////////////////////////////////
 
-DSRGraph::DSRGraph(uint64_t root, std::string name, int id, const std::string &dsr_input_file, bool all_same_host)
+DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file, bool all_same_host)
         : agent_id(id),
         agent_name(std::move(name)),
         copy(false),

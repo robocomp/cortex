@@ -20,7 +20,7 @@ namespace DSR {
             pi.first(kv_dots.first.first);
             pi.second(kv_dots.first.second);
 
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.toIDLNode(id)));
+            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_node(id)));
             delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
         }
 
@@ -73,7 +73,7 @@ namespace DSR {
             pi.first(kv_dots.first.first);
             pi.second(kv_dots.first.second);
 
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.toIDLAttrib()));
+            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
             delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
         }
 
@@ -123,7 +123,8 @@ namespace DSR {
     }
 
     inline static IDL::MvregNodeAttr
-    CRDTNodeAttr_to_IDL(uint32_t agent_id, uint64_t id, uint64_t node, const std::string &attr, mvreg<CRDTAttribute> &data)
+    CRDTNodeAttr_to_IDL(uint32_t agent_id, uint64_t id, uint64_t node, const std::string &attr,
+                        mvreg<CRDTAttribute> &data)
     {
         IDL::MvregNodeAttr delta_crdt;
 
@@ -132,7 +133,7 @@ namespace DSR {
             pi.first(kv_dots.first.first);
             pi.second(kv_dots.first.second);
 
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.toIDLAttrib()));
+            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
             delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
         }
 
@@ -202,7 +203,8 @@ namespace DSR {
         return aw;
     }
 
-    inline static IDL::MvregEdge CRDTEdge_to_IDL(uint32_t agent_id, uint64_t from, uint64_t to, const std::string& type , mvreg<CRDTEdge> &data)
+    inline static IDL::MvregEdge CRDTEdge_to_IDL(uint32_t agent_id, uint64_t from, uint64_t to, const std::string& type,
+                                                 mvreg<CRDTEdge> &data)
     {
         IDL::MvregEdge delta_crdt;
 
@@ -211,7 +213,7 @@ namespace DSR {
             pi.first(kv_dots.first.first);
             pi.second(kv_dots.first.second);
 
-            auto edge = kv_dots.second.toIDLEdge(from);
+            auto edge = kv_dots.second.to_IDL_edge(from);
             delta_crdt.dk().ds().emplace(std::make_pair(pi, edge));
             delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
 
@@ -319,6 +321,5 @@ namespace DSR {
         return crdt_node;
     }
 }
-
 
 #endif //CONVERTER_H
