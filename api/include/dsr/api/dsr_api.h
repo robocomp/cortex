@@ -34,6 +34,7 @@
 #include "dsr/api/dsr_camera_api.h"
 #include "dsr/api/dsr_rt_api.h"
 #include "dsr/api/dsr_utils.h"
+#include "dsr/api/dsr_signal_info.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
@@ -690,14 +691,14 @@ namespace DSR
         NewMessageFunctor dsrpub_request_answer_call;
 
     signals:
-        void update_node_signal(uint64_t, const std::string &type/*, uint64_t=0*/);
-        void update_node_attr_signal(uint64_t id ,const std::vector<std::string>& att_names/*, uint64_t=0*/);
+        void update_node_signal(uint64_t, const std::string &type, DSR::SignalInfo info = {});
+        void update_node_attr_signal(uint64_t id ,const std::vector<std::string>& att_names, DSR::SignalInfo info = {});
 
-        void update_edge_signal(uint64_t from, uint64_t to, const std::string &type/*, uint64_t=0*/);
-        void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type, const std::vector<std::string>& att_name/*, uint64_t=0*/);
+        void update_edge_signal(uint64_t from, uint64_t to, const std::string &type, DSR::SignalInfo info = {});
+        void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type, const std::vector<std::string>& att_name, DSR::SignalInfo info = {});
 
-        void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag/*, uint64_t=0*/);
-        void del_node_signal(uint64_t id/*, uint64_t=0*/) ;
+        void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag, DSR::SignalInfo info = {});
+        void del_node_signal(uint64_t id, DSR::SignalInfo info = {}) ;
 
     };
 } // namespace CRDT

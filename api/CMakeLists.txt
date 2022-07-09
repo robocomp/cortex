@@ -31,10 +31,11 @@ set(headers_to_moc
         include/dsr/api/dsr_api.h
         include/dsr/api/dsr_inner_eigen_api.h
         include/dsr/api/dsr_agent_info_api.h
+        include/dsr/api/dsr_signal_info.h
         ${GEOM_API_HEADERS}
         )
 
-add_library(dsr_api SHARED )
+add_library(dsr_api SHARED)
 add_library(Robocomp::dsr_api ALIAS dsr_api )
 
 
