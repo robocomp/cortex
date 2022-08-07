@@ -6,9 +6,9 @@
 ## like this: curl -o- -L https://raw.githubusercontent.com/robocomp/cortex/development/installation.sh | bash -x
 ## This will install all the cortex dependencies and the library itself. You can read this script and dependencies.sh to better know what is done.
 #######################
-
+branch="${1:-development}"
 set -e
-git clone https://github.com/robocomp/cortex.git
+git clone --branch $branch https://github.com/robocomp/cortex.git
 cd cortex
 yes | bash dependencies.sh
 mkdir -p build
