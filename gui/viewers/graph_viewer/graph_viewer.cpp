@@ -5,6 +5,7 @@
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
 #include <dsr/gui/viewers/graph_viewer/graph_viewer.h>
 #include <QMessageBox>
+#include <random>
 
 using namespace DSR ;
 
