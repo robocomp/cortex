@@ -45,7 +45,7 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
                                                                     if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
                                                                     {
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
-                                                                        //std::cout << "Se conecto " <<info.info.m_participantName.to_string() << std::endl;
+                                                                        std::cout << "Participant matched [" <<info.info.m_participantName.to_string() << "]" << std::endl;
                                                                         graph->participant_set.insert({info.info.m_participantName.to_string(), false});
                                                                     }
                                                                     else if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
@@ -53,7 +53,7 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
                                                                     {
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
                                                                         graph->participant_set.erase(info.info.m_participantName.to_string());
-                                                                        //std::cout << "Se desconectó uno"<<info.info.m_participantName.to_string() <<  std::endl;
+                                                                        std::cout << "Participant unmatched [" <<info.info.m_participantName.to_string() << "]" << std::endl;
                                                                         graph->delete_node(info.info.m_participantName.to_string());
                                                                     }
                                                                 }));
@@ -294,6 +294,7 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
 template bool DSRGraph::update_node<DSR::Node &&>(DSR::Node&&);
 template bool DSRGraph::update_node<DSR::Node&>(DSR::Node&);
 template bool DSRGraph::update_node<const DSR::Node&>(const DSR::Node&);
+template bool DSRGraph::update_node<DSR::Node>(DSR::Node&&);
 
 
 
@@ -1585,36 +1586,39 @@ void DSRGraph::edge_attrs_subscription_thread(bool showReceived)
                             qDebug() << name << " Received:" << samples.vec().size() << " edge attr from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
                         }
-                        tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
-                            if (samples.vec().empty()) return;
+                        if (!samples.vec().empty() and samples.vec().at(0).agent_id() != agent_id)
+                        {
+                            tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                                if (samples.vec().empty()) return;
 
-                            auto from = samples.vec().at(0).from();
-                            auto to = samples.vec().at(0).to();
-                            auto type = samples.vec().at(0).type();
+                                auto from = samples.vec().at(0).from();
+                                auto to = samples.vec().at(0).to();
+                                auto type = samples.vec().at(0).type();
 
-                            std::vector<std::future<std::optional<std::string>>> futures;
+                                std::vector<std::future<std::optional<std::string>>> futures;
 
-                            for (auto &&sample: samples.vec()) {
-                                if (sample.agent_id() != agent_id and !ignored_attributes.contains(sample.attr_name().data())) {
-                                    futures.emplace_back(tp.spawn_task_waitable([this, sample = std::move(sample)]() mutable {
-                                            return join_delta_edge_attr(std::move(sample));
-                                    }));
+                                for (auto &&sample: samples.vec()) {
+                                    if (!ignored_attributes.contains(sample.attr_name().data())) {
+                                        futures.emplace_back(tp.spawn_task_waitable([this, sample = std::move(sample)]() mutable {
+                                                return join_delta_edge_attr(std::move(sample));
+                                        }));
+                                    }
                                 }
-                            }
 
-                            std::vector<std::string> sig (futures.size());
-                            for (auto &f: futures)
-                            {
-                                auto opt_str = f.get();
-                                if (opt_str.has_value())
-                                    sig.emplace_back(std::move(opt_str.value()));
-                            }
+                                std::vector<std::string> sig (futures.size());
+                                for (auto &f: futures)
+                                {
+                                    auto opt_str = f.get();
+                                    if (opt_str.has_value())
+                                        sig.emplace_back(std::move(opt_str.value()));
+                                }
 
 
-                            emit update_edge_attr_signal(from, to, type, sig, SignalInfo{samples.vec().at(0).agent_id()});
-                            emit update_edge_signal(from, to, type, SignalInfo{samples.vec().at(0).agent_id()});
+                                emit update_edge_attr_signal(from, to, type, sig, SignalInfo{samples.vec().at(0).agent_id()});
+                                emit update_edge_signal(from, to, type, SignalInfo{samples.vec().at(0).agent_id()});
 
-                        });
+                            });
+                        }
                     }
                 } else {
                     break;
@@ -1649,40 +1653,40 @@ void DSRGraph::node_attrs_subscription_thread(bool showReceived)
                             qDebug() << name << " Received:" << samples.vec().size() << " node attrs from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
                         }
+                        if (!samples.vec().empty() and samples.vec().at(0).agent_id() != agent_id) {
+                            tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
 
-                        tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                                if (samples.vec().empty()) return;
 
-                            if (samples.vec().empty()) return;
-
-                            auto id = samples.vec().at(0).id();
-                            std::string type;
-                            {
-                                std::shared_lock<std::shared_mutex> lock(_mutex);
-                                if (auto itn = nodes.find(id); itn != nodes.end())  type = itn->second.read_reg().type() ;
-                            }
-                            std::vector<std::future<std::optional<std::string>>> futures;
-                            for (auto &&s: samples.vec()) {
-                                if (s.agent_id() != agent_id and
-                                    ignored_attributes.find(s.attr_name().data()) == ignored_attributes.end()) {
-                                    futures.emplace_back(tp.spawn_task_waitable([this, samp{std::move(s)}]() mutable {
-                                        auto f = join_delta_node_attr(std::move(samp));
-                                        return f;
-                                    }));
-
+                                auto id = samples.vec().at(0).id();
+                                std::string type;
+                                {
+                                    std::shared_lock<std::shared_mutex> lock(_mutex);
+                                    if (auto itn = nodes.find(id); itn != nodes.end())  type = itn->second.read_reg().type() ;
                                 }
-                            }
+                                std::vector<std::future<std::optional<std::string>>> futures;
+                                for (auto &&s: samples.vec()) {
+                                    if (ignored_attributes.find(s.attr_name().data()) == ignored_attributes.end()) {
+                                        futures.emplace_back(tp.spawn_task_waitable([this, samp{std::move(s)}]() mutable {
+                                            auto f = join_delta_node_attr(std::move(samp));
+                                            return f;
+                                        }));
 
-                            std::vector<std::string> sig (futures.size());
-                            for (auto &f: futures)
-                            {
-                                auto opt_str = f.get();
-                                if (opt_str.has_value())
-                                    sig.emplace_back(std::move(opt_str.value()));
-                            }
+                                    }
+                                }
 
-                            emit update_node_attr_signal(id, sig, SignalInfo{samples.vec().at(0).agent_id()});
-                            emit update_node_signal(id, type, SignalInfo{samples.vec().at(0).agent_id()});
-                        });
+                                std::vector<std::string> sig (futures.size());
+                                for (auto &f: futures)
+                                {
+                                    auto opt_str = f.get();
+                                    if (opt_str.has_value())
+                                        sig.emplace_back(std::move(opt_str.value()));
+                                }
+
+                                emit update_node_attr_signal(id, sig, SignalInfo{samples.vec().at(0).agent_id()});
+                                emit update_node_signal(id, type, SignalInfo{samples.vec().at(0).agent_id()});
+                            });
+                        }
                     }
                 } else {
                     break;
