@@ -4,8 +4,36 @@ project(dsr_gui
         DESCRIPTION "Robocomp DSR gui library"
         LANGUAGES CXX )
 
+option(QT3D "Compile QT3D viewer WIP" OFF)
 
-find_package(Qt5 COMPONENTS Widgets OpenGL Xml REQUIRED)
+if(QT3D)
+
+set(qt3d_required
+        3DCore 3DRender 3DExtras 3DInput 3DAnimation
+        )
+
+set(qt3d_viewer_headers   
+        include/dsr/gui/viewers/qt3d_viewer/qt3d_viewer.h
+        )
+
+set(qt3d_viewer_sources  
+        viewers/qt3d_viewer/qt3d_viewer.cpp
+        )
+
+set (qt3d_libs 
+        Qt5::3DCore
+        Qt5::3DRender
+        Qt5::3DAnimation
+        Qt5::3DExtras
+        Qt5::3DInput
+        )
+
+endif()
+
+
+message(STATUS ${qt3d_required} " " ${qt3d_viewer_headers} " " ${qt3d_libs} " " ${qt3d_viewer_sources})
+
+find_package(Qt5 COMPONENTS Widgets OpenGL Xml ${qt3d_required} REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenSceneGraph REQUIRED COMPONENTS osg osgDB osgGA)
 find_package(cppitertools)
@@ -29,6 +57,7 @@ set(headers_to_moc
         include/dsr/gui/viewers/tree_viewer/tree_viewer.h
         include/dsr/gui/viewers/_abstract_graphic_view.h
         include/dsr/gui/dsr_gui.h
+        ${qt3d_viewer_headers}
         )
 
 add_library(dsr_gui SHARED )
@@ -44,6 +73,7 @@ target_sources(dsr_gui
         viewers/graph_viewer/graph_edge.cpp
         viewers/tree_viewer/tree_viewer.cpp
         viewers/_abstract_graphic_view.cpp
+        ${qt3d_viewer_sources}
         ${headers_to_moc}
         )
 
@@ -57,6 +87,7 @@ target_link_libraries(dsr_gui
         PUBLIC
         Qt5::OpenGL
         fastrtps
+        ${qt3d_libs}
         )
 
 target_include_directories(dsr_gui
@@ -76,7 +107,7 @@ set_target_properties(dsr_gui
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ON)
 
-target_compile_options(dsr_gui PUBLIC -O3 -fmax-errors=5 -std=c++20 -fno-char8_t)
+target_compile_options(dsr_gui PUBLIC -O3 -g -fmax-errors=5 -std=c++20 -fno-char8_t )
 
 # 'make install' to the correct locations (provided by GNUInstallDirs).
 install(TARGETS dsr_gui EXPORT dsr_guiConfig
