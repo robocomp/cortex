@@ -31,6 +31,7 @@
 #include <QWidget>
 #include <QMatrix4x4>
 
+#include <cstdint>
 #include <dsr/api/dsr_api.h>
 #include <qwidget.h>
 
@@ -58,13 +59,12 @@ namespace DSR
 
         void update_edge(uint64_t from, uint64_t to, const std::string& type);
         void delete_edge(uint64_t from, uint64_t to, const std::string& type);
-        void update_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string> &att_names);
+        //void update_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string> &att_names);
 
-        void insert_node(const Node& node);
+        void update_qt3d_entity(const Node& node);
         void delete_node(uint64_t id);
         void update_node(uint64_t id, const std::string& type);
-        void update_node_attr(uint64_t id, const std::vector<std::string> &att_names);
-
+        //void update_node_attr(uint64_t id, const std::vector<std::string> &att_names);
 
 
         //Convenience methods
@@ -83,11 +83,9 @@ namespace DSR
         QWidget * widget;
         std::shared_ptr<DSR::DSRGraph> g; //We don't own this pointer.
         std::unique_ptr<DSR::InnerEigenAPI> inner;
-        std::unique_ptr<DSR::CameraAPI> cam;
         Qt3DCore::QEntity *rootEntity;
-        Qt3DRender::QCamera *main_camera;
         Qt3DRender::QLayer* globalLayer;
-        
+        std::unordered_map<uint64_t, Qt3DCore::QEntity*> entities;
 
     };
 };
