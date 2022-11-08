@@ -400,8 +400,9 @@ bool DSRGraph::delete_node(uint64_t id)
             for (auto &a  : delta_vec) {
                 dsrpub_edge.write(&a);
             }
-            for (auto &[id0, id1, label] : deleted_edges)
+            for (auto &[id0, id1, label] : deleted_edges) {
                     emit del_edge_signal(id0, id1, label, SignalInfo{ agent_id });
+            }
         }
         return true;
     }
@@ -1029,7 +1030,7 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             std::unique_lock<std::shared_mutex> lock(_mutex);
             if (!deleted.contains(id)) {
                 joined = true;
-                //maybe_deleted_node = (nodes[id].empty()) ? std::nullopt : std::make_optional(nodes.at(id).read_reg());
+                maybe_deleted_node = (nodes[id].empty()) ? std::nullopt : std::make_optional(nodes.at(id).read_reg());
                 nodes[id].join(std::move(crdt_delta));
                 if (nodes.at(id).empty() or d_empty) {
                     nodes.erase(id);

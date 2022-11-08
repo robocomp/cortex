@@ -87,8 +87,8 @@ void GraphViewer::createGraph()
             } else
                 type_id_map[node.type()].insert(node.id());
         }
-		for(auto node : map) // Aworset
-           	for(const auto &[k, edges] : node.second.fano())
+		for(auto &[id, node] : map)
+           	for(const auto &[k, edges] : node.fano())
 			   add_or_assign_edge_SLOT(edges.from(), edges.to(), edges.type());
     }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
@@ -140,13 +140,13 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
     static std::random_device rd;
     static std::mt19937 mt(rd());
     static std::uniform_real_distribution<double> unif_dist(-300, 300);
+    //std::cout << "[SLOT] Insert node:  "<<id<< std::endl;
 
     GraphNode *gnode;
-    auto name_op = G->get_name_from_id(id);
-    auto name = name_op.value_or("No_name");
 	std::optional<Node> n = G->get_node(id);
     if (n.has_value())
     {
+        auto &name = n->name();
         if (gmap.count(id) == 0)    // if node does not exist, create it
         {
             qDebug()<<__FUNCTION__<<"##### New node";
@@ -179,6 +179,12 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
 			gnode->setPos(posx, posy);
 		}
         //emit G->update_node_attr_signal(id, {});
+        for(const auto &[k, edges] : (*n).fano())
+        {
+            auto key = std::make_tuple(edges.from(), edges.to(), edges.type());
+		    if (gmap_edges.contains(key) && gmap_edges[key] == nullptr) 
+                add_or_assign_edge_SLOT(edges.from(), edges.to(), edges.type());
+        }
     }
 }
 
@@ -200,17 +206,17 @@ void GraphViewer::add_or_assign_edge_SLOT(std::uint64_t from, std::uint64_t to, 
 {
 	try
     {
+        //std::cout << "[SLOT] Insert edge:  "<<from << ", " << to << ", "<< edge_tag<< std::endl;
  		qDebug() << __FUNCTION__ << "edge id " << QString::fromStdString(edge_tag) << from << to;
 		std::tuple<std::uint64_t, std::uint64_t, std::string> key = std::make_tuple(from, to, edge_tag);
         if ( G->get_edge(from, to, edge_tag).has_value() )
         {
-            if (gmap_edges.count(key) == 0)
+            if (gmap_edges.count(key) == 0 || gmap_edges[key] == nullptr)
             {
-
                 auto item = this->new_visual_edge(from, to, edge_tag);
                 gmap_edges.insert(std::make_pair(key, item));
             }
-            gmap_edges[key]->change_detected();
+            if (gmap_edges[key]) gmap_edges[key]->change_detected();
         }
 	}
 	catch(const std::exception &e) {
@@ -221,8 +227,8 @@ void GraphViewer::add_or_assign_edge_SLOT(std::uint64_t from, std::uint64_t to, 
 GraphEdge* GraphViewer::new_visual_edge(GraphNode *sourceNode, GraphNode *destNode, const QString &edge_name)
 {
     try {
+        if (!sourceNode || !destNode) return nullptr;
         auto gedge = new GraphEdge(sourceNode, destNode, edge_name);
-        scene.addItem(gedge);
         return gedge;
     }
     catch(const std::runtime_error &e)
@@ -240,7 +246,7 @@ GraphEdge* GraphViewer::new_visual_edge(std::uint64_t from, std::uint64_t to, co
 
 
     auto gedge = new GraphEdge(sourceNode, destNode, edge_tag.c_str());
-    scene.addItem(gedge);
+    if (gedge) scene.addItem(gedge);
     return gedge;
 }
 
@@ -248,16 +254,18 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
 {
     qDebug()<<__FUNCTION__<<":"<<__LINE__;
 	try {
+        //std::cout << "[SLOT] Delete edge:  "<<from << ", " << to << ", "<< edge_tag<< std::endl;
 		std::tuple<std::uint64_t, std::uint64_t, std::string> key = std::make_tuple(from, to, edge_tag);
 		while (gmap_edges.count(key) > 0) {
-            GraphEdge *edge = gmap_edges.at(key);
-            scene.removeItem(edge);
+            GraphEdge *edge = gmap_edges.extract(key).mapped();
             if (gmap.find(from) != gmap.end())
                 gmap.at(from)->deleteEdge(edge);
             if (gmap.find(to) != gmap.end())
                 gmap.at(to)->deleteEdge(edge);
-            gmap_edges.erase(key);
-            delete edge;
+            if (edge) {
+                scene.removeItem(edge);
+                delete edge;
+            }
 		}
 	} catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 
@@ -268,6 +276,7 @@ void GraphViewer::del_node_SLOT(uint64_t id)
 {
     qDebug()<<__FUNCTION__<<":"<<__LINE__;
     try {
+        //std::cout << "[SLOT] Delete node:  "<<id<< std::endl;
         while (gmap.count(id) > 0) {
             auto item = gmap.at(id);
             scene.removeItem(item);

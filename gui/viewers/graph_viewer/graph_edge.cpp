@@ -58,9 +58,7 @@ GraphEdge::GraphEdge(GraphNode* sourceNode, GraphNode* destNode, const QString& 
     dest = destNode;
 
     if (source->id_in_graph == destNode->id_in_graph) {
-
         source->addEdge(this);
-
     } else {
         source->addEdge(this);
         dest->addEdge(this);
