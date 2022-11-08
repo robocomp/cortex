@@ -30,25 +30,22 @@
 #include <cstdio>
 #include <cstring>
 #include "sys/times.h"
+#include <fcntl.h>
 
 using namespace DSR;
 
 std::string get_self_path()
 {
-	std::vector<char> buf(400);
-	std::vector<char>::size_type len;
-	do
-	{
-		buf.resize(buf.size() + 100);
-		len = ::readlink("/proc/self/exe", &(buf[0]), buf.size());
-	} while (buf.size() == len);
+  std::vector<char> buf(1024*4);
+  int fd = open("/proc/self/cmdline", O_RDONLY);
+    char * end = buf.data() + read(fd, buf.data(), 1024*4);
 
-	if (len > 0)
-	{
-		buf[len] = '\0';
-		return (std::string(&(buf[0])));
-	}
-	return "";
+  for (char *p = buf.data(); p < end; p++)
+  {
+        if (!*p) *p = ' ';
+  }
+  close(fd);
+  return std::string(&buf[0]);
 }
 
 int parseLine(char* line)
@@ -153,7 +150,7 @@ DSRViewer::DSRViewer(QMainWindow * widget, std::shared_ptr<DSR::DSRGraph> G_, in
 	auto restart_action = actionsMenu->addAction("Restart");
 
 	//restart_action
-	connect(restart_action, &QAction::triggered, this, [=] (bool)
+	connect(restart_action, &QAction::triggered, this, [this] (bool)
 	{
 		qDebug()<<"TO RESTART";
 		auto current_path = get_self_path();
@@ -161,6 +158,7 @@ DSRViewer::DSRViewer(QMainWindow * widget, std::shared_ptr<DSR::DSRGraph> G_, in
 		[[maybe_unused]] auto _ = std::system(command.c_str());
 //		QProcess a;
 //		a.startDetached(command);
+		G->reset();
 		qDebug()<<"TO RESTART2: "<<command.c_str();
 		QTimer::singleShot(1000,QApplication::quit);
 //		restart_app(true);
