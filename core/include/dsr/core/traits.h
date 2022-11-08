@@ -5,7 +5,11 @@
 #ifndef TRAITS_H
 #define TRAITS_H
 
+#include <array>
+#include <cstdint>
+#include <string>
 #include <type_traits>
+#include <vector>
 
 namespace DSR {
     class Node;
@@ -26,7 +30,7 @@ template <typename T>
 struct unwrap_reference_wrapper<std::reference_wrapper<T>>{ typedef T type; };
 
 template<typename T>
-using unwrap_reference_wrapper_t = unwrap_reference_wrapper<T>::type;
+using unwrap_reference_wrapper_t = typename unwrap_reference_wrapper<T>::type;
 
 
 template <typename T, typename ... Ts>
@@ -36,9 +40,9 @@ struct one_of
 };
 
 template<typename T>
-concept allowed_types = one_of<T , std::int32_t, std::uint32_t, std::uint64_t,
-                                   std::string, std::float_t, std::double_t,
-                                   std::vector<float_t>, std::vector<uint8_t>,
+concept allowed_types = one_of<T , int32_t, uint32_t, uint64_t,
+                                   std::string, float, double,
+                                   std::vector<float>, std::vector<uint8_t>,
                                    bool, std::vector<uint64_t>, std::array<float, 2>,
                                    std::array<float, 3>, std::array<float, 4>, std::array<float, 6>
                                    >::value;
