@@ -18,8 +18,18 @@
 
 #include <dsr/api/GHistorySaver.h>
 
+
+template<typename E>
+struct not_exists { typedef E type; };
+
+template<>
+struct not_exists<void>;
+
 namespace pybind11 { namespace detail {
-template <> struct type_caster<std::monostate> {
+template <> 
+struct type_caster<std::monostate, 
+                typename not_exists<decltype(type_caster<std::monostate>::name)>::type> 
+{
 public:
     /**
      * This macro establishes the name 'std::monostate' in
