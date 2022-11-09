@@ -975,10 +975,10 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             while (!node_handle_edge.empty()) {
                 auto &[to, type, delta, timestamp_edge] = node_handle_edge.mapped();
                 auto att_key = std::tuple{id, to, type};
-                //std::cout << "Procesando delta edge almacenado (unprocessed_delta_edge_from) " << id<< ", " <<to << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                //std::cout << "[OLD] Procesando delta edge almacenado (unprocessed_delta_edge_from) " << id<< ", " <<to << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
                 if (timestamp < timestamp_edge) {
                 //TODO: este se debería hacer después de insertar el nodo?
-                    if (process_delta_edge(id, to, type, std::move(delta))) map_new_to_edges.emplace(std::pair<uint64_t, std::string>{id, type});
+                    if (process_delta_edge(id, to, type, std::move(delta))) map_new_to_edges.emplace(std::pair<uint64_t, std::string>{to, type});
                 }
                 if (nodes.contains(id) and nodes.at(id).read_reg().fano().contains({to, type})) {
                     decltype(unprocessed_delta_edge_att)::node_type node_handle_edge_att = std::move(
@@ -1003,7 +1003,7 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             while (!node_handle_edge.empty()) {
                 auto &[from, type, delta, timestamp_edge] = node_handle_edge.mapped();
                 auto att_key = std::tuple{from, id, type};
-                //std::cout << "Procesando delta edge almacenado (unprocessed_delta_edge_to) " << from << ", " <<id << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                //std::cout << "[OLD] Procesando delta edge almacenado (unprocessed_delta_edge_to) " << from << ", " <<id << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
                 if (timestamp < timestamp_edge) {
                     process_delta_edge(from, id, type, std::move(delta));
                 }
@@ -1054,23 +1054,27 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             if (signal) {
                 emit update_node_signal(id, nodes.at(id).read_reg().type(), SignalInfo{ mvreg.agent_id() });
                 for (const auto &[k, v] : nodes.at(id).read_reg().fano()) {
+                    //std::cout << "[JOIN NODE] add edge FROM: "<< id << ", " << k.first << ", " << k.second << std::endl;
                     emit update_edge_signal(id, k.first, k.second, SignalInfo{ mvreg.agent_id() });
                 }
 
                 for (const auto &[k, v]: map_new_to_edges)
                 {
-                    emit update_edge_signal(id, k, v, SignalInfo{ mvreg.agent_id() });
+                    //std::cout << "[JOIN NODE] add edge TO: "<< k << ", " << id << ", " << v << std::endl;
+                    emit update_edge_signal(k, id, v, SignalInfo{ mvreg.agent_id() });
                 }
             } else {
                 emit del_node_signal(id, SignalInfo{ mvreg.agent_id() });
                 if (maybe_deleted_node.has_value()) {
                     for (const auto &node: maybe_deleted_node->fano()) {
+                        //std::cout << "[JOIN NODE] delete edge FROM: "<< node.second.read_reg().from() << ", " << node.second.read_reg().to() << ", " << node.second.read_reg().type() << std::endl;
                         emit del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
                                              node.second.read_reg().type(), SignalInfo{ mvreg.agent_id() });
                     }
                 }
 
                 for (const auto &[from, type] : cache_map_to_edges.value()) {
+                    //std::cout << "[JOIN NODE] delete edge TO: "<< from << ", " << id << ", " << type << std::endl;
                     emit del_edge_signal(from, id, type, SignalInfo{ mvreg.agent_id() });
                 }
 
@@ -1155,7 +1159,7 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
                 }
 
             } else if (!dfrom and !dto) {
-                //We should receive the node late  r.
+                //We should receive the node later.
                 bool find = false;
                 for (auto [begin, end] = unprocessed_delta_edge_from.equal_range(from); begin != end; ++begin) { //There should not be many elements in this iteration
                     if (std::get<0>(begin->second) == to && std::get<1>(begin->second) == type){
@@ -1175,12 +1179,18 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
 
                 if (!find) {
                     std::cout << "JOIN_DELTA_EDGE ID(" << from<< ", "<< to <<", "<< type << ") INSERT UNPROCESSED "  ;
-                    if (!cfrom) { std::cout << "No existe from (" << from << ") unprocessed_delta_edge_from" << std::endl; unprocessed_delta_edge_from.emplace(from, std::tuple{to, type, crdt_delta, timestamp}); }
-                    if (cfrom && !cto) { std::cout << "No existe to (" << to << ") unprocessed_delta_edge_to" << std::endl;
-                    unprocessed_delta_edge_to.emplace(to, std::tuple{from, type, std::move(crdt_delta), timestamp});
+                    if (!cfrom) { 
+                        std::cout << "No existe from (" << from << ") unprocessed_delta_edge_from" << std::endl; 
+                        unprocessed_delta_edge_from.emplace(from, std::tuple{to, type, crdt_delta, timestamp}); 
+                    }
+                    if (cfrom && !cto) 
+                    {
+                        std::cout << "No existe to (" << to << ") unprocessed_delta_edge_to" << std::endl;
+                        unprocessed_delta_edge_to.emplace(to, std::tuple{from, type, std::move(crdt_delta), timestamp});
                     }
                 } else {
-                std::cout <<"ALGO PASA" << std::endl;
+                    // We should sync the deleted_nodes set too...
+                    std::cout <<"TODO: Unhandled" << std::endl;
                 }
             } else {
                 std::cout << "ELIMINADO, BORRAR DE UNPROCESSED" << std::endl;
@@ -1199,8 +1209,10 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
 
         if (joined) {
             if (signal) {
+                //std::cout << "[JOIN EDGE] add edge: "<< from << ", " << to << ", " << type << std::endl;
                 emit update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
             } else {
+                //std::cout << "[JOIN EDGE] delete edge: "<< from << ", " << to << ", " << type << std::endl;
                 emit del_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
             }
         }
