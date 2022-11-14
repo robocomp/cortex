@@ -207,8 +207,8 @@ namespace DSR {
                         Entity->addComponent(mesh);
                         Entity->addComponent(globalLayer);
 
-                        scale = QVector3D(scalex.value_or(1.0)/10, scaley.value_or(1.0)/10, scalez.value_or(1.0)/10);
-                        scale = QVector3D(scalex.value_or(1.0)/10, scaley.value_or(1.0)/10, scalez.value_or(1.0)/10);
+                        scale = QVector3D(scalex.value_or(1.0)/10., scaley.value_or(1.0)/10., scalez.value_or(1.0)/10.);
+                        scale = QVector3D(scalex.value_or(1.0)/10., scaley.value_or(1.0)/10., scalez.value_or(1.0)/10.);
                     }
 
                 } else {
