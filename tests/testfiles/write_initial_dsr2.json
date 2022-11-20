@@ -1,0 +1,51 @@
+{
+    "DSRModel": {
+        "symbols": {
+            "0": {
+                "attribute": {
+                    "OuterRegionBottom": {
+                        "type": 1,
+                        "value": -4250
+                    },
+                    "OuterRegionLeft": {
+                        "type": 1,
+                        "value": -2000
+                    },
+                    "OuterRegionRight": {
+                        "type": 1,
+                        "value": 7500
+                    },
+                    "OuterRegionTop": {
+                        "type": 1,
+                        "value": 4250
+                    },
+                    "color": {
+                        "type": 0,
+                        "value": "SeaGreen"
+                    },
+                    "level": {
+                        "type": 1,
+                        "value": 0
+                    },
+                    "parent": {
+                        "type": 7,
+                        "value": "0"
+                    },
+                    "pos_x": {
+                        "type": 2,
+                        "value": -121.546974
+                    },
+                    "pos_y": {
+                        "type": 2,
+                        "value": -382.900055
+                    }
+                },
+                "id": "0",
+                "links": [
+                ],
+                "name": "world",
+                "type": "world"
+            }
+        }
+    }
+}
