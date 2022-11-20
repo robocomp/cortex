@@ -20,19 +20,20 @@ public:
     virtual ~DSRParticipant();
     [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> fn);
     [[nodiscard]] const eprosima::fastrtps::rtps::GUID_t& getID() const;
-    [[nodiscard]] const char *getNodeTopicName()     const { return dsrgraphType->getName();}
-    [[nodiscard]] const char *getRequestTopicName()  const { return graphrequestType->getName();}
-    [[nodiscard]] const char *getAnswerTopicName()   const { return graphRequestAnswerType->getName();}
-    [[nodiscard]] const char *getEdgeTopicName()     const { return dsrEdgeType->getName();}
-    [[nodiscard]] const char *getNodeAttrTopicName() const { return dsrNodeAttrType->getName();}
-    [[nodiscard]] const char *getEdgeAttrTopicName() const { return dsrEdgeAttrType->getName();}
+    [[nodiscard]] const char *getNodeTopicName()     const { return dsrgraphType->getName(); }
+    [[nodiscard]] const char *getRequestTopicName()  const { return graphrequestType->getName(); }
+    [[nodiscard]] const char *getAnswerTopicName()   const { return graphRequestAnswerType->getName(); }
+    [[nodiscard]] const char *getEdgeTopicName()     const { return dsrEdgeType->getName(); }
+    [[nodiscard]] const char *getNodeAttrTopicName() const { return dsrNodeAttrType->getName(); }
+    [[nodiscard]] const char *getEdgeAttrTopicName() const { return dsrEdgeAttrType->getName(); }
 
     [[nodiscard]] eprosima::fastdds::dds::Topic*  getNodeTopic()          { return topic_node; }
     [[nodiscard]] eprosima::fastdds::dds::Topic*  getEdgeTopic()          { return topic_edge; }
-    [[nodiscard]] eprosima::fastdds::dds::Topic*  getGraphTopic()         { return topic_graph;}
-    [[nodiscard]] eprosima::fastdds::dds::Topic*  getGraphRequestTopic()  { return topic_graph_request;}
-    [[nodiscard]] eprosima::fastdds::dds::Topic*  getAttNodeTopic()       { return topic_node_att;}
-    [[nodiscard]] eprosima::fastdds::dds::Topic*  getAttEdgeTopic()       { return topic_edge_att;}
+    [[nodiscard]] eprosima::fastdds::dds::Topic*  getGraphTopic()         { return topic_graph; }
+    [[nodiscard]] eprosima::fastdds::dds::Topic*  getGraphRequestTopic()  { return topic_graph_request; }
+    [[nodiscard]] eprosima::fastdds::dds::Topic*  getAttNodeTopic()       { return topic_node_att; }
+    [[nodiscard]] eprosima::fastdds::dds::Topic*  getAttEdgeTopic()       { return topic_edge_att; }
+    
     [[nodiscard]] eprosima::fastdds::dds::DomainParticipant *getParticipant();
 
     void add_subscriber(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>);
@@ -81,7 +82,6 @@ private:
 
 
         std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> f;
-        //int n_matched;
     };
     std::unique_ptr<ParticpantListener> m_listener;
 };

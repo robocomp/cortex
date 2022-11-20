@@ -2,6 +2,7 @@
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
+//#include <fastdds/dds/topic/ContentFilteredTopic.hpp>
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/utils/IPFinder.h>
 
@@ -108,13 +109,11 @@ eprosima::fastdds::dds::DataReader * DSRSubscriber::getDataReader() {
 void DSRSubscriber::SubListener::on_subscription_matched(eprosima::fastdds::dds::DataReader* reader,
                                                          const eprosima::fastdds::dds::SubscriptionMatchedStatus& info)
 {
-    if (info.current_count_change == eprosima::fastrtps::rtps::MATCHED_MATCHING)
+    if (0 < info.current_count_change)
     {
-        //n_matched++;
-        qInfo() << "Publisher[" << reader->get_topicdescription()->get_name().data() <<"] matched " << info.last_publication_handle.value;// << " self: " << info..is_on_same_process_as(sub->getGuid());
+        qInfo() << "Publisher [" << reader->get_topicdescription()->get_name().data() <<"] matched " << info.last_publication_handle.value;// << " self: " << info..is_on_same_process_as(sub->getGuid());
     } else {
-        //n_matched--;
-        qInfo() << "Publisher[" << reader->get_topicdescription()->get_name().data() <<"] unmatched "  << info.last_publication_handle.value;//<< " self: " << info.remoteEndpointGuid.is_on_same_process_as(sub->getGuid());
+        qInfo() << "Publisher [" << reader->get_topicdescription()->get_name().data() <<"] unmatched "  << info.last_publication_handle.value;//<< " self: " << info.remoteEndpointGuid.is_on_same_process_as(sub->getGuid());
     }
 }
 

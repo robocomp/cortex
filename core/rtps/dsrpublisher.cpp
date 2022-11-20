@@ -170,11 +170,9 @@ bool DSRPublisher::write(std::vector<IDL::MvregNodeAttr> *object) {
 void DSRPublisher::PubListener::on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
                                                        const eprosima::fastdds::dds::PublicationMatchedStatus& info)
 {
-    if (info.current_count == eprosima::fastrtps::rtps::MATCHED_MATCHING) {
-        n_matched++;
+    if (0 < info.current_count_change) {
         qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] matched " << info.last_subscription_handle.value;// << " self: " << info.remoteEndpointGuid.is_on_same_process_as(pub->getGuid());
     } else {
-        n_matched--;
         qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] unmatched" << info.last_subscription_handle.value;// << " self: " <<info.remoteEndpointGuid.is_on_same_process_as(pub->getGuid());
     }
 }

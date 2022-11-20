@@ -6,6 +6,7 @@
 #define UTILS_H
 
 #include <chrono>
+#include <functional>
 
 
 class hash_tuple {
