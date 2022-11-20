@@ -12,7 +12,11 @@
 namespace DSR {
 
     // Translators
-    inline static IDL::MvregNode CRDTNode_to_IDL(uint32_t agent_id, uint64_t id, mvreg<DSR::CRDTNode> &data)
+    inline static IDL::MvregNode CRDTNode_to_IDL(
+        uint32_t agent_id,
+        uint64_t id,
+        mvreg<DSR::CRDTNode> &data
+    )
     {
         IDL::MvregNode delta_crdt;
         for (auto &kv_dots : data.dk.ds) {
@@ -62,9 +66,14 @@ namespace DSR {
         return aw;
     }
 
-    inline static IDL::MvregEdgeAttr
-    CRDTEdgeAttr_to_IDL(uint32_t agent_id, uint64_t id, uint64_t from, uint64_t to, const std::string &type,
-                                      const std::string &attr, mvreg<CRDTAttribute> &data)
+    inline static IDL::MvregEdgeAttr CRDTEdgeAttr_to_IDL(
+        uint32_t agent_id,
+        uint64_t id,
+        uint64_t from,
+        uint64_t to,
+        const std::string &type,
+        const std::string &attr, mvreg<CRDTAttribute> &data
+    )
     {
         IDL::MvregEdgeAttr delta_crdt;
 
@@ -122,9 +131,13 @@ namespace DSR {
         return aw;
     }
 
-    inline static IDL::MvregNodeAttr
-    CRDTNodeAttr_to_IDL(uint32_t agent_id, uint64_t id, uint64_t node, const std::string &attr,
-                        mvreg<CRDTAttribute> &data)
+    inline static IDL::MvregNodeAttr CRDTNodeAttr_to_IDL(
+        uint32_t agent_id,
+        uint64_t id,
+        uint64_t node,
+        const std::string &attr,
+        mvreg<CRDTAttribute> &data
+    )
     {
         IDL::MvregNodeAttr delta_crdt;
 
@@ -203,8 +216,13 @@ namespace DSR {
         return aw;
     }
 
-    inline static IDL::MvregEdge CRDTEdge_to_IDL(uint32_t agent_id, uint64_t from, uint64_t to, const std::string& type,
-                                                 mvreg<CRDTEdge> &data)
+    inline static IDL::MvregEdge CRDTEdge_to_IDL(
+        uint32_t agent_id,
+        uint64_t from,
+        uint64_t to,
+        const std::string& type,
+        mvreg<CRDTEdge> &data
+    )
     {
         IDL::MvregEdge delta_crdt;
 

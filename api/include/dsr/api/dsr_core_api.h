@@ -54,7 +54,7 @@ namespace DSR
         std::unique_ptr<BaseManager> comm; //this is moved to transport later.
     };
 
-    inline static constexpr SignalInfo default_signal_info {};
+    inline constexpr SignalInfo default_signal_info {};
 
     /////////////////////////////////////////////////////////////////
     /// GRAPH UNSAFE API

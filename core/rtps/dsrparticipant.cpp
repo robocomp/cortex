@@ -111,27 +111,13 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     dsrNodeAttrType.register_type(mp_participant);
     dsrEdgeAttrType.register_type(mp_participant);
 
-    /*
-    filter = std::make_unique<SameHostFactory>(mp_participant);
-    mp_participant->register_content_filter_factory("SAME_HOST_FILTER", filter.get());
-    
     //Create topics
-    std::string expression = " "; //used for filtering
-    std::vector<std::string> parameters; //used for filtering
-    */
     topic_node = mp_participant->create_topic("DSR_NODE", dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    //topic_node_f =  mp_participant->create_contentfilteredtopic("DSR_NODE_F", topic_node, expression, parameters, "SAME_HOST_FILTER");
     topic_edge = mp_participant->create_topic("DSR_EDGE", dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    //topic_edge_f =  mp_participant->create_contentfilteredtopic("DSR_EDGE_F", topic_edge, expression, parameters, "SAME_HOST_FILTER");
     topic_node_att = mp_participant->create_topic("DSR_NODE_ATTS", dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    //topic_node_att_f =  mp_participant->create_contentfilteredtopic("DSR_NODE_ATTS_F", topic_node_att, expression, parameters, "SAME_HOST_FILTER");    
     topic_edge_att = mp_participant->create_topic("DSR_EDGE_ATTS", dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    //topic_edge_att_f =  mp_participant->create_contentfilteredtopic("DSR_EDGE_ATTS_F", topic_edge_att, expression, parameters, "SAME_HOST_FILTER");    
     topic_graph_request = mp_participant->create_topic("GRAPH_REQUEST", graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    //topic_graph_request_f =  mp_participant->create_contentfilteredtopic("GRAPH_REQUEST_F", topic_graph_request, expression, parameters, "SAME_HOST_FILTER");    
     topic_graph = mp_participant->create_topic("GRAPH_ANSWER", graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    //topic_graph_f =  mp_participant->create_contentfilteredtopic("GRAPH_ANSWER_F", topic_graph, expression, parameters, "SAME_HOST_FILTER");    
-
 
     return std::make_tuple(true, mp_participant);
 }

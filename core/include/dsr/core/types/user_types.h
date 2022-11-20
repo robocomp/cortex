@@ -6,6 +6,7 @@
 #define USER_TYPES_H
 
 #include <cstdint>
+#include <functional>
 #include <utility>
 #include "type_checking/type_checker.h"
 #include "common_types.h"
@@ -15,19 +16,31 @@
 
 namespace DSR {
 
+    class Edge;
+
+    
+    inline const std::map<std::string, Attribute> default_attributes = {};
+    inline const std::map<std::pair<uint64_t, std::string>, Edge> default_fano = {};
+    inline const std::string default_str = "";
+    
+
     class Edge
     {
 
     private:
 
-        Edge(uint64_t from, uint64_t to, std::string  type,
-             uint32_t agent_id, std::map<std::string, Attribute> attrs)
+        Edge(
+            uint64_t from, uint64_t to,
+            std::string type, uint32_t agent_id,
+            std::map<std::string, Attribute> attrs
+        )
             : m_to(to),
             m_from(from),
             m_type(std::move(type)),
             m_attrs(std::move(attrs)),
             m_agent_id(agent_id)
         {}
+
     public:
 
         Edge() = default;
@@ -61,15 +74,15 @@ namespace DSR {
             }
         }
 
-        template <typename edge_type>
-        static Edge create(uint64_t from, uint64_t to)
-            requires(edge_type::edge_type)
-        {
-            return Edge(from, to,  std::string(edge_type::attr_name.data()), 0, {});
-        }
+        //template <typename edge_type>
+        //static Edge create(uint64_t from, uint64_t to)
+        //    requires(edge_type::edge_type)
+        //{
+        //    return Edge(from, to,  std::string(edge_type::attr_name.data()), 0, {});
+        //}
 
         template <typename edge_type>
-        static Edge create(uint64_t from, uint64_t to,  const  std::map<std::string, Attribute> &attrs)
+        static Edge create(uint64_t from, uint64_t to, const std::map<std::string, Attribute> &attrs = default_attributes)
             requires(edge_type::edge_type)
         {
             return Edge(from, to, std::string(edge_type::attr_name.data()), 0, attrs);
@@ -183,6 +196,13 @@ namespace DSR {
             return !(*this < rhs);
         }
 
+
+        Attribute& operator[](const std::string& str) 
+        {
+            //This can throw
+            return m_attrs.at(str);
+        }
+
     private:
         uint64_t m_to = 0;
         uint64_t m_from = 0;
@@ -248,9 +268,9 @@ namespace DSR {
 
 
         template <typename node_type>
-        static Node create(const  std::map<std::string, Attribute> &attrs,
-                           const  std::map<std::pair<uint64_t, std::string>, Edge > &fano,
-                           const  std::string& name = "")
+        static Node create(const  std::map<std::string, Attribute> &attrs = default_attributes,
+                           const  std::map<std::pair<uint64_t, std::string>, Edge > &fano = default_fano,
+                           const  std::string& name = default_str)
             requires(node_type::node_type)
         {
             return Node( std::string(node_type::attr_name.data()), 0, attrs, fano, name);
@@ -382,6 +402,18 @@ namespace DSR {
         bool operator>=(const Node &rhs) const
         {
             return !(*this < rhs);
+        }
+
+        Attribute& operator[](const std::string& str) 
+        {
+            //This can throw
+            return m_attrs.at(str);
+        }
+
+        Edge& operator[](std::pair<uint64_t, std::string>& str) 
+        {
+            //This can throw
+            return m_fano.at(str);
         }
 
     private:
