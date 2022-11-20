@@ -45,6 +45,15 @@ namespace DSR
         //uint64_t recv_timestamp; //recv timestamp from the middleware
     };
 
+
+    class CortexConfig {
+        uint64_t agent_id;
+        std::string agent_name;
+        bool localhost;
+        bool copy;
+        std::unique_ptr<BaseManager> comm; //this is moved to transport later.
+    };
+
     inline static constexpr SignalInfo default_signal_info {};
 
     /////////////////////////////////////////////////////////////////
@@ -59,20 +68,20 @@ namespace DSR
         Graph(const CortexConfig& cfg);
         ~Graph() override;
 
-
         //////////////////////////////////////////////////////
         ///  Graph API
         //////////////////////////////////////////////////////
 
-        // Utils
-        size_t size();
-        bool empty(const uint64_t &id);
-        std::map<uint64_t, Node> get_copy() const;
 
         //////////////////////////////////////////////////////
         ///  CONVENIENCE METHODS
         //////////////////////////////////////////////////////
-
+        
+        size_t size();
+        bool empty(const uint64_t &id);
+        std::map<uint64_t, Node> get_copy() const;
+        std::map<uint64_t , IDL::MvregNode> copy_map() const;
+        uint64_t get_agent_id() const;
         void reset();
 
         //////////////////////////////////////////////////////
@@ -95,6 +104,7 @@ namespace DSR
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
+
         std::optional<CRDTNode> get_(uint64_t id);
         std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
         std::tuple<bool, std::optional<IDL::MvregNode>> insert_node_(CRDTNode &&node);
@@ -103,10 +113,6 @@ namespace DSR
         std::optional<IDL::MvregEdge> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
         std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
 
-        //////////////////////////////////////////////////////////////////////////
-        // Other methods
-        //////////////////////////////////////////////////////////////////////////
-        std::map<uint64_t , IDL::MvregNode> copy_map();
 
         //////////////////////////////////////////////////////////////////////////
         // CRDT join operations
@@ -127,7 +133,6 @@ namespace DSR
 
         Graph(const Graph& G); //Private constructor for DSRCopy
 
-       
         //////////////////////////////////////////////////////////////////////////
         // Other
         //////////////////////////////////////////////////////////////////////////
