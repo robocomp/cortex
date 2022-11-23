@@ -45,7 +45,7 @@ BreakBeforeBraces: Allman
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 BreakStringLiterals: true
-ColumnLimit:     130
+ColumnLimit:     120
 CommentPragmas:  '***'
 CompactNamespaces: true
 PackConstructorInitializers: CurrentLine
@@ -103,7 +103,7 @@ SpacesInContainerLiterals: false
 SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
-Standard:        LS_Cpp20
+Standard:        Auto
 TabWidth:        4
 UseTab:          Never
 ...
