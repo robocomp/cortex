@@ -109,7 +109,7 @@ namespace DSR {
         return m_agent_id;
     }
 
-    IDL::IDLEdge CRDTEdge::to_IDL_edge(uint64_t id) {
+    IDL::IDLEdge CRDTEdge::to_IDL_edge(uint64_t id) const {
         IDL::IDLEdge edge;
         edge.from(m_from);
         edge.to(m_to);
@@ -256,7 +256,7 @@ namespace DSR {
     }
 
 
-    IDL::IDLNode CRDTNode::to_IDL_node(uint64_t id) {
+    IDL::IDLNode CRDTNode::to_IDL_node(uint64_t id) const {
         IDL::IDLNode node;
         node.id(m_id);
         node.name(m_name);

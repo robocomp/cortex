@@ -417,7 +417,7 @@ public:
         return dk.ds.begin()->second;
     }
 
-    bool empty() {
+    bool empty() const {
         return dk.ds.empty();
     }
 

@@ -102,9 +102,9 @@ namespace DSR {
             return *this;
         }
 
-        [[nodiscard]] IDL::Val to_IDL_val();
+        [[nodiscard]] IDL::Val to_IDL_val() const;
 
-        [[nodiscard]] IDL::Attrib to_IDL_attrib();
+        [[nodiscard]] IDL::Attrib to_IDL_attrib() const;
 
         ///////////////////////
         // Members

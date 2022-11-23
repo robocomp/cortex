@@ -11,16 +11,16 @@ namespace DSR {
     /// Attribute
     ////////////////////////////////////////////////////
 
-    IDL::Attrib Attribute::to_IDL_attrib() {
+    IDL::Attrib Attribute::to_IDL_attrib() const {
         IDL::Attrib att;
         att.timestamp(m_timestamp);
         att.type(m_value.index());
-        att.value(std::move(to_IDL_val()));
+        att.value(to_IDL_val());
         att.agent_id(m_agent_id);
         return att;
     }
 
-    IDL::Val Attribute::to_IDL_val()
+    IDL::Val Attribute::to_IDL_val() const
     {
         IDL::Val value;
 

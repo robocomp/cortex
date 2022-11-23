@@ -60,7 +60,7 @@ namespace DSR {
 
         [[nodiscard]] uint32_t agent_id() const;
 
-        [[nodiscard]] IDL::IDLEdge to_IDL_edge(uint64_t id);
+        [[nodiscard]] IDL::IDLEdge to_IDL_edge(uint64_t id) const;
 
 
         bool operator==(const CRDTEdge &rhs) const
@@ -185,7 +185,7 @@ namespace DSR {
 
         [[nodiscard]] const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano() const;
 
-        [[nodiscard]] IDL::IDLNode to_IDL_node(uint64_t id);
+        [[nodiscard]] IDL::IDLNode to_IDL_node(uint64_t id) const;
 
         bool operator==(const CRDTNode &rhs) const
         {

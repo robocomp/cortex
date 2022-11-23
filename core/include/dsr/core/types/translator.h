@@ -15,7 +15,7 @@ namespace DSR {
     inline static IDL::MvregNode CRDTNode_to_IDL(
         uint32_t agent_id,
         uint64_t id,
-        mvreg<DSR::CRDTNode> &data
+        const mvreg<DSR::CRDTNode> &data
     )
     {
         IDL::MvregNode delta_crdt;
