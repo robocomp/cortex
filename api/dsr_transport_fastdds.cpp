@@ -24,6 +24,13 @@ namespace DSR {
        transport =  _transport;
     }
 
+
+    auto FastDDSTransport::stop() -> void
+    {
+        participant.remove_participant_and_entities();
+    }
+
+
     //////////////////////////////////////////////////
     ///// Topics
     /////////////////////////////////////////////////
@@ -63,16 +70,16 @@ namespace DSR {
 
         DDSPubSub pub_sub;
         
-        auto [res, sub, reader] = pub_sub.dsr_sub.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(),
+        auto [res, sub, reader] = pub_sub.dsr_sub.init(participant.getParticipant(), participant.getGraphTopic(),
                                 NewMessageFn (graph, lambda_request_answer), mtx_entity_creation);
-        dsrparticipant.add_subscriber(dsrparticipant.getGraphTopic()->get_name(), {sub, reader});
+        participant.add_subscriber(participant.getGraphTopic()->get_name(), {sub, reader});
 
         std::this_thread::sleep_for(300ms);   // NEEDED ?
 
         std::cout << " Requesting the complete graph \n";
 
         IDL::GraphRequest gr;
-        gr.from( dsrparticipant.getParticipant()->get_qos().name().to_string());
+        gr.from( participant.getParticipant()->get_qos().name().to_string());
         gr.id(graph->get_agent_id());
         write_request(&gr);
 
@@ -89,8 +96,8 @@ namespace DSR {
             write_request(&gr);
         }
 
-        dsrparticipant.delete_publisher(dsrparticipant.getGraphRequestTopic()->get_name());
-        dsrparticipant.delete_subscriber(dsrparticipant.getGraphTopic()->get_name());
+        participant.delete_publisher(participant.getGraphRequestTopic()->get_name());
+        participant.delete_subscriber(participant.getGraphTopic()->get_name());
 
         return { sync, repeated };
     }
@@ -147,12 +154,12 @@ namespace DSR {
             }
         };
 
-        auto [res, sub, reader] = graph_server.dsr_sub.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(),
+        auto [res, sub, reader] = graph_server.dsr_sub.init(participant.getParticipant(), participant.getGraphRequestTopic(),
                                 NewMessageFn(graph, lambda_graph_request), mtx_entity_creation);
-        dsrparticipant.add_subscriber(dsrparticipant.getGraphRequestTopic()->get_name(), {sub, reader});
+        participant.add_subscriber(participant.getGraphRequestTopic()->get_name(), {sub, reader});
     }
 
-    auto FastDDSTransport::start_topics(Graph *graph, bool show) -> void 
+    auto FastDDSTransport::start_subs(Graph *graph, bool show) -> void 
     {
         auto delta_node_thread = std::async(std::launch::async, &FastDDSTransport::start_node_subscription, this, graph, show);
         auto delta_edge_thread = std::async(std::launch::async, &FastDDSTransport::start_edge_subscription, this, graph, show);
@@ -163,6 +170,27 @@ namespace DSR {
         delta_edge_thread.get();
         delta_node_attrs_thread.get();
         delta_edge_attrs_thread.get();
+    }
+
+
+    auto FastDDSTransport::start_pubs(Graph *graph, bool show) -> void 
+    {
+        auto [res, pub, writer] = node.dsr_pub.init(participant.getParticipant(), participant.getNodeTopic());
+        auto [res2, pub2, writer2] = node_attribute.dsr_pub.init(participant.getParticipant(), participant.getAttNodeTopic());
+
+        auto [res3, pub3, writer3] = edge.dsr_pub.init(participant.getParticipant(), participant.getEdgeTopic());
+        auto [res4, pub4, writer4] = edge_attribute.dsr_pub.init(participant.getParticipant(), participant.getAttEdgeTopic());
+
+        auto [res5, pub5, writer5] = graph_request.dsr_pub.init(participant.getParticipant(), participant.getGraphRequestTopic());
+        auto [res6, pub6, writer6] = graph_request.dsr_pub.init(participant.getParticipant(), participant.getGraphTopic());
+
+        participant.add_publisher(participant.getNodeTopic()->get_name(), {pub, writer});
+        participant.add_publisher(participant.getAttNodeTopic()->get_name(), {pub2, writer2});
+        participant.add_publisher(participant.getEdgeTopic()->get_name(), {pub3, writer3});
+        participant.add_publisher(participant.getAttEdgeTopic()->get_name(), {pub4, writer4});
+        participant.add_publisher(participant.getGraphRequestTopic()->get_name(), {pub5, writer5});
+        participant.add_publisher(participant.getGraphTopic()->get_name(), {pub6, writer6});
+
     }
 
     auto FastDDSTransport::start_node_subscription(Graph *graph, bool show) -> void
@@ -194,8 +222,8 @@ namespace DSR {
             catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
         };
 
-        auto [res, sub, reader] = node.dsr_sub.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), NewMessageFn(graph, lambda_general_topic), mtx_entity_creation);
-        dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), {sub, reader});
+        auto [res, sub, reader] = node.dsr_sub.init(participant.getParticipant(), participant.getNodeTopic(), NewMessageFn(graph, lambda_general_topic), mtx_entity_creation);
+        participant.add_subscriber(participant.getNodeTopic()->get_name(), {sub, reader});
     }
 
     auto FastDDSTransport::start_edge_subscription(Graph *graph, bool show) -> void
@@ -226,8 +254,8 @@ namespace DSR {
             }
             catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
         };
-        auto [res, sub, reader]  = edge.dsr_sub.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), NewMessageFn(graph, lambda_general_topic), mtx_entity_creation);
-        dsrparticipant.add_subscriber(dsrparticipant.getEdgeTopic()->get_name(), {sub, reader});
+        auto [res, sub, reader]  = edge.dsr_sub.init(participant.getParticipant(), participant.getEdgeTopic(), NewMessageFn(graph, lambda_general_topic), mtx_entity_creation);
+        participant.add_subscriber(participant.getEdgeTopic()->get_name(), {sub, reader});
 
     }
 
@@ -257,12 +285,12 @@ namespace DSR {
                                     std::string type;
                                     {
                                         //TODO: replace with get_node_type()
-                                        std::shared_lock<std::shared_mutex> lock(_mutex);
-                                        if (auto itn = nodes.find(id); itn != nodes.end())  type = itn->second.read_reg().type() ;
+                                        std::shared_lock<std::shared_mutex> lock(graph->_mutex_data);
+                                        if (auto itn = graph->nodes.find(id); itn != graph->nodes.end())  type = itn->second.read_reg().type() ;
                                     }
                                     std::vector<std::future<std::optional<std::string>>> futures;
                                     for (auto &&s: samples.vec()) {
-                                        if (ignored_attributes.find(s.attr_name().data()) == ignored_attributes.end()) {
+                                        if (graph->ignored_attributes.find(s.attr_name().data()) == graph->ignored_attributes.end()) {
                                             futures.emplace_back(tp.spawn_task_waitable([graph, samp{std::move(s)}]() mutable {
                                                 auto f = graph->join_delta_node_attr(std::move(samp));
                                                 return f;
@@ -293,9 +321,9 @@ namespace DSR {
 
         };
         
-        auto [res, sub, reader] = node_attribute.dsr_sub.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(),
+        auto [res, sub, reader] = node_attribute.dsr_sub.init(participant.getParticipant(), participant.getAttNodeTopic(),
                             NewMessageFn(graph, lambda_general_topic), mtx_entity_creation);
-        dsrparticipant.add_subscriber(dsrparticipant.getAttNodeTopic()->get_name(), {sub, reader});
+        participant.add_subscriber(participant.getAttNodeTopic()->get_name(), {sub, reader});
     }
 
     auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) -> void
@@ -327,7 +355,7 @@ namespace DSR {
                                     std::vector<std::future<std::optional<std::string>>> futures;
 
                                     for (auto &&sample: samples.vec()) {
-                                        if (!ignored_attributes.contains(sample.attr_name().data())) {
+                                        if (!graph->ignored_attributes.contains(sample.attr_name().data())) {
                                             futures.emplace_back(tp.spawn_task_waitable([graph, sample = std::move(sample)]() mutable {
                                                     return graph->join_delta_edge_attr(std::move(sample));
                                             }));
@@ -343,8 +371,8 @@ namespace DSR {
                                     }
 
 
-                                    emit update_edge_attr_signal(from, to, type, sig, SignalInfo{samples.vec().at(0).agent_id()});
-                                    emit update_edge_signal(from, to, type, SignalInfo{samples.vec().at(0).agent_id()});
+                                    emit graph->update_edge_attr_signal(from, to, type, sig, SignalInfo{samples.vec().at(0).agent_id()});
+                                    emit graph->update_edge_signal(from, to, type, SignalInfo{samples.vec().at(0).agent_id()});
 
                                 });
                             }
@@ -357,10 +385,10 @@ namespace DSR {
             catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
 
         };
-        auto [res, sub, reader] = edge_attribute.dsr_sub.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(),
+        auto [res, sub, reader] = edge_attribute.dsr_sub.init(participant.getParticipant(), participant.getAttEdgeTopic(),
                             NewMessageFn(graph, lambda_general_topic), mtx_entity_creation);
-        dsrparticipant.add_subscriber(dsrparticipant.getAttEdgeTopic()->get_name(), {sub, reader});
-        //dsrsub_edge_attrs_stream.init(dsrparticipant.getParticipant(), "DSR_EDGE_ATTRS_STREAM", dsrparticipant.getEdgeAttrTopicName(),
+        participant.add_subscriber(participant.getAttEdgeTopic()->get_name(), {sub, reader});
+        //dsrsub_edge_attrs_stream.init(participant.getParticipant(), "DSR_EDGE_ATTRS_STREAM", participant.getEdgeAttrTopicName(),
         //                       dsrpub_call_edge_attrs, true);
     }
 

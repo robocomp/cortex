@@ -21,6 +21,12 @@ namespace DSR {
     }
 
 
+    auto Transport::stop() -> void
+    {
+        comm->stop();
+    }
+
+
     //////////////////////////////////////////////////
     ///// Topics
     /////////////////////////////////////////////////
@@ -34,11 +40,16 @@ namespace DSR {
         comm->start_fullgraph_server(graph); 
     }
 
-    auto Transport::start_topics(Graph* graph, bool show) -> void 
+    auto Transport::start_topics_subcription(Graph* graph, bool show) -> void 
     { 
-        comm->start_topics(graph, show);
-    
+        comm->start_pubs(graph, show);
     }
+
+    auto Transport::start_topics_publishing(Graph* graph, bool show) -> void 
+    {
+        comm->start_subs(graph, show);
+    }
+
 
     //////////////////////////////////////////////////
     ///// Agents info

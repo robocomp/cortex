@@ -12,7 +12,6 @@
 #include <thread>
 #include <mutex>
 #include <shared_mutex>
-#include <any>
 #include <memory>
 #include <vector>
 #include <variant>
@@ -46,15 +45,19 @@ namespace DSR
     };
 
 
-    class CortexConfig {
+    struct CortexConfig {
         uint64_t agent_id;
         std::string agent_name;
         bool localhost;
         bool copy;
-        std::unique_ptr<BaseManager> comm; //this is moved to transport later.
+        bool init_empty;
+        std::shared_ptr<BaseManager> comm; //this is moved to transport later.
+        std::optional<std::string> load_file;
     };
 
     inline constexpr SignalInfo default_signal_info {};
+    inline constexpr std::string_view default_empty_stringv = "";
+    inline const std::string default_empty_string = "";
 
     /////////////////////////////////////////////////////////////////
     /// GRAPH UNSAFE API
@@ -65,23 +68,20 @@ namespace DSR
         Q_OBJECT
 
     public:
-        Graph(const CortexConfig& cfg);
+        Graph(CortexConfig cfg);
         ~Graph() override;
 
-        //////////////////////////////////////////////////////
-        ///  Graph API
-        //////////////////////////////////////////////////////
-
+        //TODO: Document functions locking.
 
         //////////////////////////////////////////////////////
         ///  CONVENIENCE METHODS
         //////////////////////////////////////////////////////
         
-        size_t size();
-        bool empty(const uint64_t &id);
-        std::map<uint64_t, Node> get_copy() const;
-        std::map<uint64_t , IDL::MvregNode> copy_map() const;
-        uint64_t get_agent_id() const;
+        auto size() const -> size_t;
+        auto empty(uint64_t id) const -> bool;
+        auto get_copy() const -> std::map<uint64_t, Node>;
+        auto copy_map() const -> std::map<uint64_t , IDL::MvregNode>;
+        auto get_agent_id() const -> uint64_t;
         void reset();
 
         //////////////////////////////////////////////////////
@@ -97,21 +97,21 @@ namespace DSR
 
         void update_maps_node_delete(uint64_t id, const std::optional<CRDTNode>& n);
         void update_maps_node_insert(uint64_t id, const CRDTNode &n);
-        void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "");
-        void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key);
+        void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string& key = default_empty_string);
+        void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string& key);
 
 
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
 
-        std::optional<CRDTNode> get_(uint64_t id);
-        std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
-        std::tuple<bool, std::optional<IDL::MvregNode>> insert_node_(CRDTNode &&node);
-        std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> update_node_(CRDTNode &&node);
-        std::tuple<bool, std::vector<std::tuple<uint64_t, uint64_t, std::string>>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>> delete_node_(uint64_t id);
-        std::optional<IDL::MvregEdge> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
-        std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
+        auto get_(uint64_t id) -> std::optional<CRDTNode>;
+        auto get_edge_(uint64_t from, uint64_t to, const std::string& key) -> std::optional<CRDTEdge>;
+        auto insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<IDL::MvregNode>>;
+        auto update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>>;
+        auto delete_node_(uint64_t id) -> std::tuple<bool, std::vector<std::tuple<uint64_t, uint64_t, std::string>>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>>;
+        auto delete_edge_(uint64_t from, uint64_t t, const std::string& key) -> std::optional<IDL::MvregEdge>;
+        auto insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to) -> std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>>;
 
 
         //////////////////////////////////////////////////////////////////////////
@@ -119,11 +119,11 @@ namespace DSR
         ///////////////////////////////////////////////////////////////////////////
         void join_delta_node(IDL::MvregNode &&mvreg);
         void join_delta_edge(IDL::MvregEdge &&mvreg);
-        std::optional<std::string> join_delta_node_attr(IDL::MvregNodeAttr &&mvreg);
-        std::optional<std::string> join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg);
+        auto join_delta_node_attr(IDL::MvregNodeAttr &&mvreg) -> std::optional<std::string>;
+        auto join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg) -> std::optional<std::string>;
         void join_full_graph(IDL::OrMap &&full_graph);
 
-        bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta);
+        auto process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta) -> bool;
         void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute> && attr);
         void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute> && attr);
 
@@ -162,12 +162,12 @@ namespace DSR
 
         mutable std::shared_mutex _mutex_cache_maps;
 
-        std::unordered_map<std::string, uint64_t> name_map;     // mapping between name and id of nodes.
+        std::unordered_map<std::string, uint64_t, string_hash, string_equal> name_map;     // mapping between name and id of nodes.
         std::unordered_map<uint64_t, std::string> id_map;       // mapping between id and name of nodes.
         std::unordered_map<std::pair<uint64_t, uint64_t>, std::unordered_set<std::string>, hash_tuple> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<uint64_t , std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple>> to_edges;      // collection with all graph edges. (to, (from, key))
-        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>> edgeType;  // collection with all edge types.
-        std::unordered_map<std::string, std::unordered_set<uint64_t>> nodeType;  // collection with all node types.
+        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>>, string_hash, string_equal> edgeType;  // collection with all edge types.
+        std::unordered_map<std::string, std::unordered_set<uint64_t>, string_hash, string_equal> nodeType;  // collection with all node types.
 
 
         //////////////////////////////////////////////////////////////////////////

@@ -19,16 +19,6 @@
 namespace DSR
 {
     class Graph;
-        /*
-        auto get_agent_id() -> uint64_t;
-
-        auto copy_map() -> std::map<uint64_t , IDL::MvregNode>;
-
-        auto join_delta_node(IDL::MvregNode &&mvreg) -> void;
-        auto join_delta_edge(IDL::MvregEdge &&mvreg) -> void;
-        auto join_delta_node_attr(IDL::MvregNodeAttr &&mvreg) -> std::optional<std::string>;
-        auto join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg) -> std::optional<std::string>;
-        auto join_full_graph(IDL::OrMap &&full_graph) -> void;*/
 
     class Transport;
 
@@ -40,13 +30,16 @@ namespace DSR
         
         public:
 
+        virtual auto stop() -> void = 0;
+
         //////////////////////////////////////////////////
         ///// topics
         /////////////////////////////////////////////////
 
         virtual auto start_fullgraph_request(Graph*) -> std::pair<bool, bool> = 0;
         virtual auto start_fullgraph_server(Graph*) -> void  = 0;
-        virtual auto start_topics(Graph*, bool show) -> void = 0;
+        virtual auto start_pubs(Graph*, bool show) -> void = 0;
+        virtual auto start_subs(Graph*, bool show) -> void = 0;
 
 
         //////////////////////////////////////////////////
@@ -74,8 +67,10 @@ namespace DSR
         mutable std::mutex participant_set_mutex;
         std::unordered_map<std::string, bool> participant_set;
  
-        auto create(BaseManager *comm_) -> std::shared_ptr<Transport>;
+        static auto create(BaseManager *comm_) -> std::shared_ptr<Transport>;
         
+        auto stop() -> void;
+
         //////////////////////////////////////////////////
         ///// Topics
         /////////////////////////////////////////////////
@@ -83,7 +78,9 @@ namespace DSR
         
         auto start_fullgraph_server(Graph* graph) -> void ;
 
-        auto start_topics(Graph* graph, bool show) -> void ;
+        auto start_topics_subcription(Graph* graph, bool show) -> void ;
+
+        auto start_topics_publishing(Graph* graph, bool show) -> void ;
 
         //////////////////////////////////////////////////
         ///// Agents info

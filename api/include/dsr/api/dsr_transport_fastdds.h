@@ -25,9 +25,13 @@ namespace DSR
 
         FastDDSTransport(std::weak_ptr<Transport> _transport);
 
+        auto stop() -> void override;
+
         auto start_fullgraph_request(Graph* graph) -> std::pair<bool, bool> override;
         auto start_fullgraph_server(Graph* graph) -> void                   override;
-        auto start_topics(Graph* graph, bool show) -> void                  override;
+        auto start_subs(Graph* graph, bool show) -> void                  override;
+        auto start_pubs(Graph* graph, bool show) -> void                  override;
+
 
         auto start_node_subscription(Graph* graph, bool show) -> void;
         auto start_edge_subscription(Graph* graph, bool show) -> void;
@@ -81,7 +85,7 @@ namespace DSR
             DSRSubscriber dsr_sub;
         };
 
-        DSRParticipant dsrparticipant;
+        DSRParticipant participant;
         DDSPubSub node;
         DDSPubSub node_attribute;
         DDSPubSub edge;
