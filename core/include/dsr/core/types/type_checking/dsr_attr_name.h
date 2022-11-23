@@ -58,8 +58,10 @@ static constexpr auto reg_fn = []() -> auto
 
 
 
+[[maybe_unused]] inline unsigned char reg_type_b [sizeof(bool)];
+
 #define REGISTER_FN(x, it, stream)  \
-                            [[maybe_unused]] inline bool x ##_b =  attribute_types::register_type( x##_str, reg_fn<it>(), stream);     \
+                            [[maybe_unused]] inline auto x_##x =  new (reg_type_b) bool(attribute_types::register_type( x##_str, reg_fn<it>(), stream));     \
                             \
 
 
@@ -426,5 +428,21 @@ REGISTER_TYPE(test_vec6_type, std::reference_wrapper<const vec6> , false)
 */
 REGISTER_TYPE(compresssed_id, int, false)
 REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uint8_t>>, false)
+
+
+REGISTER_TYPE(rt_translation_grid, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(inter_cont, std::int32_t, false)
+REGISTER_TYPE(checked_face, bool, false)
+
+ 
+/*
+* Grid
+* */
+
+REGISTER_TYPE(grid_pos, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(grid_size, std::reference_wrapper<const std::vector<float>>, false) // [0] and [1] top_left, [2] and [3] width and height
+REGISTER_TYPE(grid_ang, float, false)
+REGISTER_TYPE(grid_activated, bool, false)
+
 
 #endif //DSR_ATTR_NAME_H

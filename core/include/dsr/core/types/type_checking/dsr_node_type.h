@@ -122,4 +122,8 @@ REGISTER_NODE_TYPE(agent)
 
 //pioneer
 REGISTER_NODE_TYPE(wayp)
+
+REGISTER_NODE_TYPE(servo)
+REGISTER_NODE_TYPE(virtual_person)
+
 #endif //DSR_NODE_TYPE_H
