@@ -7,6 +7,30 @@
 
 #include <chrono>
 #include <functional>
+#include <string>
+#include <type_traits>
+
+
+struct string_equal 
+{
+    using is_transparent = std::true_type ;
+
+    constexpr bool operator()(std::string_view l, std::string_view r) const noexcept
+    {
+        return l == r;
+    }
+};
+
+
+struct string_hash 
+{
+    using is_transparent = std::true_type ;
+
+    size_t operator()(std::string_view str) const noexcept 
+    {
+        return std::hash<std::string_view>()(str);
+    }
+};
 
 
 class hash_tuple {
@@ -18,7 +42,11 @@ class hash_tuple {
         component(const T &value) : value(value) {}
 
         uintmax_t operator,(uintmax_t n) const {
-            n ^= std::hash<T>()(value);
+            if constexpr(std::is_same_v<T, std::string>){
+                n ^= std::hash<std::string_view>()(value);
+            } else {
+                n ^= std::hash<T>()(value);
+            }
             n ^= n << (sizeof(uintmax_t) * 4 - 1);
             return n ^ std::hash<uintmax_t>()(n);
         }
