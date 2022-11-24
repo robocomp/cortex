@@ -27,7 +27,6 @@
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/utils.h"
-#include "dsr/core/id_generator.h"
 
 
 #define TIMEOUT 5000
@@ -35,6 +34,7 @@
 namespace DSR
 {
 
+    class DSRGraph;
     class RT_API;
 
     struct SignalInfo
@@ -46,11 +46,11 @@ namespace DSR
 
 
     struct CortexConfig {
-        uint64_t agent_id;
-        std::string agent_name;
+        uint32_t agent_id;
         bool localhost;
         bool copy;
         bool init_empty;
+        std::string agent_name;
         std::shared_ptr<BaseManager> comm; //this is moved to transport later.
         std::optional<std::string> load_file;
     };
@@ -64,11 +64,12 @@ namespace DSR
     /////////////////////////////////////////////////////////////////
     class Graph : public QObject
     {
+        friend DSRGraph;
         friend RT_API;
         Q_OBJECT
 
     public:
-        Graph(CortexConfig cfg);
+        Graph(CortexConfig& cfg);
         ~Graph() override;
 
         //TODO: Document functions locking.
@@ -137,9 +138,7 @@ namespace DSR
         // Other
         //////////////////////////////////////////////////////////////////////////
         
-        CortexConfig config;
-        id_generator generator;
-        
+        CortexConfig& config;        
 
         //////////////////////////////////////////////////////////////////////////
         // Communication

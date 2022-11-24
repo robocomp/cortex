@@ -8,7 +8,7 @@
 namespace DSR
 {
 
-    Graph::Graph(CortexConfig cfg) : config(std::move(cfg)), generator(config.agent_id)
+    Graph::Graph(CortexConfig& cfg) : config(cfg)
     {
         // TODO: copy from dsr_api.cpp
         transport = std::make_shared<Transport>(cfg.comm);
@@ -33,7 +33,7 @@ namespace DSR
 
                 if (repeated)
                 {
-                    qFatal("%s", (std::string("There is already an agent connected with the id: ") + std::to_string(agent_id)).c_str());
+                    qFatal("%s", (std::string("There is already an agent connected with the id: ") + std::to_string(config.agent_id)).c_str());
                 }
                 else {
                     qFatal("DSRGraph aborting: could not get DSR from the network after timeout");

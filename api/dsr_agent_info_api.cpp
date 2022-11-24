@@ -3,6 +3,8 @@
 //
 
 #include <dsr/api/dsr_agent_info_api.h>
+#include <dsr/api/dsr_api.h>
+
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/times.h>
@@ -19,11 +21,6 @@ namespace DSR {
     {
         return timer.is_running();
     }
-    /*void AgentInfoAPI::setPriod(uint32_t period_)
-    {
-        period = period_;
-        timer.setInterval(static_cast<int32_t>(period_));
-    }*/
 
     std::string AgentInfoAPI::exec(const char* cmd)
     {
