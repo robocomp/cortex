@@ -27,6 +27,7 @@
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/utils.h"
+#include "dsr_transport.h"
 
 
 #define TIMEOUT 5000
@@ -37,40 +38,31 @@ namespace DSR
     class DSRGraph;
     class RT_API;
 
-    struct SignalInfo
-    {
-        uint32_t agent_id; //change agent_id
-        //uint64_t send_timestamp; //send timestamp from the middleware
-        //uint64_t recv_timestamp; //recv timestamp from the middleware
-    };
-
-
     struct CortexConfig {
         uint32_t agent_id;
         bool localhost;
         bool copy;
         bool init_empty;
         std::string agent_name;
-        std::shared_ptr<BaseManager> comm; //this is moved to transport later.
+        std::unique_ptr<BaseManager> comm; //this is moved to transport later.
         std::optional<std::string> load_file;
+        DSRGraph *dsr; //this is a not owned pointer used only to allow sending signals in the transport. 
     };
 
-    inline constexpr SignalInfo default_signal_info {};
     inline constexpr std::string_view default_empty_stringv = "";
     inline const std::string default_empty_string = "";
 
     /////////////////////////////////////////////////////////////////
     /// GRAPH UNSAFE API
     /////////////////////////////////////////////////////////////////
-    class Graph : public QObject
+    class Graph
     {
         friend DSRGraph;
         friend RT_API;
-        Q_OBJECT
 
     public:
-        Graph(CortexConfig& cfg);
-        ~Graph() override;
+        Graph(CortexConfig& cfg, std::function<void(std::string)> read_from_json_file);
+        ~Graph();
 
         //TODO: Document functions locking.
 
@@ -137,7 +129,6 @@ namespace DSR
         //////////////////////////////////////////////////////////////////////////
         // Other
         //////////////////////////////////////////////////////////////////////////
-        
         CortexConfig& config;        
 
         //////////////////////////////////////////////////////////////////////////
@@ -165,7 +156,7 @@ namespace DSR
         std::unordered_map<uint64_t, std::string> id_map;       // mapping between id and name of nodes.
         std::unordered_map<std::pair<uint64_t, uint64_t>, std::unordered_set<std::string>, hash_tuple> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<uint64_t , std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple>> to_edges;      // collection with all graph edges. (to, (from, key))
-        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>>, string_hash, string_equal> edgeType;  // collection with all edge types.
+        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>, string_hash, string_equal> edgeType;  // collection with all edge types.
         std::unordered_map<std::string, std::unordered_set<uint64_t>, string_hash, string_equal> nodeType;  // collection with all node types.
 
 
@@ -178,17 +169,7 @@ namespace DSR
         std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_to;
         std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att;
 
-    signals:
-        void update_node_signal(uint64_t, const std::string &type, DSR::SignalInfo info = default_signal_info);
-        void update_node_attr_signal(uint64_t id ,const std::vector<std::string>& att_names, DSR::SignalInfo info = default_signal_info);
-
-        void update_edge_signal(uint64_t from, uint64_t to, const std::string &type, DSR::SignalInfo info = default_signal_info);
-        void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type, const std::vector<std::string>& att_name, DSR::SignalInfo info = default_signal_info);
-
-        void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag, DSR::SignalInfo info = default_signal_info);
-        void del_node_signal(uint64_t id, DSR::SignalInfo info = default_signal_info) ;
-
     };
 } // namespace CRDT
 
-Q_DECLARE_METATYPE(DSR::SignalInfo)
+

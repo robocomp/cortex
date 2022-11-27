@@ -60,14 +60,14 @@ namespace DSR
     class Transport : std::enable_shared_from_this<Transport> 
     {
 
-        Transport(BaseManager *comm_);
+        Transport(std::unique_ptr<BaseManager> comm_);
 
     public:
         std::unique_ptr<BaseManager> comm;
         mutable std::mutex participant_set_mutex;
         std::unordered_map<std::string, bool> participant_set;
  
-        static auto create(BaseManager *comm_) -> std::shared_ptr<Transport>;
+        static auto create(std::unique_ptr<BaseManager> comm_) -> std::shared_ptr<Transport>;
         
         auto stop() -> void;
 

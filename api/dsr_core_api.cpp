@@ -1,4 +1,6 @@
 #include "dsr/api/dsr_core_api.h"
+#include "dsr/api/dsr_api.h"
+#include "dsr/api/dsr_signal_info.h"
 
 #include "dsr/api/dsr_transport.h"
 #include "dsr/core/id_generator.h"
@@ -8,10 +10,10 @@
 namespace DSR
 {
 
-    Graph::Graph(CortexConfig& cfg) : config(cfg)
+    Graph::Graph(CortexConfig& cfg, std::function<void(std::string)> read_from_json_file) : config(cfg)
     {
         // TODO: copy from dsr_api.cpp
-        transport = std::make_shared<Transport>(cfg.comm);
+        transport = Transport::create(std::move(cfg.comm));
         transport->start_topics_publishing(this, false);
 
         if (config.load_file.has_value())
@@ -611,13 +613,13 @@ namespace DSR
             {
                 if (signal)
                 {
-                    emit update_node_signal(id, nodes.at(id).read_reg().type(), SignalInfo{mvreg.agent_id()});
+                    emit config.dsr->update_node_signal(id, nodes.at(id).read_reg().type(), SignalInfo{mvreg.agent_id()});
                     for (const auto &[k, v] : nodes.at(id).read_reg().fano())
                     {
                         // std::cout << "[JOIN NODE] add edge FROM: "<< id << ", "
                         // << k.first
                         // << ", " << k.second << std::endl;
-                        emit update_edge_signal(id, k.first, k.second, SignalInfo{mvreg.agent_id()});
+                        emit config.dsr->update_edge_signal(id, k.first, k.second, SignalInfo{mvreg.agent_id()});
                     }
 
                     for (const auto &[k, v] : map_new_to_edges)
@@ -625,12 +627,12 @@ namespace DSR
                         // std::cout << "[JOIN NODE] add edge TO: "<< k << ", " <<
                         // id << ", "
                         // << v << std::endl;
-                        emit update_edge_signal(k, id, v, SignalInfo{mvreg.agent_id()});
+                        emit config.dsr->update_edge_signal(k, id, v, SignalInfo{mvreg.agent_id()});
                     }
                 }
                 else
                 {
-                    emit del_node_signal(id, SignalInfo{mvreg.agent_id()});
+                    emit config.dsr->del_node_signal(id, SignalInfo{mvreg.agent_id()});
                     if (maybe_deleted_node.has_value())
                     {
                         for (const auto &node : maybe_deleted_node->fano())
@@ -639,7 +641,7 @@ namespace DSR
                             // node.second.read_reg().from() << ", " <<
                             // node.second.read_reg().to() << ", " <<
                             // node.second.read_reg().type() << std::endl;
-                            emit del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
+                            emit config.dsr->del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
                                                  node.second.read_reg().type(), SignalInfo{mvreg.agent_id()});
                         }
                     }
@@ -649,7 +651,7 @@ namespace DSR
                         // std::cout << "[JOIN NODE] delete edge TO: "<< from << ",
                         // " << id <<
                         // ", " << type << std::endl;
-                        emit del_edge_signal(from, id, type, SignalInfo{mvreg.agent_id()});
+                        emit config.dsr->del_edge_signal(from, id, type, SignalInfo{mvreg.agent_id()});
                     }
                 }
             }
@@ -797,14 +799,14 @@ namespace DSR
                 {
                     // std::cout << "[JOIN EDGE] add edge: "<< from << ", " << to <<
                     // ", " << type << std::endl;
-                    emit update_edge_signal(from, to, type, SignalInfo{mvreg.agent_id()});
+                    emit config.dsr->update_edge_signal(from, to, type, SignalInfo{mvreg.agent_id()});
                 }
                 else
                 {
                     // std::cout << "[JOIN EDGE] delete edge: "<< from << ", " << to
                     // << ", "
                     // << type << std::endl;
-                    emit del_edge_signal(from, to, type, SignalInfo{mvreg.agent_id()});
+                    emit config.dsr->del_edge_signal(from, to, type, SignalInfo{mvreg.agent_id()});
                 }
             }
         }
@@ -1087,25 +1089,25 @@ namespace DSR
                 // check what change is joined
                 if (!nd.has_value() || nd->attrs() != nodes[id].read_reg().attrs())
                 {
-                    emit update_node_signal(id, nodes[id].read_reg().type(), SignalInfo{agent_id_ch});
+                    emit config.dsr->update_node_signal(id, nodes[id].read_reg().type(), SignalInfo{agent_id_ch});
                 }
                 else if (nd.value() != nodes[id].read_reg())
                 {
                     auto iter = nodes[id].read_reg().fano();
                     for (const auto &[k, v] : nd->fano())
                     {
-                        if (!iter.contains(k)) emit del_edge_signal(id, k.first, k.second, SignalInfo{agent_id_ch});
+                        if (!iter.contains(k)) emit config.dsr->del_edge_signal(id, k.first, k.second, SignalInfo{agent_id_ch});
                     }
                     for (const auto &[k, v] : iter)
                     {
                         if (auto it = nd->fano().find(k); it == nd->fano().end() or it->second != v)
-                            emit update_edge_signal(id, k.first, k.second, SignalInfo{agent_id_ch});
+                            emit config.dsr->update_edge_signal(id, k.first, k.second, SignalInfo{agent_id_ch});
                     }
                 }
             }
             else
             {
-                emit del_node_signal(id, SignalInfo{agent_id_ch});
+                emit config.dsr->del_node_signal(id, SignalInfo{agent_id_ch});
             }
     }
 

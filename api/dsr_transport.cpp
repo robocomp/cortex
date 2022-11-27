@@ -11,15 +11,14 @@ using namespace std::literals;
 namespace DSR {
 
 
-    Transport::Transport(BaseManager *comm_) 
-        : comm(std::unique_ptr<BaseManager>(comm_))
+    Transport::Transport(std::unique_ptr<BaseManager> comm_) 
+        : comm(std::move(comm_))
     {};
 
-    auto Transport::create(BaseManager *comm_) -> std::shared_ptr<Transport>
+    auto Transport::create(std::unique_ptr<BaseManager> comm_) -> std::shared_ptr<Transport>
     {
-        return std::make_shared<Transport>(comm_);
+        return std::make_shared<Transport>(std::move(comm_));
     }
-
 
     auto Transport::stop() -> void
     {

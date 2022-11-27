@@ -29,6 +29,9 @@ endif(DEFINED GEOMETRY_API)
 
 set(headers_to_moc
         include/dsr/api/dsr_api.h
+        include/dsr/api/dsr_core_api.h
+        include/dsr/api/dsr_transport.h
+        include/dsr/api/dsr_transport_fastdds.h
         include/dsr/api/dsr_inner_eigen_api.h
         include/dsr/api/dsr_agent_info_api.h
         include/dsr/api/dsr_signal_info.h
@@ -42,12 +45,15 @@ add_library(Robocomp::dsr_api ALIAS dsr_api )
 target_sources(dsr_api
         PRIVATE
         dsr_api.cpp
+        dsr_core_api.cpp
         dsr_camera_api.cpp
         dsr_agent_info_api.cpp
         dsr_inner_eigen_api.cpp
         dsr_rt_api.cpp
         dsr_utils.cpp
         GHistorySaver.cpp
+        dsr_transport.cpp
+        dsr_transport_fastdds.cpp
         ${GEOM_API_SOURCES}
         ${headers_to_moc}
         )

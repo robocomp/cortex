@@ -2,12 +2,12 @@
 // Created by crivac on 17/01/19.
 //
 
-#ifndef DSR_GRAPH
-#define DSR_GRAPH
+#pragma once
 
 #include "dsr/api/dsr_agent_info_api.h"
 #include "dsr/api/dsr_camera_api.h"
 #include "dsr/api/dsr_core_api.h"
+#include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_eigen_defs.h"
 #include "dsr/api/dsr_inner_eigen_api.h"
 #include "dsr/api/dsr_rt_api.h"
@@ -34,6 +34,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <QtCore/QtCore>
 #include <shared_mutex>
 #include <thread>
 #include <type_traits>
@@ -49,10 +50,14 @@ namespace DSR
     /////////////////////////////////////////////////////////////////
     /// CRDT API
     /////////////////////////////////////////////////////////////////
-    class DSRGraph
+
+    inline const std::vector<std::string> empty_string_vec = {};
+
+
+    class DSRGraph : public QObject
     {
         friend RT_API;
-
+        Q_OBJECT
     public:
         size_t size();
         DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file = std::string(),
@@ -64,16 +69,18 @@ namespace DSR
         {
         }
 
-        ~DSRGraph();
+        ~DSRGraph() override;
 
         //////////////////////////////////////////////////////
         ///  Graph API
         //////////////////////////////////////////////////////
 
         // Utils
-        bool empty(const uint64_t &id);
-        std::map<uint64_t, Node> getCopy() const;
+        bool empty(const uint64_t &id); //TODO: this is in Graph
+        std::map<uint64_t, Node> getCopy() const; //TODO: this is in Graph + Deprecate and new name
 
+
+        //TODO: add more apis or remove all
         std::unique_ptr<InnerEigenAPI> get_inner_eigen_api()
         {
             return std::make_unique<InnerEigenAPI>(this);
@@ -117,7 +124,7 @@ namespace DSR
         ///  CONVENIENCE METHODS
         //////////////////////////////////////////////////////
         // Nodes
-        std::optional<Node> get_node_root();
+        [[deprecated("root node is not defined anymore. It may be 100 in old configurations")]] std::optional<Node> get_node_root();
         std::vector<Node> get_nodes_by_type(const std::string &type);
         std::vector<Node> get_nodes_by_types(const std::vector<std::string> &types);
         std::optional<std::string> get_name_from_id(uint64_t id);
@@ -410,65 +417,6 @@ namespace DSR
             return true;
         }
 
-    private:
-        template <typename name, typename Type>
-        inline auto get_crdt_attrib_by_name(const Type &n) requires(
-            crdt_node_or_edge<Type> and is_attr_name<name>)  // TODO: DEPRECATE THIS?
-        {
-            using name_type = std::remove_cv_t<
-                unwrap_reference_wrapper_t<std::remove_reference_t<std::remove_cv_t<decltype(name::type)>>>>;
-
-            auto &attrs = n.attrs();
-            auto value = attrs.find(name::attr_name.data());
-
-            if constexpr (is_reference_wrapper<name_type>::value)
-            {
-                using ret_type = std::optional<decltype(name_type::type)>;
-                if (value == attrs.end()) return ret_type();
-                auto av = *value->second.read().begin();
-
-                if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::string>>)
-                    return ret_type(av.str());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::vector<float>>>)
-                    return ret_type(av.float_vec());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::vector<uint8_t>>>)
-                    return ret_type(av.byte_vec());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::vector<uint64_t>>>)
-                    return ret_type(av.u64_vec());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::array<float, 2>>>)
-                    return ret_type(av.vec2());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::array<float, 3>>>)
-                    return ret_type(av.vec3());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::array<float, 4>>>)
-                    return ret_type(av.vec4());
-                else if constexpr (std::is_same_v<name_type, std::reference_wrapper<const std::array<float, 6>>>)
-                    return ret_type(av.vec6());
-                else []<bool flag = false>()
-                    {
-                        static_assert(flag, "Unreachable");
-                    }
-                ();
-            }
-            else
-            {
-                using ret_type = std::optional<name_type>;
-                if (value == attrs.end()) return ret_type();
-                auto av = value->second.read_reg();
-
-                if constexpr (std::is_same_v<name_type, float>) return ret_type(av.fl());
-                else if constexpr (std::is_same_v<name_type, std::int32_t>) return ret_type(av.dec());
-                else if constexpr (std::is_same_v<name_type, std::uint32_t>) return ret_type(av.uint());
-                else if constexpr (std::is_same_v<name_type, std::uint64_t>) return ret_type(av.uint64());
-                else if constexpr (std::is_same_v<name_type, bool>) return ret_type(av.bl());
-                else if constexpr (std::is_same_v<name_type, double>) return ret_type(av.dob());
-                else []<bool flag = false>()
-                    {
-                        static_assert(flag, "Unreachable");
-                    }
-                ();
-            }
-        }
-
     public:
         // Mixed
         inline uint64_t get_agent_id() const;
@@ -494,7 +442,7 @@ namespace DSR
         void print_node(uint64_t id);
         void print_RT(uint64_t root) const;
 
-        void write_to_json_file(const std::string &file, const std::vector<std::string> &skip_node_content = {}) const;
+        void write_to_json_file(const std::string &file, const std::vector<std::string> &skip_node_content = empty_string_vec) const;
 
         void read_from_json_file(const std::string &file);
 
@@ -518,7 +466,18 @@ namespace DSR
         std::shared_ptr<Graph> graph;
         std::unique_ptr<Utilities> utils;
         std::unordered_set<std::string_view> ignored_attributes;
+
+    public:
+
+    signals:
+        void update_node_signal(uint64_t, const std::string &type, DSR::SignalInfo info = default_signal_info);
+        void update_node_attr_signal(uint64_t id ,const std::vector<std::string>& att_names, DSR::SignalInfo info = default_signal_info);
+
+        void update_edge_signal(uint64_t from, uint64_t to, const std::string &type, DSR::SignalInfo info = default_signal_info);
+        void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type, const std::vector<std::string>& att_name, DSR::SignalInfo info = default_signal_info);
+
+        void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag, DSR::SignalInfo info = default_signal_info);
+        void del_node_signal(uint64_t id, DSR::SignalInfo info = default_signal_info) ;
+
     };
 }  // namespace DSR
-
-#endif
