@@ -21,7 +21,7 @@ class GraphNodeWidget : public  QTableWidget
 {
   Q_OBJECT
   public:
-    GraphNodeWidget(std::shared_ptr<DSR::DSRGraph> graph_, DSR::IDType node_id_) : graph(std::move(graph_)), node_id(node_id_)
+    GraphNodeWidget(std::shared_ptr<DSR::DSRGraph> graph_, uint64_t node_id_) : graph(std::move(graph_)), node_id(node_id_)
     {
       qRegisterMetaType<std::int32_t>("std::int32_t");
       qRegisterMetaType<std::uint32_t>("std::uint32_t");

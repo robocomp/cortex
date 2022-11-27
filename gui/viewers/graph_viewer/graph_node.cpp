@@ -356,7 +356,7 @@ void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<s
 //        }
 //    }
 }
-/* void GraphNode::NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs &attr)
+/* void GraphNode::NodeAttrsChangedSLOT(const uint64_t &node, const DSR::Attribs &attr)
  {
 	 std::cout << "do cool stuff" << std::endl;
  }

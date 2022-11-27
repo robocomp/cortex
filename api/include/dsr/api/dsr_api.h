@@ -295,7 +295,7 @@ namespace DSR
 
             if constexpr (std::is_same_v<Type, Node> || std::is_same_v<Type, Edge>)
             {
-                Attribute at(std::forward<Ta>(att_value), get_unix_timestamp(), graph->config.agent_id);
+                Attribute at(std::forward<Ta>(att_value), get_unix_timestamp(), config.agent_id);
                 elem.attrs().insert_or_assign(name::attr_name.data(), at);
             }
             else
@@ -327,7 +327,7 @@ namespace DSR
 
             if constexpr (std::is_same_v<Type, Node> || std::is_same_v<Type, Edge>)
             {
-                Attribute at(std::forward<Ta>(att_value), get_unix_timestamp(), graph->config.agent_id);
+                Attribute at(std::forward<Ta>(att_value), get_unix_timestamp(), config.agent_id);
                 elem.attrs().insert_or_assign(att_name, at);
             }
             else
@@ -419,8 +419,8 @@ namespace DSR
 
     public:
         // Mixed
-        inline uint64_t get_agent_id() const;
-        inline std::string get_agent_name() const;
+        uint32_t get_agent_id() const;
+        std::string get_agent_name() const;
 
         void reset();
 

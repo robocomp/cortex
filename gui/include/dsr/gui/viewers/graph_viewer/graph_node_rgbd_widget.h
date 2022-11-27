@@ -27,7 +27,7 @@ class GraphNodeRGBDWidget : public QWidget
   std::chrono::system_clock::time_point last_update_rgb, last_update_d ;
 
   public:
-    GraphNodeRGBDWidget(std::shared_ptr<DSR::DSRGraph> graph_, DSR::IDType node_id_) : graph(std::move(graph_)), node_id(node_id_)
+    GraphNodeRGBDWidget(std::shared_ptr<DSR::DSRGraph> graph_, uint64_t node_id_) : graph(std::move(graph_)), node_id(node_id_)
     {
       //cam = graph->get_camera_api(graph->get_nodes_by_type("rgbd").at(0));
       setWindowTitle(QString::fromStdString(graph->get_agent_name()) + "-RGBD");
@@ -157,7 +157,7 @@ class GraphNodeRGBDWidget : public QWidget
     QLabel label;
     std::shared_ptr<DSR::DSRGraph> graph;
     std::unique_ptr<CameraAPI> cam;
-    DSR::IDType node_id;
+    uint64_t node_id;
 };      
 
 #endif // GRAPHNODERGBDWIDGET_H

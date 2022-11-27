@@ -102,7 +102,7 @@ protected:
     //void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override { qDebug() << "move " << event->pos();};
 
 public slots:
-    //void NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs&);
+    //void NodeAttrsChangedSLOT(const uint64_t &node, const DSR::Attribs&);
     void show_node_widget(const std::string &show_type= "table");
     void update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type_);
     void delete_node();

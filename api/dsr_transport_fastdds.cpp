@@ -7,6 +7,8 @@
 #include <dsr/api/dsr_core_api.h>
 #include <dsr/api/dsr_transport.h>
 #include <dsr/api/dsr_transport_fastdds.h>
+#include <dsr/api/dsr_signal_info.h>
+#include <dsr/api/dsr_api.h>
 #include <exception>
 #include <functional>
 #include <future>
@@ -337,8 +339,8 @@ auto FastDDSTransport::start_node_attrs_subscription(Graph *graph, bool show) ->
                                     std::vector<std::future<std::optional<std::string>>> futures;
                                     for (auto &&s : samples.vec())
                                     {
-                                        if (graph->ignored_attributes.find(s.attr_name().data()) ==
-                                            graph->ignored_attributes.end())
+                                        if (graph->get_ignored_attributes().find(s.attr_name().data()) ==
+                                            graph->get_ignored_attributes().end())
                                         {
                                             futures.emplace_back(tp.spawn_task_waitable(
                                                 [graph, samp{std::move(s)}]() mutable
@@ -356,9 +358,9 @@ auto FastDDSTransport::start_node_attrs_subscription(Graph *graph, bool show) ->
                                         if (opt_str.has_value()) sig.emplace_back(std::move(opt_str.value()));
                                     }
 
-                                    emit graph->dsr->update_node_attr_signal(id, sig,
+                                    emit graph->get_config().dsr->update_node_attr_signal(id, sig,
                                                                         SignalInfo{samples.vec().at(0).agent_id()});
-                                    emit graph->dsr->update_node_signal(id, type,
+                                    emit graph->get_config().dsr->update_node_signal(id, type,
                                                                    SignalInfo{samples.vec().at(0).agent_id()});
                                 });
                         }
@@ -418,7 +420,7 @@ auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) ->
 
                                     for (auto &&sample : samples.vec())
                                     {
-                                        if (!graph->ignored_attributes.contains(sample.attr_name().data()))
+                                        if (!graph->get_ignored_attributes().contains(sample.attr_name().data()))
                                         {
                                             futures.emplace_back(tp.spawn_task_waitable(
                                                 [graph, sample = std::move(sample)]() mutable
@@ -433,9 +435,9 @@ auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) ->
                                         if (opt_str.has_value()) sig.emplace_back(std::move(opt_str.value()));
                                     }
 
-                                    emit graph->dsr->update_edge_attr_signal(from, to, type, sig,
+                                    emit graph->get_config().dsr->update_edge_attr_signal(from, to, type, sig,
                                                                         SignalInfo{samples.vec().at(0).agent_id()});
-                                    emit graph->dsr->update_edge_signal(from, to, type,
+                                    emit graph->get_config().dsr->update_edge_signal(from, to, type,
                                                                    SignalInfo{samples.vec().at(0).agent_id()});
                                 });
                         }

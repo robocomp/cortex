@@ -9,7 +9,7 @@ class GraphEdgeWidget : public QTableWidget
 {
     Q_OBJECT
 public:
-    GraphEdgeWidget(std::shared_ptr<DSR::DSRGraph> graph_, const DSR::IDType &from_, const DSR::IDType &to_, const std::string &label_) :
+    GraphEdgeWidget(std::shared_ptr<DSR::DSRGraph> graph_, const uint64_t &from_, const uint64_t &to_, const std::string &label_) :
             graph(std::move(graph_)), from(from_), to(to_), edge_type(label_)
     {
         qRegisterMetaType<std::int32_t>("std::int32_t");

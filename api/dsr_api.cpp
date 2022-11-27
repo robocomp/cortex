@@ -560,7 +560,7 @@ bool DSRGraph::is_copy() const
     return config.copy;
 }
 
-inline uint64_t DSRGraph::get_agent_id() const
+inline uint32_t DSRGraph::get_agent_id() const
 {
     return config.agent_id;
 };

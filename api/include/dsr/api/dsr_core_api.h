@@ -37,6 +37,7 @@ namespace DSR
 
     class DSRGraph;
     class RT_API;
+    class FastDDSTransport;
 
     struct CortexConfig {
         uint32_t agent_id;
@@ -59,6 +60,7 @@ namespace DSR
     {
         friend DSRGraph;
         friend RT_API;
+        friend FastDDSTransport; //TODO remove this;
 
     public:
         Graph(CortexConfig& cfg, std::function<void(std::string)> read_from_json_file);
@@ -76,7 +78,7 @@ namespace DSR
         auto copy_map() const -> std::map<uint64_t , IDL::MvregNode>;
         auto get_agent_id() const -> uint64_t;
         void reset();
-
+        auto get_config() -> CortexConfig&;
         //////////////////////////////////////////////////////
         ///  Attribute filters
         //////////////////////////////////////////////////////
@@ -87,7 +89,12 @@ namespace DSR
             (ignored_attributes.insert(Att::attr_name), ...);
         }
 
+        auto get_ignored_attributes() -> const std::unordered_set<std::string_view>&;
 
+        //////////////////////////////////////////////////////
+        //  Attribute maps
+        //////////////////////////////////////////////////////
+        
         void update_maps_node_delete(uint64_t id, const std::optional<CRDTNode>& n);
         void update_maps_node_insert(uint64_t id, const CRDTNode &n);
         void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string& key = default_empty_string);
