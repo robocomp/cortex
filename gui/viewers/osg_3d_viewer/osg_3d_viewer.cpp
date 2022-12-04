@@ -562,7 +562,7 @@ void OSG3dViewer::mouseReleaseEvent(QMouseEvent* event)
 
 void OSG3dViewer::wheelEvent(QWheelEvent* event)
 {
-    int delta = event->delta();
+    int delta = event->angleDelta().y();
     osgGA::GUIEventAdapter::ScrollingMotion motion = delta < 0 ?
                 osgGA::GUIEventAdapter::SCROLL_UP : osgGA::GUIEventAdapter::SCROLL_DOWN;
     this->getEventQueue()->mouseScroll(motion);
