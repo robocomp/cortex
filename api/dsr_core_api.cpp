@@ -3,6 +3,7 @@
 #include "dsr/api/dsr_api.h"
 #include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_transport.h"
+#include "dsr/api/dsr_core_api.h"
 #include "dsr/core/id_generator.h"
 #include "dsr/core/types/translator.h"
 
@@ -10,11 +11,17 @@
 
 using namespace DSR;
 
-Graph::Graph(CortexConfig &cfg, std::function<void(std::string)> read_from_json_file) : config(cfg)
+Graph::Graph(CortexConfig &cfg) : config(cfg)
 {
-    // TODO: copy from dsr_api.cpp
-    transport = Transport::create(std::move(cfg.comm));
+    transport = Transport::create(std::move(config.comm));
     transport->start_topics_publishing(this, false);
+
+    qDebug() << __FUNCTION__ << "Constructor finished OK";
+}
+
+
+auto Graph::init(std::function<void(std::string)> read_from_json_file) -> void
+{
 
     if (config.load_file.has_value())
     {
@@ -47,7 +54,6 @@ Graph::Graph(CortexConfig &cfg, std::function<void(std::string)> read_from_json_
             }
         }
     }
-    qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
 
 Graph::~Graph() {}
@@ -114,6 +120,10 @@ void Graph::reset()
     to_edges.clear();
 }
 
+auto Graph::get_config() -> CortexConfig&
+{
+    return config;
+}
 
 auto Graph::get_ignored_attributes() -> const std::unordered_set<std::string_view>& 
 {

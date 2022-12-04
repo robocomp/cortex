@@ -4,11 +4,11 @@
 
 #include "dsr/core/topics/IDLGraph.h"
 
+#include <dsr/api/dsr_api.h>
 #include <dsr/api/dsr_core_api.h>
+#include <dsr/api/dsr_signal_info.h>
 #include <dsr/api/dsr_transport.h>
 #include <dsr/api/dsr_transport_fastdds.h>
-#include <dsr/api/dsr_signal_info.h>
-#include <dsr/api/dsr_api.h>
 #include <exception>
 #include <functional>
 #include <future>
@@ -19,9 +19,11 @@
 using namespace std::literals;
 using namespace DSR;
 
-FastDDSTransport::FastDDSTransport(std::weak_ptr<Transport> _transport) : tp(5), tp_delta_attr(2)
+FastDDSTransport::FastDDSTransport() : tp(5), tp_delta_attr(2) {}
+
+auto FastDDSTransport::set_transport(std::weak_ptr<Transport> ptr) -> void
 {
-    transport = _transport;
+    transport = ptr;
 }
 
 auto FastDDSTransport::stop() -> void
@@ -193,6 +195,28 @@ auto FastDDSTransport::start_subs(Graph *graph, bool show) -> void
 
 auto FastDDSTransport::start_pubs(Graph *graph, bool show) -> void
 {
+    [[maybe_unused]] auto _ = participant.init(
+        graph->get_agent_id(), graph->config.agent_name, graph->config.localhost,
+        [&](eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&info)
+        {
+            if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
+            {
+                auto tr = transport.lock();
+                std::unique_lock<std::mutex> lck(tr->participant_set_mutex);
+                std::cout << "Participant matched [" << info.info.m_participantName.to_string() << "]" << std::endl;
+                tr->participant_set.insert({info.info.m_participantName.to_string(), false});
+            }
+            else if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
+                        info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
+            {
+                auto tr = transport.lock();
+                std::unique_lock<std::mutex> lck(tr->participant_set_mutex);
+                tr->participant_set.erase(info.info.m_participantName.to_string());
+                std::cout << "Participant unmatched [" << info.info.m_participantName.to_string() << "]" << std::endl;
+                // graph->delete_node(info.info.m_participantName.to_string()); TODO: delete this node.
+            }
+        });
+
     auto [res, pub, writer] = node.dsr_pub.init(participant.getParticipant(), participant.getNodeTopic());
     auto [res2, pub2, writer2] =
         node_attribute.dsr_pub.init(participant.getParticipant(), participant.getAttNodeTopic());
@@ -358,10 +382,10 @@ auto FastDDSTransport::start_node_attrs_subscription(Graph *graph, bool show) ->
                                         if (opt_str.has_value()) sig.emplace_back(std::move(opt_str.value()));
                                     }
 
-                                    emit graph->get_config().dsr->update_node_attr_signal(id, sig,
-                                                                        SignalInfo{samples.vec().at(0).agent_id()});
-                                    emit graph->get_config().dsr->update_node_signal(id, type,
-                                                                   SignalInfo{samples.vec().at(0).agent_id()});
+                                    emit graph->get_config().dsr->update_node_attr_signal(
+                                        id, sig, SignalInfo{samples.vec().at(0).agent_id()});
+                                    emit graph->get_config().dsr->update_node_signal(
+                                        id, type, SignalInfo{samples.vec().at(0).agent_id()});
                                 });
                         }
                     }
@@ -435,10 +459,10 @@ auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) ->
                                         if (opt_str.has_value()) sig.emplace_back(std::move(opt_str.value()));
                                     }
 
-                                    emit graph->get_config().dsr->update_edge_attr_signal(from, to, type, sig,
-                                                                        SignalInfo{samples.vec().at(0).agent_id()});
-                                    emit graph->get_config().dsr->update_edge_signal(from, to, type,
-                                                                   SignalInfo{samples.vec().at(0).agent_id()});
+                                    emit graph->get_config().dsr->update_edge_attr_signal(
+                                        from, to, type, sig, SignalInfo{samples.vec().at(0).agent_id()});
+                                    emit graph->get_config().dsr->update_edge_signal(
+                                        from, to, type, SignalInfo{samples.vec().at(0).agent_id()});
                                 });
                         }
                     }

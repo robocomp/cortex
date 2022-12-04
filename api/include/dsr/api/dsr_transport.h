@@ -30,6 +30,7 @@ namespace DSR
         
         public:
 
+        virtual auto set_transport(std::weak_ptr<Transport> ptr) -> void = 0;
         virtual auto stop() -> void = 0;
 
         //////////////////////////////////////////////////

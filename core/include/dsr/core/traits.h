@@ -48,14 +48,14 @@ concept allowed_types = one_of<T , int32_t, uint32_t, uint64_t,
                                    >::value;
 
 template<typename Va>
-concept any_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTEdge, DSR::Node, DSR::Edge>::value;;
+concept any_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTEdge, DSR::Node, DSR::Edge>::value;
 
 template<typename Va>
-concept node_or_edge = one_of<Va, DSR::Node, DSR::Edge>::value;;
+concept node_or_edge = one_of<Va, DSR::Node, DSR::Edge>::value;
 
 
 template<typename Va>
-concept crdt_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTNode>::value;;
+concept crdt_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTNode>::value;
 
 
 //Attributes requires valis types to be defined

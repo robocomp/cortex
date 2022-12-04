@@ -124,7 +124,7 @@ namespace DSR
         ///  CONVENIENCE METHODS
         //////////////////////////////////////////////////////
         // Nodes
-        [[deprecated("root node is not defined anymore. It may be 100 in old configurations")]] std::optional<Node> get_node_root();
+        [[deprecated("node_root is deprecated. try get_node(100) instead")]] std::optional<Node> get_node_root();
         std::vector<Node> get_nodes_by_type(const std::string &type);
         std::vector<Node> get_nodes_by_types(const std::vector<std::string> &types);
         std::optional<std::string> get_name_from_id(uint64_t id);

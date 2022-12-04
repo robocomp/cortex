@@ -23,8 +23,10 @@ namespace DSR
         using DDSParticipantInfo = eprosima::fastrtps::rtps::ParticipantDiscoveryInfo;
         using FnParticipantChange = std::function<void(Graph *graph_, DDSParticipantInfo&&)>;
 
-        FastDDSTransport(std::weak_ptr<Transport> _transport);
+        FastDDSTransport();
 
+
+        auto set_transport(std::weak_ptr<Transport> ptr) -> void override;
         auto stop() -> void override;
 
         auto start_fullgraph_request(Graph* graph) -> std::pair<bool, bool> override;

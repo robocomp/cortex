@@ -14,7 +14,9 @@ Transport::Transport(std::unique_ptr<BaseManager> comm_) : comm(std::move(comm_)
 
 auto Transport::create(std::unique_ptr<BaseManager> comm_) -> std::shared_ptr<Transport>
 {
-    return std::shared_ptr<Transport>(new Transport(std::move(comm_)));
+    auto ptr = std::shared_ptr<Transport>(new Transport(std::move(comm_)));
+    ptr->comm->set_transport(ptr);
+    return ptr;
 }
 
 auto Transport::stop() -> void
@@ -37,12 +39,12 @@ auto Transport::start_fullgraph_server(Graph *graph) -> void
 
 auto Transport::start_topics_subcription(Graph *graph, bool show) -> void
 {
-    comm->start_pubs(graph, show);
+    comm->start_subs(graph, show);
 }
 
 auto Transport::start_topics_publishing(Graph *graph, bool show) -> void
 {
-    comm->start_subs(graph, show);
+    comm->start_pubs(graph, show);
 }
 
 //////////////////////////////////////////////////

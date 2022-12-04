@@ -2,9 +2,13 @@
 // Created by crivac on 5/02/19.
 //
 
+#include "dsr/api/dsr_transport.h"
+#include "dsr/api/dsr_transport_fastdds.h"
 #include <dsr/api/dsr_api.h>
+#include <ios>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
 #include <unistd.h>
 #include <algorithm>
 #include <utility>
@@ -38,9 +42,11 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
     config.load_file = (! dsr_input_file.empty()) ? std::make_optional(dsr_input_file) : std::nullopt;
     config.init_empty = false;
     config.dsr = this;
-    
-    utils =  std::make_unique<Utilities>(this);
-
+    auto ptr = std::make_unique<FastDDSTransport>();
+    config.comm = std::move(ptr);
+    utils = std::make_unique<Utilities>(this);
+    graph = std::make_shared<Graph>(config);
+    graph->init([&](auto file) { read_from_json_file(file); });
 }
 
 DSRGraph::~DSRGraph()
@@ -548,6 +554,7 @@ DSRGraph::DSRGraph(const DSRGraph &G) : generator(G.config.agent_id)
     std::shared_lock<std::shared_mutex> lock_cache(graph->_mutex_cache_maps);
     utils = std::make_unique<Utilities>(this);
     //TODO 
+    throw std::runtime_error("Unimplemented");
 }
 
 std::unique_ptr<DSRGraph> DSRGraph::G_copy()
@@ -560,12 +567,12 @@ bool DSRGraph::is_copy() const
     return config.copy;
 }
 
-inline uint32_t DSRGraph::get_agent_id() const
+uint32_t DSRGraph::get_agent_id() const
 {
     return config.agent_id;
 };
 
-inline std::string DSRGraph::get_agent_name() const
+std::string DSRGraph::get_agent_name() const
 {
     return config.agent_name;
 };

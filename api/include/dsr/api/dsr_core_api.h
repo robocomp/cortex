@@ -63,8 +63,10 @@ namespace DSR
         friend FastDDSTransport; //TODO remove this;
 
     public:
-        Graph(CortexConfig& cfg, std::function<void(std::string)> read_from_json_file);
+        Graph(CortexConfig& cfg);
         ~Graph();
+
+        auto init(std::function<void(std::string)> read_from_json_file) -> void;
 
         //TODO: Document functions locking.
 
