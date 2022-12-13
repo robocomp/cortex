@@ -1,9 +1,6 @@
 //
 // Created by jc on 19/11/22.
 //
-//
-// Created by juancarlos on 7/5/20.
-//
 
 #include <iostream>
 #include <optional>
@@ -40,32 +37,32 @@ REGISTER_TYPE(test_vec6_no_reference, vec6, false)
 
 
 
-class Graph
+class TGraph
 {
 public:
-    static Graph &get() {
-        static Graph instance;
+    static TGraph &get() {
+        static TGraph instance;
         return instance;
     }
 
-    Graph(Graph const &) = delete;
+    TGraph(TGraph const &) = delete;
 
-    void operator=(Graph const &) = delete;
+    void operator=(TGraph const &) = delete;
 
-    std::shared_ptr<DSR::DSRGraph> get_G() { return G; }
+    std::shared_ptr<DSRGraph> get_G() { return G; }
 
 private:
-    Graph() {
-        G = std::make_shared<DSR::DSRGraph>(0, "test", 1111, "/home/robocomp/robocomp/components/cortex/tests/testfiles/example.json");
+    TGraph() {
+        G = std::make_shared<DSRGraph>(0, "test", 1111, "/home/robocomp/robocomp/components/cortex/tests/testfiles/example.json");
     }
 
-    std::shared_ptr<DSR::DSRGraph> G;
+    std::shared_ptr<DSRGraph> G;
 };
 
 
 TEST_CASE("Node operations", "[NODE]") {
 
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Get a node that does not exists by id")
     {
@@ -179,7 +176,7 @@ TEST_CASE("Node operations", "[NODE]") {
 
 TEST_CASE("Edge operations", "[EDGE]") {
 
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Get an edge that does not exists by id")
     {
@@ -267,14 +264,14 @@ TEST_CASE("Edge operations", "[EDGE]") {
 /*
 TEST_CASE("File operations (Utilities sub-api)", "[FILE]") {
 
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
     //DSR::Utilities u (G.get());
 
-    const std::string empty_file = "/home/robocomp/robocomp/components/dsr-graph/components/dsr_tests/src/unittests/testfiles/empty_file.json";
-    const std::string wempty_file = "/home/robocomp/robocomp/components/dsr-graph/components/dsr_tests/src/unittests/testfiles/write_empty_file.json";
+    const std::string empty_file = "/home/robocomp/robocomp/components/dsr-TGraph/components/dsr_tests/src/unittests/testfiles/empty_file.json";
+    const std::string wempty_file = "/home/robocomp/robocomp/components/dsr-TGraph/components/dsr_tests/src/unittests/testfiles/write_empty_file.json";
 
-    const std::string test_file = "/home/robocomp/robocomp/components/dsr-graph/components/dsr_tests/src/unittests/testfiles/initial_dsr2.json";
-    const std::string wtest_file = "/home/robocomp/robocomp/components/dsr-graph/components/dsr_tests/src/unittests/testfiles/write_initial_dsr2.json";
+    const std::string test_file = "/home/robocomp/robocomp/components/dsr-TGraph/components/dsr_tests/src/unittests/testfiles/initial_dsr2.json";
+    const std::string wtest_file = "/home/robocomp/robocomp/components/dsr-TGraph/components/dsr_tests/src/unittests/testfiles/write_initial_dsr2.json";
 
 
 
@@ -331,7 +328,7 @@ TEST_CASE("File operations (Utilities sub-api)", "[FILE]") {
 }*/
 
 TEST_CASE("Maps operations", "[UTILS]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Get id from a name and a name from an id")
     {
@@ -438,7 +435,7 @@ TEST_CASE("Maps operations", "[UTILS]") {
 }
 
 TEST_CASE("Node and Edge type checking (RUNTIME)") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Node")
     {
@@ -456,7 +453,7 @@ TEST_CASE("Node and Edge type checking (RUNTIME)") {
 }
 
 TEST_CASE("Attributes operations (Compile time type-check)", "[ATTRIBUTES]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Insert attribute (node) and insert node in G")
     {
@@ -513,7 +510,7 @@ TEST_CASE("Attributes operations (Compile time type-check)", "[ATTRIBUTES]") {
 }
 
 TEST_CASE("Convenience methods", "[CONVENIENCE METHODS]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Get node level")
     {
@@ -567,7 +564,7 @@ TEST_CASE("Convenience methods", "[CONVENIENCE METHODS]") {
 }
 
 TEST_CASE("Attributes operations II (Runtime time type-check)", "[RUNTIME ATTRIBUTES]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Insert an attribute")
     {
@@ -624,7 +621,7 @@ TEST_CASE("Attributes operations II (Runtime time type-check)", "[RUNTIME ATTRIB
 }
 
 TEST_CASE("Other attribute operations and checks", "[ATTRIBUTES]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Get attribute timestamp")
     {
@@ -742,7 +739,7 @@ TEST_CASE("Other attribute operations and checks", "[ATTRIBUTES]") {
 }
 
 TEST_CASE("Native types in attributes", "[ATTRIBUTES]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     SECTION("Insert a string attribute")
     {
@@ -1046,7 +1043,7 @@ TEST_CASE("Native types in attributes", "[ATTRIBUTES]") {
 
 //Scenarios
 SCENARIO("Node insertions, updates and removals", "[NODE]") {
-    std::shared_ptr<DSR::DSRGraph> G = Graph::get().get_G();
+    std::shared_ptr<DSRGraph> G = TGraph::get().get_G();
 
     GIVEN("A new Node")
     {

@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.10)
 
 project( dsr_tests
-        VERSION 1.0.0
+        VERSION 0.1.0
         DESCRIPTION "Robocomp DSR test"
         LANGUAGES CXX )
 
 find_package(Qt5 COMPONENTS Core REQUIRED)
-find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Catch2 3 REQUIRED)
 
 #add_custom_target(dsr_tests)
-add_executable( dsr_tests src/test_dsr_core.cpp)
+add_executable( dsr_tests src/test_dsr_api.cpp)
 
 set(CMAKE_BUILD_TYPE Debug)
 
@@ -22,7 +22,7 @@ target_sources(dsr_tests
 
 target_link_libraries(dsr_tests
         PRIVATE
-        pthread Qt5::Core dsr_core dsr_gui dsr_api  fastcdr fastrtps osgDB OpenThreads Eigen3::Eigen Catch2::Catch2WithMain)
+        pthread Qt5::Core dsr_core dsr_gui dsr_api fastcdr fastrtps osgDB OpenThreads Eigen3::Eigen Catch2::Catch2WithMain)
 
 
 target_include_directories(dsr_tests
@@ -40,10 +40,7 @@ set_target_properties(dsr_tests PROPERTIES
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ON)
 
-target_compile_options(dsr_tests PUBLIC -Ofast -g -fmax-errors=5 -std=c++20 -fno-char8_t)
-
-
-
+target_compile_options(dsr_tests PUBLIC -O1 -g -fmax-errors=5 -std=c++20 -fno-char8_t)
 
 
 install(FILES ${EXECUTABLE_OUTPUT_PATH}/dsr_tests DESTINATION ${RC_COMPONENT_INSTALL_PATH}/bin/ PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE )
