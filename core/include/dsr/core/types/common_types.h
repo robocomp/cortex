@@ -2,33 +2,28 @@
 // Created by juancarlos on 1/6/21.
 //
 
-#ifndef DSR_COMMON_TYPES_H
-#define DSR_COMMON_TYPES_H
+#pragma once
 
 #include "../topics/IDLGraph.h"
 #include "../utils.h"
 
-#include <variant>
-#include <unordered_map>
-#include <iostream>
 #include <cassert>
+#include <iostream>
+#include <unordered_map>
+#include <variant>
 
-namespace DSR {
-    static constexpr std::array<std::string_view, 14> TYPENAMES_UNION =
-            { "STRING", "INT", "FLOAT",
-            "FLOAT_VEC", "BOOL", "BYTE_VEC",
-            "UINT","UINT64", "DOUBLE",
-            "UINT64_VEC", "FLOAT_VEC2", "FLOAT_VEC3",
-            "FLOAT_VEC4", "FLOAT_VEC6"};
+namespace DSR
+{
+    static constexpr std::array<std::string_view, 14> TYPENAMES_UNION = {
+        "STRING", "INT",    "FLOAT",      "FLOAT_VEC",  "BOOL",       "BYTE_VEC",   "UINT",
+        "UINT64", "DOUBLE", "UINT64_VEC", "FLOAT_VEC2", "FLOAT_VEC3", "FLOAT_VEC4", "FLOAT_VEC6"};
 
-    using ValType = std::variant<std::string, int32_t, float,
-            std::vector<float>, bool, std::vector<uint8_t>,
-            uint32_t, uint64_t, double, std::vector<uint64_t>,
-            std::array<float, 2>, std::array<float, 3>,
-            std::array<float, 4>, std::array<float, 6>>;
+    using ValType = std::variant<std::string, int32_t, float, std::vector<float>, bool, std::vector<uint8_t>, uint32_t,
+                                 uint64_t, double, std::vector<uint64_t>, std::array<float, 2>, std::array<float, 3>,
+                                 std::array<float, 4>, std::array<float, 6>>;
 
-
-    enum Types : uint32_t {
+    enum Types : uint32_t
+    {
         STRING = 0,
         INT = 1,
         FLOAT = 2,
@@ -45,40 +40,41 @@ namespace DSR {
         VEC6 = 13
     };
 
-
     class Attribute
     {
     public:
-
         Attribute() = default;
         ~Attribute() = default;
 
         Attribute(const ValType &value, uint64_t timestamp, uint32_t agent_id)
-                : m_value(ValType(value)), m_timestamp(timestamp), m_agent_id(agent_id)
-        {}
+            : m_value(ValType(value)),
+              m_timestamp(timestamp),
+              m_agent_id(agent_id)
+        {
+        }
 
-        Attribute (const Attribute& attr)
+        Attribute(const Attribute &attr)
         {
             m_timestamp = attr.timestamp();
             m_agent_id = attr.agent_id();
             m_value = attr.m_value;
         }
 
-        Attribute (Attribute&& attr) noexcept
+        Attribute(Attribute &&attr) noexcept
         {
             m_timestamp = attr.timestamp();
             m_agent_id = attr.agent_id();
             m_value = std::move(attr.m_value);
         }
 
-        explicit Attribute (IDL::Attrib &&x) noexcept
+        explicit Attribute(IDL::Attrib &&x) noexcept
         {
             m_timestamp = x.timestamp();
             m_value = std::move(get_valtype(std::move(x.value())));
             m_agent_id = x.agent_id();
         }
 
-        Attribute& operator= (const Attribute& attr)
+        Attribute &operator=(const Attribute &attr)
         {
             m_timestamp = attr.timestamp();
             m_agent_id = attr.agent_id();
@@ -86,7 +82,7 @@ namespace DSR {
             return *this;
         }
 
-        Attribute& operator= (Attribute&& attr) noexcept
+        Attribute &operator=(Attribute &&attr) noexcept
         {
             m_timestamp = attr.timestamp();
             m_agent_id = attr.agent_id();
@@ -129,7 +125,7 @@ namespace DSR {
 
         [[nodiscard]] const ValType &value() const;
 
-        [[nodiscard]] ValType& value();
+        [[nodiscard]] ValType &value();
         ///////////////////////
         // String
         //////////////////////
@@ -259,73 +255,58 @@ namespace DSR {
         friend std::ostream &operator<<(std::ostream &os, const Attribute &type)
         {
 
-            switch (type.m_value.index()) {
-                case 0:
-                    os << " str: " << std::get<std::string>(type.m_value);
-                    break;
-                case 1:
-                    os << " dec: " << std::get<int32_t>(type.m_value);
-                    break;
-                case 2:
-                    os << " float: " << std::get<float>(type.m_value);
-                    break;
+            switch (type.m_value.index())
+            {
+                case 0: os << " str: " << std::get<std::string>(type.m_value); break;
+                case 1: os << " dec: " << std::get<int32_t>(type.m_value); break;
+                case 2: os << " float: " << std::get<float>(type.m_value); break;
                 case 3:
                     os << " float_vec: [ ";
-                    for (const auto &k: std::get<std::vector<float>>(type.m_value))
+                    for (const auto &k : std::get<std::vector<float>>(type.m_value))
                         os << k << ", ";
                     os << "] ";
                     break;
-                case 4:
-                    os << "bool: " << (std::get<bool>(type.m_value) ? " TRUE" : " FALSE");
-                    break;
+                case 4: os << "bool: " << (std::get<bool>(type.m_value) ? " TRUE" : " FALSE"); break;
                 case 5:
                     os << " byte_vec: [ ";
-                    for (const uint8_t k: std::get<std::vector<uint8_t>>(type.m_value))
+                    for (const uint8_t k : std::get<std::vector<uint8_t>>(type.m_value))
                         os << std::to_string(k) << ", ";
                     os << "] ";
                     break;
-                case 6:
-                    os << " uint: " << std::get<uint32_t>(type.m_value);
-                    break;
-                case 7:
-                    os << " uint64: " << std::get<uint64_t>(type.m_value);
-                    break;
-                case 8:
-                    os << " double: " << std::get<double>(type.m_value);
-                    break;
+                case 6: os << " uint: " << std::get<uint32_t>(type.m_value); break;
+                case 7: os << " uint64: " << std::get<uint64_t>(type.m_value); break;
+                case 8: os << " double: " << std::get<double>(type.m_value); break;
                 case 9:
                     os << " u64_vec: [ ";
-                    for (const auto &k: type.u64_vec())
+                    for (const auto &k : type.u64_vec())
                         os << k << ", ";
                     os << "] ";
                     break;
                 case 10:
                     os << " vec2: [ ";
-                    for (const auto &k: type.vec2())
+                    for (const auto &k : type.vec2())
                         os << k << ", ";
                     os << "] ";
                     break;
                 case 11:
                     os << " vec3: [ ";
-                    for (const auto &k: type.vec3())
+                    for (const auto &k : type.vec3())
                         os << k << ", ";
                     os << "] ";
                     break;
                 case 12:
                     os << " vec4: [ ";
-                    for (const auto &k: type.vec4())
+                    for (const auto &k : type.vec4())
                         os << k << ", ";
                     os << "] ";
                     break;
                 case 13:
                     os << " vec6: [ ";
-                    for (const auto &k: type.vec6())
+                    for (const auto &k : type.vec6())
                         os << k << ", ";
                     os << "] ";
                     break;
-                default:
-                    os << "INVALID TYPE";
-                    assert(false);
+                default: os << "INVALID TYPE"; assert(false);
             }
             return os;
         }
@@ -363,70 +344,31 @@ namespace DSR {
         [[nodiscard]] static ValType get_valtype(IDL::Val &&x)
         {
             ValType val;
-            switch (x._d()) {
-                case 0:
-                    val = std::move(x.str());
-                    break;
-                case 1:
-                    val = x.dec();
-                    break;
-                case 2:
-                    val = x.fl();
-                    break;
-                case 3:
-                    val = std::move(x.float_vec());
-                    break;
-                case 4:
-                    val = x.bl();
-                    break;
-                case 5: {
-                    val = std::move(x.byte_vec());
-                    break;
-                }
-                case 6: {
-                    val = x.uint();
-                    break;
-                }
-                case 7: {
-                    val = x.u64();
-                    break;
-                }
-                case 8: {
-                    val = x.dob();
-                    break;
-                }
-                case 9: {
-                    val = std::move(x.uint64_vec());
-                    break;
-                }
-                case 10: {
-                    val = x.vec_float2();
-                    break;
-                }
-                case 11: {
-                    val = x.vec_float3();
-                    break;
-                }
-                case 12: {
-                    val = x.vec_float4();
-                    break;
-                }
-                case 13: {
-                    val = x.vec_float6();
-                    break;
-                }
-                default:
-                    assert(false);
+            switch (x._d())
+            {
+                case 0: val = std::move(x.str()); break;
+                case 1: val = x.dec(); break;
+                case 2: val = x.fl(); break;
+                case 3: val = std::move(x.float_vec()); break;
+                case 4: val = x.bl(); break;
+                case 5: val = std::move(x.byte_vec()); break;
+                case 6: val = x.uint(); break;
+                case 7: val = x.u64(); break;
+                case 8: val = x.dob(); break;
+                case 9: val = std::move(x.uint64_vec()); break;
+                case 10: val = x.vec_float2(); break;
+                case 11: val = x.vec_float3(); break;
+                case 12: val = x.vec_float4(); break;
+                case 13: val = x.vec_float6(); break;
+                default: assert(false);
             }
             return val;
         }
-    private:
 
+    private:
         ValType m_value;
         uint64_t m_timestamp = 0;
         uint32_t m_agent_id = 0;
     };
 
-}
-
-#endif //DSR_COMMON_TYPES_H
+}  // namespace DSR

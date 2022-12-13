@@ -7,12 +7,13 @@
 #include "dsr/api/dsr_agent_info_api.h"
 #include "dsr/api/dsr_camera_api.h"
 #include "dsr/api/dsr_core_api.h"
-#include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_eigen_defs.h"
 #include "dsr/api/dsr_inner_eigen_api.h"
 #include "dsr/api/dsr_rt_api.h"
+#include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_utils.h"
 #include "dsr/core/crdt/delta_crdt.h"
+#include "dsr/core/id_generator.h"
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
 #include "dsr/core/rtps/dsrsubscriber.h"
@@ -24,9 +25,8 @@
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/utils.h"
-#include "dsr/core/id_generator.h"
 
-
+#include <QtCore/QtCore>
 #include <any>
 #include <chrono>
 #include <iostream>
@@ -34,7 +34,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <QtCore/QtCore>
 #include <shared_mutex>
 #include <thread>
 #include <type_traits>
@@ -53,7 +52,6 @@ namespace DSR
 
     inline const std::vector<std::string> empty_string_vec = {};
 
-
     class DSRGraph : public QObject
     {
         friend RT_API;
@@ -62,12 +60,9 @@ namespace DSR
         size_t size();
         DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file = std::string(),
                  bool all_same_host = true);
-        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id,
-                                                                      const std::string &dsr_input_file = std::string(),
-                                                                      bool all_same_host = true)
-            : DSRGraph(name, id, dsr_input_file, all_same_host)
-        {
-        }
+        DSRGraph(uint64_t root, std::string name, uint32_t id, const std::string &dsr_input_file = std::string(),
+                 bool all_same_host = true);
+        DSRGraph(CortexConfig cfg);
 
         ~DSRGraph() override;
 
@@ -76,11 +71,15 @@ namespace DSR
         //////////////////////////////////////////////////////
 
         // Utils
-        bool empty(const uint64_t &id); //TODO: this is in Graph
-        std::map<uint64_t, Node> getCopy() const; //TODO: this is in Graph + Deprecate and new name
+        bool empty(const uint64_t &id);            // TODO: this is in Graph
+        std::map<uint64_t, Node> get_copy() const;
+        [[deprecated("Use get_copy instead")]]std::map<uint64_t, Node> getCopy() const;
+        uint32_t get_agent_id() const;
+        std::string get_agent_name() const;
+        void reset();
 
 
-        //TODO: add more apis or remove all
+        // TODO: add more apis or remove all
         std::unique_ptr<InnerEigenAPI> get_inner_eigen_api()
         {
             return std::make_unique<InnerEigenAPI>(this);
@@ -124,7 +123,7 @@ namespace DSR
         ///  CONVENIENCE METHODS
         //////////////////////////////////////////////////////
         // Nodes
-        [[deprecated("node_root is deprecated. try get_node(100) instead")]] std::optional<Node> get_node_root();
+        std::optional<Node> get_node_root();
         std::vector<Node> get_nodes_by_type(const std::string &type);
         std::vector<Node> get_nodes_by_types(const std::vector<std::string> &types);
         std::optional<std::string> get_name_from_id(uint64_t id);
@@ -417,13 +416,6 @@ namespace DSR
             return true;
         }
 
-    public:
-        // Mixed
-        uint32_t get_agent_id() const;
-        std::string get_agent_name() const;
-
-        void reset();
-
         //////////////////////////////////////////////////////
         ///  Attribute filters
         //////////////////////////////////////////////////////
@@ -442,7 +434,8 @@ namespace DSR
         void print_node(uint64_t id);
         void print_RT(uint64_t root) const;
 
-        void write_to_json_file(const std::string &file, const std::vector<std::string> &skip_node_content = empty_string_vec) const;
+        void write_to_json_file(const std::string &file,
+                                const std::vector<std::string> &skip_node_content = empty_string_vec) const;
 
         void read_from_json_file(const std::string &file);
 
@@ -462,22 +455,25 @@ namespace DSR
 
         id_generator generator;
         CortexConfig config;
-        
+
         std::shared_ptr<Graph> graph;
         std::unique_ptr<Utilities> utils;
         std::unordered_set<std::string_view> ignored_attributes;
 
     public:
-
     signals:
         void update_node_signal(uint64_t, const std::string &type, DSR::SignalInfo info = default_signal_info);
-        void update_node_attr_signal(uint64_t id ,const std::vector<std::string>& att_names, DSR::SignalInfo info = default_signal_info);
+        void update_node_attr_signal(uint64_t id, const std::vector<std::string> &att_names,
+                                     DSR::SignalInfo info = default_signal_info);
 
-        void update_edge_signal(uint64_t from, uint64_t to, const std::string &type, DSR::SignalInfo info = default_signal_info);
-        void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type, const std::vector<std::string>& att_name, DSR::SignalInfo info = default_signal_info);
+        void update_edge_signal(uint64_t from, uint64_t to, const std::string &type,
+                                DSR::SignalInfo info = default_signal_info);
+        void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type,
+                                     const std::vector<std::string> &att_name,
+                                     DSR::SignalInfo info = default_signal_info);
 
-        void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag, DSR::SignalInfo info = default_signal_info);
-        void del_node_signal(uint64_t id, DSR::SignalInfo info = default_signal_info) ;
-
+        void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag,
+                             DSR::SignalInfo info = default_signal_info);
+        void del_node_signal(uint64_t id, DSR::SignalInfo info = default_signal_info);
     };
 }  // namespace DSR

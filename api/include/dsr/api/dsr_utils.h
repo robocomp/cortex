@@ -2,6 +2,7 @@
 #ifndef DSR_UTILS
 #define DSR_UTILS
 
+#include <qjsonobject.h>
 #include <string>
 #include <optional>
 #include <dsr/core/topics/IDLGraphPubSubTypes.h>

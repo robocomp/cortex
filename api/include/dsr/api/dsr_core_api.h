@@ -47,6 +47,7 @@ namespace DSR
         std::string agent_name;
         std::unique_ptr<BaseManager> comm; //this is moved to transport later.
         std::optional<std::string> load_file;
+        std::optional<uint64_t> node_root;
         DSRGraph *dsr; //this is a not owned pointer used only to allow sending signals in the transport. 
     };
 
@@ -79,8 +80,9 @@ namespace DSR
         auto get_copy() const -> std::map<uint64_t, Node>;
         auto copy_map() const -> std::map<uint64_t , IDL::MvregNode>;
         auto get_agent_id() const -> uint64_t;
-        void reset();
         auto get_config() -> CortexConfig&;
+        void reset();
+
         //////////////////////////////////////////////////////
         ///  Attribute filters
         //////////////////////////////////////////////////////

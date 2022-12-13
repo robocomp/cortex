@@ -138,7 +138,7 @@ namespace DSR {
             else parent_id = G->get_node_root().value().id();
 
             // node
-            DSR::Node new_node = Node::create<agent_node_type> ({}, {}, str);
+            DSR::Node new_node = Node::create<agent_node_type> (str);
             timestamp_start = get_unix_timestamp();
             G->add_or_modify_attrib_local<timestamp_agent_att>(new_node, timestamp_start);
             G->add_or_modify_attrib_local<timestamp_creation_att>(new_node, timestamp_start);

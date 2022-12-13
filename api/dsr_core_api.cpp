@@ -285,7 +285,7 @@ auto Graph::insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<IDL:
         }
 
         update_maps_node_insert(node.id(), node);
-        mvreg<CRDTNode> delta = nodes[node.id()].write(std::move(node));
+        auto delta = nodes[node.id()].write(std::move(node));
 
         return {true, CRDTNode_to_IDL(config.agent_id, node.id(), delta)};
     }

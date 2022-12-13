@@ -2,39 +2,37 @@
 // Created by juancarlos on 8/6/20.
 //
 
-#ifndef DSR_CRDT_TYPES_H
-#define DSR_CRDT_TYPES_H
-
-
-#include <iostream>
-#include <unordered_map>
-#include <variant>
-#include <map>
+#pragma once
 
 #include "../crdt/delta_crdt.h"
 #include "../topics/IDLGraph.h"
 #include "../utils.h"
 #include "common_types.h"
 
-namespace DSR {
+#include <iostream>
+#include <map>
+#include <unordered_map>
+#include <variant>
 
-    typedef DSR::Attribute CRDTAttribute;
+namespace DSR
+{
+
+    typedef Attribute CRDTAttribute;
 
     class CRDTEdge
     {
     public:
-
         CRDTEdge() : m_to(0), m_from(0), m_agent_id(0) {}
 
         ~CRDTEdge() = default;
 
-        explicit CRDTEdge (IDL::IDLEdge &&x) noexcept;
+        explicit CRDTEdge(IDL::IDLEdge &&x) noexcept;
 
         CRDTEdge &operator=(IDL::IDLEdge &&x);
 
-        void to(uint64_t  _to);
+        void to(uint64_t _to);
 
-        [[nodiscard]] uint64_t  to() const;
+        [[nodiscard]] uint64_t to() const;
 
         void type(const std::string &type);
 
@@ -62,13 +60,14 @@ namespace DSR {
 
         [[nodiscard]] IDL::IDLEdge to_IDL_edge(uint64_t id) const;
 
-
         bool operator==(const CRDTEdge &rhs) const
         {
-            if (this == &rhs) {
+            if (this == &rhs)
+            {
                 return true;
             }
-            if (m_type != rhs.m_type || from() != rhs.from() || to() != rhs.to() || attrs() != rhs.attrs()) {
+            if (m_type != rhs.m_type || from() != rhs.from() || to() != rhs.to() || attrs() != rhs.attrs())
+            {
                 return false;
             }
             return true;
@@ -76,12 +75,16 @@ namespace DSR {
 
         bool operator<(const CRDTEdge &rhs) const
         {
-            if (this == &rhs) {
+            if (this == &rhs)
+            {
                 return false;
             }
-            if (m_type < rhs.m_type) {
+            if (m_type < rhs.m_type)
+            {
                 return true;
-            } else if (rhs.m_type < m_type) {
+            }
+            else if (rhs.m_type < m_type)
+            {
                 return false;
             }
             return false;
@@ -109,8 +112,8 @@ namespace DSR {
 
         friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs)
         {
-            output << "IDL::EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from()) << "-> to:" << std::to_string(rhs.to())
-                   << " Attribs:[";
+            output << "IDL::EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from())
+                   << "-> to:" << std::to_string(rhs.to()) << " Attribs:[";
             for (const auto &v : rhs.attrs())
                 output << v.first << ":" << v.second << " - ";
             output << "]]";
@@ -120,15 +123,15 @@ namespace DSR {
     private:
         uint64_t m_to;
         std::string m_type;
-        uint64_t  m_from;
+        uint64_t m_from;
         std::map<std::string, mvreg<CRDTAttribute>> m_attrs;
         uint32_t m_agent_id{};
     };
 
-    class CRDTNode {
+    class CRDTNode
+    {
 
     public:
-
         CRDTNode() : m_id(0), m_agent_id(0) {}
 
         ~CRDTNode() = default;
@@ -189,10 +192,12 @@ namespace DSR {
 
         bool operator==(const CRDTNode &rhs) const
         {
-            if (this == &rhs) {
+            if (this == &rhs)
+            {
                 return true;
             }
-            if (id() != rhs.id() || type() != rhs.type() || attrs() != rhs.attrs() || fano() != rhs.fano()) {
+            if (id() != rhs.id() || type() != rhs.type() || attrs() != rhs.attrs() || fano() != rhs.fano())
+            {
                 return false;
             }
             return true;
@@ -200,12 +205,16 @@ namespace DSR {
 
         bool operator<(const CRDTNode &rhs) const
         {
-            if (this == &rhs) {
+            if (this == &rhs)
+            {
                 return false;
             }
-            if (id() < rhs.id()) {
+            if (id() < rhs.id())
+            {
                 return true;
-            } else if (rhs.id() < id()) {
+            }
+            else if (rhs.id() < id())
+            {
                 return false;
             }
             return false;
@@ -233,15 +242,18 @@ namespace DSR {
 
         friend std::ostream &operator<<(std::ostream &output, CRDTNode &rhs)
         {
-            output << "IDL::Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type() << "], Attribs:[";
+            output << "IDL::Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type()
+                   << "], Attribs:[";
             for (const auto &v : rhs.attrs())
                 output << v.first << ":(" << v.second << ");";
             output << "], FanOut:[";
             for (auto &v : rhs.fano())
-                output << "[ " << std::to_string(v.first.first) << " " << v.first.second << "] " << ":(" << v.second << ");";
+                output << "[ " << std::to_string(v.first.first) << " " << v.first.second << "] "
+                       << ":(" << v.second << ");";
             output << "]";
             return output;
         }
+
     private:
         std::string m_type;
         std::string m_name;
@@ -251,7 +263,5 @@ namespace DSR {
         std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> m_fano;
     };
 
+}  // namespace DSR
 
-}
-
-#endif //DSR_CRDT_TYPES_H
