@@ -73,7 +73,7 @@ namespace DSR
         // Utils
         bool empty(const uint64_t &id);            // TODO: this is in Graph
         std::map<uint64_t, Node> get_copy() const;
-        [[deprecated("Use get_copy instead")]]std::map<uint64_t, Node> getCopy() const;
+        [[deprecated("Use get_copy() instead")]]std::map<uint64_t, Node> getCopy() const;
         uint32_t get_agent_id() const;
         std::string get_agent_name() const;
         void reset();
