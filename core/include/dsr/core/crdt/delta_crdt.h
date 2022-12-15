@@ -23,7 +23,7 @@ class dot_context {
 public:
 
     std::map<key_type, int> cc; // Compact causal context
-    std::set<std::pair<key_type, int> > dc; // Dot cloud
+    std::set<std::pair<key_type, int>> dc; // Dot cloud
 
     dot_context &operator=(const dot_context &o) {
         if (&o == this) return *this;

@@ -18,9 +18,9 @@ namespace DSR
         "STRING", "INT",    "FLOAT",      "FLOAT_VEC",  "BOOL",       "BYTE_VEC",   "UINT",
         "UINT64", "DOUBLE", "UINT64_VEC", "FLOAT_VEC2", "FLOAT_VEC3", "FLOAT_VEC4", "FLOAT_VEC6"};
 
-    using ValType = std::variant<std::string, int32_t, float, std::vector<float>, bool, std::vector<uint8_t>, uint32_t,
+    typedef std::variant<std::string, int32_t, float, std::vector<float>, bool, std::vector<uint8_t>, uint32_t,
                                  uint64_t, double, std::vector<uint64_t>, std::array<float, 2>, std::array<float, 3>,
-                                 std::array<float, 4>, std::array<float, 6>>;
+                                 std::array<float, 4>, std::array<float, 6>>  ValType;
 
     enum Types : uint32_t
     {

@@ -12,12 +12,12 @@ using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
 
 DSRParticipant::DSRParticipant() : mp_participant(nullptr),
-                                   dsrgraphType(new MvregNodePubSubType()),
-                                   graphrequestType(new GraphRequestPubSubType()),
-                                   graphRequestAnswerType(new OrMapPubSubType()),
-                                   dsrEdgeType(new MvregEdgePubSubType()),
-                                   dsrNodeAttrType(new MvregNodeAttrVecPubSubType()),
-                                   dsrEdgeAttrType(new MvregEdgeAttrVecPubSubType()),
+                                   dsrgraphType(new DDSTypeNode()),
+                                   graphrequestType(new DDSTypeGraphRequest()),
+                                   graphRequestAnswerType(new DDSTypeGraph()),
+                                   dsrEdgeType(new DDSTypeEdge()),
+                                   dsrNodeAttrType(new DDSTypeNodeAttribute()),
+                                   dsrEdgeAttrType(new DDSTypeEdgeAttribute()),
                                    m_listener(nullptr)
 
 {}
