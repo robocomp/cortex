@@ -41,12 +41,12 @@ namespace DSR
         auto start_edge_attrs_subscription(Graph* graph, bool show) -> void;
 
 
-        auto write_node(IDL::MvregNode *node) -> bool override;
-        auto write_edge(IDL::MvregEdge *edge) -> bool override;
-        auto write_node_attributes(std::vector<IDL::MvregNodeAttr> *attributes) -> bool override;
-        auto write_edge_attributes(std::vector<IDL::MvregEdgeAttr> *attributes) -> bool override;
-        auto write_graph(IDL::OrMap *map) -> bool override;
-        auto write_request(IDL::GraphRequest* request) -> bool override;
+        auto write_node(NodeInfoTuple *node) -> bool override;
+        auto write_edge(EdgeInfoTuple *edge) -> bool override;
+        auto write_node_attributes(NodeAttributeVecTuple *attributes) -> bool override;
+        auto write_edge_attributes(EdgeAttributeVecTuple *attributes) -> bool override;
+        auto write_graph(GraphInfoTuple *map) -> bool override;
+        auto write_request(GraphRequestTuple* request) -> bool override;
 
     private:
 

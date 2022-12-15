@@ -97,7 +97,7 @@ template <typename No>
 std::optional<uint64_t>
 DSRGraph::insert_node(No &&node) requires(std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
-    std::optional<IDL::MvregNode> delta;
+    std::optional<NodeInfoTuple> delta;
     bool inserted = false;
     {
         std::unique_lock<std::shared_mutex> lock(graph->_mutex_data);
@@ -137,7 +137,7 @@ bool DSRGraph::update_node(No &&node) requires(std::is_same_v<std::remove_cvref_
 {
 
     bool updated = false;
-    std::optional<std::vector<IDL::MvregNodeAttr>> vec_node_attr;
+    std::optional<NodeAttributeVecTuple> vec_node_attr;
 
     {
         std::unique_lock<std::shared_mutex> lock(graph->_mutex_data);
@@ -192,8 +192,8 @@ bool DSRGraph::delete_node(const std::string &name)
 
     bool result = false;
     std::vector<std::tuple<uint64_t, uint64_t, std::string>> deleted_edges;
-    std::optional<IDL::MvregNode> deleted_node;
-    std::vector<IDL::MvregEdge> delta_vec;
+    std::optional<NodeInfoTuple> deleted_node;
+    std::vector<EdgeInfoTuple> delta_vec;
 
     std::optional<uint64_t> id = {};
     {
@@ -233,8 +233,8 @@ bool DSRGraph::delete_node(uint64_t id)
 
     bool result = false;
     std::vector<std::tuple<uint64_t, uint64_t, std::string>> deleted_edges;
-    std::optional<IDL::MvregNode> deleted_node;
-    std::vector<IDL::MvregEdge> delta_vec;
+    std::optional<NodeInfoTuple> deleted_node;
+    std::vector<EdgeInfoTuple> delta_vec;
     {
         std::unique_lock<std::shared_mutex> lock(graph->_mutex_data);
         std::tie(result, deleted_edges, deleted_node, delta_vec) = graph->delete_node_(id);
@@ -344,8 +344,8 @@ template <typename Ed>
 bool DSRGraph::insert_or_assign_edge(Ed &&attrs) requires(std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
 {
     bool result = false;
-    std::optional<IDL::MvregEdge> delta_edge;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> delta_attrs;
+    std::optional<EdgeInfoTuple> delta_edge;
+    std::optional<EdgeAttributeVecTuple> delta_attrs;
 
     {
         std::unique_lock<std::shared_mutex> lock(graph->_mutex_data);
@@ -396,7 +396,7 @@ template bool DSRGraph::insert_or_assign_edge<const DSR::Edge &>(const DSR::Edge
 bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
 {
 
-    std::optional<IDL::MvregEdge> delta;
+    std::optional<EdgeInfoTuple> delta;
     {
         std::unique_lock<std::shared_mutex> lock(graph->_mutex_data);
         delta = graph->delete_edge_(from, to, key);
@@ -418,7 +418,7 @@ bool DSRGraph::delete_edge(const std::string &from, const std::string &to, const
 
     std::optional<uint64_t> id_from = {};
     std::optional<uint64_t> id_to = {};
-    std::optional<IDL::MvregEdge> delta;
+    std::optional<EdgeInfoTuple> delta;
     {
         std::unique_lock<std::shared_mutex> lock(graph->_mutex_data);
         id_from = get_id_from_name(from);

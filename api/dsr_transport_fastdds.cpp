@@ -43,7 +43,7 @@ auto FastDDSTransport::start_fullgraph_request(Graph *graph) -> std::pair<bool, 
         while (true)
         {
             eprosima::fastdds::dds::SampleInfo m_info;
-            IDL::OrMap sample;
+            GraphInfoTuple sample;
             if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK)
             {
                 if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -84,7 +84,7 @@ auto FastDDSTransport::start_fullgraph_request(Graph *graph) -> std::pair<bool, 
 
     std::cout << " Requesting the complete graph \n";
 
-    IDL::GraphRequest gr;
+    GraphRequestTuple gr;
     gr.from(participant.getParticipant()->get_qos().name().to_string());
     gr.id(graph->get_agent_id());
     write_request(&gr);
@@ -115,7 +115,7 @@ auto FastDDSTransport::start_fullgraph_server(Graph *graph) -> void
         while (true)
         {
             eprosima::fastdds::dds::SampleInfo m_info;
-            IDL::GraphRequest sample;
+            GraphRequestTuple sample;
             if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK)
             {
                 if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -133,7 +133,7 @@ auto FastDDSTransport::start_fullgraph_server(Graph *graph) -> void
                             if (it->second)
                             {
                                 lck.unlock();
-                                IDL::OrMap mp;
+                                GraphInfoTuple mp;
                                 mp.id(-1);
                                 mp.to_id(sample.id());
                                 graph_server.dsr_pub.write(&mp);
@@ -154,7 +154,7 @@ auto FastDDSTransport::start_fullgraph_server(Graph *graph) -> void
 
                         std::cout << " Received Full Graph request: from "
                                   << m_info.sample_identity.writer_guid().entityId.value << "\n";
-                        IDL::OrMap mp;
+                        GraphInfoTuple mp;
                         mp.id(graph->get_agent_id());
                         mp.m(graph->copy_map());
                         graph_server.dsr_pub.write(&mp);
@@ -247,7 +247,7 @@ auto FastDDSTransport::start_node_subscription(Graph *graph, bool show) -> void
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregNode sample;
+                NodeInfoTuple sample;
                 if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK)
                 {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -291,7 +291,7 @@ auto FastDDSTransport::start_edge_subscription(Graph *graph, bool show) -> void
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregEdge sample;
+                EdgeInfoTuple sample;
                 if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK)
                 {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -334,7 +334,7 @@ auto FastDDSTransport::start_node_attrs_subscription(Graph *graph, bool show) ->
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregNodeAttrVec samples;
+                NodeInfoTupleAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == ReturnCode_t::RETCODE_OK)
                 {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -418,7 +418,7 @@ auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) ->
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregEdgeAttrVec samples;
+                EdgeInfoTupleAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == ReturnCode_t::RETCODE_OK)
                 {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -491,32 +491,32 @@ auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) ->
 ///// write
 /////////////////////////////////////////////////
 
-auto FastDDSTransport::write_node(IDL::MvregNode *_node) -> bool
+auto FastDDSTransport::write_node(NodeInfoTuple *_node) -> bool
 {
     return node.dsr_pub.write(_node);
 }
 
-auto FastDDSTransport::write_edge(IDL::MvregEdge *_edge) -> bool
+auto FastDDSTransport::write_edge(EdgeInfoTuple *_edge) -> bool
 {
     return edge.dsr_pub.write(_edge);
 }
 
-auto FastDDSTransport::write_node_attributes(std::vector<IDL::MvregNodeAttr> *attributes) -> bool
+auto FastDDSTransport::write_node_attributes(NodeAttributeVecTuple *attributes) -> bool
 {
     return node_attribute.dsr_pub.write(attributes);
 }
 
-auto FastDDSTransport::write_edge_attributes(std::vector<IDL::MvregEdgeAttr> *attributes) -> bool
+auto FastDDSTransport::write_edge_attributes(EdgeAttributeVecTuple *attributes) -> bool
 {
     return edge_attribute.dsr_pub.write(attributes);
 }
 
-auto FastDDSTransport::write_graph(IDL::OrMap *map) -> bool
+auto FastDDSTransport::write_graph(GraphInfoTuple *map) -> bool
 {
     return graph_server.dsr_pub.write(map);
 }
 
-auto FastDDSTransport::write_request(IDL::GraphRequest *request) -> bool
+auto FastDDSTransport::write_request(GraphRequestTuple *request) -> bool
 {
     return graph_request.dsr_pub.write(request);
 }

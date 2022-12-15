@@ -26,10 +26,6 @@ namespace DSR
 
         ~CRDTEdge() = default;
 
-        explicit CRDTEdge(IDL::IDLEdge &&x) noexcept;
-
-        CRDTEdge &operator=(IDL::IDLEdge &&x);
-
         void to(uint64_t _to);
 
         [[nodiscard]] uint64_t to() const;
@@ -57,8 +53,6 @@ namespace DSR
         void agent_id(uint32_t agent_id);
 
         [[nodiscard]] uint32_t agent_id() const;
-
-        [[nodiscard]] IDL::IDLEdge to_IDL_edge(uint64_t id) const;
 
         bool operator==(const CRDTEdge &rhs) const
         {
@@ -112,7 +106,7 @@ namespace DSR
 
         friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs)
         {
-            output << "IDL::EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from())
+            output << "EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from())
                    << "-> to:" << std::to_string(rhs.to()) << " Attribs:[";
             for (const auto &v : rhs.attrs())
                 output << v.first << ":" << v.second << " - ";
@@ -145,8 +139,6 @@ namespace DSR
             m_attrs = x.m_attrs;
             m_fano = x.m_fano;
         }
-
-        explicit CRDTNode(IDL::IDLNode &&x);
 
         void type(const std::string &type);
 
@@ -187,8 +179,6 @@ namespace DSR
         [[nodiscard]] std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano();
 
         [[nodiscard]] const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano() const;
-
-        [[nodiscard]] IDL::IDLNode to_IDL_node(uint64_t id) const;
 
         bool operator==(const CRDTNode &rhs) const
         {
@@ -242,7 +232,7 @@ namespace DSR
 
         friend std::ostream &operator<<(std::ostream &output, CRDTNode &rhs)
         {
-            output << "IDL::Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type()
+            output << "Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type()
                    << "], Attribs:[";
             for (const auto &v : rhs.attrs())
                 output << v.first << ":(" << v.second << ");";

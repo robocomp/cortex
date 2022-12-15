@@ -78,7 +78,7 @@ namespace DSR
         auto size() const -> size_t;
         auto empty(uint64_t id) const -> bool;
         auto get_copy() const -> std::map<uint64_t, Node>;
-        auto copy_map() const -> std::map<uint64_t , IDL::MvregNode>;
+        auto copy_map() const -> std::map<uint64_t , NodeInfoTuple>;
         auto get_agent_id() const -> uint64_t;
         auto get_config() -> CortexConfig&;
         void reset();
@@ -111,21 +111,21 @@ namespace DSR
 
         auto get_(uint64_t id) -> std::optional<CRDTNode>;
         auto get_edge_(uint64_t from, uint64_t to, const std::string& key) -> std::optional<CRDTEdge>;
-        auto insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<IDL::MvregNode>>;
-        auto update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>>;
-        auto delete_node_(uint64_t id) -> std::tuple<bool, std::vector<std::tuple<uint64_t, uint64_t, std::string>>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>>;
-        auto delete_edge_(uint64_t from, uint64_t t, const std::string& key) -> std::optional<IDL::MvregEdge>;
-        auto insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to) -> std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>>;
+        auto insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<NodeInfoTuple>>;
+        auto update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<NodeAttributeVecTuple>>;
+        auto delete_node_(uint64_t id) -> std::tuple<bool, std::vector<std::tuple<uint64_t, uint64_t, std::string>>, std::optional<NodeInfoTuple>, std::vector<EdgeInfoTuple>>;
+        auto delete_edge_(uint64_t from, uint64_t t, const std::string& key) -> std::optional<EdgeInfoTuple>;
+        auto insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to) -> std::tuple<bool, std::optional<EdgeInfoTuple>, std::optional<EdgeAttributeVecTuple>>;
 
 
         //////////////////////////////////////////////////////////////////////////
         // CRDT join operations
         ///////////////////////////////////////////////////////////////////////////
-        void join_delta_node(IDL::MvregNode &&mvreg);
-        void join_delta_edge(IDL::MvregEdge &&mvreg);
-        auto join_delta_node_attr(IDL::MvregNodeAttr &&mvreg) -> std::optional<std::string>;
-        auto join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg) -> std::optional<std::string>;
-        void join_full_graph(IDL::OrMap &&full_graph);
+        void join_delta_node(NodeInfoTuple &&mvreg);
+        void join_delta_edge(EdgeInfoTuple &&mvreg);
+        auto join_delta_node_attr(NodeInfoTupleAttr &&mvreg) -> std::optional<std::string>;
+        auto join_delta_edge_attr(EdgeInfoTupleAttr &&mvreg) -> std::optional<std::string>;
+        void join_full_graph(GraphInfoTuple &&full_graph);
 
         auto process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta) -> bool;
         void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute> && attr);

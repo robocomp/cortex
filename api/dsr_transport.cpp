@@ -66,32 +66,32 @@ auto Transport::get_connected_agents() const -> std::vector<std::string>
 ///// write
 /////////////////////////////////////////////////
 
-auto Transport::write_node(IDL::MvregNode *node) -> bool
+auto Transport::write_node(NodeInfoTuple *node) -> bool
 {
     return comm->write_node(node);
 }
 
-auto Transport::write_edge(IDL::MvregEdge *edge) -> bool
+auto Transport::write_edge(EdgeInfoTuple *edge) -> bool
 {
     return comm->write_edge(edge);
 }
 
-auto Transport::write_node_attributes(std::vector<IDL::MvregNodeAttr> *attributes) -> bool
+auto Transport::write_node_attributes(NodeAttributeVecTuple *attributes) -> bool
 {
     return comm->write_node_attributes(attributes);
 }
 
-auto Transport::write_edge_attributes(std::vector<IDL::MvregEdgeAttr> *attributes) -> bool
+auto Transport::write_edge_attributes(EdgeAttributeVecTuple *attributes) -> bool
 {
     return comm->write_edge_attributes(attributes);
 }
 
-auto Transport::write_graph(IDL::OrMap *map) -> bool
+auto Transport::write_graph(GraphInfoTuple *map) -> bool
 {
     return comm->write_graph(map);
 }
 
-auto Transport::write_request(IDL::GraphRequest *request) -> bool
+auto Transport::write_request(GraphRequestTuple *request) -> bool
 {
     return comm->write_request(request);
 }

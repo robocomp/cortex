@@ -8,37 +8,6 @@
 
 namespace DSR {
 
-    CRDTEdge::CRDTEdge (IDL::IDLEdge &&x) noexcept
-    {
-
-        m_to = x.to();
-        m_type = std::move(x.type());
-        m_from = x.from();
-        if (!x.attrs().empty()) {
-            for (auto&[k, v] : x.attrs()) {
-                m_attrs.emplace(k , IDLEdgeAttr_to_CRDT(std::move(v)));
-            }
-        }
-        m_agent_id = x.agent_id();
-
-    }
-
-    CRDTEdge &CRDTEdge::operator=(IDL::IDLEdge &&x)
-    {
-
-        m_to = x.to();
-        m_type = std::move(x.type());
-        m_from = x.from();
-        if (!x.attrs().empty()) {
-            for (auto&[k, v] : x.attrs()) {
-                m_attrs.emplace(k , IDLEdgeAttr_to_CRDT(std::move(v)));
-            }
-        }
-        m_agent_id = x.agent_id();
-
-        return *this;
-    }
-
     void CRDTEdge::to(uint64_t  _to)
     {
         m_to = _to;
@@ -107,52 +76,6 @@ namespace DSR {
     uint32_t CRDTEdge::agent_id() const
     {
         return m_agent_id;
-    }
-
-    IDL::IDLEdge CRDTEdge::to_IDL_edge(uint64_t id) const {
-        IDL::IDLEdge edge;
-        edge.from(m_from);
-        edge.to(m_to);
-        edge.type(m_type);
-        edge.agent_id(m_agent_id);
-        for (auto &[k, v] : m_attrs) {
-
-            IDL::MvregEdgeAttr edgeAttr;
-            for (auto &kv_dots : v.dk.ds) {
-                IDL::PairInt pi;
-                pi.first(kv_dots.first.first);
-                pi.second(kv_dots.first.second);
-
-                edgeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
-                edgeAttr.dk().cbase().cc().emplace(kv_dots.first);
-
-            }
-
-            edgeAttr.from(m_from);
-            edgeAttr.to(m_to);
-            edgeAttr.type(m_type);
-            edgeAttr.agent_id(v.read_reg().agent_id());
-            edgeAttr.id(id);
-
-            edge.attrs().emplace(k, std::move(edgeAttr));
-        }
-        return edge;
-    }
-
-
-    CRDTNode::CRDTNode(IDL::IDLNode &&x)
-    {
-        m_type = std::move(x.type());
-        m_name = std::move(x.name());
-        m_id = x.id();
-        m_agent_id = x.agent_id();
-        for (auto&[k, v] : x.attrs()) {
-            m_attrs.emplace(k, IDLNodeAttr_to_CRDT(std::move(v)));
-        }
-        for (auto&[k, v] : x.fano()) {
-            m_fano.emplace(std::pair<uint64_t, std::string>{k.to(), k.type()},
-                           IDLEdge_to_CRDT(std::move(v)));
-        }
     }
 
     void CRDTNode::type(const std::string &type)
@@ -253,55 +176,6 @@ namespace DSR {
     const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &CRDTNode::fano() const
     {
         return m_fano;
-    }
-
-
-    IDL::IDLNode CRDTNode::to_IDL_node(uint64_t id) const {
-        IDL::IDLNode node;
-        node.id(m_id);
-        node.name(m_name);
-        node.type(m_type);
-        node.agent_id(m_agent_id);
-        for (auto &[k, v] : m_attrs) {
-            IDL::MvregNodeAttr nodeAttr;
-            for (auto &kv_dots : v.dk.ds) {
-                IDL::PairInt pi;
-                pi.first(kv_dots.first.first);
-                pi.second(kv_dots.first.second);
-
-                nodeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
-                nodeAttr.dk().cbase().cc().emplace(kv_dots.first);
-            }
-
-            nodeAttr.id(id);
-            nodeAttr.attr_name(k);
-            nodeAttr.agent_id(v.read_reg().agent_id());
-            node.attrs().emplace(k, std::move(nodeAttr));
-        }
-
-        for (auto &[k, v] : m_fano) {
-            IDL::MvregEdge mvregCRDTEdge;
-            for (auto &kv_dots : v.dk.ds) {
-                IDL::PairInt pi;
-                pi.first(kv_dots.first.first);
-                pi.second(kv_dots.first.second);
-
-                mvregCRDTEdge.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_edge(id)));
-                mvregCRDTEdge.dk().cbase().cc().emplace(kv_dots.first);
-
-            }
-
-            mvregCRDTEdge.id(id);
-            mvregCRDTEdge.agent_id(v.read_reg().agent_id());
-            mvregCRDTEdge.to(k.first);
-            mvregCRDTEdge.from(v.read_reg().from());
-            mvregCRDTEdge.type(k.second);
-            IDL::EdgeKey ek;
-            ek.to(k.first);
-            ek.type(k.second);
-            node.fano().emplace(ek, std::move(mvregCRDTEdge));
-        }
-        return node;
     }
 
 }

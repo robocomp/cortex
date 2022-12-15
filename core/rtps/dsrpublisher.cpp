@@ -1,3 +1,4 @@
+#include "dsr/core/topics/IDLGraphPubSubTypes.h"
 #include <fastrtps/participant/Participant.h>
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/Domain.h>
@@ -99,42 +100,42 @@ eprosima::fastrtps::rtps::GUID_t DSRPublisher::getParticipantID() const
 }
 
 
-bool DSRPublisher::write(IDL::MvregNode *object)
+bool DSRPublisher::write(NodeInfoTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
         if (mp_writer->write(object)) return true;
         retry++;
     }
-    qInfo() << "Error writing NODE " << object->id() << " after 5 attempts";
+    qInfo() << "Error writing NODE " << std::get<0>(*object).id << " after 5 attempts";
     return false;
 }
 
 
-bool DSRPublisher::write(IDL::MvregEdge *object)
+bool DSRPublisher::write(EdgeInfoTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
         if (mp_writer->write(object)) return true;
         retry++;
     }
-    qInfo() << "Error writing EDGE " << object->from() << " " << object->to() << " " << object->type().data() << " after 5 attempts";
+    qInfo() << "Error writing EDGE " << std::get<1>(*object) << " " << std::get<2>(*object) << " " << std::get<3>(*object) << " after 5 attempts";
     return false;
 }
 
 
-bool DSRPublisher::write(IDL::OrMap *object)
+bool DSRPublisher::write(GraphInfoTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
         if (mp_writer->write(object)) return true;
         retry++;
     }
-    qInfo() << "Error writing GRAPH " << object->m().size() << " after 5 attempts";
+    qInfo() << "Error writing GRAPH " << std::get<2>(*object).size() << " after 5 attempts";
     return false;
 }
 
-bool DSRPublisher::write(IDL::GraphRequest *object)
+bool DSRPublisher::write(GraphRequestTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -145,7 +146,7 @@ bool DSRPublisher::write(IDL::GraphRequest *object)
     return false;
 }
 
-bool DSRPublisher::write(std::vector<IDL::MvregEdgeAttr> *object)
+bool DSRPublisher::write(EdgeAttributeVecTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -156,7 +157,7 @@ bool DSRPublisher::write(std::vector<IDL::MvregEdgeAttr> *object)
     return false;
 }
 
-bool DSRPublisher::write(std::vector<IDL::MvregNodeAttr> *object) {
+bool DSRPublisher::write(NodeAttributeVecTuple *object) {
     int retry = 0;
     while (retry < 5) {
         if (mp_writer->write(object)) return true;

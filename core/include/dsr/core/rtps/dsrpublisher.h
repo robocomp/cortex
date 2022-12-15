@@ -12,7 +12,7 @@
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastrtps/utils/IPLocator.h>
 
-#include "../topics/IDLGraphPubSubTypes.h"
+#include "dsr/core/topics/IDLGraphPubSubTypes.h"
 
 class DSRPublisher
 {
@@ -21,12 +21,12 @@ public:
     virtual ~DSRPublisher();
     [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic,  bool isStreamData = false);
     [[nodiscard]] eprosima::fastrtps::rtps::GUID_t getParticipantID() const;
-    bool write(IDL::GraphRequest *object);
-    bool write(IDL::MvregNode *object);
-    bool write(IDL::OrMap *object);
-    bool write(IDL::MvregEdge *object);
-    bool write(std::vector<IDL::MvregEdgeAttr> *object);
-    bool write(std::vector<IDL::MvregNodeAttr> *object);
+    bool write(NodeInfoTuple *object);
+    bool write(EdgeInfoTuple *object);
+    bool write(GraphInfoTuple *object);
+    bool write(GraphRequestTuple *object);
+    bool write(NodeAttributeVecTuple*object);
+    bool write(EdgeAttributeVecTuple *object);
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;

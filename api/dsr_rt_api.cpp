@@ -166,9 +166,9 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
     bool r2 = false;
     bool no_send = true;
 
-    std::optional<IDL::MvregEdge> node1_insert;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> node1_update;
-    std::optional<std::vector<IDL::MvregNodeAttr>> node2;
+    std::optional<EdgeInfoTuple> node1_insert;
+    std::optional<EdgeAttributeVecTuple> node1_update;
+    std::optional<NodeAttributeVecTuple> node2;
     std::optional<CRDTNode> to_n;
     {
         //TODO: change api
@@ -211,14 +211,14 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
             //Check if RT edge exist.
             if (n.fano().find({to, "RT"}) == n.fano().end())
             {
-                //Create -> from: IDL::MvregEdge, to: vector<IDL::MvregNodeAttr>
+                //Create -> from: EdgeInfoTuple, to: vector<NodeInfoTupleAttr>
                 std::tie(r1, node1_insert, std::ignore) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 
             }
             else
             {
-                //Update -> from: IDL::MvregEdgeAttr, to: vector<IDL::MvregNodeAttr>
+                //Update -> from: EdgeInfoTupleAttr, to: vector<NodeInfoTupleAttr>
                 std::tie(r1, std::ignore, node1_update) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 
@@ -267,9 +267,9 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
     bool r2 = false;
     bool no_send = true;
 
-    std::optional<IDL::MvregEdge> node1_insert;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> node1_update;
-    std::optional<std::vector<IDL::MvregNodeAttr>> node2;
+    std::optional<EdgeInfoTuple> node1_insert;
+    std::optional<EdgeAttributeVecTuple> node1_update;
+    std::optional<NodeAttributeVecTuple> node2;
     std::optional<CRDTNode> to_n;
     {
         std::unique_lock<std::shared_mutex> lock(G->graph->_mutex_data);
@@ -312,14 +312,14 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
             //Check if RT edge exist.
             if (n.fano().find({to, "RT"}) == n.fano().end())
             {
-                //Create -> from: IDL::MvregEdge, to: vector<IDL::MvregNodeAttr>
+                //Create -> from: EdgeInfoTuple, to: vector<NodeInfoTupleAttr>
                 std::tie(r1, node1_insert, std::ignore) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 
             }
             else
             {
-                //Update -> from: IDL::MvregEdgeAttr, to: vector<IDL::MvregNodeAttr>
+                //Update -> from: EdgeInfoTupleAttr, to: vector<NodeInfoTupleAttr>
                 std::tie(r1, std::ignore, node1_update) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 

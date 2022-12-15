@@ -131,12 +131,12 @@ public:
 
 //MVREG NODE, Operation timestamp, agent_id
 typedef std::tuple<mvreg<DSR::CRDTNode>, uint64_t, uint32_t> NodeInfoTuple;
-//MVREG EDGE, from, to, Operation timestamp,  agent_id
-typedef std::tuple<mvreg<DSR::CRDTEdge>, uint64_t, uint64_t, uint64_t, uint32_t> EdgeInfoTuple;
+//MVREG EDGE, from, to, type, Operation timestamp,  agent_id
+typedef std::tuple<mvreg<DSR::CRDTEdge>, uint64_t, uint64_t, std::string, uint64_t, uint32_t> EdgeInfoTuple;
 //VECTOR <MVREG ATTRIBUTE, Operation timestamp>, agent_id
 typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t>>, uint32_t> NodeAttributeVecTuple;
-//VECTOR <MVREG ATTRIBUTE, Operation timestamp, from, to>, agent_id
-typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t, uint64_t, uint64_t>>, uint32_t> EdgeAttributeVecTuple;
+//VECTOR <MVREG ATTRIBUTE, Operation timestamp, from, to, type>, agent_id
+typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t, uint64_t, uint64_t, std::string>>, uint32_t> EdgeAttributeVecTuple;
 //agent_id, request_agent_id, map<id, node>, deleted ids VECTOR <uint64_t>, dot_context
 typedef std::tuple<uint32_t, uint32_t, std::map<uint64_t, NodeInfoTuple>, std::vector<uint64_t>, dot_context> GraphInfoTuple;
 //agent_name, agent_id

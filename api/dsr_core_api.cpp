@@ -90,9 +90,9 @@ auto Graph::get_copy() const -> std::map<uint64_t, Node>
     return data;
 }
 
-auto Graph::copy_map() const -> std::map<uint64_t, IDL::MvregNode>
+auto Graph::copy_map() const -> std::map<uint64_t, NodeInfoTuple>
 {
-    std::map<uint64_t, IDL::MvregNode> map;
+    std::map<uint64_t, NodeInfoTuple> map;
     std::shared_lock<std::shared_mutex> lock(_mutex_data);
 
     for (auto &[key, val] : nodes)
@@ -274,7 +274,7 @@ auto Graph::get_edge_(uint64_t from, uint64_t to, const std::string &key) -> std
     return {};
 }
 
-auto Graph::insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<IDL::MvregNode>>
+auto Graph::insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<NodeInfoTuple>>
 {
     if (deleted.find(node.id()) == deleted.end())
     {
@@ -292,7 +292,7 @@ auto Graph::insert_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<IDL:
     return {false, {}};
 }
 
-auto Graph::update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>>
+auto Graph::update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<NodeAttributeVecTuple>>
 {
 
     if (deleted.find(node.id()) == deleted.end())
@@ -300,7 +300,7 @@ auto Graph::update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<std:
         if (nodes.contains(node.id()) and !nodes.at(node.id()).empty())
         {
 
-            std::vector<IDL::MvregNodeAttr> atts_deltas;
+            NodeAttributeVecTuple atts_deltas;
             auto &iter = nodes.at(node.id()).read_reg().attrs();
             // New attributes and updates.
             for (auto &[k, att] : node.attrs())
@@ -344,11 +344,11 @@ auto Graph::update_node_(CRDTNode &&node) -> std::tuple<bool, std::optional<std:
 }
 
 auto Graph::delete_node_(uint64_t id) -> std::tuple<bool, std::vector<std::tuple<uint64_t, uint64_t, std::string>>,
-                                                    std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>>
+                                                    std::optional<NodeInfoTuple>, std::vector<EdgeInfoTuple>>
 {
 
     std::vector<std::tuple<uint64_t, uint64_t, std::string>> deleted_edges;
-    std::vector<IDL::MvregEdge> delta_vec;
+    std::vector<EdgeInfoTuple> delta_vec;
 
     // Get and remove node.
     auto node = get_(id);
@@ -360,7 +360,7 @@ auto Graph::delete_node_(uint64_t id) -> std::tuple<bool, std::vector<std::tuple
     }
     // Get remove delta.
     auto delta = nodes[id].reset();
-    IDL::MvregNode delta_remove = CRDTNode_to_IDL(config.agent_id, id, delta);
+    NodeInfoTuple delta_remove = CRDTNode_to_IDL(config.agent_id, id, delta);
     update_maps_node_delete(id, node.value());
     // search and remove edges.
     // For each node check if there is an edge to remove.
@@ -386,7 +386,7 @@ auto Graph::delete_node_(uint64_t id) -> std::tuple<bool, std::vector<std::tuple
     return make_tuple(true, std::move(deleted_edges), std::move(delta_remove), std::move(delta_vec));
 }
 
-auto Graph::delete_edge_(uint64_t from, uint64_t to, const std::string &key) -> std::optional<IDL::MvregEdge>
+auto Graph::delete_edge_(uint64_t from, uint64_t to, const std::string &key) -> std::optional<EdgeInfoTuple>
 {
     if (nodes.contains(from))
     {
@@ -403,11 +403,11 @@ auto Graph::delete_edge_(uint64_t from, uint64_t to, const std::string &key) -> 
 }
 
 auto Graph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
-    -> std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>>
+    -> std::tuple<bool, std::optional<EdgeInfoTuple>, std::optional<EdgeAttributeVecTuple>>
 {
 
-    std::optional<IDL::MvregEdge> delta_edge;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> delta_attrs;
+    std::optional<EdgeInfoTuple> delta_edge;
+    std::optional<EdgeAttributeVecTuple> delta_attrs;
 
     if (nodes.contains(from))
     {
@@ -416,7 +416,7 @@ auto Graph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
         // Update
         if (node.fano().contains({to, attrs.type()}))
         {
-            std::vector<IDL::MvregEdgeAttr> atts_deltas;
+            EdgeAttributeVecTuple atts_deltas;
             auto iter = nodes.at(from).read_reg().fano().find({attrs.to(), attrs.type()});
             auto end = nodes.at(from).read_reg().fano().end();
             if (iter != end)
@@ -471,7 +471,7 @@ auto Graph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
 //////////////////////////////////////////////////////////////////////////
 // CRDT join operations
 ///////////////////////////////////////////////////////////////////////////
-void Graph::join_delta_node(IDL::MvregNode &&mvreg)
+void Graph::join_delta_node(NodeInfoTuple &&mvreg)
 {
 
     std::optional<CRDTNode> maybe_deleted_node = {};
@@ -682,7 +682,7 @@ void Graph::join_delta_node(IDL::MvregNode &&mvreg)
     }
 }
 
-void Graph::join_delta_edge(IDL::MvregEdge &&mvreg)
+void Graph::join_delta_edge(EdgeInfoTuple &&mvreg)
 {
     try
     {
@@ -833,7 +833,7 @@ void Graph::join_delta_edge(IDL::MvregEdge &&mvreg)
     }
 }
 
-auto Graph::join_delta_node_attr(IDL::MvregNodeAttr &&mvreg) -> std::optional<std::string>
+auto Graph::join_delta_node_attr(NodeInfoTupleAttr &&mvreg) -> std::optional<std::string>
 {
 
     try
@@ -893,7 +893,7 @@ auto Graph::join_delta_node_attr(IDL::MvregNodeAttr &&mvreg) -> std::optional<st
 
     return std::nullopt;
 }
-auto Graph::join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg) -> std::optional<std::string>
+auto Graph::join_delta_edge_attr(EdgeInfoTupleAttr &&mvreg) -> std::optional<std::string>
 {
     try
     {
@@ -959,7 +959,7 @@ auto Graph::join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg) -> std::optional<st
     return std::nullopt;
 }
 
-void Graph::join_full_graph(IDL::OrMap &&full_graph)
+void Graph::join_full_graph(GraphInfoTuple &&full_graph)
 {
 
     std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDTNode>>> updates;

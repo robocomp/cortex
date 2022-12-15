@@ -67,13 +67,6 @@ namespace DSR
             m_value = std::move(attr.m_value);
         }
 
-        explicit Attribute(IDL::Attrib &&x) noexcept
-        {
-            m_timestamp = x.timestamp();
-            m_value = std::move(get_valtype(std::move(x.value())));
-            m_agent_id = x.agent_id();
-        }
-
         Attribute &operator=(const Attribute &attr)
         {
             m_timestamp = attr.timestamp();
@@ -89,18 +82,6 @@ namespace DSR
             m_value = std::move(attr.m_value);
             return *this;
         }
-
-        Attribute &operator=(IDL::Attrib &&x)
-        {
-            m_timestamp = x.timestamp();
-            m_value = std::move(get_valtype(std::move(x.value())));
-            m_agent_id = x.agent_id();
-            return *this;
-        }
-
-        [[nodiscard]] IDL::Val to_IDL_val() const;
-
-        [[nodiscard]] IDL::Attrib to_IDL_attrib() const;
 
         ///////////////////////
         // Members
@@ -339,30 +320,6 @@ namespace DSR
         bool operator>=(const Attribute &rhs) const
         {
             return !(*this < rhs);
-        }
-
-        [[nodiscard]] static ValType get_valtype(IDL::Val &&x)
-        {
-            ValType val;
-            switch (x._d())
-            {
-                case 0: val = std::move(x.str()); break;
-                case 1: val = x.dec(); break;
-                case 2: val = x.fl(); break;
-                case 3: val = std::move(x.float_vec()); break;
-                case 4: val = x.bl(); break;
-                case 5: val = std::move(x.byte_vec()); break;
-                case 6: val = x.uint(); break;
-                case 7: val = x.u64(); break;
-                case 8: val = x.dob(); break;
-                case 9: val = std::move(x.uint64_vec()); break;
-                case 10: val = x.vec_float2(); break;
-                case 11: val = x.vec_float3(); break;
-                case 12: val = x.vec_float4(); break;
-                case 13: val = x.vec_float6(); break;
-                default: assert(false);
-            }
-            return val;
         }
 
     private:
