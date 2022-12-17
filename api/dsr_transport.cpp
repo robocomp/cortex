@@ -2,10 +2,12 @@
 // Created by jc on 19/09/22.
 //
 
+#include "dsr/core/types/crdt_types.h"
 #include <dsr/api/dsr_transport.h>
 #include <functional>
 #include <future>
 #include <memory>
+#include <utility>
 
 using namespace std::literals;
 using namespace DSR;
@@ -66,32 +68,32 @@ auto Transport::get_connected_agents() const -> std::vector<std::string>
 ///// write
 /////////////////////////////////////////////////
 
-auto Transport::write_node(NodeInfoTuple *node) -> bool
+auto Transport::write_node(mvreg<DSR::CRDTNode>&& node, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool
 {
-    return comm->write_node(node);
+    return comm->write_node(std::forward<mvreg<DSR::CRDTNode>>(node), node_id, timestamp, agent_id);
 }
 
-auto Transport::write_edge(EdgeInfoTuple *edge) -> bool
+auto Transport::write_edge(mvreg<DSR::CRDTEdge>&& edge, uint64_t from, uint64_t to, std::string edge_type, uint64_t timestamp, uint32_t agent_id) -> bool
 {
-    return comm->write_edge(edge);
+    return comm->write_edge(std::forward<mvreg<DSR::CRDTEdge>>(edge), from, to, edge_type, timestamp, agent_id);
 }
 
-auto Transport::write_node_attributes(NodeAttributeVecTuple *attributes) -> bool
+auto Transport::write_node_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool
 {
-    return comm->write_node_attributes(attributes);
+    return comm->write_node_attributes(std::forward<std::vector<DSR::CRDTAttribute>>(attributes), node_id, timestamp, agent_id);
 }
 
-auto Transport::write_edge_attributes(EdgeAttributeVecTuple *attributes) -> bool
+auto Transport::write_edge_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t from, uint64_t to, std::string edge_type, uint64_t timestamp, uint32_t agent_id) -> bool
 {
-    return comm->write_edge_attributes(attributes);
+    return comm->write_edge_attributes(std::forward<std::vector<DSR::CRDTAttribute>>(attributes), from, to, edge_type, timestamp, agent_id);
 }
 
-auto Transport::write_graph(GraphInfoTuple *map) -> bool
+auto Transport::write_graph(std::map<uint64_t, DSR::CRDTNode> &&graph, std::vector<uint64_t> deleted_nodes) -> bool
 {
-    return comm->write_graph(map);
+    return comm->write_graph(std::forward<std::map<uint64_t, DSR::CRDTNode>>(graph), std::forward<std::vector<uint64_t>>(deleted_nodes));
 }
 
-auto Transport::write_request(GraphRequestTuple *request) -> bool
+auto Transport::write_request(std::string& agent_name, uint32_t agent_id) -> bool
 {
-    return comm->write_request(request);
+    return comm->write_request(agent_name, agent_id);
 }

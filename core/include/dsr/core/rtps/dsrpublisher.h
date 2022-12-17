@@ -1,7 +1,7 @@
-#ifndef _PUBLISHER_H_
-#define _PUBLISHER_H_
+#pragma once
 
 
+#include <cstdint>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
@@ -13,6 +13,7 @@
 #include <fastrtps/utils/IPLocator.h>
 
 #include "dsr/core/topics/IDLGraphPubSubTypes.h"
+#include "dsr/core/types/crdt_types.h"
 
 class DSRPublisher
 {
@@ -44,5 +45,3 @@ private:
 	} m_listener;
 
 };
-
-#endif // _PUBLISHER_H_

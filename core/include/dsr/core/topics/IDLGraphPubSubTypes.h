@@ -3,7 +3,6 @@
 #include "dsr/core/crdt/delta_crdt.h"
 #include "dsr/core/types/crdt_types.h"
 #include <cstdint>
-#include <dsr/core/topics/IDLGraph.h>
 #include <fastcdr/Cdr.h>
 #include <fastcdr/FastBuffer.h>
 #include <fastrtps/TopicDataType.h>
@@ -133,14 +132,15 @@ public:
 typedef std::tuple<mvreg<DSR::CRDTNode>, uint64_t, uint32_t> NodeInfoTuple;
 //MVREG EDGE, from, to, type, Operation timestamp,  agent_id
 typedef std::tuple<mvreg<DSR::CRDTEdge>, uint64_t, uint64_t, std::string, uint64_t, uint32_t> EdgeInfoTuple;
-//VECTOR <MVREG ATTRIBUTE, Operation timestamp>, agent_id
-typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t>>, uint32_t> NodeAttributeVecTuple;
-//VECTOR <MVREG ATTRIBUTE, Operation timestamp, from, to, type>, agent_id
-typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t, uint64_t, uint64_t, std::string>>, uint32_t> EdgeAttributeVecTuple;
-//agent_id, request_agent_id, map<id, node>, deleted ids VECTOR <uint64_t>, dot_context
+//VECTOR <MVREG ATTRIBUTE, Operation timestamp, string attr name>, agent_id
+typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t, std::string>>, uint32_t> NodeAttributeVecTuple;
+//VECTOR <MVREG ATTRIBUTE, Operation timestamp, from, to, type, name>, agent_id
+typedef std::tuple<std::vector<std::tuple<mvreg<DSR::CRDTAttribute>, uint64_t, uint64_t, uint64_t, std::string, std::string>>, uint32_t> EdgeAttributeVecTuple;
+//agent_id, request_agent_id, map<id, node>, deleted ids VECTOR <uint64_t>, dot_context 
 typedef std::tuple<uint32_t, uint32_t, std::map<uint64_t, NodeInfoTuple>, std::vector<uint64_t>, dot_context> GraphInfoTuple;
 //agent_name, agent_id
 typedef std::tuple<std::string, uint32_t> GraphRequestTuple;
+
 
 constexpr char DDSTypeNodeStr [] = "Node";
 constexpr char DDSTypeEdgeStr [] = "Edge";

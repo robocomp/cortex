@@ -96,7 +96,7 @@ auto Graph::copy_map() const -> std::map<uint64_t, NodeInfoTuple>
     std::shared_lock<std::shared_mutex> lock(_mutex_data);
 
     for (auto &[key, val] : nodes)
-        map.emplace(key, CRDTNode_to_IDL(config.agent_id, key, val));
+        map.emplace(key, std::tuple {val, key, config.agent_id });
 
     return map;
 }
@@ -247,7 +247,7 @@ void Graph::update_maps_edge_insert(uint64_t from, uint64_t to, const std::strin
 
 auto Graph::get_(uint64_t id) -> std::optional<CRDTNode>
 {
-    // TODO: check std::shared_lock<std::shared_mutex> lock(_mutex_data);
+    std::shared_lock<std::shared_mutex> lock(_mutex_data);
     auto it = nodes.find(id);
     if (it != nodes.end() and !it->second.empty())
     {
@@ -258,7 +258,7 @@ auto Graph::get_(uint64_t id) -> std::optional<CRDTNode>
 
 auto Graph::get_edge_(uint64_t from, uint64_t to, const std::string &key) -> std::optional<CRDTEdge>
 {
-    // TODO: check std::shared_lock<std::shared_mutex> lock(_mutex_data);
+    std::shared_lock<std::shared_mutex> lock(_mutex_data);
     if (nodes.contains(from) && nodes.contains(to))
     {
         auto n = get_(from);
@@ -471,18 +471,17 @@ auto Graph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
 //////////////////////////////////////////////////////////////////////////
 // CRDT join operations
 ///////////////////////////////////////////////////////////////////////////
-void Graph::join_delta_node(NodeInfoTuple &&mvreg)
+void Graph::join_delta_node(NodeInfoTuple &&join_node)
 {
 
     std::optional<CRDTNode> maybe_deleted_node = {};
     try
     {
         bool signal = false, joined = false;
-        auto id = mvreg.id();
-        uint64_t timestamp = mvreg.timestamp();
+        auto &[node, timestamp, agent_id] = join_node;
+        auto id = node.id;
 
-        auto crdt_delta = IDLNode_to_CRDT(std::move(mvreg));
-        bool d_empty = crdt_delta.empty();
+        bool d_empty = node.empty();
 
         auto delete_unprocessed_deltas = [&]()
         {
@@ -833,7 +832,7 @@ void Graph::join_delta_edge(EdgeInfoTuple &&mvreg)
     }
 }
 
-auto Graph::join_delta_node_attr(NodeInfoTupleAttr &&mvreg) -> std::optional<std::string>
+auto Graph::join_delta_node_attr(NodeAttributeVecTuple &&mvreg) -> std::optional<std::string>
 {
 
     try
@@ -893,7 +892,7 @@ auto Graph::join_delta_node_attr(NodeInfoTupleAttr &&mvreg) -> std::optional<std
 
     return std::nullopt;
 }
-auto Graph::join_delta_edge_attr(EdgeInfoTupleAttr &&mvreg) -> std::optional<std::string>
+auto Graph::join_delta_edge_attr(EdgeAttributeVecTuple &&mvreg) -> std::optional<std::string>
 {
     try
     {

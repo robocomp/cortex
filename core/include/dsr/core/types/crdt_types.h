@@ -5,7 +5,6 @@
 #pragma once
 
 #include "../crdt/delta_crdt.h"
-#include "../topics/IDLGraph.h"
 #include "../utils.h"
 #include "common_types.h"
 

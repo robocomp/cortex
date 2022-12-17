@@ -123,8 +123,8 @@ namespace DSR
         ///////////////////////////////////////////////////////////////////////////
         void join_delta_node(NodeInfoTuple &&mvreg);
         void join_delta_edge(EdgeInfoTuple &&mvreg);
-        auto join_delta_node_attr(NodeInfoTupleAttr &&mvreg) -> std::optional<std::string>;
-        auto join_delta_edge_attr(EdgeInfoTupleAttr &&mvreg) -> std::optional<std::string>;
+        auto join_delta_node_attr(NodeAttributeVecTuple &&mvreg) -> std::optional<std::string>;
+        auto join_delta_edge_attr(EdgeAttributeVecTuple &&mvreg) -> std::optional<std::string>;
         void join_full_graph(GraphInfoTuple &&full_graph);
 
         auto process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta) -> bool;

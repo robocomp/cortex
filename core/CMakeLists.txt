@@ -33,8 +33,6 @@ target_sources(dsr_core
         include/dsr/core/rtps/dsrsubscriber.h
 
         topics/IDLGraphPubSubTypes.cxx
-        topics/IDLGraph.cxx
-        include/dsr/core/topics/IDLGraph.h
         include/dsr/core/topics/IDLGraphPubSubTypes.h
 
         include/dsr/core/crdt/delta_crdt.h

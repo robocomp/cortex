@@ -211,14 +211,14 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
             //Check if RT edge exist.
             if (n.fano().find({to, "RT"}) == n.fano().end())
             {
-                //Create -> from: EdgeInfoTuple, to: vector<NodeInfoTupleAttr>
+                //Create -> from: EdgeInfoTuple, to: vector<NodeAttributeVecTuple>
                 std::tie(r1, node1_insert, std::ignore) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 
             }
             else
             {
-                //Update -> from: EdgeInfoTupleAttr, to: vector<NodeInfoTupleAttr>
+                //Update -> from: EdgeAttributeVecTuple, to: vector<NodeAttributeVecTuple>
                 std::tie(r1, std::ignore, node1_update) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 
@@ -312,14 +312,14 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
             //Check if RT edge exist.
             if (n.fano().find({to, "RT"}) == n.fano().end())
             {
-                //Create -> from: EdgeInfoTuple, to: vector<NodeInfoTupleAttr>
+                //Create -> from: EdgeInfoTuple, to: vector<NodeAttributeVecTuple>
                 std::tie(r1, node1_insert, std::ignore) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 
             }
             else
             {
-                //Update -> from: EdgeInfoTupleAttr, to: vector<NodeInfoTupleAttr>
+                //Update -> from: EdgeAttributeVecTuple, to: vector<NodeAttributeVecTuple>
                 std::tie(r1, std::ignore, node1_update) = G->graph->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->graph->update_node_(std::move(to_n.value()));
 

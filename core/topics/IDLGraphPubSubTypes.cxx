@@ -11,7 +11,9 @@ using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
 template <typename T>
-constexpr size_t serialized_size(const T &val, size_t current_alignment);
+constexpr size_t serialized_size(const T &val, size_t current_alignment) {
+    return serialized_size(val, current_alignment);
+}
 
 constexpr size_t serialized_size(const std::string &val, size_t current_alignment)
 {
@@ -331,7 +333,7 @@ void deserialize(DSR::CRDTEdge &val, eprosima::fastcdr::Cdr &cdr)
     val.agent_id(x1);
     cdr >> x2;
     val.from(x2);
-    cdr >> x2;
+    cdr >> x3;
     val.to(x3);
     cdr >> val.type();
     cdr >> val.attrs();

@@ -2,7 +2,6 @@
 // Created by jc on 19/09/22.
 //
 
-#include "dsr/core/topics/IDLGraph.h"
 
 #include <dsr/api/dsr_api.h>
 #include <dsr/api/dsr_core_api.h>
@@ -334,7 +333,7 @@ auto FastDDSTransport::start_node_attrs_subscription(Graph *graph, bool show) ->
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                NodeInfoTupleAttrVec samples;
+                NodeAttributeVecTupleVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == ReturnCode_t::RETCODE_OK)
                 {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -418,7 +417,7 @@ auto FastDDSTransport::start_edge_attrs_subscription(Graph *graph, bool show) ->
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                EdgeInfoTupleAttrVec samples;
+                EdgeAttributeVecTupleVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == ReturnCode_t::RETCODE_OK)
                 {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE)
@@ -501,7 +500,7 @@ auto FastDDSTransport::write_edge(EdgeInfoTuple *_edge) -> bool
     return edge.dsr_pub.write(_edge);
 }
 
-auto FastDDSTransport::write_node_attributes(NodeAttributeVecTuple *attributes) -> bool
+auto FastDDSTransport::write_node_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool
 {
     return node_attribute.dsr_pub.write(attributes);
 }
@@ -511,12 +510,12 @@ auto FastDDSTransport::write_edge_attributes(EdgeAttributeVecTuple *attributes) 
     return edge_attribute.dsr_pub.write(attributes);
 }
 
-auto FastDDSTransport::write_graph(GraphInfoTuple *map) -> bool
+auto FastDDSTransport::write_graph(std::map<uint64_t, DSR::CRDTNode> &&graph, std::vector<uint64_t> deleted_nodes) -> bool
 {
     return graph_server.dsr_pub.write(map);
 }
 
-auto FastDDSTransport::write_request(GraphRequestTuple *request) -> bool
+auto FastDDSTransport::write_request(std::string& agent_name, uint32_t agent_id) -> bool
 {
     return graph_request.dsr_pub.write(request);
 }

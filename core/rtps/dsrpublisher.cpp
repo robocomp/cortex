@@ -119,7 +119,7 @@ bool DSRPublisher::write(EdgeInfoTuple *object)
         if (mp_writer->write(object)) return true;
         retry++;
     }
-    qInfo() << "Error writing EDGE " << std::get<1>(*object) << " " << std::get<2>(*object) << " " << std::get<3>(*object) << " after 5 attempts";
+    qInfo() << "Error writing EDGE " << std::get<1>(*object) << " " << std::get<2>(*object) << " " << std::get<3>(*object).data() << " after 5 attempts";
     return false;
 }
 

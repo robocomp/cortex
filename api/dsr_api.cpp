@@ -166,9 +166,9 @@ bool DSRGraph::update_node(No &&node) requires(std::is_same_v<std::remove_cvref_
             {
                 graph->transport->write_node_attributes(&vec_node_attr.value());
                 emit update_node_signal(node.id(), node.type(), SignalInfo{config.agent_id});
-                std::vector<std::string> atts_names(vec_node_attr->size());
-                std::transform(std::make_move_iterator(vec_node_attr->begin()),
-                               std::make_move_iterator(vec_node_attr->end()), atts_names.begin(),
+                std::vector<std::string> atts_names(std::get<0>(*vec_node_attr).size());
+                std::transform(std::make_move_iterator(std::get<0>(*vec_node_attr).begin()),
+                               std::make_move_iterator(std::get<0>(*vec_node_attr).end()), atts_names.begin(),
                                [](auto &&x) { return x.attr_name(); });
                 emit update_node_attr_signal(node.id(), atts_names, SignalInfo{config.agent_id});
             }

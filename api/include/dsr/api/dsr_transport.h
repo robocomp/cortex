@@ -5,7 +5,6 @@
 #pragma once
 
 #include "dsr/core/rtps/dsrparticipant.h"
-#include "dsr/core/topics/IDLGraph.h"
 #include "dsr/core/topics/IDLGraphPubSubTypes.h"
 #include "dsr/core/types/crdt_types.h"
 
@@ -36,20 +35,28 @@ namespace DSR
         /////////////////////////////////////////////////
 
         virtual auto start_fullgraph_request(Graph *) -> std::pair<bool, bool> = 0;
+
         virtual auto start_fullgraph_server(Graph *) -> void = 0;
+        
         virtual auto start_pubs(Graph *, bool show) -> void = 0;
+        
         virtual auto start_subs(Graph *, bool show) -> void = 0;
 
         //////////////////////////////////////////////////
         ///// write
         /////////////////////////////////////////////////
 
-        virtual auto write_node(NodeInfoTuple *node) -> bool = 0;
-        virtual auto write_edge(EdgeInfoTuple *edge) -> bool = 0;
-        virtual auto write_node_attributes(NodeAttributeVecTuple *attributes) -> bool = 0;
-        virtual auto write_edge_attributes(EdgeAttributeVecTuple *attributes) -> bool = 0;
-        virtual auto write_graph(GraphInfoTuple *map) -> bool = 0;
-        virtual auto write_request(GraphRequestTuple *request) -> bool = 0;
+        virtual auto write_node(mvreg<DSR::CRDTNode>&& node, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool = 0;
+        
+        virtual auto write_edge(mvreg<DSR::CRDTEdge>&& edge, uint64_t from, uint64_t to, std::string edge_type, uint64_t timestamp, uint32_t agent_id) -> bool = 0;
+        
+        virtual auto write_node_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool = 0;
+        
+        virtual auto write_edge_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t from, uint64_t to, std::string edge_type, uint64_t timestamp, uint32_t agent_id) -> bool = 0;
+        
+        virtual auto write_graph(std::map<uint64_t, DSR::CRDTNode> &&graph, std::vector<uint64_t> deleted_nodes) -> bool = 0;
+        
+        virtual auto write_request(std::string& agent_name, uint32_t agent_id) -> bool = 0;
     };
 
     class Transport : std::enable_shared_from_this<Transport>
@@ -85,17 +92,17 @@ namespace DSR
         //////////////////////////////////////////////////
         ///// Write
         /////////////////////////////////////////////////
-        auto write_node(NodeInfoTuple *node) -> bool;
+        auto write_node(mvreg<DSR::CRDTNode>&& node, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool;
 
-        auto write_edge(EdgeInfoTuple *edge) -> bool;
+        auto write_edge(mvreg<DSR::CRDTEdge>&& edge, uint64_t from, uint64_t to, std::string edge_type, uint64_t timestamp, uint32_t agent_id) -> bool;
 
-        auto write_node_attributes(NodeAttributeVecTuple *attributes) -> bool;
+        auto write_node_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t node_id, uint64_t timestamp, uint32_t agent_id) -> bool;
 
-        auto write_edge_attributes(EdgeAttributeVecTuple *attributes) -> bool;
+        auto write_edge_attributes(std::vector<DSR::CRDTAttribute> &&attributes, uint64_t from, uint64_t to, std::string edge_type, uint64_t timestamp, uint32_t agent_id) -> bool;
 
-        auto write_graph(GraphInfoTuple *map) -> bool;
+        auto write_graph(std::map<uint64_t, DSR::CRDTNode> &&graph, std::vector<uint64_t> deleted_nodes) -> bool;
 
-        auto write_request(GraphRequestTuple *request) -> bool;
+        auto write_request(std::string& agent_name, uint32_t agent_id) -> bool;
     };
 
 }  // namespace DSR

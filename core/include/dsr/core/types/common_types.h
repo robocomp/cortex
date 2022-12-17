@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "../topics/IDLGraph.h"
 #include "../utils.h"
 
 #include <cassert>
