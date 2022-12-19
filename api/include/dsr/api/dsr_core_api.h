@@ -23,6 +23,7 @@
 #include <QtCore/QtCore>
 
 #include "dsr/api/dsr_transport.h"
+#include "dsr/core/topics/IDLGraphPubSubTypes.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
@@ -121,11 +122,11 @@ namespace DSR
         //////////////////////////////////////////////////////////////////////////
         // CRDT join operations
         ///////////////////////////////////////////////////////////////////////////
-        void join_delta_node(NodeInfoTuple &&mvreg);
-        void join_delta_edge(EdgeInfoTuple &&mvreg);
-        auto join_delta_node_attr(NodeAttributeVecTuple &&mvreg) -> std::optional<std::string>;
-        auto join_delta_edge_attr(EdgeAttributeVecTuple &&mvreg) -> std::optional<std::string>;
-        void join_full_graph(GraphInfoTuple &&full_graph);
+        void join_delta_node(NodeInfoTuple &&delta_node);
+        void join_delta_edge(EdgeInfoTuple &&delte_edge);
+        auto join_delta_node_attr(NodeAttributeVecTuple &&delta_node_vec) -> std::optional<std::string>;
+        auto join_delta_edge_attr(EdgeAttributeVecTuple &&delta_edge_vec) -> std::optional<std::string>;
+        void join_full_graph(GraphInfoTuple &&graph);
 
         auto process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta) -> bool;
         void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute> && attr);
