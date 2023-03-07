@@ -19,108 +19,39 @@ namespace DSR
 
     inline const std::map<std::string, Attribute> default_attributes = {};
     inline const std::map<std::pair<uint64_t, std::string>, Edge> default_fano = {};
-    inline const std::string default_str = "";
+    inline const std::string default_str;
 
     class Edge
     {
 
     private:
-        Edge(uint64_t from, uint64_t to, std::string type, uint32_t agent_id, std::map<std::string, Attribute> attrs)
-            : m_to(to),
-              m_from(from),
-              m_type(std::move(type)),
-              m_attrs(std::move(attrs)),
-              m_agent_id(agent_id)
-        {
-        }
+        Edge(uint64_t from, uint64_t to, std::string type, uint32_t agent_id, std::map<std::string, Attribute> attrs);
 
     public:
         Edge() = default;
         ~Edge() = default;
 
         [[deprecated("Use Edge::create<example_edge_type>(...)")]] Edge(uint64_t to, uint64_t from, std::string type,
-                                                                        uint32_t agent_id)
-            : m_to(to),
-              m_from(from),
-              m_type(std::move(type)),
-              m_attrs{},
-              m_agent_id(agent_id)
-        {
-            if (!edge_types::check_type(m_type))
-            {
-                throw std::runtime_error("Error, \"" + m_type + "\" is not a valid edge type");
-            }
-        }
+                                                                        uint32_t agent_id);
 
         [[deprecated("Use Edge::create<example_edge_type>(...)")]] Edge(uint64_t to, uint64_t from, std::string type,
                                                                         std::map<std::string, Attribute> attrs,
-                                                                        uint32_t agent_id)
-            : m_to(to),
-              m_from(from),
-              m_type(std::move(type)),
-              m_attrs{std::move(attrs)},
-              m_agent_id(agent_id)
-        {
-            if (!edge_types::check_type(m_type))
-            {
-                throw std::runtime_error("Error, \"" + m_type + "\" is not a valid edge type");
-            }
-        }
+                                                                        uint32_t agent_id);
 
-        // template <typename edge_type>
-        // static Edge create(uint64_t from, uint64_t to)
-        //     requires(edge_type::edge_type)
-        //{
-        //     return Edge(from, to,  std::string(edge_type::attr_name.data()), 0, {});
-        // }
 
         template <typename edge_type>
         static Edge
         create(uint64_t from, uint64_t to,
                const std::map<std::string, Attribute> &attrs = default_attributes) requires(edge_type::edge_type)
         {
-            return Edge(from, to, std::string(edge_type::attr_name.data()), 0, attrs);
+            return {from, to, std::string(edge_type::attr_name.data()), 0, attrs};
         }
 
-        explicit Edge(const CRDTEdge &edge)
-        {
-            m_agent_id = edge.agent_id();
-            m_from = edge.from();
-            m_to = edge.to();
-            m_type = edge.type();
-            for (const auto &[k, v] : edge.attrs())
-            {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-        }
+        explicit Edge(const CRDTEdge &edge);
 
-        explicit Edge(CRDTEdge &&edge)
-        {
-            m_agent_id = edge.agent_id();
-            m_from = edge.from();
-            m_to = edge.to();
-            m_type = edge.type();
-            for (auto &[k, v] : edge.attrs())
-            {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, std::move(v.dk.ds.begin()->second));
-            }
-        }
+        explicit Edge(CRDTEdge &&edge);
 
-        Edge &operator=(const CRDTEdge &attr)
-        {
-            m_agent_id = attr.agent_id();
-            m_from = attr.from();
-            m_to = attr.to();
-            m_type = attr.type();
-            for (const auto &[k, v] : attr.attrs())
-            {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-            return *this;
-        }
+        Edge &operator=(const CRDTEdge &attr);
 
         [[nodiscard]] uint64_t to() const;
 
@@ -146,172 +77,58 @@ namespace DSR
 
         void agent_id(uint32_t agent_id);
 
-        bool operator==(const Edge &rhs) const
-        {
-            return m_to == rhs.m_to && m_from == rhs.m_from && m_type == rhs.m_type && m_attrs == rhs.m_attrs;
-        }
+        bool operator==(const Edge &rhs) const;
 
-        bool operator!=(const Edge &rhs) const
-        {
-            return !(rhs == *this);
-        }
+        bool operator!=(const Edge &rhs) const;
 
-        bool operator<(const Edge &rhs) const
-        {
-            if (m_to < rhs.m_to) return true;
-            if (rhs.m_to < m_to) return false;
-            if (m_from < rhs.m_from) return true;
-            if (rhs.m_from < m_from) return false;
-            if (m_type < rhs.m_type) return true;
-            if (rhs.m_type < m_type) return false;
-            return true;
-        }
+        bool operator<(const Edge &rhs) const;
 
-        bool operator>(const Edge &rhs) const
-        {
-            return rhs < *this;
-        }
+        bool operator>(const Edge &rhs) const;
 
-        bool operator<=(const Edge &rhs) const
-        {
-            return !(rhs < *this);
-        }
+        bool operator<=(const Edge &rhs) const;
 
-        bool operator>=(const Edge &rhs) const
-        {
-            return !(*this < rhs);
-        }
+        bool operator>=(const Edge &rhs) const;
 
-        Attribute &operator[](const std::string &str)
-        {
-            // This can throw
-            return m_attrs.at(str);
-        }
+        Attribute &operator[](const std::string &str);
 
     private:
-        uint64_t m_to = 0;
-        uint64_t m_from = 0;
+        uint64_t m_to;
+        uint64_t m_from;
         std::string m_type;
         std::map<std::string, Attribute> m_attrs;
-        uint32_t m_agent_id = 0;
+        uint32_t m_agent_id;
+        uint64_t m_timestamp;
     };
 
     class Node
     {
     private:
         Node(std::string type, uint32_t agent_id, std::map<std::string, Attribute> attrs,
-             std::map<std::pair<uint64_t, std::string>, Edge> fano, std::string name = "")
-            : m_id(0),
-              m_type{std::move(type)},
-              m_name{std::move(name)},
-              m_attrs{std::move(attrs)},
-              m_fano{std::move(fano)},
-              m_agent_id(agent_id)
-        {
-        }
+             std::map<std::pair<uint64_t, std::string>, Edge> fano, std::string name = "");
 
     public:
         Node() = default;
         ~Node() = default;
 
-        [[deprecated("Use Node::create<example_node_type>(...)")]] Node(uint64_t agent_id, std::string type)
-            : m_id(0),
-              m_type(std::move(type)),
-              m_attrs{},
-              m_fano{},
-              m_agent_id(agent_id)
-        {
-            if (!node_types::check_type(m_type))
-            {
-                throw std::runtime_error("Error, \"" + m_type + "\" is not a valid node type");
-            }
-        }
+        [[deprecated("Use Node::create<example_node_type>(...)")]] Node(uint64_t agent_id, std::string type);
 
         [[deprecated("Use Node::create<example_node_type>(...)")]] Node(
             std::string type, uint32_t agent_id, std::map<std::string, Attribute> attrs,
-            std::map<std::pair<uint64_t, std::string>, Edge> fano)
-            : m_id(0),
-              m_type(std::move(type)),
-              m_attrs{std::move(attrs)},
-              m_fano{std::move(fano)},
-              m_agent_id(agent_id)
-        {
-            if (!node_types::check_type(m_type))
-            {
-                throw std::runtime_error("Error, \"" + m_type + "\" is not a valid node type");
-            }
-        }
-
-        /*template <typename node_type>
-        static Node create(const std::string& name = "")
-            requires(node_type::node_type)
-        {
-            return Node( std::string(node_type::attr_name.data()), 0, {}, {}, name);
-        }*/
+            std::map<std::pair<uint64_t, std::string>, Edge> fano);
 
         template <typename node_type>
         static Node create(
             const std::string &name = default_str, const std::map<std::string, Attribute> &attrs = default_attributes,
             const std::map<std::pair<uint64_t, std::string>, Edge> &fano = default_fano) requires(node_type::node_type)
         {
-            return Node(std::string(node_type::attr_name.data()), 0, attrs, fano, name);
+            return {std::string(node_type::attr_name.data()), 0, attrs, fano, name};
         }
 
-        explicit Node(const CRDTNode &node)
-        {
-            m_agent_id = node.agent_id();
-            m_id = node.id();
-            m_name = node.name();
-            m_type = node.type();
-            for (const auto &[k, v] : node.attrs())
-            {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-            for (const auto &[k, v] : node.fano())
-            {
-                assert(!v.dk.ds.empty());
-                m_fano.emplace(k, v.dk.ds.begin()->second);
-            }
-        }
+        explicit Node(const CRDTNode &node);
 
-        explicit Node(CRDTNode &&node)
-        {
-            m_agent_id = node.agent_id();
-            m_id = node.id();
-            m_name = node.name();
-            m_type = node.type();
-            for (auto &[k, v] : node.attrs())
-            {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, std::move(v.dk.ds.begin()->second));
-            }
-            for (auto &[k, v] : node.fano())
-            {
-                assert(!v.dk.ds.empty());
-                m_fano.emplace(k, std::move(v.dk.ds.begin()->second));
-            }
-        }
+        explicit Node(CRDTNode &&node);
 
-        Node &operator=(const CRDTNode &node)
-        {
-            m_agent_id = node.agent_id();
-            m_id = node.id();
-            m_name = node.name();
-            m_type = node.type();
-            for (const auto &[k, v] : node.attrs())
-            {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-            for (const auto &[k, v] : node.fano())
-            {
-                assert(!v.dk.ds.empty());
-                m_fano.emplace(k, v.dk.ds.begin()->second);
-            }
-
-            return *this;
-        }
+        Node &operator=(const CRDTNode &node);
 
         [[nodiscard]] uint64_t id() const;
 
@@ -345,62 +162,30 @@ namespace DSR
 
         void agent_id(uint32_t agent_id);
 
-        bool operator==(const Node &rhs) const
-        {
-            return m_id == rhs.m_id && m_type == rhs.m_type && m_name == rhs.m_name && m_attrs == rhs.m_attrs &&
-                   m_fano == rhs.m_fano;
-        }
+        bool operator==(const Node &rhs) const;
 
-        bool operator!=(const Node &rhs) const
-        {
-            return !(rhs == *this);
-        }
+        bool operator!=(const Node &rhs) const;
 
-        bool operator<(const Node &rhs) const
-        {
-            if (m_id < rhs.m_id) return true;
-            if (rhs.m_id < m_id) return false;
-            if (m_type < rhs.m_type) return true;
-            if (rhs.m_type < m_type) return false;
-            if (m_name < rhs.m_name) return true;
-            if (rhs.m_name < m_name) return false;
-            return true;
-        }
+        bool operator<(const Node &rhs) const;
 
-        bool operator>(const Node &rhs) const
-        {
-            return rhs < *this;
-        }
+        bool operator>(const Node &rhs) const;
 
-        bool operator<=(const Node &rhs) const
-        {
-            return !(rhs < *this);
-        }
+        bool operator<=(const Node &rhs) const;
 
-        bool operator>=(const Node &rhs) const
-        {
-            return !(*this < rhs);
-        }
+        bool operator>=(const Node &rhs) const;
 
-        Attribute &operator[](const std::string &str)
-        {
-            // This can throw
-            return m_attrs.at(str);
-        }
+        Attribute &operator[](const std::string &str);
 
-        Edge &operator[](std::pair<uint64_t, std::string> &str)
-        {
-            // This can throw
-            return m_fano.at(str);
-        }
+        Edge &operator[](std::pair<uint64_t, std::string> &str);
 
     private:
-        uint64_t m_id = 0;
+        uint64_t m_id;
         std::string m_type;
         std::string m_name;
         std::map<std::string, Attribute> m_attrs;
         std::map<std::pair<uint64_t, std::string>, Edge> m_fano;
-        uint32_t m_agent_id = 0;
+        uint32_t m_agent_id;
+        uint64_t m_timestamp;
     };
 
 }  // namespace DSR

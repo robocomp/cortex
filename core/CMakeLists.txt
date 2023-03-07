@@ -25,15 +25,15 @@ target_sources(dsr_core
         include/dsr/core/types/type_checking/dsr_node_type.h
         include/dsr/core/types/type_checking/type_checker.h
 
-        rtps/dsrpublisher.cpp
-        rtps/dsrsubscriber.cpp
-        rtps/dsrparticipant.cpp
-        include/dsr/core/rtps/dsrparticipant.h
-        include/dsr/core/rtps/dsrpublisher.h
-        include/dsr/core/rtps/dsrsubscriber.h
+		transport/fastdds/publisher.cpp
+		transport/fastdds/subscriber.cpp
+		transport/fastdds/participant.cpp
+		include/dsr/core/transport/fastdds/participant.h
+		include/dsr/core/transport/fastdds/publisher.h
+		include/dsr/core/transport/fastdds/subscriber.h
 
-        topics/IDLGraphPubSubTypes.cxx
-        include/dsr/core/topics/IDLGraphPubSubTypes.h
+		transport/fastdds/dsr_types.cpp
+		include/dsr/core/transport/fastdds/dds_types.h
 
         include/dsr/core/crdt/delta_crdt.h
 

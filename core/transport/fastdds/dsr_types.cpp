@@ -1,11 +1,10 @@
-#include "dsr/core/topics/IDLGraphPubSubTypes.h"
-
+#include "dsr/core/crdt/delta_crdt.h"
+#include "dsr/core/transport/fastdds/dds_types.h"
 #include "dsr/core/types/common_types.h"
+#include "dsr/core/types/crdt_types.h"
 
 #include <array>
 #include <cstdint>
-#include <dsr/core/crdt/delta_crdt.h>
-#include <dsr/core/types/crdt_types.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;

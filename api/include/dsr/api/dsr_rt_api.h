@@ -1,12 +1,13 @@
 #ifndef RTAPI
 #define RTAPI
 
-#include <cassert>
+#include "dsr/core/transport/fastdds/dds_types.h"
+
 #include <QtCore>
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
-#include <dsr/core/types/user_types.h>
-#include <dsr/core/types/type_checking/dsr_attr_name.h>
+#include <cassert>
 #include <dsr/api/dsr_eigen_defs.h>
+#include <dsr/core/types/type_checking/dsr_attr_name.h>
+#include <dsr/core/types/user_types.h>
 #include <optional>
 
 namespace DSR

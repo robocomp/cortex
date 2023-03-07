@@ -1,8 +1,9 @@
 #ifndef INNER_EIGEN_API
 #define INNER_EIGEN_API
 
+#include "dsr/core/transport/fastdds/dds_types.h"
+
 #include <QObject>
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
 #include <dsr/api/dsr_eigen_defs.h>
 #include <dsr/api/dsr_rt_api.h>
 #include <optional>

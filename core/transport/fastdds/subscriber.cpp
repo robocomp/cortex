@@ -3,26 +3,27 @@
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/qos/DataReaderQos.hpp>
 //#include <fastdds/dds/topic/ContentFilteredTopic.hpp>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <fastrtps/utils/IPFinder.h>
-
-#include <dsr/core/rtps/dsrsubscriber.h>
+#include "dsr/core/transport/fastdds/subscriber.h"
 
 #include <QDebug>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastrtps/utils/IPFinder.h>
 
 using namespace eprosima;
 using namespace eprosima::fastdds;
 using namespace eprosima::fastdds::rtps;
 using namespace eprosima::fastrtps::rtps;
 
-DSRSubscriber::DSRSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr), mp_reader(nullptr) {}
+using namespace DSR;
 
-DSRSubscriber::~DSRSubscriber()
+DDSSubscriber::DDSSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr), mp_reader(nullptr) {}
+
+DDSSubscriber::~DDSSubscriber()
 {
 }
 
 std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
-        DSRSubscriber::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
+        DDSSubscriber::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
                          eprosima::fastdds::dds::Topic *topic,
                         const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
                         std::mutex& mtx,
@@ -94,11 +95,11 @@ std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::Da
 }
 
 
-eprosima::fastdds::dds::Subscriber * DSRSubscriber::getSubscriber(){
+eprosima::fastdds::dds::Subscriber * DDSSubscriber::getSubscriber(){
     return mp_subscriber;
 }
 
-eprosima::fastdds::dds::DataReader * DSRSubscriber::getDataReader() {
+eprosima::fastdds::dds::DataReader * DDSSubscriber::getDataReader() {
     return mp_reader;
 }
 
@@ -106,18 +107,18 @@ eprosima::fastdds::dds::DataReader * DSRSubscriber::getDataReader() {
 /// Callbacks
 ///////////////////////////////////////////
 
-void DSRSubscriber::SubListener::on_subscription_matched(eprosima::fastdds::dds::DataReader* reader,
+void DDSSubscriber::SubListener::on_subscription_matched(eprosima::fastdds::dds::DataReader* reader,
                                                          const eprosima::fastdds::dds::SubscriptionMatchedStatus& info)
 {
     if (0 < info.current_count_change)
     {
-        qInfo() << "Publisher [" << reader->get_topicdescription()->get_name().data() <<"] matched " << info.last_publication_handle.value;// << " self: " << info..is_on_same_process_as(sub->getGuid());
+        qInfo() << "DDSPublisher [" << reader->get_topicdescription()->get_name().data() <<"] matched " << info.last_publication_handle.value;// << " self: " << info..is_on_same_process_as(sub->getGuid());
     } else {
-        qInfo() << "Publisher [" << reader->get_topicdescription()->get_name().data() <<"] unmatched "  << info.last_publication_handle.value;//<< " self: " << info.remoteEndpointGuid.is_on_same_process_as(sub->getGuid());
+        qInfo() << "DDSPublisher [" << reader->get_topicdescription()->get_name().data() <<"] unmatched "  << info.last_publication_handle.value;//<< " self: " << info.remoteEndpointGuid.is_on_same_process_as(sub->getGuid());
     }
 }
 
-void DSRSubscriber::SubListener::on_data_available(eprosima::fastdds::dds::DataReader* sub)
+void DDSSubscriber::SubListener::on_data_available(eprosima::fastdds::dds::DataReader* sub)
 {
     f(sub);
 }

@@ -9,6 +9,11 @@
 #include <fastrtps/config.h>
 #include <vector>
 
+template <typename T>
+constexpr size_t serialized_size(const T &val, size_t current_alignment) {
+    return serialized_size(val, current_alignment);
+}
+
 template <typename T, const char* name, uint32_t s>
 class DDSTtype : public eprosima::fastrtps::TopicDataType
 {
@@ -54,9 +59,8 @@ public:
         m_isGetKeyDefined = false;
     }
 
-    ~DDSTtype()
-    {
-    }
+    ~DDSTtype() override
+    = default;
 
     bool serialize(void *data, eprosima::fastrtps::rtps::SerializedPayload_t *payload) override
     {
@@ -109,10 +113,10 @@ public:
     std::function<uint32_t()> getSerializedSizeProvider(void *data) override
     {
         return [data]() -> uint32_t
-        { return static_cast<uint32_t>(type::getCdrSerializedSize(*static_cast<T *>(data))) + 4 /*encapsulation*/; };
+        { return static_cast<uint32_t>(serialized_size(data, 0)) + 4 /*encapsulation*/; };
     }
 
-    bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *handle, bool force_md5 = false) override
+    bool getKey(void *data, eprosima::fastrtps::rtps::InstanceHandle_t *handle, bool force_md5) override
     {
         return false;
     }
@@ -128,7 +132,7 @@ public:
     }
 };
 
-//MVREG NODE, Operation timestamp, agent_id
+// MVREG NODE, Operation timestamp, agent_id
 typedef std::tuple<mvreg<DSR::CRDTNode>, uint64_t, uint32_t> NodeInfoTuple;
 //MVREG EDGE, from, to, type, Operation timestamp,  agent_id
 typedef std::tuple<mvreg<DSR::CRDTEdge>, uint64_t, uint64_t, std::string, uint64_t, uint32_t> EdgeInfoTuple;

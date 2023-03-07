@@ -2,8 +2,10 @@
 // Created by jc on 19/09/22.
 //
 
+#include "dsr/core/transport/dsr_transport.h"
+
 #include "dsr/core/types/crdt_types.h"
-#include <dsr/api/dsr_transport.h>
+
 #include <functional>
 #include <future>
 #include <memory>
@@ -21,7 +23,7 @@ auto Transport::create(std::unique_ptr<BaseManager> comm_) -> std::shared_ptr<Tr
     return ptr;
 }
 
-auto Transport::stop() -> void
+auto Transport::stop() const -> void
 {
     comm->stop();
 }

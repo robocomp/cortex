@@ -1,5 +1,6 @@
+#include "dsr/core/transport/fastdds/participant.h"
+
 #include <QDebug>
-#include <dsr/core/rtps/dsrparticipant.h>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
@@ -8,8 +9,9 @@
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
+using namespace DSR;
 
-DSRParticipant::DSRParticipant()
+DDSParticipant::DDSParticipant()
     : mp_participant(nullptr),
       dsrgraphType(new DDSTypeNode()),
       graphrequestType(new DDSTypeGraphRequest()),
@@ -18,20 +20,19 @@ DSRParticipant::DSRParticipant()
       dsrNodeAttrType(new DDSTypeNodeAttribute()),
       dsrEdgeAttrType(new DDSTypeEdgeAttribute()),
       m_listener(nullptr)
-
 {
 }
 
-DSRParticipant::~DSRParticipant()
+DDSParticipant::~DDSParticipant()
 {
 
     remove_participant_and_entities();
 
-    qDebug() << "Removing DSRParticipant";
+    qDebug() << "Removing DDSParticipant";
 }
 
 std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *>
-DSRParticipant::init(uint32_t agent_id, const std::string &agent_name, int localhost,
+DDSParticipant::init(uint32_t agent_id, const std::string &agent_name, int localhost,
                      std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&)> fn)
 {
     // Create RTPSParticipant
@@ -131,12 +132,12 @@ DSRParticipant::init(uint32_t agent_id, const std::string &agent_name, int local
     return std::make_tuple(true, mp_participant);
 }
 
-eprosima::fastdds::dds::DomainParticipant *DSRParticipant::getParticipant()
+eprosima::fastdds::dds::DomainParticipant *DDSParticipant::getParticipant()
 {
     return mp_participant;
 }
 
-void DSRParticipant::remove_participant_and_entities()
+void DDSParticipant::remove_participant_and_entities()
 {
     if (mp_participant != nullptr)
     {
@@ -259,25 +260,25 @@ void DSRParticipant::remove_participant_and_entities()
     }
 }
 
-const eprosima::fastrtps::rtps::GUID_t &DSRParticipant::getID() const
+const eprosima::fastrtps::rtps::GUID_t &DDSParticipant::getID() const
 {
     return mp_participant->guid();
 }
 
-void DSRParticipant::add_subscriber(
+void DDSParticipant::add_subscriber(
     const std::string &id, std::pair<eprosima::fastdds::dds::Subscriber *, eprosima::fastdds::dds::DataReader *> val)
 {
     std::unique_lock<std::mutex> lck(sub_mtx);
     subscribers.emplace(id, val);
 }
-void DSRParticipant::add_publisher(
+void DDSParticipant::add_publisher(
     const std::string &id, std::pair<eprosima::fastdds::dds::Publisher *, eprosima::fastdds::dds::DataWriter *> val)
 {
     std::unique_lock<std::mutex> lck(pub_mtx);
     publishers.emplace(id, val);
 }
 
-void DSRParticipant::delete_subscriber(const std::string &id)
+void DDSParticipant::delete_subscriber(const std::string &id)
 {
     std::unique_lock<std::mutex> lck(sub_mtx);
     try
@@ -316,7 +317,7 @@ void DSRParticipant::delete_subscriber(const std::string &id)
     }
 }
 
-void DSRParticipant::delete_publisher(const std::string &id)
+void DDSParticipant::delete_publisher(const std::string &id)
 {
     std::unique_lock<std::mutex> lck(pub_mtx);
     try

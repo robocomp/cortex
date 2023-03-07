@@ -3,11 +3,10 @@
 //
 
 
-#pragma once 
+#pragma once
 
+#include "dsr/core/transport/dsr_transport.h"
 #include "threadpool/threadpool.h"
-#include <dsr/api/dsr_transport.h>
-
 
 namespace DSR
 {
@@ -82,11 +81,11 @@ namespace DSR
 
         struct DDSPubSub
         {
-            DSRPublisher dsr_pub;
-            DSRSubscriber dsr_sub;
+            DDSPublisher dsr_pub;
+            DDSSubscriber dsr_sub;
         };
 
-        DSRParticipant participant;
+        DDSParticipant participant;
         DDSPubSub node;
         DDSPubSub node_attribute;
         DDSPubSub edge;

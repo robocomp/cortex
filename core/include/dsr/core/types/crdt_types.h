@@ -21,7 +21,7 @@ namespace DSR
     class CRDTEdge
     {
     public:
-        CRDTEdge() : m_to(0), m_from(0), m_agent_id(0) {}
+        CRDTEdge();
 
         ~CRDTEdge() = default;
 
@@ -53,72 +53,27 @@ namespace DSR
 
         [[nodiscard]] uint32_t agent_id() const;
 
-        bool operator==(const CRDTEdge &rhs) const
-        {
-            if (this == &rhs)
-            {
-                return true;
-            }
-            if (m_type != rhs.m_type || from() != rhs.from() || to() != rhs.to() || attrs() != rhs.attrs())
-            {
-                return false;
-            }
-            return true;
-        }
+        bool operator==(const CRDTEdge &rhs) const;
 
-        bool operator<(const CRDTEdge &rhs) const
-        {
-            if (this == &rhs)
-            {
-                return false;
-            }
-            if (m_type < rhs.m_type)
-            {
-                return true;
-            }
-            else if (rhs.m_type < m_type)
-            {
-                return false;
-            }
-            return false;
-        }
+        bool operator<(const CRDTEdge &rhs) const;
 
-        bool operator!=(const CRDTEdge &rhs) const
-        {
-            return !operator==(rhs);
-        }
+        bool operator!=(const CRDTEdge &rhs) const;
 
-        bool operator<=(const CRDTEdge &rhs) const
-        {
-            return operator<(rhs) || operator==(rhs);
-        }
+        bool operator<=(const CRDTEdge &rhs) const;
 
-        bool operator>(const CRDTEdge &rhs) const
-        {
-            return !operator<(rhs) && !operator==(rhs);
-        }
+        bool operator>(const CRDTEdge &rhs) const;
 
-        bool operator>=(const CRDTEdge &rhs) const
-        {
-            return !operator<(rhs);
-        }
+        bool operator>=(const CRDTEdge &rhs) const;
 
-        friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs)
-        {
-            output << "EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from())
-                   << "-> to:" << std::to_string(rhs.to()) << " Attribs:[";
-            for (const auto &v : rhs.attrs())
-                output << v.first << ":" << v.second << " - ";
-            output << "]]";
-            return output;
-        };
+        friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs);;
 
     private:
         uint64_t m_to;
-        std::string m_type;
         uint64_t m_from;
+        std::string m_type;
         std::map<std::string, mvreg<CRDTAttribute>> m_attrs;
-        uint32_t m_agent_id{};
+        uint32_t m_agent_id;
+        uint64_t m_timestamp;
     };
 
     class CRDTNode
@@ -129,15 +84,7 @@ namespace DSR
 
         ~CRDTNode() = default;
 
-        CRDTNode(const CRDTNode &x)
-        {
-            m_type = x.m_type;
-            m_name = x.m_name;
-            m_id = x.m_id;
-            m_agent_id = x.m_agent_id;
-            m_attrs = x.m_attrs;
-            m_fano = x.m_fano;
-        }
+        CRDTNode(const CRDTNode &x);
 
         void type(const std::string &type);
 
@@ -179,77 +126,29 @@ namespace DSR
 
         [[nodiscard]] const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano() const;
 
-        bool operator==(const CRDTNode &rhs) const
-        {
-            if (this == &rhs)
-            {
-                return true;
-            }
-            if (id() != rhs.id() || type() != rhs.type() || attrs() != rhs.attrs() || fano() != rhs.fano())
-            {
-                return false;
-            }
-            return true;
-        }
+        bool operator==(const CRDTNode &rhs) const;
 
-        bool operator<(const CRDTNode &rhs) const
-        {
-            if (this == &rhs)
-            {
-                return false;
-            }
-            if (id() < rhs.id())
-            {
-                return true;
-            }
-            else if (rhs.id() < id())
-            {
-                return false;
-            }
-            return false;
-        }
+        bool operator<(const CRDTNode &rhs) const;
 
-        bool operator!=(const CRDTNode &rhs) const
-        {
-            return !operator==(rhs);
-        }
+        bool operator!=(const CRDTNode &rhs) const;
 
-        bool operator<=(const CRDTNode &rhs) const
-        {
-            return operator<(rhs) || operator==(rhs);
-        }
+        bool operator<=(const CRDTNode &rhs) const;
 
-        bool operator>(const CRDTNode &rhs) const
-        {
-            return !operator<(rhs) && !operator==(rhs);
-        }
+        bool operator>(const CRDTNode &rhs) const;
 
-        bool operator>=(const CRDTNode &rhs) const
-        {
-            return !operator<(rhs);
-        }
+        bool operator>=(const CRDTNode &rhs) const;
 
-        friend std::ostream &operator<<(std::ostream &output, CRDTNode &rhs)
-        {
-            output << "Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type()
-                   << "], Attribs:[";
-            for (const auto &v : rhs.attrs())
-                output << v.first << ":(" << v.second << ");";
-            output << "], FanOut:[";
-            for (auto &v : rhs.fano())
-                output << "[ " << std::to_string(v.first.first) << " " << v.first.second << "] "
-                       << ":(" << v.second << ");";
-            output << "]";
-            return output;
-        }
+        friend std::ostream &operator<<(std::ostream &output, CRDTNode &rhs);
 
     private:
+
+        uint64_t m_id;
         std::string m_type;
         std::string m_name;
-        uint64_t m_id{};
-        uint32_t m_agent_id{};
         std::map<std::string, mvreg<CRDTAttribute>> m_attrs;
         std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> m_fano;
+        uint32_t m_agent_id;
+        uint64_t m_timestamp;
     };
 
 }  // namespace DSR

@@ -30,7 +30,7 @@ endif(DEFINED GEOMETRY_API)
 set(headers_to_moc
         include/dsr/api/dsr_api.h
         include/dsr/api/dsr_core_api.h
-        include/dsr/api/dsr_transport.h
+        ../core/include/dsr/core/transport/dsr_transport.h
         include/dsr/api/dsr_transport_fastdds.h
         include/dsr/api/dsr_inner_eigen_api.h
         include/dsr/api/dsr_agent_info_api.h
@@ -52,7 +52,7 @@ target_sources(dsr_api
         dsr_rt_api.cpp
         dsr_utils.cpp
         GHistorySaver.cpp
-        dsr_transport.cpp
+        ../core/transport/dsr_transport.cpp
         dsr_transport_fastdds.cpp
         ${GEOM_API_SOURCES}
         ${headers_to_moc}

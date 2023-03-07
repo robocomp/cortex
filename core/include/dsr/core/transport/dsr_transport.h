@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "dsr/core/rtps/dsrparticipant.h"
-#include "dsr/core/topics/IDLGraphPubSubTypes.h"
+#include "dsr/core/transport/fastdds/dds_types.h"
+#include "dsr/core/transport/fastdds/participant.h"
 #include "dsr/core/types/crdt_types.h"
 
 #include <memory>
@@ -71,7 +71,7 @@ namespace DSR
 
         static auto create(std::unique_ptr<BaseManager> comm_) -> std::shared_ptr<Transport>;
 
-        auto stop() -> void;
+        auto stop() const -> void;
 
         //////////////////////////////////////////////////
         ///// Topics

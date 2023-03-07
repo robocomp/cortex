@@ -1,9 +1,10 @@
 #ifndef CAMERA_API
 #define CAMERA_API
 
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
-#include <dsr/core/types/user_types.h>
+#include "dsr/core/transport/fastdds/dds_types.h"
+
 #include <Eigen/Dense>
+#include <dsr/core/types/user_types.h>
 #include <optional>
 
 namespace DSR

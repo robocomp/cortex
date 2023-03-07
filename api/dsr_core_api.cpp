@@ -1,10 +1,10 @@
 #include "dsr/api/dsr_core_api.h"
 
 #include "dsr/api/dsr_api.h"
-#include "dsr/api/dsr_signal_info.h"
-#include "dsr/api/dsr_transport.h"
 #include "dsr/api/dsr_core_api.h"
+#include "dsr/api/dsr_signal_info.h"
 #include "dsr/core/id_generator.h"
+#include "dsr/core/transport/dsr_transport.h"
 #include "dsr/core/types/translator.h"
 
 #include <memory>

@@ -1,28 +1,28 @@
-#include "dsr/core/topics/IDLGraphPubSubTypes.h"
-#include <fastrtps/participant/Participant.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/Domain.h>
-#include <fastrtps/transport/TransportDescriptorInterface.h>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <fastrtps/utils/IPFinder.h>
-
-#include <dsr/core/rtps/dsrpublisher.h>
+#include "dsr/core/transport/fastdds/dds_types.h"
+#include "dsr/core/transport/fastdds/publisher.h"
 
 #include <QDebug>
-
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastrtps/Domain.h>
+#include <fastrtps/attributes/PublisherAttributes.h>
+#include <fastrtps/participant/Participant.h>
+#include <fastrtps/transport/TransportDescriptorInterface.h>
+#include <fastrtps/utils/IPFinder.h>
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-DSRPublisher::DSRPublisher() : mp_participant(nullptr), mp_publisher(nullptr), mp_writer(nullptr)
+using namespace DSR;
+
+DDSPublisher::DDSPublisher() : mp_participant(nullptr), mp_publisher(nullptr), mp_writer(nullptr)
 {}
 
-DSRPublisher::~DSRPublisher()
+DDSPublisher::~DDSPublisher()
 {
 }
 
 std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*>
-        DSRPublisher::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic, bool isStreamData )
+        DDSPublisher::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic, bool isStreamData )
 {
     mp_participant = mp_participant_;
 
@@ -82,7 +82,7 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
         mp_writer = mp_publisher->create_datawriter(topic, dataWriterQos, &m_listener);
 
         if(mp_publisher != nullptr && mp_writer != nullptr) {
-            qDebug() << "Publisher created, waiting for Subscribers." ;
+            qDebug() << "DDSPublisher created, waiting for Subscribers." ;
             return { true, mp_publisher, mp_writer };
         }
         retry++;
@@ -94,13 +94,13 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
 
 }
 
-eprosima::fastrtps::rtps::GUID_t DSRPublisher::getParticipantID() const
+eprosima::fastrtps::rtps::GUID_t DDSPublisher::getParticipantID() const
 {
     return mp_participant->guid();
 }
 
 
-bool DSRPublisher::write(NodeInfoTuple *object)
+bool DDSPublisher::write(NodeInfoTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -112,7 +112,7 @@ bool DSRPublisher::write(NodeInfoTuple *object)
 }
 
 
-bool DSRPublisher::write(EdgeInfoTuple *object)
+bool DDSPublisher::write(EdgeInfoTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -124,7 +124,7 @@ bool DSRPublisher::write(EdgeInfoTuple *object)
 }
 
 
-bool DSRPublisher::write(GraphInfoTuple *object)
+bool DDSPublisher::write(GraphInfoTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -135,7 +135,7 @@ bool DSRPublisher::write(GraphInfoTuple *object)
     return false;
 }
 
-bool DSRPublisher::write(GraphRequestTuple *object)
+bool DDSPublisher::write(GraphRequestTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -146,7 +146,7 @@ bool DSRPublisher::write(GraphRequestTuple *object)
     return false;
 }
 
-bool DSRPublisher::write(EdgeAttributeVecTuple *object)
+bool DDSPublisher::write(EdgeAttributeVecTuple *object)
 {
     int retry = 0;
     while (retry < 5) {
@@ -157,7 +157,7 @@ bool DSRPublisher::write(EdgeAttributeVecTuple *object)
     return false;
 }
 
-bool DSRPublisher::write(NodeAttributeVecTuple *object) {
+bool DDSPublisher::write(NodeAttributeVecTuple *object) {
     int retry = 0;
     while (retry < 5) {
         if (mp_writer->write(object)) return true;
@@ -168,7 +168,7 @@ bool DSRPublisher::write(NodeAttributeVecTuple *object) {
 }
 
 
-void DSRPublisher::PubListener::on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
+void DDSPublisher::PubListener::on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
                                                        const eprosima::fastdds::dds::PublicationMatchedStatus& info)
 {
     if (0 < info.current_count_change) {

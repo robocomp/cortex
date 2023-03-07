@@ -2,13 +2,14 @@
 #ifndef DSR_UTILS
 #define DSR_UTILS
 
-#include <qjsonobject.h>
-#include <string>
-#include <optional>
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
+#include "dsr/core/transport/fastdds/dds_types.h"
+
+#include <dsr/api/dsr_exceptions.h>
 #include <dsr/core/types/crdt_types.h>
 #include <dsr/core/types/user_types.h>
-#include <dsr/api/dsr_exceptions.h>
+#include <optional>
+#include <qjsonobject.h>
+#include <string>
 
 namespace DSR
 {

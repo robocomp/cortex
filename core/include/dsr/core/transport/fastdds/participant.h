@@ -1,0 +1,134 @@
+#pragma once
+
+#include "dsr/core/transport/fastdds/dds_types.h"
+#include "publisher.h"
+#include "subscriber.h"
+
+#include <fastdds/dds/domain/DomainParticipant.hpp>
+#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
+#include <fastdds/dds/domain/DomainParticipantListener.hpp>
+#include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/rtps/RTPSDomain.h>
+#include <fastrtps/fastrtps_fwd.h>
+#include <fastrtps/log/Log.h>
+
+namespace DSR
+{
+    class DDSParticipant
+    {
+    public:
+        DDSParticipant();
+        ~DDSParticipant();
+
+        [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *>
+        init(uint32_t agent_id, const std::string &agent_name, int localhost,
+             std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&)> fn);
+
+        [[nodiscard]] const eprosima::fastrtps::rtps::GUID_t &getID() const;
+
+        [[nodiscard]] const char *getNodeTopicName() const
+        {
+            return dsrgraphType->getName();
+        }
+        [[nodiscard]] const char *getRequestTopicName() const
+        {
+            return graphrequestType->getName();
+        }
+        [[nodiscard]] const char *getAnswerTopicName() const
+        {
+            return graphRequestAnswerType->getName();
+        }
+        [[nodiscard]] const char *getEdgeTopicName() const
+        {
+            return dsrEdgeType->getName();
+        }
+        [[nodiscard]] const char *getNodeAttrTopicName() const
+        {
+            return dsrNodeAttrType->getName();
+        }
+        [[nodiscard]] const char *getEdgeAttrTopicName() const
+        {
+            return dsrEdgeAttrType->getName();
+        }
+
+        [[nodiscard]] eprosima::fastdds::dds::Topic *getNodeTopic()
+        {
+            return topic_node;
+        }
+        [[nodiscard]] eprosima::fastdds::dds::Topic *getEdgeTopic()
+        {
+            return topic_edge;
+        }
+        [[nodiscard]] eprosima::fastdds::dds::Topic *getGraphTopic()
+        {
+            return topic_graph;
+        }
+        [[nodiscard]] eprosima::fastdds::dds::Topic *getGraphRequestTopic()
+        {
+            return topic_graph_request;
+        }
+        [[nodiscard]] eprosima::fastdds::dds::Topic *getAttNodeTopic()
+        {
+            return topic_node_att;
+        }
+        [[nodiscard]] eprosima::fastdds::dds::Topic *getAttEdgeTopic()
+        {
+            return topic_edge_att;
+        }
+
+        [[nodiscard]] eprosima::fastdds::dds::DomainParticipant *getParticipant();
+
+        void add_subscriber(const std::string &id,
+                            std::pair<eprosima::fastdds::dds::Subscriber *, eprosima::fastdds::dds::DataReader *>);
+        void add_publisher(const std::string &id,
+                           std::pair<eprosima::fastdds::dds::Publisher *, eprosima::fastdds::dds::DataWriter *>);
+        void delete_subscriber(const std::string &id);
+        void delete_publisher(const std::string &id);
+
+        void remove_participant_and_entities();
+
+    private:
+        eprosima::fastdds::dds::DomainParticipant *mp_participant{};
+
+        eprosima::fastdds::dds::Topic *topic_node{};
+        eprosima::fastdds::dds::Topic *topic_edge{};
+        eprosima::fastdds::dds::Topic *topic_graph{};
+        eprosima::fastdds::dds::Topic *topic_graph_request{};
+        eprosima::fastdds::dds::Topic *topic_node_att{};
+        eprosima::fastdds::dds::Topic *topic_edge_att{};
+
+        eprosima::fastdds::dds::TypeSupport dsrgraphType{};
+        eprosima::fastdds::dds::TypeSupport graphrequestType{};
+        eprosima::fastdds::dds::TypeSupport graphRequestAnswerType{};
+        eprosima::fastdds::dds::TypeSupport dsrEdgeType{};
+        eprosima::fastdds::dds::TypeSupport dsrNodeAttrType{};
+        eprosima::fastdds::dds::TypeSupport dsrEdgeAttrType{};
+
+        std::map<std::string, std::pair<eprosima::fastdds::dds::Subscriber *, eprosima::fastdds::dds::DataReader *>>
+            subscribers;
+        std::map<std::string, std::pair<eprosima::fastdds::dds::Publisher *, eprosima::fastdds::dds::DataWriter *>>
+            publishers;
+        mutable std::mutex pub_mtx;
+        mutable std::mutex sub_mtx;
+
+        class ParticpantListener : public eprosima::fastdds::dds::DomainParticipantListener
+        {
+        public:
+            explicit ParticpantListener(std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&)> &&fn)
+                : eprosima::fastdds::dds::DomainParticipantListener(),
+                  f(std::move(fn)){};
+            ~ParticpantListener() override = default;
+
+            void on_participant_discovery(eprosima::fastdds::dds::DomainParticipant *participant,
+                                          eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&info) override
+            {
+                // Callback
+                f(std::forward<eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&>(info));
+            }
+
+            std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo &&)> f;
+        };
+        std::unique_ptr<ParticpantListener> m_listener;
+    };
+
+}

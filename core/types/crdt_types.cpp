@@ -8,7 +8,7 @@
 
 namespace DSR {
 
-    void CRDTEdge::to(uint64_t  _to)
+    void CRDTEdge::to(uint64_t _to)
     {
         m_to = _to;
     }
@@ -77,6 +77,61 @@ namespace DSR {
     {
         return m_agent_id;
     }
+    bool CRDTEdge::operator==(const CRDTEdge &rhs) const
+    {
+        if (this == &rhs)
+        {
+            return true;
+        }
+        if (m_type != rhs.m_type || from() != rhs.from() || to() != rhs.to() || attrs() != rhs.attrs())
+        {
+            return false;
+        }
+        return true;
+    }
+    bool CRDTEdge::operator<(const CRDTEdge &rhs) const
+    {
+        if (this == &rhs)
+        {
+            return false;
+        }
+        if (m_type < rhs.m_type)
+        {
+            return true;
+        }
+        else if (rhs.m_type < m_type)
+        {
+            return false;
+        }
+        return false;
+    }
+    bool CRDTEdge::operator!=(const CRDTEdge &rhs) const
+    {
+        return !operator==(rhs);
+    }
+    bool CRDTEdge::operator<=(const CRDTEdge &rhs) const
+    {
+        return operator<(rhs) || operator==(rhs);
+    }
+    bool CRDTEdge::operator>(const CRDTEdge &rhs) const
+    {
+        return !operator<(rhs) && !operator==(rhs);
+    }
+    bool CRDTEdge::operator>=(const CRDTEdge &rhs) const
+    {
+        return !operator<(rhs);
+    }
+    std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs)
+    {
+        output << "EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from())
+               << "-> to:" << std::to_string(rhs.to()) << " Attribs:[";
+        for (const auto &v : rhs.attrs())
+            output << v.first << ":" << v.second << " - ";
+        output << "]]";
+        return output;
+    }
+
+    CRDTEdge::CRDTEdge() : m_to(0), m_from(0), m_agent_id(0), m_timestamp(0) {}
 
     void CRDTNode::type(const std::string &type)
     {
@@ -176,6 +231,72 @@ namespace DSR {
     const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &CRDTNode::fano() const
     {
         return m_fano;
+    }
+    CRDTNode::CRDTNode(const CRDTNode &x)
+    {
+        m_type = x.m_type;
+        m_name = x.m_name;
+        m_id = x.m_id;
+        m_agent_id = x.m_agent_id;
+        m_attrs = x.m_attrs;
+        m_fano = x.m_fano;
+    }
+    bool CRDTNode::operator==(const CRDTNode &rhs) const
+    {
+        if (this == &rhs)
+        {
+            return true;
+        }
+        if (id() != rhs.id() || type() != rhs.type() || attrs() != rhs.attrs() || fano() != rhs.fano())
+        {
+            return false;
+        }
+        return true;
+    }
+    bool CRDTNode::operator<(const CRDTNode &rhs) const
+    {
+        if (this == &rhs)
+        {
+            return false;
+        }
+        if (id() < rhs.id())
+        {
+            return true;
+        }
+        else if (rhs.id() < id())
+        {
+            return false;
+        }
+        return false;
+    }
+    bool CRDTNode::operator!=(const CRDTNode &rhs) const
+    {
+        return !operator==(rhs);
+    }
+    bool CRDTNode::operator<=(const CRDTNode &rhs) const
+    {
+        return operator<(rhs) || operator==(rhs);
+    }
+    bool CRDTNode::operator>(const CRDTNode &rhs) const
+    {
+        return !operator<(rhs) && !operator==(rhs);
+    }
+    bool CRDTNode::operator>=(const CRDTNode &rhs) const
+    {
+        return !operator<(rhs);
+    }
+    std::ostream &operator<<(std::ostream &output, CRDTNode &rhs)
+    {
+        output << "Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type()
+               << "], Attribs:[";
+        for (const auto &v : rhs.attrs())
+            output << v.first << ":(" << v.second << ");";
+        output << "], FanOut:[";
+        for (auto &v : rhs.fano())
+            output << "[ " << std::to_string(v.first.first) << " " << v.first.second << "] "
+                   << ":(" << v.second << ");";
+        output << "]";
+        return output;
     }
 
 }

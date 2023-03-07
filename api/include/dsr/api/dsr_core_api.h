@@ -4,32 +4,28 @@
 
 #pragma once
 
-#include <iostream>
-#include <map>
-#include <unordered_map>
-#include <unordered_set>
-#include <chrono>
-#include <thread>
-#include <mutex>
-#include <shared_mutex>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <typeinfo>
-#include <optional>
-#include <type_traits>
-
+#include "dsr/core/transport/dsr_transport.h"
+#include "dsr/core/transport/fastdds/dds_types.h"
+#include "dsr/core/types/type_checking/dsr_attr_name.h"
+#include "dsr/core/types/type_checking/dsr_edge_type.h"
+#include "dsr/core/types/type_checking/dsr_node_type.h"
+#include "dsr/core/utils.h"
 
 #include <QtCore/QtCore>
-
-#include "dsr/api/dsr_transport.h"
-#include "dsr/core/topics/IDLGraphPubSubTypes.h"
-#include "dsr/core/types/type_checking/dsr_attr_name.h"
-#include "dsr/core/types/type_checking/dsr_node_type.h"
-#include "dsr/core/types/type_checking/dsr_edge_type.h"
-#include "dsr/core/utils.h"
-#include "dsr_transport.h"
-
+#include <chrono>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
+#include <thread>
+#include <type_traits>
+#include <typeinfo>
+#include <unordered_map>
+#include <unordered_set>
+#include <variant>
+#include <vector>
 
 #define TIMEOUT 5000
 
@@ -52,8 +48,8 @@ namespace DSR
         DSRGraph *dsr; //this is a not owned pointer used only to allow sending signals in the transport. 
     };
 
-    inline constexpr std::string_view default_empty_stringv = "";
-    inline const std::string default_empty_string = "";
+    inline constexpr std::string_view default_empty_stringv;
+    inline const std::string default_empty_string;
 
     /////////////////////////////////////////////////////////////////
     /// GRAPH UNSAFE API
@@ -182,6 +178,6 @@ namespace DSR
         std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att;
 
     };
-} // namespace CRDT
+}
 
 
