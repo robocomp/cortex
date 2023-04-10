@@ -210,12 +210,12 @@ void GraphNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     QRadialGradient gradient(-3, -3, 10);
     if (option->state & QStyle::State_Sunken)
     {
-        gradient.setColorAt(0, QColor(Qt::darkGray).light(LUMINOSITY_FACTOR));
+        gradient.setColorAt(0, QColor(Qt::darkGray).lighter());
         gradient.setColorAt(1, QColor(Qt::darkGray));
     } else
 		{
         gradient.setColorAt(0, node_brush.color());
-        gradient.setColorAt(1, QColor(node_brush.color().dark(LUMINOSITY_FACTOR)));
+        gradient.setColorAt(1, QColor(node_brush.color().darker()));
     }
     painter->setBrush(gradient);
     if(isSelected())

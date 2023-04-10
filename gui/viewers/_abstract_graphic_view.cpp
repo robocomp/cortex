@@ -43,7 +43,7 @@ void AbstractGraphicViewer::wheelEvent(QWheelEvent* event)
 		factor = 0.9;
 
 	}
-	auto view_pos = event->pos();
+	auto view_pos = event->position().toPoint();
 	auto scene_pos = this->mapToScene(view_pos);
 	this->centerOn(scene_pos);
 	this->scale(factor, factor);

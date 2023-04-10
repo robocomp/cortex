@@ -17,9 +17,9 @@
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
 #include <QDesktopWidget>
-#include <QGLViewer/qglviewer.h>
 #include <QApplication>
 #include <QTableWidget>
+#include <QScreen>
 #include <QStringList>
 #include <QStatusBar>
 #include <utility>
@@ -129,7 +129,7 @@ DSRViewer::DSRViewer(QMainWindow * widget, std::shared_ptr<DSR::DSRGraph> G_, in
     qRegisterMetaType<std::uint64_t>("std::uint64_t");
     qRegisterMetaType<std::vector<std::string>>("std::vector<std::string>");
 
-    QRect availableGeometry(QApplication::desktop()->availableGeometry());
+    QRect availableGeometry(QApplication::primaryScreen()->availableGeometry());
  	this->window = widget;
  	window->move((availableGeometry.width() - window->width()) / 2, (availableGeometry.height() - window->height()) / 2);
 	
