@@ -16,7 +16,6 @@
 
 #include <dsr/gui/dsr_gui.h>
 #include <cppitertools/range.hpp>
-#include <QDesktopWidget>
 #include <QApplication>
 #include <QTableWidget>
 #include <QScreen>

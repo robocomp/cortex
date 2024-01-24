@@ -27,7 +27,7 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsItem>
 #include <QMouseEvent>
-#include <QGLWidget>
+#include <QOpenGLWidget>
 #include <QScrollBar>
 #include <QGraphicsSceneHoverEvent>
 #include <QInputDialog>

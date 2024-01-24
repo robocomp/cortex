@@ -8,17 +8,17 @@ project(dsr_api
 SET(CMAKE_AUTOMOC ON)
 SET(CMAKE_AUTOUIC ON)
 
-find_package(Qt5 COMPONENTS Core REQUIRED)
+find_package(Qt6 COMPONENTS Core REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(cppitertools)
 
 if(DEFINED GEOMETRY_API)
-    find_package(Qt5 REQUIRED COMPONENTS Widgets Core Gui 3DCore 3DRender 3DExtras 3DInput 3DAnimation)
-    set(QT_GEOM Qt5::3DCore
-            Qt5::3DRender
-            Qt5::3DAnimation
-            Qt5::3DExtras
-            Qt5::3DInput)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui 3DCore 3DRender 3DExtras 3DInput 3DAnimation)
+    set(QT_GEOM Qt6::3DCore
+            Qt6::3DRender
+            Qt6::3DAnimation
+            Qt6::3DExtras
+            Qt6::3DInput)
     set(GEOM_API_HEADERS "include/dsr/api/dsr_geometry_queries_api.h"
             "include/dsr/api/GeometryInfo.h")
     set(GEOM_API_SOURCES "dsr_geometry_queries_api.cpp")
@@ -58,7 +58,7 @@ target_link_libraries(dsr_api
         PRIVATE
         fastcdr fastrtps
         osgDB OpenThreads
-        Qt5::Core
+        Qt6::Core
         PUBLIC
         Eigen3::Eigen
         ${QT_GEOM}

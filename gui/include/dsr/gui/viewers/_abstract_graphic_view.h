@@ -10,7 +10,7 @@
 #include <QGraphicsView>
 #include <QMouseEvent>
 #include <QResizeEvent>
-#include <QGLWidget>
+#include <QOpenGLWidget>
 #include <QScrollBar>
 #include <QApplication>
 

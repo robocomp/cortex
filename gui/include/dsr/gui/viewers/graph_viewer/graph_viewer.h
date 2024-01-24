@@ -24,7 +24,7 @@
 #include <QWidget>
 
 #include <QMouseEvent>
-#include <QGLWidget>
+#include <QOpenGLWidget>
 #include <QResizeEvent>
 #include <QMenu>
 

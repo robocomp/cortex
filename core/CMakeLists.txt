@@ -5,7 +5,7 @@ project( dsr_core
         LANGUAGES CXX )
 
 
-find_package(Qt5 COMPONENTS Core REQUIRED)
+find_package(Qt6 COMPONENTS Core REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 add_library(dsr_core SHARED)
@@ -51,7 +51,7 @@ target_sources(dsr_core
 
 target_link_libraries(dsr_core
         PRIVATE
-        Qt5::Core fastcdr fastrtps osgDB OpenThreads Eigen3::Eigen)
+        Qt6::Core fastcdr fastrtps osgDB OpenThreads Eigen3::Eigen)
 
 
 target_include_directories(dsr_core

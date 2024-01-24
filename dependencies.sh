@@ -8,7 +8,7 @@ sudo apt-get install -y libopenscenegraph-dev
 sudo apt install libasio-dev
 sudo apt install libtinyxml2-dev 
 sudo apt install libopencv-dev
-sudo apt install libqglviewer-dev-qt5
+sudo apt install libqglviewer-dev-qt6
 sudo apt install libeigen3-dev
 sudo apt install python3-dev python3-pybind11
 sudo apt install cmake gcc-10 g++-10

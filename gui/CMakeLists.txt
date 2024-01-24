@@ -21,11 +21,11 @@ set(qt3d_viewer_sources
         )
 
 set (qt3d_libs 
-        Qt5::3DCore
-        Qt5::3DRender
-        Qt5::3DAnimation
-        Qt5::3DExtras
-        Qt5::3DInput
+        Qt6::3DCore
+        Qt6::3DRender
+        Qt6::3DAnimation
+        Qt6::3DExtras
+        Qt6::3DInput
         )
 
 endif()
@@ -33,7 +33,7 @@ endif()
 
 message(STATUS ${qt3d_required} " " ${qt3d_viewer_headers} " " ${qt3d_libs} " " ${qt3d_viewer_sources})
 
-find_package(Qt5 COMPONENTS Widgets OpenGL Xml ${qt3d_required} REQUIRED)
+find_package(Qt6 COMPONENTS Widgets OpenGL Xml ${qt3d_required} REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenSceneGraph REQUIRED COMPONENTS osg osgDB osgGA)
 find_package(cppitertools)
@@ -80,12 +80,12 @@ target_sources(dsr_gui
 
 target_link_libraries(dsr_gui
         PRIVATE
-        Qt5::Widgets Qt5::Xml
+        Qt6::Widgets Qt6::Xml
         Eigen3::Eigen
         fastcdr
         osgViewer osgDB osgGA OpenThreads
         PUBLIC
-        Qt5::OpenGL
+        Qt6::OpenGL
         fastrtps
         ${qt3d_libs}
         )

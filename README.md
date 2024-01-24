@@ -70,7 +70,7 @@ To be able to use the DSR/CORTEX infraestructure you need to follow the next ste
 ### Step 1
 From ubuntu repositories you need:
 ```bash
-sudo apt install libasio-dev libtinyxml2-dev libopencv-dev libqglviewer-dev-qt5 libeigen3-dev python3-dev python3-pybind11 cmake gcc-10 g++-10
+sudo apt install libasio-dev libtinyxml2-dev libopencv-dev libqglviewer-dev-qt6 libeigen3-dev python3-dev python3-pybind11 cmake gcc-10 g++-10
 ```
 
 > __NOTE :__ If you are using `python` with `Anaconda`, `cmake` might not be able to find pybind11 installation. So, you have to install it using `conda-forge` as well :

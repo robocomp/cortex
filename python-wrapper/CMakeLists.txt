@@ -4,7 +4,7 @@ project(python_wrapper
         DESCRIPTION "Robocomp dsr python wrapper library"
         LANGUAGES CXX )
 
-find_package(Qt5 COMPONENTS Core REQUIRED)
+find_package(Qt6 COMPONENTS Core REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(PythonLibs REQUIRED)
 find_package(Python3)
@@ -20,7 +20,7 @@ target_sources(pydsr
 
 target_link_libraries(pydsr
         PRIVATE
-        Qt5::Core
+        Qt6::Core
         Eigen3::Eigen
         Robocomp::dsr_api
         Robocomp::dsr_core

@@ -4,9 +4,9 @@
 #include <qnamespace.h>
 #include <qphongalphamaterial.h>
 #include <qsceneloader.h>
-#include <qt5/Qt3DExtras/qcuboidgeometry.h>
-#include <qt5/Qt3DExtras/qphongmaterial.h>
-#include <qt5/Qt3DRender/qmaterial.h>
+#include <qt6/Qt3DExtras/qcuboidgeometry.h>
+#include <qt6/Qt3DExtras/qphongmaterial.h>
+#include <qt6/Qt3DRender/qmaterial.h>
 
 namespace DSR {
     
