@@ -12,17 +12,19 @@ using namespace DSR ;
 AbstractGraphicViewer::AbstractGraphicViewer(QWidget* parent) :  QGraphicsView(parent)
 {
 	scene.setItemIndexMethod(QGraphicsScene::NoIndex);
-	scene.setSceneRect(-2000,-2000, 4000, 4000);
+	scene.setSceneRect(-5000,-5000, 10000, 10000);
 	this->setScene(&scene);
 	this->setCacheMode(QGraphicsView::CacheBackground);
-//	this->setViewport(new QGLWidget(QGLFormat(QGL::SampleBuffers)));
+	this->setViewport(new QOpenGLWidget());
 	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	this->setRenderHint(QPainter::Antialiasing);
 	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	this->setMinimumSize(400, 400);
-	this->adjustSize();
+    this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio);
 	this->setMouseTracking(true);
 	this->viewport()->setMouseTracking(true);
+
+    this->adjustSize();
 }
 
 
@@ -63,8 +65,8 @@ void AbstractGraphicViewer::mousePressEvent(QMouseEvent *event)
 	if (event->button() == Qt::LeftButton)
 	{
 		_pan = true;
-		_panStartX = event->x();
-		_panStartY = event->y();
+		_panStartX = event->position().x();
+		_panStartY = event->position().y();
 		setCursor(Qt::ClosedHandCursor);
 		event->accept();
 		return;
@@ -87,10 +89,10 @@ void AbstractGraphicViewer::mouseMoveEvent(QMouseEvent *event)
 {
 	if (_pan)
 	{
-		horizontalScrollBar()->setValue(horizontalScrollBar()->value() - (event->x() - _panStartX));
-		verticalScrollBar()->setValue(verticalScrollBar()->value() - (event->y() - _panStartY));
-		_panStartX = event->x();
-		_panStartY = event->y();
+		horizontalScrollBar()->setValue(horizontalScrollBar()->value() - (event->position().x() - _panStartX));
+		verticalScrollBar()->setValue(verticalScrollBar()->value() - (event->position().y() - _panStartY));
+		_panStartX = event->position().x();
+		_panStartY = event->position().y();
 		event->accept();
 
 	}

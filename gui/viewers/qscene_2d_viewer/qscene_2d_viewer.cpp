@@ -12,6 +12,8 @@ QScene2dViewer::QScene2dViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *paren
     this->setMinimumSize(400,400);
     scene.setItemIndexMethod(QGraphicsScene::NoIndex);
     this->scale(1, -1);
+    this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio);
+    this->adjustSize();
 
     //context menu
     contextMenu = new QMenu(this);
@@ -681,5 +683,5 @@ void QScene2dViewer::draw_axis()
 }
 void QScene2dViewer::showContextMenu(QMouseEvent *event)
 {
-    contextMenu->exec(event->globalPos());
+    contextMenu->exec();
 }

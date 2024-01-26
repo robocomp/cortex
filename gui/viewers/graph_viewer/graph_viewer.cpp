@@ -325,7 +325,7 @@ void GraphViewer::reload(QWidget * widget)
 
 void GraphViewer::showContextMenu(QMouseEvent *event)
 {
-    contextMenu->exec(event->globalPos());
+    contextMenu->exec();
 }
 
 // remove node from DSR

@@ -35,36 +35,38 @@ using namespace DSR;
 
 std::string get_self_path()
 {
-  std::vector<char> buf(1024*4);
-  int fd = open("/proc/self/cmdline", O_RDONLY);
-    char * end = buf.data() + read(fd, buf.data(), 1024*4);
+    std::vector<char> buf(1024 * 4);
+    int fd = open("/proc/self/cmdline", O_RDONLY);
+    char *end = buf.data() + read(fd, buf.data(), 1024 * 4);
 
-  for (char *p = buf.data(); p < end; p++)
-  {
+    for (char *p = buf.data(); p < end; p++)
+    {
         if (!*p) *p = ' ';
-  }
-  close(fd);
-  return std::string(&buf[0]);
+    }
+    close(fd);
+    return std::string(&buf[0]);
 }
 
-int parseLine(char* line)
+int parseLine(char *line)
 {
     int i = strlen(line);
-    const char* p = line;
-    while (*p <'0' || *p > '9') p++;
-    line[i-3] = '\0';
+    const char *p = line;
+    while (*p < '0' || *p > '9') p++;
+    line[i - 3] = '\0';
     i = atoi(p);
     return i;
 }
 
 int get_memory_usage()
 {
-    FILE* file = fopen("/proc/self/status", "r");
+    FILE *file = fopen("/proc/self/status", "r");
     int result = -1;
     char line[128];
 
-    while (fgets(line, 128, file) != nullptr){
-        if (strncmp(line, "VmRSS:", 6) == 0){
+    while (fgets(line, 128, file) != nullptr)
+    {
+        if (strncmp(line, "VmRSS:", 6) == 0)
+        {
             result = parseLine(line);
             break;
         }
@@ -76,8 +78,9 @@ int get_memory_usage()
 static clock_t lastCPU, lastSysCPU, lastUserCPU;
 static int numProcessors;
 
-void init(){
-    FILE* file;
+void init()
+{
+    FILE *file;
     struct tms timeSample;
 //    char line[128];
 
@@ -93,20 +96,22 @@ void init(){
     fclose(file);
 }
 
-double get_cpu_usage(){
+double get_cpu_usage()
+{
     struct tms timeSample;
     clock_t now;
     double percent;
 
     now = times(&timeSample);
     if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
-        timeSample.tms_utime < lastUserCPU){
+        timeSample.tms_utime < lastUserCPU)
+    {
         //Overflow detection. Just skip this value.
         percent = -1.0;
-    }
-    else{
+    } else
+    {
         percent = (timeSample.tms_stime - lastSysCPU) +
-            (timeSample.tms_utime - lastUserCPU);
+                  (timeSample.tms_utime - lastUserCPU);
         percent /= (now - lastCPU);
         percent /= numProcessors;
         percent *= 100;
@@ -119,9 +124,9 @@ double get_cpu_usage(){
 }
 
 
-DSRViewer::DSRViewer(QMainWindow * widget, std::shared_ptr<DSR::DSRGraph> G_, int options, view main) : QObject()
+DSRViewer::DSRViewer(QMainWindow *widget, std::shared_ptr<DSR::DSRGraph> G_, int options, view main) : QObject()
 {
-	G = std::move(G_);
+    G = std::move(G_);
     qRegisterMetaType<std::int32_t>("std::int32_t");
     qRegisterMetaType<std::string>("std::string");
     qRegisterMetaType<std::uint32_t>("std::uint32_t");
@@ -129,53 +134,55 @@ DSRViewer::DSRViewer(QMainWindow * widget, std::shared_ptr<DSR::DSRGraph> G_, in
     qRegisterMetaType<std::vector<std::string>>("std::vector<std::string>");
 
     QRect availableGeometry(QApplication::primaryScreen()->availableGeometry());
- 	this->window = widget;
- 	window->move((availableGeometry.width() - window->width()) / 2, (availableGeometry.height() - window->height()) / 2);
-	
-	// QSettings settings("RoboComp", "DSR");
+    this->window = widget;
+    window->move((availableGeometry.width() - window->width()) / 2,
+                 (availableGeometry.height() - window->height()) / 2);
+
+    // QSettings settings("RoboComp", "DSR");
     // settings.beginGroup("MainWindow");
     // 	graphicsView->resize(settings.value("size", QSize(400, 400)).toSize());
     // 	graphicsView->move(settings.value("pos", QPoint(200, 200)).toPoint());
     // settings.endGroup();
-	// settings.beginGroup("QGraphicsView");
-	// 	graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
-	// settings.endGroup();
+    // settings.beginGroup("QGraphicsView");
+    // 	graphicsView->setTransform(settings.value("matrix", QTransform()).value<QTransform>());
+    // settings.endGroup();
 
-	//MenuBar
+    //MenuBar
     initialize_file_menu();
     viewMenu = window->menuBar()->addMenu(window->tr("&View"));
-	forcesMenu = window->menuBar()->addMenu(window->tr("&Forces"));
-	auto actionsMenu = window->menuBar()->addMenu(window->tr("&Actions"));
-	auto restart_action = actionsMenu->addAction("Restart");
+    forcesMenu = window->menuBar()->addMenu(window->tr("&Forces"));
+    auto actionsMenu = window->menuBar()->addMenu(window->tr("&Actions"));
+    auto restart_action = actionsMenu->addAction("Restart");
 
-	//restart_action
-	connect(restart_action, &QAction::triggered, this, [this] (bool)
-	{
-		qDebug()<<"TO RESTART";
-		auto current_path = get_self_path();
-		auto command = ("sleep 4 && "+current_path+"&");
-		[[maybe_unused]] auto _ = std::system(command.c_str());
+    //restart_action
+    connect(restart_action, &QAction::triggered, this, [this](bool)
+    {
+        qDebug() << "TO RESTART";
+        auto current_path = get_self_path();
+        auto command = ("sleep 4 && " + current_path + "&");
+        [[maybe_unused]] auto _ = std::system(command.c_str());
 //		QProcess a;
 //		a.startDetached(command);
-		G->reset();
-		qDebug()<<"TO RESTART2: "<<command.c_str();
-		QTimer::singleShot(1000,QApplication::quit);
+        G->reset();
+        qDebug() << "TO RESTART2: " << command.c_str();
+        QTimer::singleShot(1000, QApplication::quit);
 //		restart_app(true);
-	});
+    });
 
-	main_widget = nullptr;
-    object_position =  nullptr;
+    main_widget = nullptr;
+    object_position = nullptr;
     initialize_views(options, main);
     create_status_bar();
     timer = new QTimer();
     alive_timer.start();
     timer->start(500);
     init();  //intialize processor number
-    connect(timer, SIGNAL(timeout()), this, SLOT(compute()));    
-    connect(G.get(), &DSR::DSRGraph::update_node_signal, this, &DSRViewer::add_or_assign_node_SLOT, Qt::QueuedConnection);
+    connect(timer, SIGNAL(timeout()), this, SLOT(compute()));
+    connect(G.get(), &DSR::DSRGraph::update_node_signal, this, &DSRViewer::add_or_assign_node_SLOT,
+            Qt::QueuedConnection);
     connect(G.get(), &DSR::DSRGraph::del_node_signal, this, &DSRViewer::del_node_SLOT, Qt::QueuedConnection);
 
-    
+
 }
 
 void DSRViewer::initialize_file_menu()
@@ -192,28 +199,29 @@ void DSRViewer::initialize_file_menu()
     laser->setCheckable(true);
     laser->setChecked(false);
     file_submenu->addAction(laser);
-	//save_action
-    connect(save_action, &QAction::triggered, [this, rgbd, laser]() {
+    //save_action
+    connect(save_action, &QAction::triggered, [this, rgbd, laser]()
+    {
         auto file_name = QFileDialog::getSaveFileName(nullptr, tr("Save file"),
                                                       "/home/robocomp/robocomp/components/dsr-graph/etc",
                                                       tr("JSON Files (*.json)"), nullptr,
                                                       QFileDialog::Option::DontUseNativeDialog);
 
         std::vector<std::string> skip_content;
-        if(not rgbd->isChecked()) skip_content.push_back("rgbd");
-        if(not laser->isChecked()) skip_content.push_back("laser");
+        if (not rgbd->isChecked()) skip_content.push_back("rgbd");
+        if (not laser->isChecked()) skip_content.push_back("laser");
         G->write_to_json_file(file_name.toStdString(), skip_content);
-        qDebug()<<"File saved";
+        qDebug() << "File saved";
     });
 
 }
 
 DSRViewer::~DSRViewer()
 {
-	QSettings settings("RoboComp", "DSR");
+    QSettings settings("RoboComp", "DSR");
     settings.beginGroup("MainWindow");
-		settings.setValue("size", window->size());
-		settings.setValue("pos", window->pos());
+    settings.setValue("size", window->size());
+    settings.setValue("pos", window->pos());
     settings.endGroup();
 }
 
@@ -260,173 +268,194 @@ void DSRViewer::restart_app(bool)
 //	}
 }
 
-void DSRViewer::initialize_views(int options, view central){
-	//Create docks view and main widget
-	std::map<view,QString> valid_options{{view::graph,"Graph"}, {view::tree,"Tree"}, {view::osg,"3D"}, {view::scene, "2D"}};
+void DSRViewer::initialize_views(int options, view central)
+{
+    //Create docks view and main widget
+    std::map<view, QString> valid_options{{view::graph, "Graph"},
+                                          {view::tree,  "Tree"},
+                                          {view::osg,   "3D"},
+                                          {view::scene, "2D"}};
 
-	// creation of docks and mainwidget
-	for (auto const& [type, name] : valid_options) {
-		if(type == central and central != view::none)
-		{
-			auto viewer = create_widget(type);
-			window->setCentralWidget(viewer);
-			WidgetContainer * widget_c = new WidgetContainer();
-			widget_c->widget = viewer;
-			widget_c->name = name;
-			widget_c->type = type;
-			widgets[name] = widget_c;
-			widgets_by_type[type]= widget_c;
-			this->main_widget = viewer;
-		}
-		else if(options & type ) {
-			auto viewer = create_widget(type);
-			WidgetContainer * widget_c = new WidgetContainer();
-			widget_c->widget = viewer;
-			widget_c->name = name;
-			widget_c->type = type;
-			widgets[name] = widget_c;
-			widgets_by_type[type]= widget_c;
-			create_dock_and_menu(QString(name), viewer);
-		}
-	}
-	if(widgets_by_type.count(view::graph))
-	{
-		QAction *new_action = new QAction("Animation", this);
-		new_action->setStatusTip(tr("Toggle animation"));
-		new_action->setCheckable(true);
-		new_action->setChecked(false);
-		forcesMenu->addAction(new_action);
-		connect(new_action, &QAction::triggered, this, [this](bool state)
-		{
-			qobject_cast<GraphViewer*>(widgets_by_type[view::graph]->widget)->toggle_animation(state);
-		});
-	}
+    // creation of docks and mainwidget
+    for (auto const &[type, name]: valid_options)
+    {
+        if (type == central and central != view::none)
+        {
+            auto viewer = create_widget(type);
+            window->setCentralWidget(viewer);
+            WidgetContainer *widget_c = new WidgetContainer();
+            widget_c->widget = viewer;
+            widget_c->name = name;
+            widget_c->type = type;
+            widgets[name] = widget_c;
+            widgets_by_type[type] = widget_c;
+            this->main_widget = viewer;
+        } else if (options & type)
+        {
+            auto viewer = create_widget(type);
+            WidgetContainer *widget_c = new WidgetContainer();
+            widget_c->widget = viewer;
+            widget_c->name = name;
+            widget_c->type = type;
+            widgets[name] = widget_c;
+            widgets_by_type[type] = widget_c;
+            create_dock_and_menu(QString(name), viewer);
+        }
+    }
+    if (widgets_by_type.count(view::graph))
+    {
+        QAction *new_action = new QAction("Animation", this);
+        new_action->setStatusTip(tr("Toggle animation"));
+        new_action->setCheckable(true);
+        new_action->setChecked(false);
+        forcesMenu->addAction(new_action);
+        connect(new_action, &QAction::triggered, this, [this](bool state)
+        {
+            qobject_cast<GraphViewer *>(widgets_by_type[view::graph]->widget)->toggle_animation(state);
+        });
+    }
 
 //	Tabification of current docks
-	QDockWidget * previous = nullptr;
-	for(auto &dock: docks) {
-		if (previous)
-			window->tabifyDockWidget(previous, dock.second);
-		previous = dock.second;
-	}
+    QDockWidget *previous = nullptr;
+    for (auto &dock: docks)
+    {
+        if (previous)
+            window->tabifyDockWidget(previous, dock.second);
+        previous = dock.second;
+    }
 
 //	connection of tree to graph signals
-	if(docks.count(QString("Tree"))==1) {
-		if (this->main_widget) {
-            auto graph_widget = qobject_cast<GraphViewer*>(this->main_widget);
-			if (graph_widget) {
-				TreeViewer* tree_widget = qobject_cast<TreeViewer*>(docks["Tree"]->widget());
-				DSRViewer::connect(
-						tree_widget,
-						&TreeViewer::node_check_state_changed,
-						graph_widget,
-						[=](int value, int id, const std::string& type, QTreeWidgetItem*) {
-							graph_widget->hide_show_node_SLOT(id, value==2); });
-			}
-		}
-	}
-//  connection of 2d scene signals
-    if(docks.count(QString("2D"))==1) {
-        //std::cout<<"connect 2D"<<std::endl;
-        QScene2dViewer* qscene_widget = qobject_cast<QScene2dViewer*>(docks["2D"]->widget());
-        DSRViewer::connect(qscene_widget, &QScene2dViewer::mouse_right_click, this, &DSRViewer::qscene2d_object_position);
+    if (docks.count(QString("Tree")) == 1)
+    {
+        if (this->main_widget)
+        {
+            auto graph_widget = qobject_cast<GraphViewer *>(this->main_widget);
+            if (graph_widget)
+            {
+                TreeViewer *tree_widget = qobject_cast<TreeViewer *>(docks["Tree"]->widget());
+                DSRViewer::connect(
+                        tree_widget,
+                        &TreeViewer::node_check_state_changed,
+                        graph_widget,
+                        [=](int value, int id, const std::string &type, QTreeWidgetItem *)
+                        {
+                            graph_widget->hide_show_node_SLOT(id, value == 2);
+                        });
+            }
+        }
     }
-	if(widgets.size()<=0 and docks.size()<=0 and main_widget==nullptr)
-	{
-        qDebug()<<__FUNCTION__ <<"Minimize"<<widgets.size()<<docks.size()<<main_widget;
+//  connection of 2d scene signals
+    if (docks.count(QString("2D")) == 1)
+    {
+        //std::cout<<"connect 2D"<<std::endl;
+        QScene2dViewer *qscene_widget = qobject_cast<QScene2dViewer *>(docks["2D"]->widget());
+        DSRViewer::connect(qscene_widget, &QScene2dViewer::mouse_right_click, this,
+                           &DSRViewer::qscene2d_object_position);
+    }
+    if (widgets.size() <= 0 and docks.size() <= 0 and main_widget == nullptr)
+    {
+        qDebug() << __FUNCTION__ << "Minimize" << widgets.size() << docks.size() << main_widget;
         window->showMinimized();
-	}
-	else {
-        qDebug()<<__FUNCTION__ <<"Normal Show";
+    } else
+    {
+        qDebug() << __FUNCTION__ << "Normal Show";
         window->show();
-	}
+    }
 }
 
 
-QWidget* DSRViewer::get_widget(view type)
+QWidget *DSRViewer::get_widget(view type)
 {
-	if(widgets_by_type.count(type)!=0)
-		return widgets_by_type[type]->widget;
-	return nullptr;
+    if (widgets_by_type.count(type) != 0)
+        return widgets_by_type[type]->widget;
+    return nullptr;
 }
 
-QWidget* DSRViewer::get_widget(const QString& name)
+QWidget *DSRViewer::get_widget(const QString &name)
 {
-	if(widgets.count(name)!=0)
-		return widgets[name]->widget;
-	return nullptr;
+    if (widgets.count(name) != 0)
+        return widgets[name]->widget;
+    return nullptr;
 }
 
-QWidget* DSRViewer::create_widget(view type){
+QWidget *DSRViewer::create_widget(view type)
+{
 
-	QWidget * widget_view = nullptr;
-	switch(type) {
+    QWidget *widget_view = nullptr;
+    switch (type)
+    {
 //		graph
-		case view::graph:
-			widget_view = new DSR::GraphViewer(G);
-			break;
+        case view::graph:
+            widget_view = new DSR::GraphViewer(G);
+            break;
 //		3D
-		case view::osg:
-			widget_view = new DSR::OSG3dViewer(G, 1, 1);
-			break;
+        case view::osg:
+            widget_view = new DSR::OSG3dViewer(G, 1, 1);
+            break;
 //		Tree
-		case view::tree:
-			widget_view = new DSR::TreeViewer(G);
-			break;
+        case view::tree:
+            widget_view = new DSR::TreeViewer(G);
+            break;
 //		2D
-		case view::scene:
-			widget_view = new DSR::QScene2dViewer(G);
-			break;
-		case view::none:
-			break;
-	}
-	connect(this, SIGNAL(resetViewer(QWidget*)), widget_view, SLOT(reload(QWidget*)));
-	return widget_view;
+        case view::scene:
+            widget_view = new DSR::QScene2dViewer(G);
+            break;
+        case view::none:
+            break;
+    }
+    connect(this, SIGNAL(resetViewer(QWidget * )), widget_view, SLOT(reload(QWidget * )));
+    return widget_view;
 }
 
-void DSRViewer::create_dock_and_menu(const QString& name, QWidget* view){
+void DSRViewer::create_dock_and_menu(const QString &name, QWidget *view)
+{
 //	TODO: Check if name exists in docks
-	QDockWidget* dock_widget;
-	if(this->docks.count(name)) {
-		dock_widget = this->docks[name];
-		window->removeDockWidget(dock_widget);
-	}
-	else{
-		dock_widget = new QDockWidget(name);
-		QAction *new_action = new QAction(name, this);
-		new_action->setStatusTip(tr("Create a new file"));
-		new_action->setCheckable(true);
-		new_action->setChecked(true);
-		connect(new_action, &QAction::triggered, this, [this, name](bool state) {
-			switch_view(state, widgets[name]);
-		});
-		viewMenu->addAction(new_action);
-		this->docks[name] = dock_widget;
-		widgets[name]->dock = dock_widget;
-	}
-	dock_widget->setWidget(view);
-	dock_widget->setAllowedAreas(Qt::AllDockWidgetAreas);
-	window->addDockWidget(Qt::RightDockWidgetArea, dock_widget);
-	dock_widget->raise();
+    QDockWidget *dock_widget;
+    if (this->docks.count(name))
+    {
+        dock_widget = this->docks[name];
+        window->removeDockWidget(dock_widget);
+    } else
+    {
+        dock_widget = new QDockWidget(name);
+        QAction *new_action = new QAction(name, this);
+        new_action->setStatusTip(tr("Create a new file"));
+        new_action->setCheckable(true);
+        new_action->setChecked(true);
+        connect(new_action, &QAction::triggered, this, [this, name](bool state)
+        {
+            switch_view(state, widgets[name]);
+        });
+        viewMenu->addAction(new_action);
+        this->docks[name] = dock_widget;
+        widgets[name]->dock = dock_widget;
+    }
+    dock_widget->setWidget(view);
+    dock_widget->setAllowedAreas(Qt::AllDockWidgetAreas);
+    window->addDockWidget(Qt::RightDockWidgetArea, dock_widget);
+    dock_widget->raise();
 }
 
-void DSRViewer::add_custom_widget_to_dock(const QString& name, QWidget* custom_view){
-	WidgetContainer * widget_c = new WidgetContainer();
-	widget_c->name = name;
-	widget_c->type = view::none;
-	widget_c->widget = custom_view;
-	widgets[name] = widget_c;
-	create_dock_and_menu(name, custom_view);
+void DSRViewer::add_custom_widget_to_dock(const QString &name, QWidget *custom_view)
+{
+    WidgetContainer *widget_c = new WidgetContainer();
+    widget_c->name = name;
+    widget_c->type = view::none;
+    widget_c->widget = custom_view;
+    widgets[name] = widget_c;
+    create_dock_and_menu(name, custom_view);
 //	Tabification of current docks
-	QDockWidget * previous = nullptr;
-	for(auto& [dock_name, dock]: docks) {
-		if (previous and previous!=dock) {
-			window->tabifyDockWidget(previous, docks[name]);
-			break;
-		}
-		previous = dock;
-	}
-	docks[name]->raise();
+    QDockWidget *previous = nullptr;
+    for (auto &[dock_name, dock]: docks)
+    {
+        if (previous and previous != dock)
+        {
+            window->tabifyDockWidget(previous, docks[name]);
+            break;
+        }
+        previous = dock;
+    }
+    docks[name]->raise();
     window->setWindowState((window->windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
 }
 
@@ -435,25 +464,25 @@ void DSRViewer::add_custom_widget_to_dock(const QString& name, QWidget* custom_v
 /// UI slots
 ////////////////////////////////////////
 void DSRViewer::saveGraphSLOT()
-{ 
-	emit saveGraphSIGNAL(); 
+{
+    emit saveGraphSIGNAL();
 }
 
-void DSRViewer::switch_view(bool state, WidgetContainer* container)
+void DSRViewer::switch_view(bool state, WidgetContainer *container)
 {
-	QWidget * widget = container->widget;
-	QDockWidget * dock = container->dock;
-	if(!state)
-	{
-		widget->blockSignals(true);
-		dock->hide();
-	}
-	else{
-		widget->blockSignals(false);
-		emit resetViewer(widget);
-		dock->show();
-		dock->raise();
-	}
+    QWidget *widget = container->widget;
+    QDockWidget *dock = container->dock;
+    if (!state)
+    {
+        widget->blockSignals(true);
+        dock->hide();
+    } else
+    {
+        widget->blockSignals(false);
+        emit resetViewer(widget);
+        dock->show();
+        dock->raise();
+    }
 }
 
 void DSRViewer::create_status_bar()
@@ -461,12 +490,12 @@ void DSRViewer::create_status_bar()
     w = new QWidget();
     w->show();
     QVBoxLayout *vLayout = new QVBoxLayout();
-    vLayout->setContentsMargins(0,1,0,1);
+    vLayout->setContentsMargins(0, 1, 0, 1);
     w->setLayout(vLayout);
     QHBoxLayout *hLayout = new QHBoxLayout();
-    hLayout->setContentsMargins(2,0,0,0);
+    hLayout->setContentsMargins(2, 0, 0, 0);
     m_stBar1L = new QHBoxLayout();
-    m_stBar1L->setContentsMargins(2,0,0,0);
+    m_stBar1L->setContentsMargins(2, 0, 0, 0);
     m_stBar1L->addStretch(1);
     m_stBar1 = new QWidget();
     m_stBar1->setFixedHeight(this->window->statusBar()->size().height());
@@ -476,7 +505,7 @@ void DSRViewer::create_status_bar()
     m_stBar2->setFixedHeight(this->window->statusBar()->size().height());
     m_stMessage = new QLabel();
     hLayout->addWidget(m_stMessage);
-    this->window->statusBar()->setFixedHeight(this->window->statusBar()->size().height()*2.2);
+    this->window->statusBar()->setFixedHeight(this->window->statusBar()->size().height() * 2.2);
     vLayout->addWidget(m_stBar1);
     vLayout->addWidget(m_stBar2);
     this->window->statusBar()->addWidget(w);
@@ -500,20 +529,24 @@ void DSRViewer::compute()
     cpu_usage << std::fixed << std::setprecision(2) << get_cpu_usage();
 
     std::stringstream memory_usage;
-    memory_usage << std::fixed << std::setprecision(2) << get_memory_usage()/1024.f;
-    std::string status = "ALIVE TIME: " + std::to_string(alive_timer.elapsed()/1000) + "s CPU: " + cpu_usage.str() + " Memory: " + memory_usage.str() + "MB ";
+    memory_usage << std::fixed << std::setprecision(2) << get_memory_usage() / 1024.f;
+    std::string status =
+            "ALIVE TIME: " + std::to_string(alive_timer.elapsed() / 1000) + "s CPU: " + cpu_usage.str() + " Memory: " +
+            memory_usage.str() + "MB ";
     if (object_position != nullptr)
     {
-        status += " Object pose: (" + std::to_string(object_position->x()) + ", " + std::to_string(object_position->y()) + ") ID: " + std::to_string(object_id);
+        status +=
+                " Object pose: (" + std::to_string(object_position->x()) + ", " + std::to_string(object_position->y()) +
+                ") ID: " + std::to_string(object_id);
     }
-    if(external_hz!=-1)
+    if (external_hz != -1)
     {
-        status += " HZ: "+std::to_string(external_hz);
+        status += " HZ: " + std::to_string(external_hz);
     }
     m_stMessage->setText(QString::fromStdString(status));
 }
 
-void DSRViewer::qscene2d_object_position(int pos_x, int pos_y, uint64_t  node_id)
+void DSRViewer::qscene2d_object_position(int pos_x, int pos_y, uint64_t node_id)
 {
     if (object_position == nullptr)
         object_position = new QPoint();
@@ -521,7 +554,6 @@ void DSRViewer::qscene2d_object_position(int pos_x, int pos_y, uint64_t  node_id
     object_position->setY(pos_y);
     object_id = node_id;
 }
-
 
 
 void DSRViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
@@ -533,15 +565,14 @@ void DSRViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
         if (it == agents_leds.end())  //not found ==> creation
         {
             int pos = name.find('(') + 2;
-            std::string show_name = name.substr(pos,6); 
+            std::string show_name = name.substr(pos, 6);
             LedWidget *newWidget = new LedWidget(show_name);
             //m_stBar1->addPermanentWidget(newWidget);
-            m_stBar1L->insertWidget(m_stBar1L->count()-1, newWidget);
+            m_stBar1L->insertWidget(m_stBar1L->count() - 1, newWidget);
             agents_names[id] = name;
             agents_leds[name] = newWidget;
-            std::cout<<"Name:"<<name<<" "<<show_name<<std::endl;
-        }
-        else
+            std::cout << "Name:" << name << " " << show_name << std::endl;
+        } else
         {
             agents_leds[name]->turnOn();
             agents_names[id] = name;
@@ -552,7 +583,7 @@ void DSRViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
 void DSRViewer::del_node_SLOT(uint64_t id)
 {
     auto it = agents_names.find(id);
-    if(it != agents_names.end())
+    if (it != agents_names.end())
     {
         agents_leds[it->second]->turnOff();
         agents_names.erase(it);
@@ -563,15 +594,17 @@ void DSRViewer::del_node_SLOT(uint64_t id)
 ///// Qt Events
 /////////////////////////
 
-void DSRViewer::keyPressEvent(QKeyEvent* event)
+void DSRViewer::keyPressEvent(QKeyEvent *event)
 {
-	if (event->key() == Qt::Key_Escape)
-		emit closeWindowSIGNAL();
+    if (event->key() == Qt::Key_Escape)
+            emit closeWindowSIGNAL();
 }
+
 float DSRViewer::get_external_hz() const
 {
     return external_hz;
 }
+
 void DSRViewer::set_external_hz(float external_hz_)
 {
     this->external_hz = external_hz_;

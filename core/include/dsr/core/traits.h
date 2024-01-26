@@ -58,7 +58,7 @@ template<typename Va>
 concept crdt_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTNode>::value;;
 
 
-//Attributes requires valis types to be defined
+//Attributes requires valid types to be defined
 template<typename T>
 concept AttributeType = allowed_types<unwrap_reference_wrapper_t<T>>;
 
