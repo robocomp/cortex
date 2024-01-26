@@ -112,6 +112,7 @@ namespace DSR
 
     signals:
         void mouse_right_click(int pos_x, int pos_y, uint64_t node_id);
+        void mouse_left_click(QPointF p);
 
     protected:
         virtual void mousePressEvent(QMouseEvent *event);

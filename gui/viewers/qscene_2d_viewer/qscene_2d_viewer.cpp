@@ -569,6 +569,8 @@ void QScene2dViewer::mousePressEvent(QMouseEvent *event){
             }
         }
     }
+    else if(event->button() == Qt::LeftButton)
+        emit mouse_left_click(event->position());
 }
 
 
