@@ -9,7 +9,7 @@ def main():
     #x = threading.Thread(target=profile)
     #x.start()
 
-    a = Node(12, "world", "elmundo")
+    a = Node(12, "root", "elmundo")
     a.attrs["cam_image"] = Attribute([100], 1)
 
     print("Update value creating attribute using numpy array")

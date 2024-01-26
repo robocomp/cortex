@@ -27,7 +27,7 @@ struct NodeType {
 inline std::unordered_set<std::string_view> node_types::set_type_;
 
 
-REGISTER_NODE_TYPE(world)
+REGISTER_NODE_TYPE(root)
 REGISTER_NODE_TYPE(transform)
 REGISTER_NODE_TYPE(room)
 REGISTER_NODE_TYPE(differentialrobot)

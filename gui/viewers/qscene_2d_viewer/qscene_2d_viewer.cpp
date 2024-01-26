@@ -146,7 +146,7 @@ void QScene2dViewer::get_2d_projection(const std::string& node_name, std::vector
     QVector<QPoint> polygon_vec;
     zvalue = -99999;
     //transform cube points
-    std::optional<Mat::RTMat> rt = innermodel->get_transformation_matrix("world", node_name);
+    std::optional<Mat::RTMat> rt = innermodel->get_transformation_matrix("root", node_name);
     if (rt.has_value())
     {
         for (unsigned int i=0;i< cube_positions.size();i++)
@@ -270,7 +270,7 @@ bool QScene2dViewer::check_RT_required_attributes(Node node)
         }
         std::optional<int> level = G->get_node_level(node);
         std::optional<uint64_t> parent = G->get_parent_id(node);
-        std::optional<Mat::Vector6d> pose = innermodel->transform_axis("world", node.name());
+        std::optional<Mat::Vector6d> pose = innermodel->transform_axis("root", node.name());
 
         if(level.has_value() and parent.has_value() and pose.has_value())
             return true;
@@ -320,7 +320,7 @@ void  QScene2dViewer::add_or_assign_person(Node &node){
 //qDebug() << __FUNCTION__ ;
     std::optional<Mat::Vector6d> pose;
     try{
-        pose = innermodel->transform_axis("world", node.name());
+        pose = innermodel->transform_axis("root", node.name());
     }catch(...){}
     if (pose.has_value()){
 //pose.value().print(QString::fromStdString(node.name()));
@@ -358,7 +358,7 @@ void QScene2dViewer::add_or_assign_robot(Node &node)
     std::optional<Mat::Vector6d> pose;
     try
     {
-        pose = innermodel->transform_axis("world", node.name());
+        pose = innermodel->transform_axis("root", node.name());
     }catch(...){}
     if (pose.has_value())
     {
@@ -416,7 +416,7 @@ std::list<uint64_t> QScene2dViewer::get_parent_list(std::uint64_t  node_id)
             }
             else
                 return std::list<uint64_t>();
-        }while(node.value().type() != "world");
+        }while(node.value().type() != "root");
     }catch(...){}
     return parent_list;
 }
@@ -456,7 +456,7 @@ void QScene2dViewer::update_scene_object_pose(std::uint64_t  node_id)
         std::optional<Mat::Vector6d> pose;
         try
         {
-            pose = innermodel->transform_axis("world", node.value().name());
+            pose = innermodel->transform_axis("root", node.value().name());
 //pose.value().print(QString::fromStdString(node.value().name()));
         }catch(...){};
         if (pose.has_value())

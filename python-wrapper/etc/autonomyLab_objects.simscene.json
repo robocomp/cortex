@@ -388,8 +388,8 @@
                         "src": "1"
                     }
                 ],
-                "name": "world",
-                "type": "world"
+                "name": "root",
+                "type": "root"
             },
             "10": {
                 "attribute": {

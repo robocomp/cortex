@@ -9,7 +9,7 @@
 #include <string>
 
 static const std::map<std::string, std::string> node_colors = {
-        { "world", "red"},
+        { "root", "red"},
         { "transform", "SteelBlue"},
         { "room", "Gray"},
         { "differentialrobot", "GoldenRod"},

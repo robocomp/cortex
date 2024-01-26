@@ -7,7 +7,7 @@ class Test(unittest.TestCase):
 
     def test_create_attribute_int32(self):
 
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #int32
         a.attrs["vehicle_id"] = Attribute(10, 1)
@@ -42,7 +42,7 @@ class Test(unittest.TestCase):
             a.attrs["vehicle_id"].value = (10,)
 
     def test_create_attribute_bool(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #bool
         a.attrs["vehicle_occupancy"] = Attribute(True, 1)
@@ -78,7 +78,7 @@ class Test(unittest.TestCase):
     def test_create_attribute_float(self):
         #We do not check precission loss on Python floats to C++ floats.
 
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #float
         a.attrs["vehicle_steer"] = Attribute(1.0, 1)
@@ -113,7 +113,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_double(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #double
         a.attrs["test_double_type"] = Attribute(1.0, 1)
@@ -155,7 +155,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_string(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #string
         a.attrs["name"] = Attribute("Prueba", 1)
@@ -189,7 +189,7 @@ class Test(unittest.TestCase):
 
     def test_create_attribute_vec_float(self):
 
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
         #vec float
         a.attrs["rt_translation"] = Attribute([10.0], 1)
         a.attrs["rt_translation"] = Attribute([10.0, 11.2], 1)
@@ -229,7 +229,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_vec_bytes(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #vec bytes
         a.attrs["cam_image"] = Attribute([100], 1)
@@ -267,7 +267,7 @@ class Test(unittest.TestCase):
             a.attrs["cam_image"].value = [[11, 0, 1]]
 
     def test_create_attribute_uint32(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #uint32
         a.attrs["test_uint32_type"] = Attribute(100, 1)
@@ -300,7 +300,7 @@ class Test(unittest.TestCase):
             a.attrs["test_uint32_type"].value = True
 
     def test_create_attribute_uint64(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #uint64
         a.attrs["parent"] = Attribute(100, 1)
@@ -336,7 +336,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_u64_vec(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #u64_vec
         a.attrs["test_uint64_vec_type"] = Attribute([256], 1)
@@ -376,7 +376,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_vec2(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
 
         #vec2
@@ -424,7 +424,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_vec3(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #vec3
         a.attrs["test_vec3_type"] = Attribute([10.0, 1.0, 0.0], 1)
@@ -477,7 +477,7 @@ class Test(unittest.TestCase):
 
     def test_create_attribute_vec4(self):
 
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #vec4
         a.attrs["test_vec4_type"] = Attribute([10.0, 1.0, 0.0, 1.0], 1)
@@ -524,7 +524,7 @@ class Test(unittest.TestCase):
 
 
     def test_create_attribute_vec6(self):
-        a = Node(12, "world", "elmundo")
+        a = Node(12, "root", "elmundo")
 
         #vec6
         a.attrs["test_vec6_type"] = Attribute([10.0, 1.0, 0.0, 1.2, 4.4, 0.0], 1)

@@ -41,7 +41,7 @@ public:
             //Reference combo
             QComboBox *references_cb = new QComboBox();
             QHBoxLayout *reference_layout = new QHBoxLayout();
-            references_cb->addItem("world");
+            references_cb->addItem("root");
             references_cb->addItem("parent");
             connect(references_cb, SIGNAL(currentTextChanged(QString)), this, SLOT(update_combo(QString)));
             reference_layout->addWidget(new QLabel("Reference:"));
@@ -111,7 +111,7 @@ public:
                     transform_set.insert(parent_node.value().name());
                     node = parent_node;
                 }
-            }while(node.value().type() != "world" and node.value().name() != to);
+            }while(node.value().type() != "root" and node.value().name() != to);
         }catch(...){}
     };
     void closeEvent (QCloseEvent *event) override
@@ -123,7 +123,7 @@ public slots:
             void update_combo(const QString& combo_text)
     {
         this->reference = to_string;
-        if (combo_text == "world")
+        if (combo_text == "root")
         {
             auto root_opt = graph->get_node_root();
             if(root_opt.has_value())

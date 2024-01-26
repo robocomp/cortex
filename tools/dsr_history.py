@@ -14,7 +14,7 @@ import difflib
 
 
 NODE_COLORS = {
-    "world": "red",
+    "root": "red",
     "transform" : "SteelBlue",
     "room" : "Gray",
     "differentialrobot" : "GoldenRod",

@@ -243,7 +243,7 @@ if __name__ == '__main__':
     from pydsr import *
 
     g = DSRGraph(0, "pythonAgent", 111)
-    node = g.get_node("world")
+    node = g.get_node("root")
     main_window = QMainWindow()
     print(node)
     current_opts = View.tree

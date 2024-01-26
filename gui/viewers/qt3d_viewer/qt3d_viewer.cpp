@@ -126,7 +126,7 @@ namespace DSR {
             auto texture = g->get_attrib_by_name<texture_att>(node);
 
 
-            auto mat = inner->get_transformation_matrix("world", node.name());
+            auto mat = inner->get_transformation_matrix("root", node.name());
 
             if (((x.has_value() && y.has_value() && z.has_value()) || path.has_value()) && mat.has_value()) {
 
@@ -230,7 +230,7 @@ namespace DSR {
         } else {
 
             auto Entity = it->second;
-            auto mat = inner->get_transformation_matrix("world", node.name());
+            auto mat = inner->get_transformation_matrix("root", node.name());
 
             auto componentList = Entity->components();
             auto c = std::find_if(componentList.begin(), componentList.end(),
