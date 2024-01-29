@@ -280,6 +280,7 @@ REGISTER_TYPE(ultrasound_y_pos, std::reference_wrapper<const std::vector<float>>
  * */
 REGISTER_TYPE(delimiting_polygon_x, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(delimiting_polygon_y, std::reference_wrapper<const std::vector<float>>, false);
+REGISTER_TYPE(room_is_oriented, bool, false);
 
 /* * * * * * * * * * *
  * MELEX-RODAO ATTR  *
