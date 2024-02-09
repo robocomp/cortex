@@ -54,6 +54,8 @@ REGISTER_EDGE_TYPE(goto_action)
 REGISTER_EDGE_TYPE(attention_action)
 REGISTER_EDGE_TYPE(following_action)
 REGISTER_EDGE_TYPE(lost)
+REGISTER_EDGE_TYPE(has_intention)
+REGISTER_EDGE_TYPE(collision)
 REGISTER_EDGE_TYPE(testtype_e)
 
 #endif //DSR_EDGE_TYPE_H

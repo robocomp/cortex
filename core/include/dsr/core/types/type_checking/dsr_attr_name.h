@@ -168,6 +168,7 @@ REGISTER_TYPE(projected_bounding_box, std::reference_wrapper<const std::vector<f
 REGISTER_TYPE(unseen_time, int, false)
 REGISTER_TYPE(obj_checked, bool, false)
 REGISTER_TYPE(average_size, std::reference_wrapper<const std::string>, false)
+REGISTER_TYPE(is_an_obstacle, bool, false)
 /*
  * Object affordances
  * 
