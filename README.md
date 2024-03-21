@@ -70,7 +70,7 @@ To be able to use the DSR/CORTEX infraestructure you need to follow the next ste
 ### Step 1
 From ubuntu repositories you need:
 ```bash
-sudo apt install libasio-dev libtinyxml2-dev libopencv-dev libeigen3-dev python3-dev python3-pybind11 cmake gcc-10 g++-10
+sudo apt install libasio-dev libtinyxml2-dev libopencv-dev libeigen3-dev python3-dev python3-pybind11 cmake gcc-11 g++-11
 ```
 
 > __NOTE :__ If you are using `python` with `Anaconda`, `cmake` might not be able to find pybind11 installation. So, you have to install it using `conda-forge` as well :
@@ -81,15 +81,16 @@ sudo apt install libasio-dev libtinyxml2-dev libopencv-dev libeigen3-dev python3
 
 You need to update the alternatives for g++ and gcc:
 ```bash
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 1
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 1
 ```
 then
 ```bash
 sudo update-alternatives --config gcc
-```
-and select version 10. Do the same for g++.
+sudo update-alternatives --config g++
 
+```
+and select version 11. In both g++ and gcc. If you have any issue try it with an older version.
 
 ### Step 2
 You need the following third-party software:
