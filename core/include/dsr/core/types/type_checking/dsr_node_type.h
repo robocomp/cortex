@@ -30,6 +30,7 @@ inline std::unordered_set<std::string_view> node_types::set_type_;
 REGISTER_NODE_TYPE(root)
 REGISTER_NODE_TYPE(transform)
 REGISTER_NODE_TYPE(room)
+REGISTER_NODE_TYPE(door)
 REGISTER_NODE_TYPE(differentialrobot)
 REGISTER_NODE_TYPE(omnirobot)
 REGISTER_NODE_TYPE(robot)

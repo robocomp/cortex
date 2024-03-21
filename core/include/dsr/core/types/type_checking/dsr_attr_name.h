@@ -95,6 +95,11 @@ REGISTER_TYPE(path, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(name, std::reference_wrapper<const std::string>, false)
 
 /*
+* Edge creation timestamp
+*/
+REGISTER_TYPE(creation_timestamp, float, true)
+
+/*
  * RT
  * */
 REGISTER_TYPE(rt_rotation_euler_xyz, std::reference_wrapper<const std::vector<float>>, true)
@@ -234,7 +239,7 @@ REGISTER_TYPE(plan_target_node_id, int, false)
  * */
 REGISTER_TYPE(current_intention, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(grid_as_string, std::reference_wrapper<const std::string>, false)
-
+REGISTER_TYPE(arrival_time, float, false)
 /*
  * World
  * */
@@ -282,6 +287,13 @@ REGISTER_TYPE(ultrasound_y_pos, std::reference_wrapper<const std::vector<float>>
 REGISTER_TYPE(delimiting_polygon_x, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(delimiting_polygon_y, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(room_is_oriented, bool, false);
+REGISTER_TYPE(rotation, float, false);
+REGISTER_TYPE(center_x, float, false);
+REGISTER_TYPE(center_y, float, false);
+REGISTER_TYPE(corner1, std::reference_wrapper<const std::vector<float>>, false);
+REGISTER_TYPE(corner2, std::reference_wrapper<const std::vector<float>>, false);
+REGISTER_TYPE(corner3, std::reference_wrapper<const std::vector<float>>, false);
+REGISTER_TYPE(corner4, std::reference_wrapper<const std::vector<float>>, false);
 
 /* * * * * * * * * * *
  * MELEX-RODAO ATTR  *
