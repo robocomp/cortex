@@ -519,7 +519,7 @@ void OSG3dViewer::resizeEvent(QResizeEvent *e)
 
 void OSG3dViewer::mouseMoveEvent(QMouseEvent* event)
 {
-    this->getEventQueue()->mouseMotion(event->x()*m_scaleX, event->y()*m_scaleY);
+    this->getEventQueue()->mouseMotion(event->position().x()*m_scaleX, event->position().y()*m_scaleY);
 }
 
 void OSG3dViewer::mousePressEvent(QMouseEvent* event)
@@ -538,7 +538,7 @@ void OSG3dViewer::mousePressEvent(QMouseEvent* event)
     default:
         break;
     }
-    this->getEventQueue()->mouseButtonPress(event->x()*m_scaleX, event->y()*m_scaleY, button);
+    this->getEventQueue()->mouseButtonPress(event->position().x()*m_scaleX, event->position().y()*m_scaleY, button);
 }
 
 void OSG3dViewer::mouseReleaseEvent(QMouseEvent* event)
@@ -557,7 +557,7 @@ void OSG3dViewer::mouseReleaseEvent(QMouseEvent* event)
     default:
         break;
     }
-    this->getEventQueue()->mouseButtonRelease(event->x()*m_scaleX, event->y()*m_scaleY, button);
+    this->getEventQueue()->mouseButtonRelease(event->position().x()*m_scaleX, event->position().y()*m_scaleY, button);
 }
 
 void OSG3dViewer::wheelEvent(QWheelEvent* event)
