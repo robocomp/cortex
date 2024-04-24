@@ -113,6 +113,7 @@ REGISTER_NODE_TYPE(container)
 REGISTER_NODE_TYPE(target)
 REGISTER_NODE_TYPE(obstacle)
 
+REGISTER_NODE_TYPE(corner)
 
 //melex-rodao types
 REGISTER_NODE_TYPE(road)

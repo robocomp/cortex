@@ -108,6 +108,7 @@ REGISTER_TYPE(rt_quaternion, std::reference_wrapper<const std::vector<float>>, t
 REGISTER_TYPE(rt_translation_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_rotation_euler_xyz_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_timestamps, std::reference_wrapper<const std::vector<uint64_t>> , false)
+REGISTER_TYPE(rt_se2_covariance, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_head_index, int, false)
 
 
@@ -140,6 +141,7 @@ REGISTER_TYPE(person_name, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(person_role, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(person_age, int, false)
 REGISTER_TYPE(person_velocity, std::vector<float>, false)
+REGISTER_TYPE(velocity_module, float, false)
 REGISTER_TYPE(is_followed, bool, false)
 REGISTER_TYPE(is_lost, bool, false)
 REGISTER_TYPE(person_image, std::reference_wrapper<const std::vector<uint8_t>>, true)
@@ -415,6 +417,11 @@ REGISTER_TYPE(task_destination_values, std::reference_wrapper<const std::vector<
 REGISTER_TYPE(task_time_stamp, float, false)
 REGISTER_TYPE(task_sensor_tick, float, false)
 
+/*
+* ROOM
+* */
+REGISTER_TYPE(corner_id, int, false)
+REGISTER_TYPE(valid, bool, false)
 
 
 
