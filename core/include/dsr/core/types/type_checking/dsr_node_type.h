@@ -114,6 +114,7 @@ REGISTER_NODE_TYPE(target)
 REGISTER_NODE_TYPE(obstacle)
 
 REGISTER_NODE_TYPE(corner)
+REGISTER_NODE_TYPE(wall)
 
 //melex-rodao types
 REGISTER_NODE_TYPE(road)
