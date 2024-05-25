@@ -1554,7 +1554,7 @@ bool MvregEdgePubSubType::getKey(
 IDLNodePubSubType::IDLNodePubSubType()
 {
     setName("IDLNode");
-    uint32_t type_size = IDLNode_max_cdr_typesize;
+    uint32_t type_size = std::numeric_limits<uint32_t>::max();
     type_size += static_cast<uint32_t>(eprosima::fastcdr::Cdr::alignment(type_size, 4)); /* possible submessage alignment */
     m_typeSize = type_size + 4; /*encapsulation*/
     m_isGetKeyDefined = false;
@@ -1858,7 +1858,7 @@ bool GraphRequestPubSubType::getKey(
 DotKernelPubSubType::DotKernelPubSubType()
 {
     setName("DotKernel");
-    uint32_t type_size = DotKernel_max_cdr_typesize;
+    uint32_t type_size =  std::numeric_limits<uint32_t>::max();
     type_size += static_cast<uint32_t>(eprosima::fastcdr::Cdr::alignment(type_size, 4)); /* possible submessage alignment */
     m_typeSize = type_size + 4; /*encapsulation*/
     m_isGetKeyDefined = false;
@@ -2010,7 +2010,7 @@ bool DotKernelPubSubType::getKey(
 MvregNodePubSubType::MvregNodePubSubType()
 {
     setName("MvregNode");
-    uint32_t type_size = MvregNode_max_cdr_typesize;
+    uint32_t type_size =  std::numeric_limits<uint32_t>::max();
     type_size += static_cast<uint32_t>(eprosima::fastcdr::Cdr::alignment(type_size, 4)); /* possible submessage alignment */
     m_typeSize = type_size + 4; /*encapsulation*/
     m_isGetKeyDefined = false;
@@ -2162,7 +2162,7 @@ bool MvregNodePubSubType::getKey(
 OrMapPubSubType::OrMapPubSubType()
 {
     setName("OrMap");
-    uint32_t type_size = OrMap_max_cdr_typesize;
+    uint32_t type_size =  std::numeric_limits<uint32_t>::max();
     type_size += static_cast<uint32_t>(eprosima::fastcdr::Cdr::alignment(type_size, 4)); /* possible submessage alignment */
     m_typeSize = type_size + 4; /*encapsulation*/
     m_isGetKeyDefined = false;
