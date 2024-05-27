@@ -136,6 +136,8 @@ You need the following third-party software:
       sudo make install
 ```
 
+If it does not install properly, try installing it from the source: https://fast-dds.docs.eprosima.com/en/latest/installation/binaries/binaries_linux.html
+
 Update the system cache of dynamic libraries with 
 
 ```sh
