@@ -174,13 +174,57 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
         std::unique_lock<std::shared_mutex> lock(G->_mutex);
         if (G->nodes.contains(to))
         {
-            CRDTEdge e; e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
-            CRDTAttribute tr(trans, get_unix_timestamp(), 0);
-            CRDTAttribute rot(rot_euler, get_unix_timestamp(), 0);
-            auto [it, new_el] = e.attrs().emplace("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
-            it->second.write(std::move(rot));
-            auto [it2, new_el2] = e.attrs().emplace("rt_translation", mvreg<CRDTAttribute> ());
-            it2->second.write(std::move(tr));
+            CRDTEdge e;
+            if (HISTORY_SIZE <= 0)
+            {
+                e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
+                CRDTAttribute tr(trans, get_unix_timestamp(), 0);
+                CRDTAttribute rot(rot_euler, get_unix_timestamp(), 0);
+
+                auto [it, new_el] = e.attrs().emplace("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(rot));
+                auto [it2, new_el2] = e.attrs().emplace("rt_translation", mvreg<CRDTAttribute> ());
+                it2->second.write(std::move(tr));
+            } else {
+
+                e = G->get_edge_(n.id(), to, "RT").value_or(CRDTEdge());
+                e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
+                auto head_o = G->get_attrib_by_name<rt_head_index_att>(e);
+                std::optional<std::vector<uint64_t>> tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(e);
+                std::optional<std::vector<float>> tr_pack_o = G->get_attrib_by_name<rt_translation_att>(e);
+                std::optional<std::vector<float>> rot_pack_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(e);
+                auto time_stamps = tstamps_o.value_or(std::vector<std::uint64_t>(HISTORY_SIZE, 0));
+                auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
+                auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
+
+                auto timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
+                uint32_t index = timestamp_index * BLOCK_SIZE;
+
+                tr_pack[index] = trans[0];
+                tr_pack[index + 1] = trans[1];
+                tr_pack[index + 2] = trans[2];
+                rot_pack[index] = rot_euler[0];
+                rot_pack[index + 1] = rot_euler[1];
+                rot_pack[index + 2] = rot_euler[2];
+                time_stamps[timestamp_index] = static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count());
+
+
+                CRDTAttribute tr(std::move(tr_pack), get_unix_timestamp(), 0);
+                CRDTAttribute rot(std::move(rot_pack), get_unix_timestamp(), 0);
+                CRDTAttribute head_index(index, get_unix_timestamp(), 0);
+                CRDTAttribute timestamps(std::move(time_stamps), get_unix_timestamp(), 0);
+
+                auto [it, new_el] = e.attrs().insert_or_assign("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(rot));
+                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_translation", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(tr));
+                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_head_index", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(head_index));
+                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_timestamps", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(timestamps));
+            }
 
             to_n = G->get_(to).value();
             if (auto x = G->get_crdt_attrib_by_name<parent_att>(to_n.value()); x.has_value())
@@ -274,14 +318,57 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
         std::unique_lock<std::shared_mutex> lock(G->_mutex);
         if (G->nodes.contains(to))
         {
-            CRDTEdge e; e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
-            CRDTAttribute tr;  tr.value(std::move(trans)); tr.timestamp(get_unix_timestamp());
-            CRDTAttribute rot; rot.value(std::move(rot_euler)); rot.timestamp(get_unix_timestamp());
-            auto [it, new_el] = e.attrs().emplace("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
-            it->second.write(std::move(rot));
-            auto [it2, new_el2] = e.attrs().emplace("rt_translation", mvreg<CRDTAttribute> ());
-            it2->second.write(std::move(tr));
+            CRDTEdge e;
+            if (HISTORY_SIZE <= 0)
+            {
+                e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
+                CRDTAttribute tr(std::move(trans), get_unix_timestamp(), 0);
+                CRDTAttribute rot(std::move(rot_euler), get_unix_timestamp(), 0);
 
+                auto [it, new_el] = e.attrs().emplace("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(rot));
+                auto [it2, new_el2] = e.attrs().emplace("rt_translation", mvreg<CRDTAttribute> ());
+                it2->second.write(std::move(tr));
+            } else {
+
+                e = G->get_edge_(n.id(), to, "RT").value_or(CRDTEdge());
+                e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
+                auto head_o = G->get_attrib_by_name<rt_head_index_att>(e);
+                std::optional<std::vector<uint64_t>> tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(e);
+                std::optional<std::vector<float>> tr_pack_o = G->get_attrib_by_name<rt_translation_att>(e);
+                std::optional<std::vector<float>> rot_pack_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(e);
+                auto time_stamps = tstamps_o.value_or(std::vector<std::uint64_t>(HISTORY_SIZE, 0));
+                auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
+                auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
+
+                auto timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
+                uint32_t index = timestamp_index * BLOCK_SIZE;
+
+                tr_pack[index] = trans[0];
+                tr_pack[index + 1] = trans[1];
+                tr_pack[index + 2] = trans[2];
+                rot_pack[index] = rot_euler[0];
+                rot_pack[index + 1] = rot_euler[1];
+                rot_pack[index + 2] = rot_euler[2];
+                time_stamps[timestamp_index] = static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count());
+
+
+                CRDTAttribute tr(std::move(tr_pack), get_unix_timestamp(), 0);
+                CRDTAttribute rot(std::move(rot_pack), get_unix_timestamp(), 0);
+                CRDTAttribute head_index(index, get_unix_timestamp(), 0);
+                CRDTAttribute timestamps(std::move(time_stamps), get_unix_timestamp(), 0);
+
+                auto [it, new_el] = e.attrs().insert_or_assign("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(rot));
+                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_translation", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(tr));
+                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_head_index", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(head_index));
+                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_timestamps", mvreg<CRDTAttribute> ());
+                it->second.write(std::move(timestamps));
+            }
 
             to_n = G->get_(to).value();
             if (auto x = G->get_crdt_attrib_by_name<parent_att>(to_n.value()); x.has_value())
