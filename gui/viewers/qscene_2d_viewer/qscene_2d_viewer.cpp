@@ -11,36 +11,37 @@ QScene2dViewer::QScene2dViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *paren
     G = std::move(G_);
     this->setMinimumSize(400,400);
     scene.setItemIndexMethod(QGraphicsScene::NoIndex);
+    this->setSceneRect(-5000, -5000,  10000, 10000);
     this->scale(1, -1);
     this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio);
     this->adjustSize();
 
     //context menu
-    contextMenu = new QMenu(this);
-    showMenu = contextMenu->addMenu(tr("&Show:"));
-    QAction *action = new QAction("Laser");
-    action->setCheckable(true);
-    action->setChecked(false);
-    showMenu->addAction(action);
-    connect(action, &QAction::toggled, this, [this](bool checked){
-        this->set_draw_laser(checked);
-        this->draw_laser();
-    });
-    QAction *action2 = new QAction("Person polyline");
-    action2->setCheckable(true);
-    action2->setChecked(false);
-    showMenu->addAction(action2);
-    connect(action2, &QAction::toggled, this, [this](bool checked){
-        this->set_draw_people_spaces(checked);
-    });
-    QAction *action3 = new QAction("Axis");
-    action3->setCheckable(true);
-    action3->setChecked(false);
-    showMenu->addAction(action3);
-    connect(action3, &QAction::toggled, this, [this](bool checked){
-        this->set_draw_axis(checked);
-        this->draw_axis();
-    });
+//    contextMenu = new QMenu(this);
+//    showMenu = contextMenu->addMenu(tr("&Show:"));
+//    QAction *action = new QAction("Laser");
+//    action->setCheckable(true);
+//    action->setChecked(false);
+//    showMenu->addAction(action);
+//    connect(action, &QAction::toggled, this, [this](bool checked){
+//        this->set_draw_laser(checked);
+//        this->draw_laser();
+//    });
+//    QAction *action2 = new QAction("Person polyline");
+//    action2->setCheckable(true);
+//    action2->setChecked(false);
+//    showMenu->addAction(action2);
+//    connect(action2, &QAction::toggled, this, [this](bool checked){
+//        this->set_draw_people_spaces(checked);
+//    });
+//    QAction *action3 = new QAction("Axis");
+//    action3->setCheckable(true);
+//    action3->setChecked(false);
+//    showMenu->addAction(action3);
+//    connect(action3, &QAction::toggled, this, [this](bool checked){
+//        this->set_draw_axis(checked);
+//        this->draw_axis();
+//    });
     //AXIS
     //center position
     axis_center = new QGraphicsRectItem(-100, -100, 200, 200);
@@ -60,11 +61,11 @@ QScene2dViewer::QScene2dViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *paren
     create_graph();
 
     //update signals
-    connect(G.get(), &DSR::DSRGraph::update_node_signal, this, &QScene2dViewer::add_or_assign_node_slot, Qt::QueuedConnection);
-	connect(G.get(), &DSR::DSRGraph::update_edge_signal, this, &QScene2dViewer::add_or_assign_edge_slot, Qt::QueuedConnection);
-
-	connect(G.get(), &DSR::DSRGraph::del_edge_signal, this, &QScene2dViewer::del_edge_slot, Qt::QueuedConnection);
-	connect(G.get(), &DSR::DSRGraph::del_node_signal, this, &QScene2dViewer::del_node_slot, Qt::QueuedConnection);
+//    connect(G.get(), &DSR::DSRGraph::update_node_signal, this, &QScene2dViewer::add_or_assign_node_slot, Qt::QueuedConnection);
+//	connect(G.get(), &DSR::DSRGraph::update_edge_signal, this, &QScene2dViewer::add_or_assign_edge_slot, Qt::QueuedConnection);
+//
+//	connect(G.get(), &DSR::DSRGraph::del_edge_signal, this, &QScene2dViewer::del_edge_slot, Qt::QueuedConnection);
+//	connect(G.get(), &DSR::DSRGraph::del_node_signal, this, &QScene2dViewer::del_node_slot, Qt::QueuedConnection);
     qDebug()<<"***************END QScene2dViewer********************";
 }
 
@@ -81,7 +82,6 @@ void QScene2dViewer::create_graph()
     {
         std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;
     }
-    
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -464,10 +464,8 @@ void QScene2dViewer::update_scene_object_pose(std::uint64_t  node_id)
             item->setPos(pose.value().x() - item->boundingRect().center().x(), pose.value().y() - item->boundingRect().center().y());
             item->setRotation(qRadiansToDegrees(pose.value()[5]));
         }
-        else   
-        {
+        else
             qDebug()<<"Error getting transformation from person"<<QString::fromStdString(node.value().name())<<"to world";
-        }
     }
 }
 
@@ -491,10 +489,8 @@ void QScene2dViewer::del_node_slot(std::uint64_t  id)
     }
 
     //remove from ignored just to keep consistency
-    if (ignore_nodes.find(id) != ignore_nodes.end()) 
-    {
+    if (ignore_nodes.find(id) != ignore_nodes.end())
         ignore_nodes.erase(id);
-    }
 
     //TODO: check what happens with rt edges
 }
@@ -510,8 +506,8 @@ void QScene2dViewer::del_edge_slot(std::uint64_t  from, std::uint64_t  to, const
     }
 }
 
-void QScene2dViewer::reload(QWidget* widget) {
-
+void QScene2dViewer::reload(QWidget* widget)
+{
     if(qobject_cast<QScene2dViewer*>(widget) == this)
     {
         std::cout<<"Reloading 2D viewer"<<std::endl;

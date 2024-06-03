@@ -175,7 +175,7 @@ DSRViewer::DSRViewer(QMainWindow *widget, std::shared_ptr<DSR::DSRGraph> G_, int
     create_status_bar();
     timer = new QTimer();
     alive_timer.start();
-    timer->start(500);
+    timer->start(1000);
     init();  //intialize processor number
     connect(timer, SIGNAL(timeout()), this, SLOT(compute()));
     connect(G.get(), &DSR::DSRGraph::update_node_signal, this, &DSRViewer::add_or_assign_node_SLOT,

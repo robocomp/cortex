@@ -23,10 +23,8 @@ AbstractGraphicViewer::AbstractGraphicViewer(QWidget* parent) :  QGraphicsView(p
     this->fitInView(scene.sceneRect(), Qt::KeepAspectRatio);
 	this->setMouseTracking(true);
 	this->viewport()->setMouseTracking(true);
-
     this->adjustSize();
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////
 ///// EVENTS
@@ -51,6 +49,7 @@ void AbstractGraphicViewer::wheelEvent(QWheelEvent* event)
 	this->scale(factor, factor);
 	auto delta = this->mapToScene(view_pos) - this->mapToScene(this->viewport()->rect().center());
 	this->centerOn(scene_pos - delta);
+    //qInfo()<< "wheel_event" << event->angleDelta().y() << factor << event->position().toPoint();
 }
 
 void AbstractGraphicViewer::resizeEvent(QResizeEvent *e)
