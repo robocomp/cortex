@@ -437,6 +437,7 @@ REGISTER_TYPE(offset_xyz, std::reference_wrapper<const std::vector<float>>, fals
 REGISTER_TYPE(orientation, std::reference_wrapper<const std::vector<float>>, false) /* 3-vector Orientation for the offset */
 REGISTER_TYPE(tolerance, std::reference_wrapper<const std::vector<float>>, false)  /* 6-vector Tolerance for the offset and orientation*/
 REGISTER_TYPE(subsystem, std::string, false) /* Subsystem that will execute the intention {base, arm_0, head}*/
+REGISTER_TYPE(bt_state, std::string, false) /* Subsystem that will execute the intention {base, arm_0, head}*/
 
 
 /* TESTS
