@@ -426,6 +426,7 @@ REGISTER_TYPE(task_sensor_tick, float, false)
 * */
 REGISTER_TYPE(corner_id, int, false)
 REGISTER_TYPE(valid, bool, false)
+REGISTER_TYPE(room_id, uint64_t, false)
 
 
 /*
