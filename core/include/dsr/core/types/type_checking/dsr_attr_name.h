@@ -300,7 +300,10 @@ REGISTER_TYPE(corner1, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner2, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner3, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner4, std::reference_wrapper<const std::vector<float>>, false);
-
+REGISTER_TYPE(corner_id, int, false);
+REGISTER_TYPE(valid, bool, false);
+REGISTER_TYPE(room_id, uint64_t, false);
+REGISTER_TYPE(connected_room_name, std::reference_wrapper<const std::string>, false);
 
 /* * * * * * * * * * *
  * MELEX-RODAO ATTR  *
@@ -421,14 +424,6 @@ REGISTER_TYPE(task_pickup_values, std::reference_wrapper<const std::vector<float
 REGISTER_TYPE(task_destination_values, std::reference_wrapper<const std::vector<float>>, false)
 REGISTER_TYPE(task_time_stamp, float, false)
 REGISTER_TYPE(task_sensor_tick, float, false)
-
-/*
-* ROOM
-* */
-REGISTER_TYPE(corner_id, int, false)
-REGISTER_TYPE(valid, bool, false)
-REGISTER_TYPE(room_id, uint64_t, false)
-
 
 /*
 * INTENTION EDGE
