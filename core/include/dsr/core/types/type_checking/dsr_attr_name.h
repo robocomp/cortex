@@ -177,6 +177,7 @@ REGISTER_TYPE(unseen_time, int, false)
 REGISTER_TYPE(obj_checked, bool, false)
 REGISTER_TYPE(average_size, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(is_an_obstacle, bool, false)
+
 /*
  * Object affordances
  * 
@@ -465,4 +466,28 @@ REGISTER_TYPE(test_vec6_type, std::reference_wrapper<const vec6> , false)
 REGISTER_TYPE(compresssed_id, int, false)
 REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uint8_t>>, false)
 
+/*
+*TTS
+*/
+REGISTER_TYPE(tts_to_say, std::string, false)
+
+/*
+*ASR
+*/
+REGISTER_TYPE(asr_texto, std::string, false)
+REGISTER_TYPE(asr_escucha, bool, false)
+
+/*
+*LLAMA
+*/
+REGISTER_TYPE(llama_inicio, std::string, false)
+REGISTER_TYPE(llama_in_llama, std::string, false)
+REGISTER_TYPE(llama_out_llama, std::string, false)
+
+/*
+*AMBIENTAL
+*/
+REGISTER_TYPE(ambiental_temperature, float, false)
+REGISTER_TYPE(ambiental_humidity, float, false)
+REGISTER_TYPE(ambiental_light, float, false)
 #endif //DSR_ATTR_NAME_H
