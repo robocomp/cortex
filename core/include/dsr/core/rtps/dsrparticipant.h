@@ -1,15 +1,14 @@
 #ifndef _PARTICIPANT_H_
 #define _PARTICIPANT_H_
 
-#include <fastrtps/fastrtps_fwd.h>
-#include <fastrtps/log/Log.h>
-#include <fastdds/rtps/RTPSDomain.h>
+#include <fastdds/dds/log/Log.hpp>
+#include <fastdds/rtps/RTPSDomain.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
+#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 #include <dsr/core/rtps/dsrpublisher.h>
 #include <dsr/core/rtps/dsrsubscriber.h>
 
@@ -18,8 +17,8 @@ class DSRParticipant
 public:
     DSRParticipant();
     virtual ~DSRParticipant();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> fn);
-    [[nodiscard]] const eprosima::fastrtps::rtps::GUID_t& getID() const;
+    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> fn);
+    [[nodiscard]] const eprosima::fastdds::rtps::GUID_t& getID() const;
     [[nodiscard]] const char *getNodeTopicName()     const { return dsrgraphType->getName();}
     [[nodiscard]] const char *getRequestTopicName()  const { return graphrequestType->getName();}
     [[nodiscard]] const char *getAnswerTopicName()   const { return graphRequestAnswerType->getName();}
@@ -67,20 +66,21 @@ private:
     class ParticpantListener : public eprosima::fastdds::dds::DomainParticipantListener
     {
     public:
-        explicit ParticpantListener(std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)>&& fn)
+        explicit ParticpantListener(std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)>&& fn)
             : eprosima::fastdds::dds::DomainParticipantListener(), f(std::move(fn)){};
         ~ParticpantListener() override = default;
 
          void on_participant_discovery  (
                 eprosima::fastdds::dds::DomainParticipant* participant,
-                eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&& info) override
+                eprosima::fastdds::rtps::ParticipantDiscoveryInfo&& info,
+                bool& should_be_ignored) override
         {
             //Callback
-            f(std::forward<eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&>(info));
+            f(std::forward<eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&>(info));
         }
 
 
-        std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> f;
+        std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> f;
         //int n_matched;
     };
     std::unique_ptr<ParticpantListener> m_listener;

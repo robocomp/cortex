@@ -7,6 +7,7 @@
 #define DSR_EXCEPTIONS
 
 #include <exception>
+#include <string>
 #include <utility>
 
 /////////////////////////////////////////////////////////////////

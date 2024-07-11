@@ -5,16 +5,11 @@ Reimplementation from https://github.com/CBaquero/delta-enabled-crdts
 #ifndef DELTA_CRDT
 #define DELTA_CRDT
 
-#include <set>
-#include <unordered_set>
-#include <map>
-#include <list>
-#include <tuple>
-#include <vector>
-#include <string>
 #include <iostream>
-#include <type_traits>
 #include <cassert>
+#include <cstdint>
+#include <map>
+#include <set>
 
 using key_type = uint64_t;
 

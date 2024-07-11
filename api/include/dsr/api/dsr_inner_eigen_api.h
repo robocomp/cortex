@@ -2,10 +2,13 @@
 #define INNER_EIGEN_API
 
 #include <QObject>
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
+#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 #include <dsr/api/dsr_eigen_defs.h>
 #include <dsr/api/dsr_rt_api.h>
 #include <optional>
+#include <cstdint>
+#include <tuple>
+#include <map>
 
 namespace DSR
 {

@@ -5,13 +5,12 @@
 #ifndef DSR_COMMON_TYPES_H
 #define DSR_COMMON_TYPES_H
 
-#include "../topics/IDLGraph.h"
-#include "../utils.h"
+#include "../topics/IDLGraph.hpp"
 
 #include <variant>
-#include <unordered_map>
-#include <iostream>
 #include <cassert>
+#include <iostream>
+
 
 namespace DSR {
     static constexpr std::array<std::string_view, 14> TYPENAMES_UNION =

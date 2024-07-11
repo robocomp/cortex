@@ -1,7 +1,7 @@
 #ifndef CAMERA_API
 #define CAMERA_API
 
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
+#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 #include <dsr/core/types/user_types.h>
 #include <Eigen/Dense>
 #include <optional>
