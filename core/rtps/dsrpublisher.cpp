@@ -66,8 +66,8 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
     }
 
     // Check ACK for sended messages.
-    dataWriterQos.reliable_writer_qos().times.heartbeatPeriod.seconds = 0;
-    dataWriterQos.reliable_writer_qos().times.heartbeatPeriod.nanosec = 20000000; //20 ms. This value should be more or less close to the sending frequency.
+    dataWriterQos.reliable_writer_qos().times.heartbeat_period.seconds = 0;
+    dataWriterQos.reliable_writer_qos().times.heartbeat_period.nanosec = 20000000; //20 ms. This value should be more or less close to the sending frequency.
 
     //Check latency
     dataWriterQos.latency_budget().duration = {0,10000000}; //10ms;
