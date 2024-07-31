@@ -177,7 +177,7 @@ REGISTER_TYPE(unseen_time, int, false)
 REGISTER_TYPE(obj_checked, bool, false)
 REGISTER_TYPE(average_size, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(is_an_obstacle, bool, false)
-
+REGISTER_TYPE(room_id, uint64_t, false)
 /*
  * Object affordances
  * 
@@ -300,10 +300,7 @@ REGISTER_TYPE(corner1, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner2, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner3, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner4, std::reference_wrapper<const std::vector<float>>, false);
-REGISTER_TYPE(corner_id, int, false);
-REGISTER_TYPE(valid, bool, false);
-REGISTER_TYPE(room_id, uint64_t, false);
-REGISTER_TYPE(connected_room_name, std::reference_wrapper<const std::string>, false);
+
 
 /* * * * * * * * * * *
  * MELEX-RODAO ATTR  *
@@ -426,6 +423,18 @@ REGISTER_TYPE(task_time_stamp, float, false)
 REGISTER_TYPE(task_sensor_tick, float, false)
 
 /*
+* ROOM
+* */
+REGISTER_TYPE(corner_id, int, false)
+REGISTER_TYPE(valid, bool, false)
+
+/*
+* DOOR
+* */
+REGISTER_TYPE(other_side_door_name, std::reference_wrapper<const std::string>, false)
+REGISTER_TYPE(connected_room_name, std::reference_wrapper<const std::string>, false)
+
+/*
 * INTENTION EDGE
 * */
 /* agent_id and valid are already defined */
@@ -461,28 +470,4 @@ REGISTER_TYPE(test_vec6_type, std::reference_wrapper<const vec6> , false)
 REGISTER_TYPE(compresssed_id, int, false)
 REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uint8_t>>, false)
 
-/*
-*TTS
-*/
-REGISTER_TYPE(tts_to_say, std::string, false)
-
-/*
-*ASR
-*/
-REGISTER_TYPE(asr_texto, std::string, false)
-REGISTER_TYPE(asr_escucha, bool, false)
-
-/*
-*LLAMA
-*/
-REGISTER_TYPE(llama_inicio, std::string, false)
-REGISTER_TYPE(llama_in_llama, std::string, false)
-REGISTER_TYPE(llama_out_llama, std::string, false)
-
-/*
-*AMBIENTAL
-*/
-REGISTER_TYPE(ambiental_temperature, float, false)
-REGISTER_TYPE(ambiental_humidity, float, false)
-REGISTER_TYPE(ambiental_light, float, false)
 #endif //DSR_ATTR_NAME_H

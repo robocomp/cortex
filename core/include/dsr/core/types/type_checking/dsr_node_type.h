@@ -129,25 +129,7 @@ REGISTER_NODE_TYPE(compressed)
 //Agent
 REGISTER_NODE_TYPE(agent)
 
-//TTS
-REGISTER_NODE_TYPE(tts)
-
-//ASR
-REGISTER_NODE_TYPE(asr)
-
-//Llama
-REGISTER_NODE_TYPE(llm)
-
-//Ambiental
-REGISTER_NODE_TYPE(ambiental)
-
-//Sonido
-REGISTER_NODE_TYPE(sound)
-
-//Actuador
-REGISTER_NODE_TYPE(actuador)
 
 //pioneer
 REGISTER_NODE_TYPE(wayp)
-
 #endif //DSR_NODE_TYPE_H
