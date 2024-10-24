@@ -3,16 +3,13 @@
 
 
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/subscriber/SampleInfo.hpp>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
-#include <fastrtps/utils/IPLocator.h>
 
-#include "../topics/IDLGraphPubSubTypes.h"
+#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 
 class DSRPublisher
 {
@@ -20,7 +17,7 @@ public:
     DSRPublisher();
     virtual ~DSRPublisher();
     [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic,  bool isStreamData = false);
-    [[nodiscard]] eprosima::fastrtps::rtps::GUID_t getParticipantID() const;
+    [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID() const;
     bool write(IDL::GraphRequest *object);
     bool write(IDL::MvregNode *object);
     bool write(IDL::OrMap *object);

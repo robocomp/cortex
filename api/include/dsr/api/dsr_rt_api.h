@@ -3,7 +3,7 @@
 
 #include <cassert>
 #include <QtCore>
-#include <dsr/core/topics/IDLGraphPubSubTypes.h>
+#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 #include <dsr/core/types/user_types.h>
 #include <dsr/core/types/type_checking/dsr_attr_name.h>
 #include <dsr/api/dsr_eigen_defs.h>

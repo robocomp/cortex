@@ -10,8 +10,8 @@
 #include <utility>
 #include <cmath>
 
-#include <fastrtps/transport/UDPv4TransportDescriptor.h>
-#include <fastrtps/Domain.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
+#include <fastdds/rtps/RTPSDomain.hpp>
 
 
 #include <QtCore/qlogging.h>
@@ -41,21 +41,22 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
     // RTPS Create participant
     auto[suc, participant_handle] = dsrparticipant.init(agent_id, agent_name, all_same_host,
                                                         ParticipantChangeFunctor(this, [&](DSR::DSRGraph *graph,
-                                                                eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&& info)
+                                                                eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
+                                                                const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info)
                                                                 {
-                                                                    if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
+                                                                    if (status == eprosima::fastdds::rtps::ParticipantDiscoveryStatus::DISCOVERED_PARTICIPANT)
                                                                     {
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
-                                                                        std::cout << "Participant matched [" <<info.info.m_participantName.to_string() << "]" << std::endl;
-                                                                        graph->participant_set.insert({info.info.m_participantName.to_string(), false});
+                                                                        std::cout << "Participant matched [" << info.participant_name.to_string() << "]" << std::endl;
+                                                                        graph->participant_set.emplace(info.participant_name.to_string(), false);
                                                                     }
-                                                                    else if (info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
-                                                                             info.status == eprosima::fastrtps::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
+                                                                    else if (status == eprosima::fastdds::rtps::ParticipantDiscoveryStatus::REMOVED_PARTICIPANT ||
+                                                                             status == eprosima::fastdds::rtps::ParticipantDiscoveryStatus::DROPPED_PARTICIPANT)
                                                                     {
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
-                                                                        graph->participant_set.erase(info.info.m_participantName.to_string());
-                                                                        std::cout << "Participant unmatched [" <<info.info.m_participantName.to_string() << "]" << std::endl;
-                                                                        graph->delete_node(info.info.m_participantName.to_string());
+                                                                        graph->participant_set.erase(info.participant_name.to_string());
+                                                                        std::cout << "Participant unmatched [" << info.participant_name.to_string() << "]" << std::endl;
+                                                                        graph->delete_node(info.participant_name.to_string());
                                                                     }
                                                                 }));
 
@@ -1532,7 +1533,7 @@ void DSRGraph::node_subscription_thread(bool showReceived)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregNode sample;
-                if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK) {
+                if (reader->take_next_sample(&sample, &m_info) == 0) {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (sample.agent_id() != agent_id) {
                             if (showReceived) {
@@ -1565,7 +1566,7 @@ void DSRGraph::edge_subscription_thread(bool showReceived)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregEdge sample;
-                if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK) {
+                if (reader->take_next_sample(&sample, &m_info) == 0) {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (sample.agent_id() != agent_id) {
                             if (showReceived) {
@@ -1599,7 +1600,7 @@ void DSRGraph::edge_attrs_subscription_thread(bool showReceived)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregEdgeAttrVec samples;
-                if (reader->take_next_sample(&samples, &m_info) == ReturnCode_t::RETCODE_OK) {
+                if (reader->take_next_sample(&samples, &m_info) == 0) {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (showReceived) {
                             qDebug() << name << " Received:" << samples.vec().size() << " edge attr from: "
@@ -1666,7 +1667,7 @@ void DSRGraph::node_attrs_subscription_thread(bool showReceived)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregNodeAttrVec samples;
-                if (reader->take_next_sample(&samples, &m_info) == ReturnCode_t::RETCODE_OK) {
+                if (reader->take_next_sample(&samples, &m_info) == 0) {
                     if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (showReceived) {
                             qDebug() << name << " Received:" << samples.vec().size() << " node attrs from: "
@@ -1730,7 +1731,7 @@ void DSRGraph::fullgraph_server_thread()
         {
             eprosima::fastdds::dds::SampleInfo m_info;
             IDL::GraphRequest sample;
-            if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK) {
+            if (reader->take_next_sample(&sample, &m_info) == 0) {
                 if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                     {
                         std::unique_lock<std::mutex> lck(participant_set_mutex);
@@ -1785,7 +1786,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
         {
             eprosima::fastdds::dds::SampleInfo m_info;
             IDL::OrMap sample;
-            if (reader->take_next_sample(&sample, &m_info) == ReturnCode_t::RETCODE_OK) {
+            if (reader->take_next_sample(&sample, &m_info) == 0) {
                 if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                     if (sample.id() != graph->get_agent_id()) {
                         if (sample.id() != static_cast<uint32_t>(-1)) {

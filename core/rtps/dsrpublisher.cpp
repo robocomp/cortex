@@ -1,17 +1,19 @@
-#include <fastrtps/participant/Participant.h>
-#include <fastrtps/attributes/PublisherAttributes.h>
-#include <fastrtps/Domain.h>
-#include <fastrtps/transport/TransportDescriptorInterface.h>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
-#include <fastrtps/utils/IPFinder.h>
+#include <fastdds/rtps/participant/RTPSParticipant.hpp>
+//#include <fastdds/rtps/attributes/PublisherAttributes.h>
+#include <fastdds/rtps/RTPSDomain.hpp>
+#include <fastdds/rtps/transport/TransportDescriptorInterface.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.hpp>
+#include <fastdds/utils/IPFinder.hpp>
+#include <fastdds/rtps/common/MatchingInfo.hpp>
 
 #include <dsr/core/rtps/dsrpublisher.h>
 
 #include <QDebug>
 
 
-using namespace eprosima::fastrtps;
-using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::fastdds;
+using namespace eprosima::fastdds::rtps;
+using namespace eprosima::fastdds::dds;
 
 DSRPublisher::DSRPublisher() : mp_participant(nullptr), mp_publisher(nullptr), mp_writer(nullptr)
 {}
@@ -44,10 +46,10 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
 
 
     if (not local) {
-        eprosima::fastrtps::rtps::Locator_t locator;
+        Locator_t locator;
         locator.port = 7900;
         locator.kind = LOCATOR_KIND_UDPv4;
-        eprosima::fastrtps::rtps::IPLocator::setIPv4(locator, "239.255.1.33");
+        IPLocator::setIPv4(locator, "239.255.1.33");
         dataWriterQos.endpoint().multicast_locator_list.push_back(locator);
 
     }
@@ -64,8 +66,8 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
     }
 
     // Check ACK for sended messages.
-    dataWriterQos.reliable_writer_qos().times.heartbeatPeriod.seconds = 0;
-    dataWriterQos.reliable_writer_qos().times.heartbeatPeriod.nanosec = 20000000; //20 ms. This value should be more or less close to the sending frequency.
+    dataWriterQos.reliable_writer_qos().times.heartbeat_period.seconds = 0;
+    dataWriterQos.reliable_writer_qos().times.heartbeat_period.nanosec = 20000000; //20 ms. This value should be more or less close to the sending frequency.
 
     //Check latency
     dataWriterQos.latency_budget().duration = {0,10000000}; //10ms;
@@ -93,7 +95,7 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
 
 }
 
-eprosima::fastrtps::rtps::GUID_t DSRPublisher::getParticipantID() const
+GUID_t DSRPublisher::getParticipantID() const
 {
     return mp_participant->guid();
 }
@@ -170,7 +172,7 @@ bool DSRPublisher::write(std::vector<IDL::MvregNodeAttr> *object) {
 void DSRPublisher::PubListener::on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
                                                        const eprosima::fastdds::dds::PublicationMatchedStatus& info)
 {
-    if (info.current_count == eprosima::fastrtps::rtps::MATCHED_MATCHING) {
+    if (info.current_count == eprosima::fastdds::rtps::MatchingStatus::MATCHED_MATCHING) {
         n_matched++;
         qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] matched " << info.last_subscription_handle.value;// << " self: " << info.remoteEndpointGuid.is_on_same_process_as(pub->getGuid());
     } else {

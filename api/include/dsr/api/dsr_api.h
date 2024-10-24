@@ -25,7 +25,7 @@
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
 #include "dsr/core/rtps/dsrsubscriber.h"
-#include "dsr/core/topics/IDLGraphPubSubTypes.h"
+#include "dsr/core/topics/IDLGraphPubSubTypes.hpp"
 #include "dsr/core/types/crdt_types.h"
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/types/translator.h"
@@ -631,17 +631,19 @@ namespace DSR
         class ParticipantChangeFunctor {
         public:
             DSRGraph *graph{};
-            std::function<void(DSRGraph *graph_,eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> f;
+            std::function<void(DSRGraph *graph_,eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f;
 
             ParticipantChangeFunctor(DSRGraph *graph_,
-                                     std::function<void(DSRGraph *graph_, eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> f_)
+                                     std::function<void(DSRGraph *graph_, eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
+                                                        const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f_)
                     : graph(graph_), f(std::move(f_)) {}
 
             ParticipantChangeFunctor() = default;
 
-            void operator()(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&& info) const
+            void operator()(eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
+                            const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info) const
             {
-                f(graph, std::forward<eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&>(info));
+                f(graph, status, info);
             };
         };
 

@@ -1,10 +1,9 @@
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.h>
-#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.hpp>
+#include <fastdds/dds/core/detail/DDSReturnCode.hpp>
+#include <fastdds/utils/IPFinder.hpp>
 
-#include <fastrtps/utils/IPFinder.h>
-
-#include <thread>
 #include <QDebug>
 #include <dsr/core/rtps/dsrparticipant.h>
 
@@ -31,7 +30,7 @@ DSRParticipant::~DSRParticipant()
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastrtps::rtps::ParticipantDiscoveryInfo&&)> fn)
+std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn)
 {
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
@@ -55,11 +54,11 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     if (not localhost)
     {
 
-        std::vector<eprosima::fastrtps::rtps::IPFinder::info_IP> ips;
-        eprosima::fastrtps::rtps::IPFinder::getIPs(&ips, false);
+        std::vector<eprosima::fastdds::rtps::IPFinder::info_IP> ips;
+        eprosima::fastdds::rtps::IPFinder::getIPs(&ips, false);
 
         for (auto &ip : ips) {
-            if (ip.type == eprosima::fastrtps::rtps::IPFinder::IP4 ) {
+            if (ip.type == eprosima::fastdds::rtps::IPFinder::IP4 ) {
                 //custom_transport->interfaceWhiteList.emplace_back(ip.name);
             }
         }
@@ -76,14 +75,14 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
 
     //Discovery
     PParam.wire_protocol().builtin.discovery_config.ignoreParticipantFlags =
-            static_cast<eprosima::fastrtps::rtps::ParticipantFilteringFlags_t>(
-            eprosima::fastrtps::rtps::ParticipantFilteringFlags_t::FILTER_SAME_PROCESS);
+            static_cast<eprosima::fastdds::rtps::ParticipantFilteringFlags>(
+            eprosima::fastdds::rtps::ParticipantFilteringFlags::FILTER_SAME_PROCESS);
 
-    PParam.wire_protocol().builtin.discovery_config.leaseDuration = /*eprosima::fastrtps::c_TimeInfinite;*/ Duration_t(6);
+    PParam.wire_protocol().builtin.discovery_config.leaseDuration = /*eprosima::fastdds::c_TimeInfinite;*/ Duration_t(6);
     PParam.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod =
-            eprosima::fastrtps::Duration_t(3, 0);
+            eprosima::fastdds::dds::Duration_t(3, 0);
 
-    eprosima::fastrtps::Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
+    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
 
     m_listener = std::make_unique<ParticpantListener>(std::move(fn));
 
@@ -145,15 +144,15 @@ void DSRParticipant::remove_participant_and_entities()
                     writer->set_listener(nullptr);
                     pub->set_listener(nullptr);
 
-                    if (auto res = pub->delete_datawriter(writer); res == ReturnCode_t::RETCODE_OK)
+                    if (auto res = pub->delete_datawriter(writer); res == 0)
                     {
-                        if (res = mp_participant->delete_publisher(pub); res != ReturnCode_t::RETCODE_OK)
+                        if (res = mp_participant->delete_publisher(pub); res != 0)
                         {
-                            std::cout << "DELETE PUBLISHER " << topic_name << " RETURNED: " << res() << std::endl;
+                            std::cout << "DELETE PUBLISHER " << topic_name << " RETURNED: " << res << std::endl;
                         }
                     }
                     else {
-                        std::cout << "DELETE DATAWRITER " << topic_name << " RETURNED: " << res() << std::endl;
+                        std::cout << "DELETE DATAWRITER " << topic_name << " RETURNED: " << res << std::endl;
                     }
                 }
             }
@@ -173,15 +172,15 @@ void DSRParticipant::remove_participant_and_entities()
                     reader->set_listener(nullptr);
                     sub->set_listener(nullptr);
 
-                    if (auto res = sub->delete_datareader(reader); res == ReturnCode_t::RETCODE_OK)
+                    if (auto res = sub->delete_datareader(reader); res == 0)
                     {
-                        if (res = mp_participant->delete_subscriber(sub); res != ReturnCode_t::RETCODE_OK)
+                        if (res = mp_participant->delete_subscriber(sub); res != 0)
                         {
-                            std::cout << "DELETE SUBSCRIBER " << topic_name << " RETURNED: " << res() << std::endl;
+                            std::cout << "DELETE SUBSCRIBER " << topic_name << " RETURNED: " << res << std::endl;
                         }
                     }
                     else {
-                        std::cout << "DELETE DATAREADER " << topic_name << " RETURNED: " << res() << std::endl;
+                        std::cout << "DELETE DATAREADER " << topic_name << " RETURNED: " << res << std::endl;
                     }
                 }
             }
@@ -191,7 +190,7 @@ void DSRParticipant::remove_participant_and_entities()
         if (topic_node)
         {
             topic_node->close();
-            if(mp_participant->delete_topic(topic_node) == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET)
+            if(mp_participant->delete_topic(topic_node) == RETCODE_PRECONDITION_NOT_MET)
             {
                 std::cout << " Remove topic error " << topic_node->get_name() << std::endl;
             }
@@ -199,7 +198,7 @@ void DSRParticipant::remove_participant_and_entities()
         if (topic_edge)
         {
             topic_edge->close();
-            if(mp_participant->delete_topic(topic_edge) == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET)
+            if(mp_participant->delete_topic(topic_edge) == RETCODE_PRECONDITION_NOT_MET)
             {
                 std::cout << " Remove topic error " << topic_edge->get_name() << std::endl;
             }
@@ -207,7 +206,7 @@ void DSRParticipant::remove_participant_and_entities()
         if (topic_graph)
         {
             topic_graph->close();
-            if(mp_participant->delete_topic(topic_graph) == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET)
+            if(mp_participant->delete_topic(topic_graph) == RETCODE_PRECONDITION_NOT_MET)
             {
                 std::cout << " Remove topic error " << topic_graph->get_name() << std::endl;
             }
@@ -215,7 +214,7 @@ void DSRParticipant::remove_participant_and_entities()
         if (topic_graph_request)
         {
             topic_graph_request->close();
-            if(mp_participant->delete_topic(topic_graph_request) == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET)
+            if(mp_participant->delete_topic(topic_graph_request) == RETCODE_PRECONDITION_NOT_MET)
             {
                 std::cout << " Remove topic error " << topic_graph_request->get_name() << std::endl;
             }
@@ -223,7 +222,7 @@ void DSRParticipant::remove_participant_and_entities()
         if (topic_node_att)
         {
             topic_node_att->close();
-            if(mp_participant->delete_topic(topic_node_att) == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET)
+            if(mp_participant->delete_topic(topic_node_att) == RETCODE_PRECONDITION_NOT_MET)
             {
                 std::cout << " Remove topic error " << topic_node_att->get_name() << std::endl;
             }
@@ -231,7 +230,7 @@ void DSRParticipant::remove_participant_and_entities()
         if (topic_edge_att)
         {
             topic_edge_att->close();
-            if(mp_participant->delete_topic(topic_edge_att) == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET)
+            if(mp_participant->delete_topic(topic_edge_att) == RETCODE_PRECONDITION_NOT_MET)
             {
                 std::cout << " Remove topic error " << topic_edge_att->get_name() << std::endl;
             }
@@ -239,14 +238,14 @@ void DSRParticipant::remove_participant_and_entities()
         }
 
         auto res = eprosima::fastdds::dds::DomainParticipantFactory::get_instance()->delete_participant(mp_participant);
-        if (res == ReturnCode_t::RETCODE_PRECONDITION_NOT_MET) {
+        if (res == RETCODE_PRECONDITION_NOT_MET) {
             std::cout << "Error removing participant. There are entities in use." <<std::endl;
         }
         mp_participant = nullptr;
     }
 }
 
-const eprosima::fastrtps::rtps::GUID_t& DSRParticipant::getID() const
+const eprosima::fastdds::rtps::GUID_t& DSRParticipant::getID() const
 {
     return mp_participant->guid();
 }
@@ -276,17 +275,17 @@ void DSRParticipant::delete_subscriber(const std::string& id)
 
                 reader->set_listener(nullptr);
                 sub->set_listener(nullptr);
-                if (auto res = sub->delete_datareader(reader); res == ReturnCode_t::RETCODE_OK)
+                if (auto res = sub->delete_datareader(reader); res == 0)
                 {
-                    if (res = mp_participant->delete_subscriber(sub); res != ReturnCode_t::RETCODE_OK)
+                    if (res = mp_participant->delete_subscriber(sub); res != 0)
                     {
-                        std::cout << "DELETE SUBSCRIBER " << id << " RETURNED: " << res() << std::endl;
+                        std::cout << "DELETE SUBSCRIBER " << id << " RETURNED: " << res << std::endl;
                     } else {
                         subscribers.erase(id);
                     }
                 }
                 else {
-                    std::cout << "DELETE DATAREADER " << id << " RETURNED: " << res() << std::endl;
+                    std::cout << "DELETE DATAREADER " << id << " RETURNED: " << res << std::endl;
                 }
             }
         }
@@ -310,17 +309,17 @@ void DSRParticipant::delete_publisher(const std::string& id)
                 writer->set_listener(nullptr);
                 pub->set_listener(nullptr);
 
-                if (auto res = pub->delete_datawriter(writer); res == ReturnCode_t::RETCODE_OK)
+                if (auto res = pub->delete_datawriter(writer); res == 0)
                 {
-                    if (res = mp_participant->delete_publisher(pub); res != ReturnCode_t::RETCODE_OK)
+                    if (res = mp_participant->delete_publisher(pub); res != 0)
                     {
-                        std::cout << "DELETE PUBLISHER " << id << " RETURNED: " << res() << std::endl;
+                        std::cout << "DELETE PUBLISHER " << id << " RETURNED: " << res << std::endl;
                     } else {
                         publishers.erase(id);
                     }
                 }
                 else {
-                    std::cout << "DELETE DATAWRITER " << id << " RETURNED: " << res() << std::endl;
+                    std::cout << "DELETE DATAWRITER " << id << " RETURNED: " << res << std::endl;
                 }
             }
         }
