@@ -631,17 +631,19 @@ namespace DSR
         class ParticipantChangeFunctor {
         public:
             DSRGraph *graph{};
-            std::function<void(DSRGraph *graph_,eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> f;
+            std::function<void(DSRGraph *graph_,eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f;
 
             ParticipantChangeFunctor(DSRGraph *graph_,
-                                     std::function<void(DSRGraph *graph_, eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> f_)
+                                     std::function<void(DSRGraph *graph_, eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
+                                                        const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f_)
                     : graph(graph_), f(std::move(f_)) {}
 
             ParticipantChangeFunctor() = default;
 
-            void operator()(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&& info) const
+            void operator()(eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
+                            const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info) const
             {
-                f(graph, std::forward<eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&>(info));
+                f(graph, status, info);
             };
         };
 

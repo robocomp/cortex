@@ -41,21 +41,22 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
     // RTPS Create participant
     auto[suc, participant_handle] = dsrparticipant.init(agent_id, agent_name, all_same_host,
                                                         ParticipantChangeFunctor(this, [&](DSR::DSRGraph *graph,
-                                                                eprosima::fastdds::rtps::ParticipantDiscoveryInfo&& info)
+                                                                eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
+                                                                const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info)
                                                                 {
-                                                                    if (info.status == eprosima::fastdds::rtps::ParticipantDiscoveryInfo::DISCOVERED_PARTICIPANT)
+                                                                    if (status == eprosima::fastdds::rtps::ParticipantDiscoveryStatus::DISCOVERED_PARTICIPANT)
                                                                     {
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
-                                                                        std::cout << "Participant matched [" <<info.info.m_participantName.to_string() << "]" << std::endl;
-                                                                        graph->participant_set.insert({info.info.m_participantName.to_string(), false});
+                                                                        std::cout << "Participant matched [" << info.participant_name.to_string() << "]" << std::endl;
+                                                                        graph->participant_set.emplace(info.participant_name.to_string(), false);
                                                                     }
-                                                                    else if (info.status == eprosima::fastdds::rtps::ParticipantDiscoveryInfo::REMOVED_PARTICIPANT ||
-                                                                             info.status == eprosima::fastdds::rtps::ParticipantDiscoveryInfo::DROPPED_PARTICIPANT)
+                                                                    else if (status == eprosima::fastdds::rtps::ParticipantDiscoveryStatus::REMOVED_PARTICIPANT ||
+                                                                             status == eprosima::fastdds::rtps::ParticipantDiscoveryStatus::DROPPED_PARTICIPANT)
                                                                     {
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
-                                                                        graph->participant_set.erase(info.info.m_participantName.to_string());
-                                                                        std::cout << "Participant unmatched [" <<info.info.m_participantName.to_string() << "]" << std::endl;
-                                                                        graph->delete_node(info.info.m_participantName.to_string());
+                                                                        graph->participant_set.erase(info.participant_name.to_string());
+                                                                        std::cout << "Participant unmatched [" << info.participant_name.to_string() << "]" << std::endl;
+                                                                        graph->delete_node(info.participant_name.to_string());
                                                                     }
                                                                 }));
 

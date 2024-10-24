@@ -17,8 +17,7 @@ using namespace eprosima::fastdds::rtps;
 DSRSubscriber::DSRSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr), mp_reader(nullptr) {}
 
 DSRSubscriber::~DSRSubscriber()
-{
-}
+= default;
 
 std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
         DSRSubscriber::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,

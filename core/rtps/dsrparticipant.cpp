@@ -30,7 +30,7 @@ DSRParticipant::~DSRParticipant()
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> fn)
+std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn)
 {
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
@@ -80,7 +80,7 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
 
     PParam.wire_protocol().builtin.discovery_config.leaseDuration = /*eprosima::fastdds::c_TimeInfinite;*/ Duration_t(6);
     PParam.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod =
-            eprosima::fastdds::Duration_t(3, 0);
+            eprosima::fastdds::dds::Duration_t(3, 0);
 
     eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
 

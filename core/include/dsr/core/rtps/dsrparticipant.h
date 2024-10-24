@@ -2,11 +2,10 @@
 #define _PARTICIPANT_H_
 
 #include <fastdds/dds/log/Log.hpp>
-#include <fastdds/rtps/RTPSDomain.hpp>
-#include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
+#include <fastdds/rtps/builtin/data/ParticipantBuiltinTopicData.hpp>
 
 #include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 #include <dsr/core/rtps/dsrpublisher.h>
@@ -17,14 +16,14 @@ class DSRParticipant
 public:
     DSRParticipant();
     virtual ~DSRParticipant();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> fn);
+    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn);
     [[nodiscard]] const eprosima::fastdds::rtps::GUID_t& getID() const;
-    [[nodiscard]] const char *getNodeTopicName()     const { return dsrgraphType->getName();}
-    [[nodiscard]] const char *getRequestTopicName()  const { return graphrequestType->getName();}
-    [[nodiscard]] const char *getAnswerTopicName()   const { return graphRequestAnswerType->getName();}
-    [[nodiscard]] const char *getEdgeTopicName()     const { return dsrEdgeType->getName();}
-    [[nodiscard]] const char *getNodeAttrTopicName() const { return dsrNodeAttrType->getName();}
-    [[nodiscard]] const char *getEdgeAttrTopicName() const { return dsrEdgeAttrType->getName();}
+    [[nodiscard]] const char *getNodeTopicName()     const { return dsrgraphType->get_name().data();}
+    [[nodiscard]] const char *getRequestTopicName()  const { return graphrequestType->get_name().data();}
+    [[nodiscard]] const char *getAnswerTopicName()   const { return graphRequestAnswerType->get_name().data();}
+    [[nodiscard]] const char *getEdgeTopicName()     const { return dsrEdgeType->get_name().data();}
+    [[nodiscard]] const char *getNodeAttrTopicName() const { return dsrNodeAttrType->get_name().data();}
+    [[nodiscard]] const char *getEdgeAttrTopicName() const { return dsrEdgeAttrType->get_name().data();}
 
     [[nodiscard]] eprosima::fastdds::dds::Topic*  getNodeTopic()          { return topic_node; }
     [[nodiscard]] eprosima::fastdds::dds::Topic*  getEdgeTopic()          { return topic_edge; }
@@ -66,21 +65,24 @@ private:
     class ParticpantListener : public eprosima::fastdds::dds::DomainParticipantListener
     {
     public:
-        explicit ParticpantListener(std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)>&& fn)
+        explicit ParticpantListener(std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
+                                                       const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)>&& fn)
             : eprosima::fastdds::dds::DomainParticipantListener(), f(std::move(fn)){};
         ~ParticpantListener() override = default;
 
          void on_participant_discovery  (
                 eprosima::fastdds::dds::DomainParticipant* participant,
-                eprosima::fastdds::rtps::ParticipantDiscoveryInfo&& info,
+                eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
+                const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info,
                 bool& should_be_ignored) override
         {
             //Callback
-            f(std::forward<eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&>(info));
+            f(status, info);
         }
 
 
-        std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryInfo&&)> f;
+        std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
+                           const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f;
         //int n_matched;
     };
     std::unique_ptr<ParticpantListener> m_listener;

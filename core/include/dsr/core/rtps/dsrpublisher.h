@@ -3,14 +3,11 @@
 
 
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
-#include <fastdds/dds/subscriber/SampleInfo.hpp>
-#include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
-#include <fastdds/utils/IPLocator.hpp>
 
 #include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
 
