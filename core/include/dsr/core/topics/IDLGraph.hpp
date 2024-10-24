@@ -57,9 +57,7 @@
 #else
 #define IDLGRAPH_DllAPI
 #endif // _WIN32
-
-
-namespace IDL {
+namespace IDL{
 /*!
  * @brief This class represents the union Val defined by the user in the IDL file.
  * @ingroup IDLGraph
@@ -379,67 +377,76 @@ public:
     {
         bool ret_value {false};
 
-        if (m__d == x.m__d &&
-                selected_member_ == x.selected_member_)
+        if (x.selected_member_ == selected_member_)
         {
-            switch (selected_member_)
+            if (0x0FFFFFFFu != selected_member_)
             {
-                                case 0x00000001:
-                                    ret_value = (m_str == x.m_str);
-                                    break;
+                if (x.m__d == m__d)
+                {
+                    switch (selected_member_)
+                    {
+                                                    case 0x00000001:
+                                                        ret_value = (x.m_str == m_str);
+                                                        break;
 
-                                case 0x00000002:
-                                    ret_value = (m_dec == x.m_dec);
-                                    break;
+                                                    case 0x00000002:
+                                                        ret_value = (x.m_dec == m_dec);
+                                                        break;
 
-                                case 0x00000003:
-                                    ret_value = (m_fl == x.m_fl);
-                                    break;
+                                                    case 0x00000003:
+                                                        ret_value = (x.m_fl == m_fl);
+                                                        break;
 
-                                case 0x00000004:
-                                    ret_value = (m_float_vec == x.m_float_vec);
-                                    break;
+                                                    case 0x00000004:
+                                                        ret_value = (x.m_float_vec == m_float_vec);
+                                                        break;
 
-                                case 0x00000005:
-                                    ret_value = (m_bl == x.m_bl);
-                                    break;
+                                                    case 0x00000005:
+                                                        ret_value = (x.m_bl == m_bl);
+                                                        break;
 
-                                case 0x00000006:
-                                    ret_value = (m_byte_vec == x.m_byte_vec);
-                                    break;
+                                                    case 0x00000006:
+                                                        ret_value = (x.m_byte_vec == m_byte_vec);
+                                                        break;
 
-                                case 0x00000007:
-                                    ret_value = (m_uint == x.m_uint);
-                                    break;
+                                                    case 0x00000007:
+                                                        ret_value = (x.m_uint == m_uint);
+                                                        break;
 
-                                case 0x00000008:
-                                    ret_value = (m_u64 == x.m_u64);
-                                    break;
+                                                    case 0x00000008:
+                                                        ret_value = (x.m_u64 == m_u64);
+                                                        break;
 
-                                case 0x00000009:
-                                    ret_value = (m_dob == x.m_dob);
-                                    break;
+                                                    case 0x00000009:
+                                                        ret_value = (x.m_dob == m_dob);
+                                                        break;
 
-                                case 0x0000000a:
-                                    ret_value = (m_uint64_vec == x.m_uint64_vec);
-                                    break;
+                                                    case 0x0000000a:
+                                                        ret_value = (x.m_uint64_vec == m_uint64_vec);
+                                                        break;
 
-                                case 0x0000000b:
-                                    ret_value = (m_vec_float2 == x.m_vec_float2);
-                                    break;
+                                                    case 0x0000000b:
+                                                        ret_value = (x.m_vec_float2 == m_vec_float2);
+                                                        break;
 
-                                case 0x0000000c:
-                                    ret_value = (m_vec_float3 == x.m_vec_float3);
-                                    break;
+                                                    case 0x0000000c:
+                                                        ret_value = (x.m_vec_float3 == m_vec_float3);
+                                                        break;
 
-                                case 0x0000000d:
-                                    ret_value = (m_vec_float4 == x.m_vec_float4);
-                                    break;
+                                                    case 0x0000000d:
+                                                        ret_value = (x.m_vec_float4 == m_vec_float4);
+                                                        break;
 
-                                case 0x0000000e:
-                                    ret_value = (m_vec_float6 == x.m_vec_float6);
-                                    break;
+                                                    case 0x0000000e:
+                                                        ret_value = (x.m_vec_float6 == m_vec_float6);
+                                                        break;
 
+                    }
+                }
+            }
+            else
+            {
+                ret_value = true;
             }
         }
 
@@ -1286,7 +1293,7 @@ private:
                     selected_member_ = 0x00000001;
                     member_destructor_ = [&]() {m_str.~basic_string();};
                     new(&m_str) std::string();
-    ;
+
                 }
 
                 return m_str;
@@ -1304,7 +1311,7 @@ private:
                     selected_member_ = 0x00000002;
                     member_destructor_ = nullptr;
                     m_dec = {0};
-    ;
+
                 }
 
                 return m_dec;
@@ -1322,7 +1329,7 @@ private:
                     selected_member_ = 0x00000003;
                     member_destructor_ = nullptr;
                     m_fl = {0.0};
-    ;
+
                 }
 
                 return m_fl;
@@ -1340,7 +1347,7 @@ private:
                     selected_member_ = 0x00000004;
                     member_destructor_ = [&]() {m_float_vec.~vector();};
                     new(&m_float_vec) std::vector<float>();
-    ;
+
                 }
 
                 return m_float_vec;
@@ -1358,7 +1365,7 @@ private:
                     selected_member_ = 0x00000005;
                     member_destructor_ = nullptr;
                     m_bl = {false};
-    ;
+
                 }
 
                 return m_bl;
@@ -1376,7 +1383,7 @@ private:
                     selected_member_ = 0x00000006;
                     member_destructor_ = [&]() {m_byte_vec.~vector();};
                     new(&m_byte_vec) std::vector<uint8_t>();
-    ;
+
                 }
 
                 return m_byte_vec;
@@ -1394,7 +1401,7 @@ private:
                     selected_member_ = 0x00000007;
                     member_destructor_ = nullptr;
                     m_uint = {0};
-    ;
+
                 }
 
                 return m_uint;
@@ -1412,7 +1419,7 @@ private:
                     selected_member_ = 0x00000008;
                     member_destructor_ = nullptr;
                     m_u64 = {0};
-    ;
+
                 }
 
                 return m_u64;
@@ -1430,7 +1437,7 @@ private:
                     selected_member_ = 0x00000009;
                     member_destructor_ = nullptr;
                     m_dob = {0.0};
-    ;
+
                 }
 
                 return m_dob;
@@ -1448,7 +1455,7 @@ private:
                     selected_member_ = 0x0000000a;
                     member_destructor_ = [&]() {m_uint64_vec.~vector();};
                     new(&m_uint64_vec) std::vector<uint64_t>();
-    ;
+
                 }
 
                 return m_uint64_vec;
@@ -1466,7 +1473,7 @@ private:
                     selected_member_ = 0x0000000b;
                     member_destructor_ = [&]() {m_vec_float2.~array();};
                     new(&m_vec_float2) std::array<float, 2>();
-    ;
+
                 }
 
                 return m_vec_float2;
@@ -1484,7 +1491,7 @@ private:
                     selected_member_ = 0x0000000c;
                     member_destructor_ = [&]() {m_vec_float3.~array();};
                     new(&m_vec_float3) std::array<float, 3>();
-    ;
+
                 }
 
                 return m_vec_float3;
@@ -1502,7 +1509,7 @@ private:
                     selected_member_ = 0x0000000d;
                     member_destructor_ = [&]() {m_vec_float4.~array();};
                     new(&m_vec_float4) std::array<float, 4>();
-    ;
+
                 }
 
                 return m_vec_float4;
@@ -1520,7 +1527,7 @@ private:
                     selected_member_ = 0x0000000e;
                     member_destructor_ = [&]() {m_vec_float6.~array();};
                     new(&m_vec_float6) std::array<float, 6>();
-    ;
+
                 }
 
                 return m_vec_float6;
@@ -3143,7 +3150,6 @@ public:
     {
         return !(*this == x);
     }
-
 
     eProsima_user_DllExport bool operator<(
         const EdgeKey &rhs) const
@@ -5565,7 +5571,6 @@ private:
     std::vector<MvregNodeAttr> m_vec;
 
 };
-
 }
 
 #endif // _FAST_DDS_GENERATED_IDLGRAPH_HPP_

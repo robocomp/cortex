@@ -512,8 +512,17 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const Attrib& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.type();
+
+                        scdr << data.value();
+
+                        scdr << data.timestamp();
+
+                        scdr << data.agent_id();
+
 }
 
 
@@ -596,8 +605,13 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const PairInt& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.first();
+
+                        scdr << data.second();
+
 }
 
 
@@ -680,8 +694,13 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const DotContext& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.cc();
+
+                        scdr << data.dc();
+
 }
 
 
@@ -764,8 +783,17 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const DotKernelAttr& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotContext& data);
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.ds();
+
+                        serialize_key(scdr, data.cbase());
+
 }
 
 
@@ -896,8 +924,31 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const MvregEdgeAttr& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotKernelAttr& data);
+
+
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.id();
+
+                        scdr << data.from();
+
+                        scdr << data.to();
+
+                        scdr << data.type();
+
+                        scdr << data.attr_name();
+
+                        serialize_key(scdr, data.dk());
+
+                        scdr << data.agent_id();
+
+                        scdr << data.timestamp();
+
 }
 
 
@@ -1004,8 +1055,19 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const IDLEdge& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.to();
+
+                        scdr << data.type();
+
+                        scdr << data.from();
+
+                        scdr << data.attrs();
+
+                        scdr << data.agent_id();
+
 }
 
 
@@ -1088,8 +1150,13 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const EdgeKey& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.to();
+
+                        scdr << data.type();
+
 }
 
 
@@ -1204,8 +1271,27 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const MvregNodeAttr& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotKernelAttr& data);
+
+
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.id();
+
+                        scdr << data.node();
+
+                        scdr << data.attr_name();
+
+                        serialize_key(scdr, data.dk());
+
+                        scdr << data.agent_id();
+
+                        scdr << data.timestamp();
+
 }
 
 
@@ -1288,8 +1374,17 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const DotKernelEdge& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotContext& data);
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.ds();
+
+                        serialize_key(scdr, data.cbase());
+
 }
 
 
@@ -1412,8 +1507,29 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const MvregEdge& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotKernelEdge& data);
+
+
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.id();
+
+                        scdr << data.from();
+
+                        scdr << data.to();
+
+                        scdr << data.type();
+
+                        serialize_key(scdr, data.dk());
+
+                        scdr << data.agent_id();
+
+                        scdr << data.timestamp();
+
 }
 
 
@@ -1528,8 +1644,21 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const IDLNode& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.type();
+
+                        scdr << data.name();
+
+                        scdr << data.id();
+
+                        scdr << data.agent_id();
+
+                        scdr << data.attrs();
+
+                        scdr << data.fano();
+
 }
 
 
@@ -1612,8 +1741,13 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const GraphRequest& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.from();
+
+                        scdr << data.id();
+
 }
 
 
@@ -1696,8 +1830,17 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const DotKernel& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotContext& data);
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.ds();
+
+                        serialize_key(scdr, data.cbase());
+
 }
 
 
@@ -1796,8 +1939,23 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const MvregNode& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotKernel& data);
+
+
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.id();
+
+                        serialize_key(scdr, data.dk());
+
+                        scdr << data.agent_id();
+
+                        scdr << data.timestamp();
+
 }
 
 
@@ -1896,8 +2054,21 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const OrMap& data)
 {
+            extern void serialize_key(
+                    Cdr& scdr,
+                    const DotContext& data);
+
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.to_id();
+
+                        scdr << data.id();
+
+                        scdr << data.m();
+
+                        serialize_key(scdr, data.cbase());
+
 }
 
 
@@ -1972,8 +2143,11 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const MvregEdgeAttrVec& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.vec();
+
 }
 
 
@@ -2048,8 +2222,11 @@ void serialize_key(
         eprosima::fastcdr::Cdr& scdr,
         const MvregNodeAttrVec& data)
 {
+
     static_cast<void>(scdr);
     static_cast<void>(data);
+                        scdr << data.vec();
+
 }
 
 
