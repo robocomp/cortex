@@ -3,7 +3,7 @@ cd ~/software/Fast-DDS-Gen
 git pull
 ./gradlew clean
 ./gradlew jar
-mv ./build/libs/fastddsgen.jar ./share/fastddsgen/  java/fastddsgen.jar
+mv ./build/libs/fastddsgen.jar ./share/fastddsgen/java/fastddsgen.jar
 scripts/fastddsgen ~/robocomp_ws/src/robocomp/robocomp_cortex/core/topics/IDLGraph.idl -no-typeobjectsupport
 sed -i 's\IDLGraphCdrAux.hpp\dsr/core/topics/IDLGraphCdrAux.hpp\g' IDLGraphCdrAux.ipp
 sed -i 's\IDLGraphPubSubTypes.hpp\dsr/core/topics/IDLGraphPubSubTypes.hpp\g' IDLGraphPubSubTypes.cxx
