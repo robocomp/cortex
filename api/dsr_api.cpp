@@ -432,6 +432,22 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
     return nodes_;
 }
 
+std::vector<Node> DSRGraph::get_nodes()
+{
+    std::shared_lock<std::shared_mutex> lock(_mutex);
+
+    std::vector<Node> nodes_;
+    nodes_.reserve(nodes.size());
+
+    for (auto &[id, N]: nodes)
+    {
+        nodes_.emplace_back(N.read_reg());
+    }
+    return nodes_;
+
+}
+
+
 std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::string> &types)
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);

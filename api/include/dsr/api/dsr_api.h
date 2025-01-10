@@ -107,6 +107,7 @@ namespace DSR
         std::optional<Node> get_node_root() { return get_node("root"); };
         std::vector<Node> get_nodes_by_type(const std::string &type);
         std::vector<Node> get_nodes_by_types(const std::vector<std::string> &types);
+        std::vector<Node> get_nodes();
         std::optional<std::string> get_name_from_id(uint64_t id);
         std::optional<uint64_t> get_id_from_name(const std::string &name);
         std::optional<std::int32_t> get_node_level(const Node &n);
