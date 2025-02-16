@@ -327,6 +327,7 @@ DSRGraph::delete_node_(uint64_t id) {
         if (!edges.contains({k, id})) continue;
         // Remove all edges between them
         auto &visited_node = v.read_reg();
+        auto keys = deleted_edges.size();
         for (const auto &key : edges.at({k, id}))
         {
             auto delta_fano = visited_node.fano().at({id, key}).reset();
@@ -336,8 +337,11 @@ DSRGraph::delete_node_(uint64_t id) {
         }
         lck_cache.unlock();
         //Remove all from cache
-        update_maps_edge_delete(k, id);
+        for (auto i = keys; i < deleted_edges.size(); i++) {
+            update_maps_edge_delete(k, id, std::get<2>(deleted_edges[i]));
+        }
     }
+    update_maps_node_delete(id, node.value());
 
     return make_tuple(true, std::move(deleted_edges), std::move(delta_remove), std::move(delta_vec));
 
@@ -865,46 +869,19 @@ inline void DSRGraph::update_maps_edge_delete(uint64_t from, uint64_t to, const 
 {
 
     std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-
-    //if key is empty we delete all edges to the node from
-    if (key.empty())
-    {
+    if (const auto tuple = std::pair{from, to}; edges.contains(tuple)) {
+        edges.at(tuple).erase(key);
         edges.erase({from, to});
+    }
 
-        if (edgeType.contains(key)) {
-            edgeType.at(key).erase({from, to});
-            if (edgeType.at(key).empty()) edgeType.erase(key);
-        }
+    if (to_edges.contains(to)) {
+        to_edges.at(to).erase({from, key});
+        if (to_edges.at(to).empty()) to_edges.erase(to);
+    }
 
-        if (to_edges.contains(to)) {
-            auto &set = to_edges.at(to);
-            auto it = set.begin();
-            while (it != set.end()){
-                if (it->first == from)
-                    it = set.erase(it);
-                else
-                    it++;
-            }
-            if (set.empty()) to_edges.erase(to);
-        }
-
-    } else
-    {
-        if (auto tuple = std::pair{from, to}; edges.contains(tuple)) {
-            edges.at(tuple).erase(key);
-            edges.erase({from, to});
-        }
-
-        if (to_edges.contains(to)) {
-            to_edges.at(to).erase({from, key});
-            if (to_edges.at(to).empty()) to_edges.erase(to);
-        }
-
-        if (edgeType.contains(key)) {
-            edgeType.at(key).erase({from, to});
-            if (edgeType.at(key).empty()) edgeType.erase(key);
-        }
-
+    if (edgeType.contains(key)) {
+        edgeType.at(key).erase({from, to});
+        if (edgeType.at(key).empty()) edgeType.erase(key);
     }
 }
 
