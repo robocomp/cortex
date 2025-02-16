@@ -617,14 +617,14 @@ TEST_CASE("delete a node", "[GRAPH][SIGNALS]") {
     auto deleted_edge_signal_recv = 0;
     QObject::connect(&G, &DSRGraph::deleted_edge_signal, &app,
                  [&](const DSR::Edge & edge) {
-                     del_edge_signal_recv++;
+                     deleted_edge_signal_recv++;
                  },
                  Qt::QueuedConnection);
 
     auto deleted_node_signal_recv = 0;
     QObject::connect(&G, &DSRGraph::deleted_node_signal, &app,
                  [&](const DSR::Node & edge) {
-                     del_node_signal_recv++;
+                     deleted_node_signal_recv++;
                  },
                  Qt::QueuedConnection);
 
@@ -638,9 +638,9 @@ TEST_CASE("delete a node", "[GRAPH][SIGNALS]") {
         REQUIRE(update_edge_attr_signal_recv == 0);
         REQUIRE(update_edge_attr_signal_size_recv == 0);
         REQUIRE(del_node_signal_recv == 1);
+        REQUIRE(deleted_node_signal_recv == 1);
+        REQUIRE(deleted_edge_signal_recv == 2);
         REQUIRE(del_edge_signal_recv == 2);
-        REQUIRE(deleted_node_signal_recv == 0);
-        REQUIRE(deleted_edge_signal_recv == 0);
         app.exit();
     });
     app.exec();
@@ -723,14 +723,14 @@ TEST_CASE("delete an edge", "[GRAPH][SIGNALS]") {
     auto deleted_edge_signal_recv = 0;
     QObject::connect(&G, &DSRGraph::deleted_edge_signal, &app,
                  [&](const DSR::Edge & edge) {
-                     del_edge_signal_recv++;
+                     deleted_edge_signal_recv++;
                  },
                  Qt::QueuedConnection);
 
     auto deleted_node_signal_recv = 0;
     QObject::connect(&G, &DSRGraph::deleted_node_signal, &app,
                  [&](const DSR::Node & edge) {
-                     del_node_signal_recv++;
+                     deleted_node_signal_recv++;
                  },
                  Qt::QueuedConnection);
 
@@ -746,7 +746,7 @@ TEST_CASE("delete an edge", "[GRAPH][SIGNALS]") {
         REQUIRE(del_node_signal_recv == 0);
         REQUIRE(del_edge_signal_recv == 1);
         REQUIRE(deleted_node_signal_recv == 0);
-        REQUIRE(deleted_edge_signal_recv == 0);
+        REQUIRE(deleted_edge_signal_recv == 1);
         app.exit();
     });
     app.exec();

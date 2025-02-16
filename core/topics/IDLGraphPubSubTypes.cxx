@@ -207,8 +207,7 @@ bool AttribPubSubType::compute_key(
 
 void AttribPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 PairIntPubSubType::PairIntPubSubType()
@@ -389,8 +388,7 @@ bool PairIntPubSubType::compute_key(
 
 void PairIntPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 DotContextPubSubType::DotContextPubSubType()
@@ -571,8 +569,7 @@ bool DotContextPubSubType::compute_key(
 
 void DotContextPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 DotKernelAttrPubSubType::DotKernelAttrPubSubType()
@@ -753,8 +750,7 @@ bool DotKernelAttrPubSubType::compute_key(
 
 void DotKernelAttrPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 MvregEdgeAttrPubSubType::MvregEdgeAttrPubSubType()
@@ -935,8 +931,7 @@ bool MvregEdgeAttrPubSubType::compute_key(
 
 void MvregEdgeAttrPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 IDLEdgePubSubType::IDLEdgePubSubType()
@@ -1117,8 +1112,7 @@ bool IDLEdgePubSubType::compute_key(
 
 void IDLEdgePubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 EdgeKeyPubSubType::EdgeKeyPubSubType()
@@ -1299,8 +1293,7 @@ bool EdgeKeyPubSubType::compute_key(
 
 void EdgeKeyPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 MvregNodeAttrPubSubType::MvregNodeAttrPubSubType()
@@ -1481,8 +1474,7 @@ bool MvregNodeAttrPubSubType::compute_key(
 
 void MvregNodeAttrPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 DotKernelEdgePubSubType::DotKernelEdgePubSubType()
@@ -1663,8 +1655,7 @@ bool DotKernelEdgePubSubType::compute_key(
 
 void DotKernelEdgePubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 MvregEdgePubSubType::MvregEdgePubSubType()
@@ -1845,8 +1836,7 @@ bool MvregEdgePubSubType::compute_key(
 
 void MvregEdgePubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 IDLNodePubSubType::IDLNodePubSubType()
@@ -2027,8 +2017,7 @@ bool IDLNodePubSubType::compute_key(
 
 void IDLNodePubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 GraphRequestPubSubType::GraphRequestPubSubType()
@@ -2209,8 +2198,7 @@ bool GraphRequestPubSubType::compute_key(
 
 void GraphRequestPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 DotKernelPubSubType::DotKernelPubSubType()
@@ -2391,8 +2379,7 @@ bool DotKernelPubSubType::compute_key(
 
 void DotKernelPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 MvregNodePubSubType::MvregNodePubSubType()
@@ -2573,8 +2560,7 @@ bool MvregNodePubSubType::compute_key(
 
 void MvregNodePubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 OrMapPubSubType::OrMapPubSubType()
@@ -2755,8 +2741,7 @@ bool OrMapPubSubType::compute_key(
 
 void OrMapPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 MvregEdgeAttrVecPubSubType::MvregEdgeAttrVecPubSubType()
@@ -2937,8 +2922,7 @@ bool MvregEdgeAttrVecPubSubType::compute_key(
 
 void MvregEdgeAttrVecPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 MvregNodeAttrVecPubSubType::MvregNodeAttrVecPubSubType()
@@ -3119,8 +3103,7 @@ bool MvregNodeAttrVecPubSubType::compute_key(
 
 void MvregNodeAttrVecPubSubType::register_type_object_representation()
 {
-    EPROSIMA_LOG_WARNING(XTYPES_TYPE_REPRESENTATION,
-        "TypeObject type representation support disabled in generated code");
+
 }
 
 

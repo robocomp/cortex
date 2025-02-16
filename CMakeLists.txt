@@ -27,9 +27,3 @@ if (WITH_TESTS)
 add_subdirectory(tests)
 
 endif()
-
-if (WITH_BENCHMARKS)
-
-add_subdirectory(bench)
-
-endif()

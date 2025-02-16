@@ -19,6 +19,7 @@
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
 #include "dsr/core/rtps/dsrsubscriber.h"
+#include "dsr/core/topics/IDLGraph.hpp"
 #include "dsr/core/types/crdt_types.h"
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/types/translator.h"
@@ -51,7 +52,7 @@ namespace DSR
         friend RT_API;
 
         public:
-        size_t size();
+        size_t size() const;
         DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true);
         [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true)
                                 : DSRGraph(name, id, dsr_input_file, all_same_host)
@@ -497,12 +498,12 @@ namespace DSR
                 bool r = false;
                 {
                     std::unique_lock<std::shared_mutex> lock(_mutex);
-                    if (auto t1 = id_map.find(node.id()) == id_map.end(), t2 = name_map.find(node.name())  == name_map.end(); t1 and t2) {
+                    if (auto t1 = !id_map.contains(node.id()), t2 = !name_map.contains(node.name()); t1 and t2) {
                         std::tie(r, std::ignore) = insert_node_(user_node_to_crdt(node));
                     } else {
                         if (!t1 and t2) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                        else if (t1 and !t2) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                        else throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") and same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
+                        if (t1) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
+                        throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") and same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
                     }
 
                 }
@@ -577,7 +578,7 @@ namespace DSR
         std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
         std::tuple<bool, std::optional<IDL::MvregNode>> insert_node_(CRDTNode &&node);
         std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> update_node_(CRDTNode &&node);
-        std::tuple<bool, std::vector<std::tuple<uint64_t, uint64_t, std::string>>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>> delete_node_(uint64_t id);
+        std::tuple<bool, std::vector<Edge>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>> delete_node_(uint64_t id);
         std::optional<IDL::MvregEdge> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
         std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
 
@@ -693,8 +694,10 @@ namespace DSR
         void update_edge_attr_signal(uint64_t from, uint64_t to, const std::string &type, const std::vector<std::string>& att_name, DSR::SignalInfo info = {});
 
         void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag, DSR::SignalInfo info = {});
+        void deleted_edge_signal(const DSR::Edge & edge, DSR::SignalInfo info = {});
         void del_node_signal(uint64_t id, DSR::SignalInfo info = {}) ;
-
+        void deleted_node_signal(const DSR::Node & edge, DSR::SignalInfo info = {});
+        
     };
 } // namespace CRDT
 

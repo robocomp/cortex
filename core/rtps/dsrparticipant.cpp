@@ -43,8 +43,8 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     //Create a descriptor for the new transport.
     auto custom_transport = std::make_shared<UDPv4TransportDescriptor>();
     //auto custom_transport = std::make_shared<SharedMemTransportDescriptor>();
-    custom_transport->sendBufferSize = 33554432;
-    custom_transport->receiveBufferSize = 33554432;
+    //custom_transport->sendBufferSize = 33554432; // commented it will use the OS default
+    //custom_transport->receiveBufferSize = 33554432; // commented it will use the OS default
     custom_transport->maxMessageSize = 65000;
 
     PParam.transport().user_transports.push_back(custom_transport);
