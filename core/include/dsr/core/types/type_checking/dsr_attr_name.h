@@ -74,6 +74,7 @@ static constexpr auto reg_fn = []() -> auto
 
 
 inline std::unordered_map<std::string_view, std::function<bool(const std::any&)>> attribute_types::map_fn_;
+inline std::vector<std::unique_ptr<std::string>> attribute_types::static_duration_str;
 
 /*
  * Generic
