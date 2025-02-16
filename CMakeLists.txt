@@ -15,8 +15,21 @@ add_subdirectory(gui)
 add_subdirectory(python-wrapper)
 
 
+if (SANITIZER)
+
+    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address,undefined")
+    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address,undefined")
+
+endif()
+
 if (WITH_TESTS)
 
 add_subdirectory(tests)
+
+endif()
+
+if (WITH_BENCHMARKS)
+
+add_subdirectory(bench)
 
 endif()

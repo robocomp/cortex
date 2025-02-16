@@ -27,22 +27,22 @@ TEST_CASE("NODE: from DSR representation to CRDT to IDL", "[TRANSLATION][NODE]")
     auto name = random_string();
 
 
-    static auto new_attribute__ = [&]() -> std::pair<std::string, DSR::Attribute> {
+    static auto new_attribute_ = [&]() -> std::pair<std::string, DSR::Attribute> {
 
-        auto val = random_choose(std::vector<ValType>{
+        const auto val = random_choose(std::vector<ValType>{
             (int)12, 
             random_string(), 
             std::vector<float>{1.0, 2.0, 3.0}
         });
-        Attribute attr(val, random_number(), (uint32_t)random_number());
+        Attribute attr(val, random_number(), static_cast<uint32_t>(random_number()));
         return std::make_pair(random_string(), attr);
     };
 
 
     auto attributes = GENERATE(std::map<std::string, DSR::Attribute>{}, 
-                               std::map<std::string, DSR::Attribute>{new_attribute__(), new_attribute__(), new_attribute__(), new_attribute__()});
+                               std::map<std::string, DSR::Attribute>{new_attribute_(), new_attribute_(), new_attribute_(), new_attribute_()});
 
-    static auto new_edge__ = [&]() -> std::pair<std::pair<uint64_t, std::string>, DSR::Edge> {
+    static auto new_edge_ = [&]() -> std::pair<std::pair<uint64_t, std::string>, DSR::Edge> {
 
         auto type = random_choose(std::vector<std::string>{"in", "RT", "reachable", "visible"});
         auto to = random_number();
@@ -58,7 +58,7 @@ TEST_CASE("NODE: from DSR representation to CRDT to IDL", "[TRANSLATION][NODE]")
 
     auto fano = GENERATE(std::map<std::pair<uint64_t, std::string>, DSR::Edge>{}, 
                          std::map<std::pair<uint64_t, std::string>, DSR::Edge>{
-                            new_edge__(), new_edge__(),new_edge__()
+                            new_edge_(), new_edge_(),new_edge_()
                             });
 
     SECTION("User Node representation"){
@@ -150,20 +150,20 @@ TEST_CASE("EDGE: from DSR representation to CRDT to IDL", "[TRANSLATION][EDGE]")
     auto to = random_number();
 
 
-    static auto new_attribute__ = [&]() -> std::pair<std::string, DSR::Attribute> {
+    static auto new_attribute_ = [&]() -> std::pair<std::string, DSR::Attribute> {
 
         auto val = random_choose(std::vector<ValType>{
             (int)12, 
             random_string(), 
             std::vector<float>{1.0, 2.0, 3.0}
         });
-        Attribute attr(val, random_number(), (uint32_t)random_number());
+        Attribute attr(val, random_number(), static_cast<uint32_t>(random_number()));
         return std::make_pair(random_string(), attr);
     };
 
 
     auto attributes = GENERATE(std::map<std::string, DSR::Attribute>{}, 
-                               std::map<std::string, DSR::Attribute>{new_attribute__(), new_attribute__(), new_attribute__(), new_attribute__()});
+                               std::map<std::string, DSR::Attribute>{new_attribute_(), new_attribute_(), new_attribute_(), new_attribute_()});
 
     SECTION("User Edge representation"){
     

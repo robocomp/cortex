@@ -86,10 +86,8 @@ set_target_properties(dsr_api PROPERTIES
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ON )
 
-# set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-# set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
-target_compile_options(dsr_api PUBLIC -g -O3 -fmax-errors=5 -std=c++20 -fno-char8_t)
+target_compile_options(dsr_api PUBLIC -g -O3 -fmax-errors=5 -std=c++23)
 
 
 # 'make install' to the correct locations (provided by GNUInstallDirs).
