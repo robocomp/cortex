@@ -236,10 +236,9 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
                     it_a = iter.erase(it_a);
                 } else if (!node.attrs().contains(k)) {
                     auto delta = iter.at(k).reset();
-                    it_a = iter.erase(it_a);
                     atts_deltas.emplace_back(
                             CRDTNodeAttr_to_IDL(node.agent_id(), node.id(), node.id(), k, delta));
-
+                    it_a = iter.erase(it_a);
                 } else {
                     it_a++;
                 }
