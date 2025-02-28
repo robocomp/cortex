@@ -30,6 +30,7 @@
 #include "dsr/api/dsr_rt_api.h"
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
+#include "dsr/api/dsr_graph_settings.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/utils.h"
 #include "dsr/core/id_generator.h"
@@ -53,6 +54,8 @@ namespace DSR
 
         public:
         size_t size() const;
+
+        DSRGraph(GraphSettings settings);
         DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true);
         [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true)
                                 : DSRGraph(name, id, dsr_input_file, all_same_host)
@@ -552,6 +555,7 @@ namespace DSR
         ThreadPool tp, tp_delta_attr;
         bool same_host;
         id_generator generator;
+        GraphSettings::LOGLEVEL log_level;
 
         //////////////////////////////////////////////////////////////////////////
         // Cache maps
@@ -645,11 +649,11 @@ namespace DSR
         //Threads handlers
         std::pair<bool, bool> start_fullgraph_request_thread();
         void start_fullgraph_server_thread();
-        void start_subscription_threads(bool showReceived);
-        void node_subscription_thread(bool showReceived);
-        void edge_subscription_thread(bool showReceived);
-        void node_attrs_subscription_thread(bool showReceived);
-        void edge_attrs_subscription_thread(bool showReceived);
+        void start_subscription_threads();
+        void node_subscription_thread();
+        void edge_subscription_thread();
+        void node_attrs_subscription_thread();
+        void edge_attrs_subscription_thread();
         void fullgraph_server_thread();
         std::pair<bool, bool> fullgraph_request_thread();
 

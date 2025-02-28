@@ -24,8 +24,6 @@ if(DEFINED GEOMETRY_API)
     set(GEOM_API_HEADERS "include/dsr/api/dsr_geometry_queries_api.h"
             "include/dsr/api/GeometryInfo.h")
     set(GEOM_API_SOURCES "dsr_geometry_queries_api.cpp")
-
-
 endif(DEFINED GEOMETRY_API)
 
 
@@ -36,6 +34,10 @@ set(headers_to_moc
         include/dsr/api/dsr_signal_info.h
         ${GEOM_API_HEADERS}
         )
+
+set(headers
+        include/dsr/api/dsr_graph_settings.h
+)
 
 add_library(dsr_api SHARED)
 add_library(Robocomp::dsr_api ALIAS dsr_api )
@@ -52,6 +54,7 @@ target_sources(dsr_api
         GHistorySaver.cpp
         ${GEOM_API_SOURCES}
         ${headers_to_moc}
+        ${headers}
         )
 
 

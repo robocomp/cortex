@@ -2,12 +2,16 @@
 // Created by crivac on 5/02/19.
 //
 
+#include "dsr/api/dsr_graph_settings.h"
 #include "dsr/core/topics/IDLGraph.hpp"
 #include "dsr/core/types/translator.h"
+#include <chrono>
+#include <ctime>
 #include <dsr/api/dsr_api.h>
 #include <dsr/core/types/crdt_types.h>
 #include <iostream>
 #include <optional>
+#include <qglobal.h>
 #include <unistd.h>
 #include <algorithm>
 #include <utility>
@@ -27,21 +31,22 @@ using namespace std::literals;
 ///// PUBLIC METHODS
 /////////////////////////////////////////////////
 
-DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file, bool all_same_host)
-        : agent_id(id),
-        agent_name(std::move(name)),
+DSRGraph::DSRGraph(GraphSettings settings) : 
+        agent_id(settings.agent_id),
+        agent_name(std::move(settings.graph_name)),
         copy(false),
-        tp(5),
-        tp_delta_attr(1),
-        same_host(all_same_host),
-        generator(id)
+        tp(settings.theradpool_threads),
+        tp_delta_attr(settings.attribute_threadpool_threads),
+        same_host(settings.same_host),
+        generator(settings.agent_id),
+        log_level(settings.log_level)
 {
 
     qDebug() << "Agent name: " << QString::fromStdString(agent_name);
     utils =  std::make_unique<Utilities>(this);
 
     // RTPS Create participant
-    auto[suc, participant_handle] = dsrparticipant.init(agent_id, agent_name, all_same_host,
+    auto[suc, participant_handle] = dsrparticipant.init(agent_id, agent_name, settings.same_host,
                                                         ParticipantChangeFunctor(this, [&](DSR::DSRGraph *graph,
                                                                 eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
                                                                 const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info)
@@ -81,12 +86,12 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
     dsrparticipant.add_publisher(dsrparticipant.getGraphTopic()->get_name(), {pub6, writer6});
 
     // RTPS Initialize comms threads
-    if (!dsr_input_file.empty())
+    if (!settings.input_file.empty())
     {
         try
         {
-            read_from_json_file(dsr_input_file);
-            qDebug() << __FUNCTION__ << "Warning, graph read from file " << QString::fromStdString(dsr_input_file);
+            read_from_json_file(settings.input_file);
+            qDebug() << __FUNCTION__ << "Warning, graph read from file " << QString::fromStdString(settings.input_file);
         }
         catch(const DSR::DSRException& e)
         {
@@ -94,11 +99,11 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
             qFatal("Aborting program. Cannot continue without intial file");
         }
         start_fullgraph_server_thread();
-        start_subscription_threads(false);
+        start_subscription_threads();
     }
     else
     {
-        start_subscription_threads(false);     // regular subscription to deltas
+        start_subscription_threads();     // regular subscription to deltas
         auto [response, repeated]  = start_fullgraph_request_thread();    // for agents that want to request the graph for other agent
 
         if(!response)
@@ -116,6 +121,11 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
     }
     qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
+
+DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file, bool all_same_host)
+    : DSR::DSRGraph(GraphSettings {id, 5, 1, name, dsr_input_file, "", all_same_host, GraphSettings::LOGLEVEL::INFOL})
+{}
+
 
 DSRGraph::~DSRGraph()
 {
@@ -1519,12 +1529,12 @@ void DSRGraph::start_fullgraph_server_thread()
     if (fullgraph_thread.joinable()) fullgraph_thread.join();
 }
 
-void DSRGraph::start_subscription_threads(bool showReceived)
+void DSRGraph::start_subscription_threads()
 {
-    auto delta_node_thread = std::thread(&DSRGraph::node_subscription_thread, this, showReceived);
-    auto delta_edge_thread = std::thread(&DSRGraph::edge_subscription_thread, this, showReceived);
-    auto delta_node_attrs_thread = std::thread(&DSRGraph::node_attrs_subscription_thread, this, showReceived);
-    auto delta_edge_attrs_thread = std::thread(&DSRGraph::edge_attrs_subscription_thread, this, showReceived);
+    auto delta_node_thread = std::thread(&DSRGraph::node_subscription_thread, this);
+    auto delta_edge_thread = std::thread(&DSRGraph::edge_subscription_thread, this);
+    auto delta_node_attrs_thread = std::thread(&DSRGraph::node_attrs_subscription_thread, this);
+    auto delta_edge_attrs_thread = std::thread(&DSRGraph::edge_attrs_subscription_thread, this);
 
     if (delta_node_thread.joinable()) delta_node_thread.join();
     if (delta_edge_thread.joinable()) delta_edge_thread.join();
@@ -1542,10 +1552,34 @@ std::map<uint64_t , IDL::MvregNode> DSRGraph::Map()
     return m;
 }
 
-void DSRGraph::node_subscription_thread(bool showReceived)
+void print_sample_info(const eprosima::fastdds::dds::SampleInfo& info) {
+
+    double milliseconds_send = static_cast<double>(info.source_timestamp.seconds()) * 1000.0;
+    milliseconds_send += static_cast<double>(info.source_timestamp.nanosec()) / 1000000.0;
+
+    double milliseconds_recv = static_cast<double>(info.reception_timestamp.seconds()) * 1000.0;
+    milliseconds_recv += static_cast<double>(info.reception_timestamp.nanosec()) / 1000000.0;
+
+    auto t_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+    auto secs_t = duration_cast<std::chrono::seconds>(t_since_epoch);
+    t_since_epoch -= secs_t;
+
+    double now = static_cast<double>(secs_t.count()) * 1000.0 ;
+    now  += static_cast<double>(duration_cast<std::chrono::nanoseconds>(t_since_epoch).count())  / 1000000.0;
+    
+    std::ostringstream oss;
+    oss << "SampleInfo:" << std::endl;
+    oss << "  ms diff reception: " << (milliseconds_recv - milliseconds_send) << "ms" << std::endl; 
+    oss << "  ms taken from dds: " << (now - milliseconds_send) << "ms" << std::endl; 
+    oss << "  Valid Data: " << (info.valid_data ? "true" : "false") << std::endl;
+    std::cout << oss.str(); 
+}
+
+
+void DSRGraph::node_subscription_thread()
 {
     auto name = __FUNCTION__;
-    auto lambda_general_topic = [&, name = name, showReceived = showReceived]
+    auto lambda_general_topic = [&, name = name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         try {
@@ -1554,9 +1588,10 @@ void DSRGraph::node_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregNode sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
+                    if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(m_info);
+                    if (m_info.valid_data) {
                         if (sample.agent_id() != agent_id) {
-                            if (showReceived) {
+                            if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) {
                                 qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
                                         << m_info.sample_identity.writer_guid().entityId.value;
                             }
@@ -1575,10 +1610,10 @@ void DSRGraph::node_subscription_thread(bool showReceived)
     dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), {sub, reader});
 }
 
-void DSRGraph::edge_subscription_thread(bool showReceived)
+void DSRGraph::edge_subscription_thread()
 {
     auto name = __FUNCTION__;
-    auto lambda_general_topic = [&, name = name, showReceived = showReceived]
+    auto lambda_general_topic = [&, name = name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         try {
@@ -1587,9 +1622,10 @@ void DSRGraph::edge_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregEdge sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
+                    if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(m_info);
+                    if (m_info.valid_data) {
                         if (sample.agent_id() != agent_id) {
-                            if (showReceived) {
+                            if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) {
                                 qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
                                         << m_info.sample_identity.writer_guid().entityId.value;
                             }
@@ -1609,10 +1645,10 @@ void DSRGraph::edge_subscription_thread(bool showReceived)
 
 }
 
-void DSRGraph::edge_attrs_subscription_thread(bool showReceived)
+void DSRGraph::edge_attrs_subscription_thread()
 {
     auto name = __FUNCTION__;
-    auto lambda_general_topic = [&, name = name, showReceived = showReceived]
+    auto lambda_general_topic = [&, name = name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         try {
@@ -1621,8 +1657,9 @@ void DSRGraph::edge_attrs_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregEdgeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
-                        if (showReceived) {
+                    if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(m_info);
+                    if (m_info.valid_data) {
+                        if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
                             qDebug() << name << " Received:" << samples.vec().size() << " edge attr from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
                         }
@@ -1676,10 +1713,10 @@ void DSRGraph::edge_attrs_subscription_thread(bool showReceived)
     //                       dsrpub_call_edge_attrs, true);
 }
 
-void DSRGraph::node_attrs_subscription_thread(bool showReceived)
+void DSRGraph::node_attrs_subscription_thread()
 {
     auto name = __FUNCTION__;
-    auto lambda_general_topic = [this, name = name, showReceived = showReceived]
+    auto lambda_general_topic = [this, name = name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         try {
@@ -1688,8 +1725,9 @@ void DSRGraph::node_attrs_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregNodeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
-                        if (showReceived) {
+                    if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(m_info);
+                    if (m_info.valid_data) {
+                        if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
                             qDebug() << name << " Received:" << samples.vec().size() << " node attrs from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
                         }
@@ -1752,7 +1790,8 @@ void DSRGraph::fullgraph_server_thread()
             eprosima::fastdds::dds::SampleInfo m_info;
             IDL::GraphRequest sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
-                if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
+                if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(m_info);
+                if (m_info.valid_data) {
                     {
                         std::unique_lock<std::mutex> lck(participant_set_mutex);
                         if (auto [it, ok] = participant_set.emplace(sample.from(), true);
@@ -1807,7 +1846,8 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
             eprosima::fastdds::dds::SampleInfo m_info;
             IDL::OrMap sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
-                if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
+                if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(m_info);
+                if (m_info.valid_data) {
                     if (sample.id() != graph->get_agent_id()) {
                         if (sample.id() != static_cast<uint32_t>(-1)) {
                             qDebug() << " Received Full Graph from " << m_info.sample_identity.writer_guid().entityId.value
