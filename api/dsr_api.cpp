@@ -1554,10 +1554,7 @@ void DSRGraph::node_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregNode sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE &&
-                        m_info.sample_state == eprosima::fastdds::dds::NOT_READ_SAMPLE_STATE && 
-                        m_info.view_state != eprosima::fastdds::dds::NOT_NEW_VIEW_STATE 
-                    ) {
+                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (sample.agent_id() != agent_id) {
                             if (showReceived) {
                                 qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
@@ -1590,10 +1587,7 @@ void DSRGraph::edge_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregEdge sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE &&
-                        m_info.sample_state == eprosima::fastdds::dds::NOT_READ_SAMPLE_STATE && 
-                        m_info.view_state != eprosima::fastdds::dds::NOT_NEW_VIEW_STATE 
-                    ) {
+                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (sample.agent_id() != agent_id) {
                             if (showReceived) {
                                 qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
@@ -1627,10 +1621,7 @@ void DSRGraph::edge_attrs_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregEdgeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE &&
-                        m_info.sample_state == eprosima::fastdds::dds::NOT_READ_SAMPLE_STATE && 
-                        m_info.view_state != eprosima::fastdds::dds::NOT_NEW_VIEW_STATE 
-                    ) {
+                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (showReceived) {
                             qDebug() << name << " Received:" << samples.vec().size() << " edge attr from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
@@ -1697,10 +1688,7 @@ void DSRGraph::node_attrs_subscription_thread(bool showReceived)
                 eprosima::fastdds::dds::SampleInfo m_info;
                 IDL::MvregNodeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
-                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE &&
-                        m_info.sample_state == eprosima::fastdds::dds::NOT_READ_SAMPLE_STATE && 
-                        m_info.view_state != eprosima::fastdds::dds::NOT_NEW_VIEW_STATE 
-                    ) {
+                    if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                         if (showReceived) {
                             qDebug() << name << " Received:" << samples.vec().size() << " node attrs from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
@@ -1764,12 +1752,7 @@ void DSRGraph::fullgraph_server_thread()
             eprosima::fastdds::dds::SampleInfo m_info;
             IDL::GraphRequest sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
-
-                if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE &&
-                        m_info.sample_state == eprosima::fastdds::dds::NOT_READ_SAMPLE_STATE && 
-                        m_info.view_state != eprosima::fastdds::dds::NOT_NEW_VIEW_STATE 
-                    ) 
-                {
+                if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                     {
                         std::unique_lock<std::mutex> lck(participant_set_mutex);
                         if (auto [it, ok] = participant_set.emplace(sample.from(), true);
@@ -1824,11 +1807,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
             eprosima::fastdds::dds::SampleInfo m_info;
             IDL::OrMap sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
-                if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE &&
-                        m_info.sample_state == eprosima::fastdds::dds::NOT_READ_SAMPLE_STATE && 
-                        m_info.view_state != eprosima::fastdds::dds::NOT_NEW_VIEW_STATE 
-                    )
-                {
+                if (m_info.instance_state == eprosima::fastdds::dds::ALIVE_INSTANCE_STATE) {
                     if (sample.id() != graph->get_agent_id()) {
                         if (sample.id() != static_cast<uint32_t>(-1)) {
                             qDebug() << " Received Full Graph from " << m_info.sample_identity.writer_guid().entityId.value
