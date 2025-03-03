@@ -19,7 +19,6 @@
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
 #include "dsr/core/rtps/dsrsubscriber.h"
-#include "dsr/core/topics/IDLGraph.hpp"
 #include "dsr/core/types/crdt_types.h"
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/types/translator.h"
@@ -31,6 +30,8 @@
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_graph_settings.h"
+#include "dsr/core/types/type_checking/dsr_edge_type.h"
+#include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/utils.h"
 #include "dsr/core/id_generator.h"
@@ -699,9 +700,9 @@ namespace DSR
 
         void del_edge_signal(uint64_t from, uint64_t to, const std::string &edge_tag, DSR::SignalInfo info = {});
         void deleted_edge_signal(const DSR::Edge & edge, DSR::SignalInfo info = {});
+
         void del_node_signal(uint64_t id, DSR::SignalInfo info = {}) ;
         void deleted_node_signal(const DSR::Node & edge, DSR::SignalInfo info = {});
-        
     };
 } // namespace CRDT
 

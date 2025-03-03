@@ -31,7 +31,7 @@ using namespace std::literals;
 ///// PUBLIC METHODS
 /////////////////////////////////////////////////
 
-DSRGraph::DSRGraph(GraphSettings settings) : 
+DSRGraph::DSRGraph(GraphSettings settings) :
         agent_id(settings.agent_id),
         agent_name(std::move(settings.graph_name)),
         copy(false),
@@ -163,7 +163,7 @@ std::optional<DSR::Node> DSRGraph::get_node(uint64_t id)
 
 std::tuple<bool, std::optional<IDL::MvregNode>> DSRGraph::insert_node_(CRDTNode &&node)
 {
-    if (deleted.find(node.id()) == deleted.end())
+    if (!deleted.contains(node.id()))
     {
         if (auto it = nodes.find(node.id()); it != nodes.end() and not it->second.empty() and it->second.read_reg() == node)
         {
@@ -563,7 +563,6 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
         //Update
         if (node.fano().contains({to, attrs.type()}))
         {
-            std::vector<IDL::MvregEdgeAttr> atts_deltas;
             auto iter = nodes.at(from).read_reg().fano().find({attrs.to(), attrs.type()});
             auto end = nodes.at(from).read_reg().fano().end();
             if (iter != end) {
@@ -1171,15 +1170,13 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
         std::optional<Edge> deleted_edge;
         {
             auto crdt_delta = IDLEdge_to_CRDT(std::move(mvreg));
+            deleted_edge = get_edge_(from, to, type);
             std::unique_lock<std::shared_mutex> lock(_mutex);
             //Check if the node where we are joining the edge exist.
             bool cfrom{nodes.contains(from)}, cto{nodes.contains(to)};
             bool dfrom{deleted.contains(from)}, dto{deleted.contains(to)};
             if (cfrom and cto) {
                 joined = true;
-                if (!crdt_delta.empty()) {
-                    deleted_edge = crdt_delta.read_reg();
-                }
                 signal = process_delta_edge(from, to, type, std::move(crdt_delta));
                 if (signal) {
                     consume_unprocessed_deltas();
@@ -1566,13 +1563,13 @@ void print_sample_info(const eprosima::fastdds::dds::SampleInfo& info) {
 
     double now = static_cast<double>(secs_t.count()) * 1000.0 ;
     now  += static_cast<double>(duration_cast<std::chrono::nanoseconds>(t_since_epoch).count())  / 1000000.0;
-    
+
     std::ostringstream oss;
     oss << "SampleInfo:" << std::endl;
-    oss << "  ms diff reception: " << (milliseconds_recv - milliseconds_send) << "ms" << std::endl; 
-    oss << "  ms taken from dds: " << (now - milliseconds_send) << "ms" << std::endl; 
+    oss << "  ms diff reception: " << (milliseconds_recv - milliseconds_send) << "ms" << std::endl;
+    oss << "  ms taken from dds: " << (now - milliseconds_send) << "ms" << std::endl;
     oss << "  Valid Data: " << (info.valid_data ? "true" : "false") << std::endl;
-    std::cout << oss.str(); 
+    std::cout << oss.str();
 }
 
 
@@ -1744,7 +1741,7 @@ void DSRGraph::node_attrs_subscription_thread()
                                 }
                                 std::vector<std::future<std::optional<std::string>>> futures;
                                 for (auto &&s: samples.vec()) {
-                                    if (ignored_attributes.contains(s.attr_name())) {
+                                    if (!ignored_attributes.contains(s.attr_name())) {
                                         futures.emplace_back(tp.spawn_task_waitable([this, samp{std::move(s)}]() mutable {
                                             auto f = join_delta_node_attr(std::move(samp));
                                             return f;
@@ -1839,7 +1836,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 {
     bool sync = false;
     bool repeated = false;
-    auto lambda_request_answer = [&](eprosima::fastdds::dds::DataReader *reader, const DSR::DSRGraph *graph)
+    auto lambda_request_answer = [&](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         while (true)
         {
