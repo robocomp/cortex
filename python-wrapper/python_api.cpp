@@ -37,13 +37,6 @@ namespace py = pybind11;
 using namespace py::literals;
 //using namespace RoboCompDSRGetID;
 
-using callback_types = std::variant<
-        std::function<void(std::uint64_t, const std::string &)>,
-        std::function<void(std::uint64_t, const std::vector<std::string> &)>,
-        std::function<void(std::uint64_t, std::uint64_t, const std::string &)>,
-        std::function<void(std::uint64_t, std::uint64_t, const std::string &, const std::vector<std::string> &)>,
-        std::function<void(std::uint64_t)>
->;
 
 enum ATT_ENUM: uint16_t {
     STRING_PY,
@@ -82,7 +75,6 @@ using attribute_type = std::variant<std::string,
                                     float,
                                     int32_t,
                                     uint32_t>;
-
 
 
 
@@ -195,7 +187,9 @@ PYBIND11_MODULE(pydsr, m) {
 
     DELETE_NODE: [[int], None]
 
+    DELETE_NODE_OBJ: [[pydsr.Node], None]
 
+    DELETE_EDGE_OBJ: [[pydsr.EDGE], None]
     ")"""");
 
     enum signal_type
@@ -205,7 +199,9 @@ PYBIND11_MODULE(pydsr, m) {
         UPDATE_EDGE,
         UPDATE_EDGE_ATTR,
         DELETE_EDGE,
-        DELETE_NODE
+        DELETE_NODE,
+        DELETE_NODE_OBJ,
+        DELETE_EDGE_OBJ
     };
 
 
@@ -216,6 +212,8 @@ PYBIND11_MODULE(pydsr, m) {
             .value("UPDATE_EDGE_ATTR", UPDATE_EDGE_ATTR)
             .value("DELETE_EDGE", DELETE_EDGE)
             .value("DELETE_NODE", DELETE_NODE)
+            .value("DELETE_EDGE_OBJ", DELETE_EDGE_OBJ)
+            .value("DELETE_NODE_OBJ", DELETE_NODE_OBJ)
             .export_values();
 
 
@@ -279,6 +277,24 @@ PYBIND11_MODULE(pydsr, m) {
                                      std::get<std::function<void(std::uint64_t)>>(fn_callback));
                 } catch (std::exception &e) {
                     std::cout << "Delete Node Callback must be (int)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case DELETE_NODE_OBJ:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::deleted_node_signal,
+                                     std::get<std::function<void(const DSR::Node&)>>(fn_callback));
+                } catch (std::exception &e) {
+                    std::cout << "Delete Node Callback must be (pydsr.Node)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case DELETE_EDGE_OBJ:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::deleted_edge_signal,
+                                     std::get<std::function<void(const DSR::Edge&)>>(fn_callback));
+                } catch (std::exception &e) {
+                    std::cout << "Delete Node Callback must be (pydsr.Edge)\n "  << std::endl;
                     throw e;
                 }
                 break;

@@ -14,6 +14,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/functional.h>
+#include <dsr/core/types/user_types.h>
 
 #pragma pop_macro("slots")
 
@@ -24,7 +25,9 @@ using callback_types = std::variant<
         std::function<void(std::uint64_t, const std::vector<std::string> &)>,
         std::function<void(std::uint64_t, std::uint64_t, const std::string &)>,
         std::function<void(std::uint64_t, std::uint64_t, const std::string&, const std::vector<std::string> &)>,
-        std::function<void(std::uint64_t)>
+        std::function<void(std::uint64_t)>,
+        std::function<void(const DSR::Node&)>,
+        std::function<void(const DSR::Edge&)>
 >;
 
 
@@ -43,7 +46,9 @@ namespace pybind11::detail {
         const std::string &)>>::name,
         make_caster<std::function<void(std::uint64_t, std::uint64_t,
                                        const std::string &,const std::vector<std::string> &)>>::name,
-        make_caster<std::function<void(std::uint64_t)>>::name) + _("]"));
+        make_caster<std::function<void(std::uint64_t)>>::name,
+        make_caster<std::function<void(const DSR::Node&)>>::name,
+        make_caster<std::function<void(const DSR::Edge&)>>::name) + _("]"));
 
 
         template<typename U>
@@ -81,12 +86,16 @@ namespace pybind11::detail {
 
             if (not annotations) return false; //We need to know attribute parameters
             auto dict = reinterpret_borrow<py::dict>(py::handle(annotations));
-
+            //py::print(dict);
             if (dict.size() == 1) {
                 auto str = py::str(dict.begin()->second).cast<std::string>();
                 if ("<class 'int'>" == str)
                 {
                     return load_alternative<std::function<void(std::uint64_t)>>(src, convert);
+                } else if ("<class 'pydsr.Node'>" == str) {
+                    return load_alternative<std::function<void(const DSR::Node&)>>(src, convert);
+                } else if ("<class 'pydsr.Edge'>" == str) {
+                    return load_alternative<std::function<void(const DSR::Edge&)>>(src, convert);
                 }
             } else if (dict.size() >= 2) {
                 auto itr = dict.begin();
