@@ -654,6 +654,7 @@ PYBIND11_MODULE(pydsr, m) {
 
             .def("get_node_root", &DSRGraph::get_node_root, "Return the root node.")
             .def("get_nodes_by_type", &DSRGraph::get_nodes_by_type, "type"_a, "Return all the nodes with a given type.")
+            .def("get_nodes", &DSRGraph::get_nodes, "Returns all nodes")
             .def("get_name_from_id", &DSRGraph::get_name_from_id, "id"_a, "Return the name of a node given its id")
             .def("get_id_from_name", &DSRGraph::get_id_from_name, "name"_a, "Return the id from a node given its name")
             .def("get_edges_by_type", &DSRGraph::get_edges_by_type, "type"_a, "Return all the edges with a given type.")
