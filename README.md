@@ -670,7 +670,7 @@ union Val switch(long) {
 
 These structures are compiled into C++ code that is included in the agent, forming the deeper layer of G. On top of it, another layer called CRDT is added to provide eventual consistency while agents communicate using asynchronous updates.
 
-## Python API 
+# Python API 
 
 [python-API](python_api_documentation.md)
 
