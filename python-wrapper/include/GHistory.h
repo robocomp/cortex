@@ -73,7 +73,7 @@ public:
 void bind_ghistory(py::module &m) {
 
 
-    py::enum_<ChangeInfo::OPER>(m, "Oper");
+    //py::enum_<ChangeInfo::OPER>(m, "Oper");
 
     py::class_<ChangeInfo>(m, "ChangeInfo")
             .def_property_readonly("op", [](ChangeInfo const &self) -> ChangeInfo::OPER {return self.op; })
