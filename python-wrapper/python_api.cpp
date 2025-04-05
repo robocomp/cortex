@@ -627,7 +627,8 @@ PYBIND11_MODULE(pydsr, m) {
                      return g;
                  }), "root"_a, "name"_a, "id"_a, "dsr_input_file"_a = "",
                  "all_same_host"_a = true, py::call_guard<py::gil_scoped_release>())
-
+            .def("get_agent_id", &DSRGraph::get_agent_id, "get agent_id")
+            .def("get_agent_name", &DSRGraph::get_agent_name, "get agent_id")
             .def("get_node", [](DSRGraph &self, uint64_t id) -> std::optional<Node> {
                 return self.get_node(id);
             }, "id"_a, "return the node with the id passed as parameter. Returns None if the node does not exist.")
