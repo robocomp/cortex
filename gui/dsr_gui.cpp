@@ -389,9 +389,9 @@ QWidget *DSRViewer::create_widget(view type)
             widget_view = new DSR::GraphViewer(G);
             break;
 //		3D
-        case view::osg:
-            widget_view = new DSR::OSG3dViewer(G, 1, 1);
-            break;
+//        case view::osg:
+//            widget_view = new DSR::OSG3dViewer(G, 1, 1);
+//            break;
 //		Tree
         case view::tree:
             widget_view = new DSR::TreeViewer(G);

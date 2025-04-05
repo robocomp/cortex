@@ -94,7 +94,7 @@ void GraphNode::addEdge(GraphEdge *edge)
             qDebug()<<"\t\t"<<__FUNCTION__ <<"SAME EDGE"<<same_count;
         }
     }
-    //            https://www.wolframalpha.com/input/?i=0%2C+1%2C+-1%2C+2%2C+-2%2C+3%2C+-3
+
     bend_factor = (pow(-1,same_count)*(-1 + pow(-1,same_count) - 2*same_count))/4;
     qDebug()<<__FUNCTION__ <<__LINE__<<"ID: "<<id_in_graph<<"SAME: "<<same_count<<"FACTOR: "<<bend_factor;
     edge->set_bend_factor(bend_factor);
@@ -205,8 +205,6 @@ void GraphNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 {
     painter->setPen(Qt::NoPen);
     painter->setBrush(SUNKEN_COLOR);
-//    painter->drawEllipse(-7, -7, node_width, node_width);
-
     QRadialGradient gradient(-3, -3, 10);
     if (option->state & QStyle::State_Sunken)
     {
@@ -229,37 +227,24 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
 {
     switch (change) 
 	{
-
         case ItemPositionHasChanged:
         {
             foreach (GraphEdge *edge, edgeList)
                  edge->adjust(this, value.toPointF());
             break;
         }
-
         default:
             break;
     }
     return QGraphicsItem::itemChange(change, value);
 }
 
-
 void GraphNode::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
-    //if (tag->text() != "") return; // Explota sin esto
-//    animation->start();
     if( event->button()== Qt::RightButton)
-    {
-// always show menu to allow delete
-//        if (contextMenu != nullptr)
-        contextMenu->exec(event->screenPos());
-//        else
-//            show_node_widget("table");
-    }
-//    update();
+       contextMenu->exec(event->screenPos());
     QGraphicsEllipseItem::mouseDoubleClickEvent(event);
 }
-
 
 void GraphNode::show_node_widget(const std::string &show_type)
 {
@@ -289,18 +274,13 @@ void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         qDebug() << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph ;
         std::optional<Node> n = g->get_node(id_in_graph);
         if (n.has_value()) {
-//            qDebug()<<"ScenePos X"<<(float) event->scenePos().x()<<" Width "<<(this->rect())<<" this "<<this->pos().x();
-//            qDebug()<<"ScenePos Y"<<(float) event->scenePos().y()<<" Height "<<(this->rect())<<" this "<<this->pos().y();
             g->add_or_modify_attrib_local<pos_x_att>(n.value(), (float) this->pos().x());
             g->add_or_modify_attrib_local<pos_y_att>(n.value(),  (float) this->pos().y());
             g->update_node(n.value());
         }
-//        this->dsr_to_graph_viewer->itemMoved();
     }
-
     QGraphicsItem::mouseReleaseEvent(event);
 }
-
 
 QColor GraphNode::_node_color()
 {
@@ -339,7 +319,6 @@ void GraphNode::delete_node()
     }
 }
 
-
 void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type_)
 {
     if (node_id != this->id_in_graph)
@@ -356,27 +335,3 @@ void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<s
 //        }
 //    }
 }
-/* void GraphNode::NodeAttrsChangedSLOT(const DSR::IDType &node, const DSR::Attribs &attr)
- {
-	 std::cout << "do cool stuff" << std::endl;
- }
-*/
-// void GraphNode::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
-// {
-//    // label = new QTableWidget(graph);
-//     //label->setText(tag->text().toStdString());
-//     //label->show();
-//     //label->exec();
-//     std::cout << "entering node: " << tag->text().toStdString() << std::endl;
-//     update (boundingRect());
-// }
-
-// void GraphNode::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
-// {
-//     // QDialog *label = new QDialog(graph);
-//     // label->exec();
-//     //label->close();
-//     //lable->delete();
-//     std::cout << "exiting node: " << tag->text().toStdString() << std::endl;
-//     update (boundingRect());
-// }

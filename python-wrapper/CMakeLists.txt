@@ -52,7 +52,7 @@ target_include_directories(pydsr
 
 
 set_target_properties(pydsr PROPERTIES
-        CMAKE_CXX_STANDARD 20
+        CMAKE_CXX_STANDARD 23
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ON
         Python_ADDITIONAL_VERSIONS 3.8)
@@ -61,7 +61,7 @@ set_target_properties(pydsr PROPERTIES
 # set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 # set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
-target_compile_options(pydsr PRIVATE -O1 -g -fmax-errors=5 -std=c++20)
+target_compile_options(pydsr PRIVATE -O3  -fmax-errors=5 -std=c++23)
 set_target_properties(pydsr PROPERTIES PREFIX "")
 
 

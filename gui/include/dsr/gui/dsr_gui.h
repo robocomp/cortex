@@ -27,7 +27,7 @@
 #include <dsr/api/dsr_api.h>
 #include <typeinfo>
 #include <QDockWidget>
-#include <dsr/gui/viewers/osg_3d_viewer/osg_3d_viewer.h>
+//#include <dsr/gui/viewers/osg_3d_viewer/osg_3d_viewer.h>
 #include <dsr/gui/viewers/qscene_2d_viewer/qscene_2d_viewer.h>
 #include <dsr/gui/viewers/graph_viewer/graph_viewer.h>
 #include <dsr/gui/viewers/tree_viewer/tree_viewer.h>

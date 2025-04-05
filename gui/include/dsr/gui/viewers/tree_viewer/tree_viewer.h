@@ -60,7 +60,6 @@ namespace DSR
 			void create_attribute_widget(QTreeWidgetItem* parent, Node* node, std::string key, Attribute value);
 			void update_attribute_widgets(Node* node);
 
-        
 		signals:
 			void node_check_state_changed(int newValue, uint64_t id, const std::string &type,  QTreeWidgetItem * item);
     };
