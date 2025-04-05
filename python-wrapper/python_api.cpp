@@ -315,6 +315,10 @@ PYBIND11_MODULE(pydsr, m) {
 
                 return Attribute(convert_variant(v), get_unix_timestamp(), agent_id);
             }),"value"_a, "agent_id"_a)
+            .def(py::init([&](attribute_type const& v) {
+                //Comprobar tipos en ValType. Como se convien los arrays de numpy, las listas, los doubles, etc.
+                return Attribute(convert_variant(v), get_unix_timestamp(), local_agent_id);
+            }),"value"_a)
             .def("__repr__", [](Attribute const &self) {
 
                 std::stringstream out;
@@ -597,7 +601,15 @@ PYBIND11_MODULE(pydsr, m) {
                           [](Node &self, const std::map<std::pair<uint64_t, std::string>, Edge> &edges) {
                               return self.fano(edges);
                           },
-                          py::return_value_policy::reference, "read or write in the edge map of the node.");
+                          py::return_value_policy::reference, "read or write in the edge map of the node.")
+            .def("get_edges", [](Node &self){
+                std::vector<Edge> edges;
+                edges.reserve(self.fano().size());
+                for (auto [_, edge] : self.fano()) {
+                    edges.emplace_back(edge);
+                }
+                return edges;
+            });
 
 
 
@@ -657,6 +669,7 @@ PYBIND11_MODULE(pydsr, m) {
             .def("get_nodes", &DSRGraph::get_nodes, "Returns all nodes")
             .def("get_name_from_id", &DSRGraph::get_name_from_id, "id"_a, "Return the name of a node given its id")
             .def("get_id_from_name", &DSRGraph::get_id_from_name, "name"_a, "Return the id from a node given its name")
+            .def("get_edges", &DSRGraph::get_edges, "Return all the edges in the graph")
             .def("get_edges_by_type", &DSRGraph::get_edges_by_type, "type"_a, "Return all the edges with a given type.")
             .def("get_edges_to_id", &DSRGraph::get_edges_to_id, "id"_a, "Return all the edges that point to the node")
             .def("write_to_json_file", &DSRGraph::write_to_json_file, "file"_a, "skip_atts"_a=std::vector<std::string>{}, "Return all the edges that point to the node");

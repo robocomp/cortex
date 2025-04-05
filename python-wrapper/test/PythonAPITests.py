@@ -136,10 +136,12 @@ class TestNode(unittest.TestCase):
     def test_edge(self):
         tmp = Node(1, "root", "name")
         self.assertEqual(len(tmp.edges), 0)
-        tmp.edges[(11, "RT")] = Edge(10, 11, "RT", 0)
+        self.assertEqual(len(tmp.get_edges()), 0)
+        tmp.edges[(11,"RT")] = Edge(10,11, "RT", 0)
         self.assertEqual(len(tmp.edges), 1)
-        self.assertIsNotNone(tmp.edges[(11, "RT")])
-        del tmp.edges[(11, "RT")]
+        self.assertEqual(len(tmp.get_edges()), 1)
+        self.assertIsNotNone(tmp.edges[(11,"RT")])
+        del tmp.edges[(11,"RT")]
         with self.assertRaises(KeyError):
             tmp.edges[(11, "RT")]
 
@@ -235,7 +237,8 @@ class TestDSRGraph(unittest.TestCase):
             True,
         )
         edge = g.get_edge(1, 2, "RT")
-        edge.attrs["color"] = Attribute("red", 0, 12)
+        edge.attrs["color"] = Attribute("red")
+        self.assertEqual(edge.attrs["color"].agent_id, 12)
         g.insert_or_assign_edge(edge)
         edge = g.get_edge(1, 2, "RT")
         self.assertEqual(edge.attrs["color"].value, "red")
