@@ -167,35 +167,25 @@ sudo ldconfig
 
 ## Common Issues
 
-1)  __DSR compilation requires GCC 9+, while other components might require GCC 8 or older (Ubuntu 20.04):__
+1)  __DSR compilation requires GCC 11+
     -   Install multiple C and C++ compiler versions :
         ```bash
         sudo apt install build-essential
-        sudo apt -y install gcc-7 g++-7 gcc-8 g++-8 gcc-9 g++-9 g++-10 gcc-10
+        sudo apt -y install  g++-10 gcc-10 g++-11 gcc-11 
         ```
     -   Use the `update-alternatives` tool to create list of multiple GCC and G++ compiler alternatives :
         ```bash
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 8
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 8
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 9
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 9
+       
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 10
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10
+       
         ```
     -   Check the available C and C++ compilers list on your system and select the desired version by entering the relevant selection number :
         ```bash
         sudo update-alternatives --config gcc
         sudo update-alternatives --config g++
-        ```
-
-3)  __This application failed to start because no Qt platform plugin could be initialized:__
-    -   This problem can appear when trying to start `viriatoPyrep`, due to compatibility issues with _Qt_ version in _OpenCV_ and _VREP_.
-
-    -   This problem is solved by installing `opencv-python-headless` :
-        ```bash
-        pip install opencv-python-headless
         ```
 
 ## Tutorials to start creating agents and using existing configurations
