@@ -47,7 +47,7 @@ class GraphNodeWidget : public  QTableWidget
                 insert_attribute(k, std::move(v));
           }
           horizontalHeader()->setStretchLastSection(true);
-          resize_wizedget();
+          resize_widget();
           //TODO: comprobar QObject::connect(graph.get(), &DSR::DSRGraph::update_attrs_signal, this, &GraphNodeWidget::drawSLOT);
           //QObject::connect(graph.get(), &DSR::DSRGraph::update_node_signal, this, &GraphNodeWidget::update_node_slot);
           //QObject::connect(graph.get(), &DSR::DSRGraph::update_node_signal, this, &GraphNodeWidget::update_node_slot);
