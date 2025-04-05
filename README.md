@@ -1,24 +1,31 @@
 [![Build](https://github.com/robocomp/cortex/actions/workflows/build_artifacts.yaml/badge.svg)](https://github.com/robocomp/cortex/actions/workflows/build_artifacts.yaml)
 
-
-# CORTEX and DSR (Deep State Representation)
+# CORTEX and DSR (Deep State Representation)]
 - [Description](#description)
 - [Definitions](#definitions)
-- [Dependencies and Installation](#dependencies-and-installation)
-  * [Installing agents](#installing-agents)
+- [Installation](#installation)
+  * [Dependencies](#dependencies)
+    + [Step 1](#step-1)
+    + [Step 2](#step-2)
+    + [Step 3](#step-3)
+  * [Common Issues](#common-issues)
+  * [Tutorials to start creating agents and using existing configurations](#tutorials-to-start-creating-agents-and-using-existing-configurations)
+  * [Installing existing agents from the RoboComp repository](#installing-existing-agents-from-the-robocomp-repository)
 - [Developer Documentation](#developer-documentation)
-  * [DSR-API (aka G-API)](#dsr-api--aka-g-api-)
+  * [DSR-API (C++)](#dsr-api--c---)
+  * [Common examples](#common-examples)
+  * [Predefined names and types](#predefined-names-and-types)
   * [CORE](#core)
   * [Auxiliary sub-APIs](#auxiliary-sub-apis)
     + [RT sub-API](#rt-sub-api)
       - [Overloaded method using move semantics.](#overloaded-method-using-move-semantics)
     + [IO sub-API](#io-sub-api)
-    + [Innermodel sub-API](#innermodel-sub-api)
+    + [Geometric transformations sub-API using the Eigen library](#geometric-transformations-sub-api-using-the-eigen-library)
   * [CRDT- API](#crdt--api)
   * [Node struct](#node-struct)
+  * [Python API](#python-api)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
 
 # Description
 
