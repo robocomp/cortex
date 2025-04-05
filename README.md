@@ -23,9 +23,10 @@
     + [Geometric transformations sub-API using the Eigen library](#geometric-transformations-sub-api-using-the-eigen-library)
   * [CRDT- API](#crdt--api)
   * [Node struct](#node-struct)
-  * [Python API](#python-api)
+- [Python API](#python-api)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
 
 # Description
 
