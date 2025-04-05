@@ -229,13 +229,14 @@ TEST_CASE("Insert a node with attributes and edges", "[GRAPH][SIGNALS]"){
     node_name = random_string();
     n = Node::create<testtype_node_type>(
         { new_attribute_(), new_attribute_(), new_attribute_()},
-        { new_edge_(*r, {}), new_edge_(*r, {})}, node_name);
+        { new_edge_(*r, {}), new_edge_(*r, {}), new_edge_(*r, {})}, node_name);
+    const auto numedges = n.fano().size();
     std::optional<uint64_t> r2  = G.insert_node(n);
     REQUIRE(r2.has_value());
 
     QTimer::singleShot(0, [&]() {
         REQUIRE(update_node_signal_recv);
-        REQUIRE(update_edge_signal_recv == 2);
+        REQUIRE(update_edge_signal_recv == numedges);
         REQUIRE(update_node_attr_signal_recv == 0);
         REQUIRE(update_edge_attr_signal_recv == 0);
         REQUIRE(not del_node_signal_recv);
