@@ -200,7 +200,7 @@ If you want to install and try some existing agents, you can clone the [dsr-grap
 
 
 # Developer Documentation
-## DSR-API (aka G-API)
+## DSR-API (C++)
 G-API is the user-level access layer to G. It comprises a set of core methods that access the underlying CRDT and RTPS APIs, and an extendable  set of auxiliary methods added to simplify the user coding tasks. 
 
 
