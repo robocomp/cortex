@@ -65,15 +65,15 @@ Conceptually, the DSR represents a network of entities and relations among them.
 
 __IMPORTANT__: DSR is only supported in Ubuntu 20.04 and 22.04. We can't help with the issues of other distros or versions.  
 
-To be able to use the DSR/CORTEX infraestructure you need to follow the next steps:
+To be able to use the DSR/CORTEX infrastructure you need to follow the next steps:
 
 ### Step 1
-From ubuntu repositories you need:
+From Ubuntu repositories, you need:
 ```bash
 sudo apt install libasio-dev libtinyxml2-dev libopencv-dev libeigen3-dev python3-dev python3-pybind11 cmake gcc-11 g++-11
 ```
 
-> __NOTE :__ If you are using `python` with `Anaconda`, `cmake` might not be able to find pybind11 installation. So, you have to install it using `conda-forge` as well :
+> __NOTE :__ If you are using `python` with `Anaconda`, `cmake` might not be able to find the Pybind11 installation. So, you have to install it using `conda-forge` as well :
 > ```bash
 > conda install -c conda-forge pybind11
 > ```
@@ -90,7 +90,7 @@ sudo update-alternatives --config gcc
 sudo update-alternatives --config g++
 
 ```
-and select version 11. In both g++ and gcc. If you have any issue try it with an older version.
+and select version 11 in both g++ and gcc. If you have any issues, try it with an older version.
 
 ### Step 2
 You need the following third-party software:
@@ -159,7 +159,7 @@ sudo ldconfig
 
 ## Common Issues
 
-1)  __DSR compilation requires GCC 9+, while other components might require GCC 8 or older (Ubuntu 20.04) :__
+1)  __DSR compilation requires GCC 9+, while other components might require GCC 8 or older (Ubuntu 20.04):__
     -   Install multiple C and C++ compiler versions :
         ```bash
         sudo apt install build-essential
@@ -176,13 +176,13 @@ sudo ldconfig
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
         ```
-    -   Check the available C and C++ compilers list on your system and select desired version by entering relevant selection number :
+    -   Check the available C and C++ compilers list on your system and select the desired version by entering the relevant selection number :
         ```bash
         sudo update-alternatives --config gcc
         sudo update-alternatives --config g++
         ```
 
-3)  __This application failed to start because no Qt platform plugin could be initialized :__
+3)  __This application failed to start because no Qt platform plugin could be initialized:__
     -   This problem can appear when trying to start `viriatoPyrep`, due to compatibility issues with _Qt_ version in _OpenCV_ and _VREP_.
 
     -   This problem is solved by installing `opencv-python-headless` :
@@ -196,25 +196,29 @@ sudo ldconfig
 	
 
 ## Installing existing agents from the RoboComp repository
-If you want to install and try some existing agents you can clone the [dsr-graph](https://github.com/robocomp/dsr-graph) repository and read the related documentation. Note that agents always are part of a CORTEX configuration. 
+If you want to install and try some existing agents, you can clone the [dsr-graph](https://github.com/robocomp/dsr-graph) repository and read the related documentation. Note that agents are always part of a CORTEX configuration. 
 
 
 # Developer Documentation
 ## DSR-API (aka G-API)
-G-API is the user-level access layer to G. It is composed by a set of core methods that access the underlying CRDT and RTPS APIs, and an extendable  set of auxiliary methods added to simplify the user coding tasks. 
+G-API is the user-level access layer to G. It comprises a set of core methods that access the underlying CRDT and RTPS APIs, and an extendable  set of auxiliary methods added to simplify the user coding tasks. 
 
 
-The most important features of the G-API are:
+The most essential features of the G-API are:
 
--   It always works on a copy a node. The obtention of the copy is done by a core method using shared mutex technology. Once a copy of the node is returned, the user can edit it for as long as she wants. When it is ready, the node is reinserted in G using another core method. This feature makes the API thread-safe.
+-   It always works on a copy of a node. The copy acquisition is transparently done using a thread-safe core method. Once a copy of the node is returned, the user can edit it for as long as she wants. When ready, the node can be safely reinserted into G using another thread-safe method. This feature relieves the user from dealing with controlled concurrent access to the graph.
     
--   There are a group of methods, that include the word local in their name, created to change the attributes of a node. These methods do not reinsert the node back into G and the user is left with this responsibility.
+-   There are a group of methods that include the word local in their name, created to change the attributes of a node. These methods do not reinsert the node back into G; the user is left responsible for that.
     
--   DSRGraph has been created as a QObject to emit signals whenever a node is created, deleted or modified. Using this functionality, a set of graphic classes have been created to show in real-time the state of G. These classes can be connected at run-time to the signals. There is an abstract class from which all of them inherit that can be used to create more user-defined observers of G.
-    
--   To create a new node, a unique identifier is needed. To guarantee this requirement, the node creation method places a RPC call to the special agent idserver, using standard RoboComp communication methods. Idserver returns a unique id that can be safely added to the new node.
+-   The DSRGraph object (G) inherits from QObject to use the signal/slot Qt facility. G emits signals whenever a node is created, deleted or modified.
 
--   G can be serialized to a JSON file from any agent but it is better to do it only from the idserver agent, to avoid the spreading of copies of the graph in different states.
+-   All agents generated with the RobocompDSL code generator have slots to receive these signals. This functionality provides the agents with an asynchronous response to changes in G, that complements the synchronous calls to the API
+
+-   Using the signal/slot functionality, G can be displayed in real-time using a set of GUI classes. The standard GUI provides different docked views of G, including a graph representation, a tree view, and a 2D robot-centered view. The user can add custom views to the tabified widget.
+    
+-   A unique identifier is needed to create a new node. A 64-bit UUID number is obtained and assigned to the agent to guarantee this requirement.
+-   
+-   G can be serialized to a JSON file from any agent using a function from the API
 
 
 ## Common examples
@@ -244,7 +248,7 @@ G->update_node(robot_node.value());
 /*==================================================================*/
 /*======== Using RT API, getting edge, modifying attributes ========*/
 
-// Get a pointer to th rt API
+// Get a pointer to the RT API
 auto rt = G->get_rt_api();
 
 // Use it to get an RT Edge from the graph
@@ -659,6 +663,9 @@ union Val switch(long) {
 
 These structures are compiled into C++ code that is included in the agent, forming the deeper layer of G. On top of it, another layer called CRDT is added to provide eventual consistency while agents communicate using asynchronous updates.
 
+## Python API
+
+[Link text](python_api_documentation.md)
 
 
 <!--stackedit_data:
