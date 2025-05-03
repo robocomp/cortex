@@ -3,6 +3,7 @@
 //
 
 #include "dsr/api/dsr_api.h"
+#include <thread>
 
 using namespace DSR;
 
@@ -144,6 +145,46 @@ ValType convert_variant(const attribute_type & e)
     return cast[idx](e);
 }
 
+class signal_forwarder {
+
+    std::mutex mtx;
+    std::queue<std::function<void()>> fns;
+
+    public:
+    bool exit = false;
+    std::condition_variable cv;
+
+    void put(std::function<void()> && fn) {
+        std::unique_lock l(mtx);
+        fns.emplace(std::forward<decltype(fn)>(fn));
+        cv.notify_all();
+    }
+
+    void run() {
+        std::function<void()> f;
+        if (!fns.empty())
+        {
+            {
+                std::unique_lock l(mtx);
+                f = std::move(fns.front());
+                fns.pop();
+            }
+            // run after lock release because f() will take the gil and weird things can happen with the main thread. 
+            f(); 
+        }
+    }
+
+    bool empty() {
+        return fns.empty();
+    }
+
+    void wait() {
+        std::unique_lock l(mtx);
+        cv.wait(l, [this]{ return !fns.empty() || exit; });
+    }
+
+};
+
 PYBIND11_MAKE_OPAQUE(std::map<std::pair<uint64_t, std::string>, Edge>)
 PYBIND11_MAKE_OPAQUE(std::map<std::string, Attribute>)
 
@@ -154,6 +195,24 @@ PYBIND11_MODULE(pydsr, m) {
     m.doc() = "DSR Api for python";
 
     uint64_t local_agent_id = -1;
+
+
+    static signal_forwarder recv;
+    static std::thread signal_thread ([&] {
+        while(true) {
+            recv.wait();
+            if (recv.exit) break;
+            recv.run();
+        }
+    });
+
+    auto cleanup_callback = []() {
+        recv.exit = true;
+        recv.cv.notify_all();
+        signal_thread.join();
+    };
+
+    m.add_object("_cleanup", py::capsule(cleanup_callback));
 
 
     //Disable messages from Qt.
@@ -302,6 +361,113 @@ PYBIND11_MODULE(pydsr, m) {
                 throw std::logic_error("Invalid signal type");
         }
     });
+
+    sig.def("connect2", [&](DSRGraph *G, signal_type type, callback_types fn_callback) {
+        
+        switch (type) {
+            case UPDATE_NODE:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::update_node_signal,
+                                    [fn_callback = std::get<std::function<void(std::uint64_t, const std::string &)>>(fn_callback)]
+                                    (auto a, auto b) { 
+                                       recv.put([a, b, fn_callback] { fn_callback(a, b); });
+                                    });
+
+                } catch (std::exception &e) {
+                    std::cout << "Update Node Callback must be (int, str)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case UPDATE_NODE_ATTR:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::update_node_attr_signal, 
+                                    [fn_callback = std::get<std::function<void(std::uint64_t, const std::vector<std::string> &)>>(fn_callback)]
+                                    (auto a, auto b) { 
+                                        recv.put([a, b, fn_callback] { fn_callback(a, b); });
+                                    });
+
+                } catch (std::exception &e) {
+                    std::cout << "Update Node Attribute Callback must be (int, [str])\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case UPDATE_EDGE:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::update_edge_signal, 
+                                    [fn_callback = std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &)>>(fn_callback)]
+                                    (auto a, auto b, auto c) { 
+                                        recv.put([a, b, c, fn_callback] { fn_callback(a, b, c); });
+                                     });
+                } catch (std::exception &e) {
+                    std::cout << "Update Edge Callback must be (int, int, str)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case UPDATE_EDGE_ATTR:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::update_edge_attr_signal, 
+                                    [fn_callback = std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &, const std::vector<std::string> &)>>(fn_callback)]
+                                    (auto a, auto b, auto c, auto d) { 
+                                            recv.put([a, b, c, d, fn_callback] { fn_callback(a, b, c, d); });
+                                    });
+                } catch (std::exception &e) {
+                    std::cout << "Update Edge Attribute Callback must be (int, int, str, [str])\n " << std::endl;
+                    throw e;
+                }
+                break;
+            case DELETE_EDGE:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::del_edge_signal, 
+                                     [fn_callback = std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &)>>(fn_callback)]
+                                     (std::uint64_t a, std::uint64_t b, const std::string & c) { 
+                                        recv.put([a, b, c, fn_callback] { fn_callback(a, b, c); });
+                                     });
+                } catch (std::exception &e) {
+                    std::cout << "Delete Edge Callback must be (int, int, str)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case DELETE_NODE:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::del_node_signal, 
+                                    [fn_callback = std::get<std::function<void(std::uint64_t)>>(fn_callback)]
+                                    (auto a) { 
+                                        recv.put([a,fn_callback] { fn_callback(a); });
+                                    });
+                } catch (std::exception &e) {
+                    std::cout << "Delete Node Callback must be (int)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case DELETE_NODE_OBJ:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::deleted_node_signal, 
+                                    [fn_callback = std::get<std::function<void(const DSR::Node&)>>(fn_callback)]
+                                    (auto a) { 
+                                        recv.put([a,fn_callback] { fn_callback(a); });
+                                    });
+                } catch (std::exception &e) {
+                    std::cout << "Delete Node Callback must be (pydsr.Node)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            case DELETE_EDGE_OBJ:
+                try {
+                    QObject::connect(G, &DSR::DSRGraph::deleted_edge_signal, 
+                                    [fn_callback = std::get<std::function<void(const DSR::Edge&)>>(fn_callback)]
+                                    (auto a) { 
+                                        recv.put([a,fn_callback] { fn_callback(a); });
+                                    });
+                } catch (std::exception &e) {
+                    std::cout << "Delete Node Callback must be (pydsr.Edge)\n "  << std::endl;
+                    throw e;
+                }
+                break;
+            default:
+                throw std::logic_error("Invalid signal type");
+        }
+    });
+
 
     //DSR Attribute class
     py::class_<Attribute>(m, "Attribute")
@@ -618,12 +784,8 @@ PYBIND11_MODULE(pydsr, m) {
             .def(py::init([&](int root, const std::string &name, int id,
                               const std::string &dsr_input_file = "",
                               bool all_same_host = true) -> std::unique_ptr<DSRGraph> {
-
-                     //py::gil_scoped_release release;
                      local_agent_id = id;
-
                      auto g = std::make_unique<DSRGraph>(root, name, id, dsr_input_file, all_same_host);
-
                      return g;
                  }), "root"_a, "name"_a, "id"_a, "dsr_input_file"_a = "",
                  "all_same_host"_a = true, py::call_guard<py::gil_scoped_release>())
