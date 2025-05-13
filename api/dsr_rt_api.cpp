@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <dsr/api/dsr_rt_api.h>
 #include <dsr/api/dsr_api.h>
 
@@ -160,7 +161,7 @@ std::optional<Eigen::Vector3d> RT_API::get_translation(uint64_t node_id, uint64_
         return {};
 }
 
-void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler)
+void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler, std::optional<uint64_t> timestamp)
 {
     bool r1 = false;
     bool r2 = false;
@@ -197,19 +198,51 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
 
-                auto timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
-                uint32_t index = timestamp_index * BLOCK_SIZE;
+                auto timestamp_index = 0;
+                uint32_t index = 0;
+                if (timestamp.has_value()) {
+                    std::vector<size_t> diffs;
+                    std::transform(time_stamps.begin(), time_stamps.end(), std::back_inserter(diffs),
+                                 [t = *timestamp](auto &val) {
+                                   return (val - t > 0) ? (val - t) : std::numeric_limits<int>::max();
+                                 });
 
-                tr_pack[index] = trans[0];
-                tr_pack[index + 1] = trans[1];
-                tr_pack[index + 2] = trans[2];
-                rot_pack[index] = rot_euler[0];
-                rot_pack[index + 1] = rot_euler[1];
-                rot_pack[index + 2] = rot_euler[2];
-                time_stamps[timestamp_index] = static_cast<std::uint64_t>(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::system_clock::now().time_since_epoch()).count());
 
+                    auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()) + 1)  % HISTORY_SIZE;
+                    
+                    timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
+                    uint32_t index = timestamp_index * BLOCK_SIZE;
+
+                    // too old to insert it
+                    if (pos == timestamp_index && *timestamp < time_stamps[pos]) {return;}
+
+                    time_stamps.erase(time_stamps.begin() + timestamp_index);
+                    tr_pack.erase(tr_pack.begin() + index, tr_pack.begin() + index + 3);
+                    rot_pack.erase(rot_pack.begin() + index, rot_pack.begin() + index + 3);
+
+                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE, trans[0]);
+                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 1, trans[1]);
+                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 2, trans[2]);
+                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE, rot_euler[0]);
+                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 1, rot_euler[1]);
+                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 2, rot_euler[2]);
+                    time_stamps.insert(time_stamps.begin() + pos, *timestamp);
+                    
+
+                } else {
+                    timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
+                    uint32_t index = timestamp_index * BLOCK_SIZE;
+
+                    tr_pack[index] = trans[0];
+                    tr_pack[index + 1] = trans[1];
+                    tr_pack[index + 2] = trans[2];
+                    rot_pack[index] = rot_euler[0];
+                    rot_pack[index + 1] = rot_euler[1];
+                    rot_pack[index + 2] = rot_euler[2];
+                    time_stamps[timestamp_index] = static_cast<std::uint64_t>(
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count());
+                }
 
                 CRDTAttribute tr(std::move(tr_pack), get_unix_timestamp(), 0);
                 CRDTAttribute rot(std::move(rot_pack), get_unix_timestamp(), 0);
@@ -304,7 +337,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
     }
 }
 
-void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler)
+void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler, std::optional<uint64_t> timestamp)
 {
     bool r1 = false;
     bool r2 = false;
@@ -341,18 +374,51 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
 
-                auto timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
-                uint32_t index = timestamp_index * BLOCK_SIZE;
+                auto timestamp_index = 0;
+                uint32_t index = 0;
+                if (timestamp.has_value()) {
+                    std::vector<size_t> diffs;
+                    std::transform(time_stamps.begin(), time_stamps.end(), std::back_inserter(diffs),
+                                 [t = *timestamp](auto &val) {
+                                   return (val - t > 0) ? (val - t) : std::numeric_limits<int>::max();
+                                 });
 
-                tr_pack[index] = trans[0];
-                tr_pack[index + 1] = trans[1];
-                tr_pack[index + 2] = trans[2];
-                rot_pack[index] = rot_euler[0];
-                rot_pack[index + 1] = rot_euler[1];
-                rot_pack[index + 2] = rot_euler[2];
-                time_stamps[timestamp_index] = static_cast<std::uint64_t>(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::system_clock::now().time_since_epoch()).count());
+
+                    auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()) + 1)  % HISTORY_SIZE;
+                    
+                    timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
+                    uint32_t index = timestamp_index * BLOCK_SIZE;
+
+                    // too old to insert it
+                    if (pos == timestamp_index && *timestamp < time_stamps[pos]) {return;}
+
+                    time_stamps.erase(time_stamps.begin() + timestamp_index);
+                    tr_pack.erase(tr_pack.begin() + index, tr_pack.begin() + index + 3);
+                    rot_pack.erase(rot_pack.begin() + index, rot_pack.begin() + index + 3);
+
+                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE, trans[0]);
+                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 1, trans[1]);
+                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 2, trans[2]);
+                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE, rot_euler[0]);
+                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 1, rot_euler[1]);
+                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 2, rot_euler[2]);
+                    time_stamps.insert(time_stamps.begin() + pos, *timestamp);
+                    
+
+                } else {
+                    timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE+1) % HISTORY_SIZE;
+                    uint32_t index = timestamp_index * BLOCK_SIZE;
+
+                    tr_pack[index] = trans[0];
+                    tr_pack[index + 1] = trans[1];
+                    tr_pack[index + 2] = trans[2];
+                    rot_pack[index] = rot_euler[0];
+                    rot_pack[index + 1] = rot_euler[1];
+                    rot_pack[index + 2] = rot_euler[2];
+                    time_stamps[timestamp_index] = static_cast<std::uint64_t>(
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count());
+                }
 
 
                 CRDTAttribute tr(std::move(tr_pack), get_unix_timestamp(), 0);
