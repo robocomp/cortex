@@ -30,6 +30,7 @@ add_executable(tests test.cpp
                      graph/graph_operations.cpp
                      graph/attribute_operations.cpp
                      graph/convenience_operations.cpp
+                     graph/rt_timestamp.cpp
                      crdt/crdt_operations.cpp
                      synchronization/graph_synchronization.cpp
                      synchronization/type_translation.cpp

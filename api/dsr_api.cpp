@@ -495,7 +495,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
 //////////////////////////////////////////////////////////////////////////////////
 std::optional<CRDTEdge> DSRGraph::get_edge_(uint64_t from, uint64_t to, const std::string &key)
 {
-    std::shared_lock<std::shared_mutex> lock(_mutex);
+    //std::shared_lock<std::shared_mutex> lock(_mutex);
     if (nodes.contains(from) && nodes.contains(to))
     {
         auto n = get_(from);
@@ -524,6 +524,7 @@ std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::
 
 std::optional<DSR::Edge> DSRGraph::get_edge(uint64_t from, uint64_t to, const std::string &key)
 {
+    std::shared_lock<std::shared_mutex> lock(_mutex);
     auto edge_opt = get_edge_(from, to, key);
     if (edge_opt.has_value()) return Edge(std::move(edge_opt.value()));
     return {};
@@ -679,8 +680,8 @@ bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
     std::optional<IDL::MvregEdge> delta;
     std::optional<Edge> deleted_edge;
     {
-        deleted_edge = get_edge_(from, to, key);
         std::unique_lock<std::shared_mutex> lock(_mutex);
+        deleted_edge = get_edge_(from, to, key);
         delta = delete_edge_(from, to, key);
     }
     if (delta.has_value())
@@ -707,8 +708,8 @@ bool DSRGraph::delete_edge(const std::string &from, const std::string &to, const
     {
         id_from = get_id_from_name(from);
         id_to = get_id_from_name(to);
-        deleted_edge = get_edge_(id_from.value(), id_to.value(), key);
         std::unique_lock<std::shared_mutex> lock(_mutex);
+        deleted_edge = get_edge_(id_from.value(), id_to.value(), key);
         if (id_from.has_value() && id_to.has_value())
         {
             delta = delete_edge_(id_from.value(), id_to.value(), key);

@@ -19,7 +19,7 @@ namespace DSR
             explicit RT_API(DSRGraph *G_);
 
             const int32_t BLOCK_SIZE = 3;   // size of 3-vector for translation and euler xyz angles
-            uint32_t HISTORY_SIZE = 0; // Number of blocks in the history.
+            uint32_t HISTORY_SIZE = 5; // Number of blocks in the history.
 
             void insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler, std::optional<uint64_t> timestamp = std::nullopt);
             void insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler, std::optional<uint64_t> timestamp = std::nullopt);
