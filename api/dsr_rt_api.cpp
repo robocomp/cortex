@@ -200,15 +200,16 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
 
                 auto timestamp_index = 0;
                 int index = 0;
+                bool update_index = true;
                 if (timestamp.has_value()) {
                     std::vector<int64_t> diffs;
                     std::transform(time_stamps.begin(), time_stamps.end(), std::back_inserter(diffs),
                                  [t = *timestamp](auto &val) {
                                     return ((int64_t)t - (int64_t)val > 0) ? ((int64_t)t - (int64_t)val) : std::numeric_limits<int64_t>::min();
                                  });
-                    
+
                     auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()))  % HISTORY_SIZE;
-                    
+
                     if (!head_o.has_value()) {
                         timestamp_index = 0;
                     } else {
@@ -221,6 +222,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                     if (pos == timestamp_index && *timestamp < time_stamps[pos]) {return;}
                     if (pos > timestamp_index) {
                         pos = timestamp_index;
+                        update_index = false;
                     }
 
                     time_stamps.erase(time_stamps.begin() + timestamp_index);
@@ -234,7 +236,6 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 1, rot_euler[1]);
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 2, rot_euler[2]);
                     time_stamps.insert(time_stamps.begin() + pos, *timestamp);
-                    
 
                 } else {
                     if (!head_o.has_value()) {
@@ -264,8 +265,10 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                 it->second.write(std::move(rot));
                 std::tie(it, new_el) = e.attrs().insert_or_assign("rt_translation", mvreg<CRDTAttribute> ());
                 it->second.write(std::move(tr));
-                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_head_index", mvreg<CRDTAttribute> ());
-                it->second.write(std::move(head_index));
+                if (update_index) {
+                    std::tie(it, new_el) = e.attrs().insert_or_assign("rt_head_index", mvreg<CRDTAttribute> ());
+                    it->second.write(std::move(head_index));
+                }
                 std::tie(it, new_el) = e.attrs().insert_or_assign("rt_timestamps", mvreg<CRDTAttribute> ());
                 it->second.write(std::move(timestamps));
             }
@@ -396,8 +399,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                                  });
 
                     auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()))  % HISTORY_SIZE;
-                    
-    
+
                     if (!head_o.has_value()) {
                         timestamp_index = 0;
                     } else {
@@ -422,7 +424,6 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 1, rot_euler[1]);
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 2, rot_euler[2]);
                     time_stamps.insert(time_stamps.begin() + pos, *timestamp);
-                    
 
                 } else {
                     if (!head_o.has_value()) {
