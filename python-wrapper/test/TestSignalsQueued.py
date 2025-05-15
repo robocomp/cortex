@@ -121,3 +121,7 @@ console.print("DELETE NODE", style="green")
 
 result = g.delete_node(2)
 console.print(result)
+
+
+import time
+time.sleep(1)

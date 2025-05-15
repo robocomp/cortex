@@ -145,48 +145,11 @@ ValType convert_variant(const attribute_type & e)
     return cast[idx](e);
 }
 
-class signal_forwarder {
-
-    std::mutex mtx;
-    std::queue<std::function<void()>> fns;
-
-    public:
-    bool exit = false;
-    std::condition_variable cv;
-
-    void put(std::function<void()> && fn) {
-        std::unique_lock l(mtx);
-        fns.emplace(std::forward<decltype(fn)>(fn));
-        cv.notify_all();
-    }
-
-    void run() {
-        std::function<void()> f;
-        if (!fns.empty())
-        {
-            {
-                std::unique_lock l(mtx);
-                f = std::move(fns.front());
-                fns.pop();
-            }
-            // run after lock release because f() will take the gil and weird things can happen with the main thread. 
-            f(); 
-        }
-    }
-
-    bool empty() {
-        return fns.empty();
-    }
-
-    void wait() {
-        std::unique_lock l(mtx);
-        cv.wait(l, [this]{ return !fns.empty() || exit; });
-    }
-
-};
-
 PYBIND11_MAKE_OPAQUE(std::map<std::pair<uint64_t, std::string>, Edge>)
 PYBIND11_MAKE_OPAQUE(std::map<std::string, Attribute>)
+
+
+static QCoreApplication *app = nullptr;
 
 PYBIND11_MODULE(pydsr, m) {
     py::bind_map<std::map<std::pair<uint64_t, std::string>, Edge>>(m, "MapStringEdge");
@@ -196,24 +159,31 @@ PYBIND11_MODULE(pydsr, m) {
 
     uint64_t local_agent_id = -1;
 
-
-    static signal_forwarder recv;
-    static std::thread signal_thread ([&] {
-        while(true) {
-            recv.wait();
-            if (recv.exit) break;
-            recv.run();
-        }
+    std::thread signal_thread ([] {
+        int argc = 0;
+        char *argv[] = {nullptr};
+        auto *QApp = new QCoreApplication(argc, argv);
+        app = QApp;
+        QApp->exec();
     });
 
-    auto cleanup_callback = []() {
-        recv.exit = true;
-        recv.cv.notify_all();
-        signal_thread.join();
-    };
+    signal_thread.detach();
 
-    m.add_object("_cleanup", py::capsule(cleanup_callback));
+    // ugly busy wait until the QApp thread is running.
+    while (app != nullptr){}
 
+    py::module::import("atexit").attr("register")(
+        py::cpp_function{
+        [&]() -> void {
+            if (app) {
+                QCoreApplication::quit();
+                //app->quit();
+                //signal_thread.join();
+                std::exit(0);
+            } 
+        }
+        }
+    );
 
     //Disable messages from Qt.
     qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &context, const QString &msg) {
@@ -367,11 +337,9 @@ PYBIND11_MODULE(pydsr, m) {
         switch (type) {
             case UPDATE_NODE:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::update_node_signal,
-                                    [fn_callback = std::get<std::function<void(std::uint64_t, const std::string &)>>(fn_callback)]
-                                    (auto a, auto b) { 
-                                       recv.put([a, b, fn_callback] { fn_callback(a, b); });
-                                    });
+                    QObject::connect(G, &DSR::DSRGraph::update_node_signal, app,
+                                    std::get<std::function<void(std::uint64_t, const std::string &)>>(fn_callback), 
+                                    Qt::QueuedConnection);
 
                 } catch (std::exception &e) {
                     std::cout << "Update Node Callback must be (int, str)\n "  << std::endl;
@@ -380,11 +348,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case UPDATE_NODE_ATTR:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::update_node_attr_signal, 
-                                    [fn_callback = std::get<std::function<void(std::uint64_t, const std::vector<std::string> &)>>(fn_callback)]
-                                    (auto a, auto b) { 
-                                        recv.put([a, b, fn_callback] { fn_callback(a, b); });
-                                    });
+                    QObject::connect(G, &DSR::DSRGraph::update_node_attr_signal, app,
+                                    std::get<std::function<void(std::uint64_t, const std::vector<std::string> &)>>(fn_callback),
+                                    Qt::QueuedConnection);
 
                 } catch (std::exception &e) {
                     std::cout << "Update Node Attribute Callback must be (int, [str])\n "  << std::endl;
@@ -393,11 +359,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case UPDATE_EDGE:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::update_edge_signal, 
-                                    [fn_callback = std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &)>>(fn_callback)]
-                                    (auto a, auto b, auto c) { 
-                                        recv.put([a, b, c, fn_callback] { fn_callback(a, b, c); });
-                                     });
+                    QObject::connect(G, &DSR::DSRGraph::update_edge_signal, app,
+                                    std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &)>>(fn_callback),
+                                    Qt::QueuedConnection);
                 } catch (std::exception &e) {
                     std::cout << "Update Edge Callback must be (int, int, str)\n "  << std::endl;
                     throw e;
@@ -405,11 +369,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case UPDATE_EDGE_ATTR:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::update_edge_attr_signal, 
-                                    [fn_callback = std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &, const std::vector<std::string> &)>>(fn_callback)]
-                                    (auto a, auto b, auto c, auto d) { 
-                                            recv.put([a, b, c, d, fn_callback] { fn_callback(a, b, c, d); });
-                                    });
+                    QObject::connect(G, &DSR::DSRGraph::update_edge_attr_signal, app,
+                                    std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &, const std::vector<std::string> &)>>(fn_callback),
+                                    Qt::QueuedConnection);
                 } catch (std::exception &e) {
                     std::cout << "Update Edge Attribute Callback must be (int, int, str, [str])\n " << std::endl;
                     throw e;
@@ -417,11 +379,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case DELETE_EDGE:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::del_edge_signal, 
-                                     [fn_callback = std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &)>>(fn_callback)]
-                                     (std::uint64_t a, std::uint64_t b, const std::string & c) { 
-                                        recv.put([a, b, c, fn_callback] { fn_callback(a, b, c); });
-                                     });
+                    QObject::connect(G, &DSR::DSRGraph::del_edge_signal, app,
+                                     std::get<std::function<void(std::uint64_t, std::uint64_t, const std::string &)>>(fn_callback),
+                                     Qt::QueuedConnection);
                 } catch (std::exception &e) {
                     std::cout << "Delete Edge Callback must be (int, int, str)\n "  << std::endl;
                     throw e;
@@ -429,11 +389,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case DELETE_NODE:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::del_node_signal, 
-                                    [fn_callback = std::get<std::function<void(std::uint64_t)>>(fn_callback)]
-                                    (auto a) { 
-                                        recv.put([a,fn_callback] { fn_callback(a); });
-                                    });
+                    QObject::connect(G, &DSR::DSRGraph::del_node_signal, app,
+                                    std::get<std::function<void(std::uint64_t)>>(fn_callback),
+                                    Qt::QueuedConnection);
                 } catch (std::exception &e) {
                     std::cout << "Delete Node Callback must be (int)\n "  << std::endl;
                     throw e;
@@ -441,11 +399,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case DELETE_NODE_OBJ:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::deleted_node_signal, 
-                                    [fn_callback = std::get<std::function<void(const DSR::Node&)>>(fn_callback)]
-                                    (auto a) { 
-                                        recv.put([a,fn_callback] { fn_callback(a); });
-                                    });
+                    QObject::connect(G, &DSR::DSRGraph::deleted_node_signal, app,
+                                    std::get<std::function<void(const DSR::Node&)>>(fn_callback),
+                                    Qt::QueuedConnection);
                 } catch (std::exception &e) {
                     std::cout << "Delete Node Callback must be (pydsr.Node)\n "  << std::endl;
                     throw e;
@@ -453,11 +409,9 @@ PYBIND11_MODULE(pydsr, m) {
                 break;
             case DELETE_EDGE_OBJ:
                 try {
-                    QObject::connect(G, &DSR::DSRGraph::deleted_edge_signal, 
-                                    [fn_callback = std::get<std::function<void(const DSR::Edge&)>>(fn_callback)]
-                                    (auto a) { 
-                                        recv.put([a,fn_callback] { fn_callback(a); });
-                                    });
+                    QObject::connect(G, &DSR::DSRGraph::deleted_edge_signal, app,
+                                    std::get<std::function<void(const DSR::Edge&)>>(fn_callback),
+                                    Qt::QueuedConnection);
                 } catch (std::exception &e) {
                     std::cout << "Delete Node Callback must be (pydsr.Edge)\n "  << std::endl;
                     throw e;
