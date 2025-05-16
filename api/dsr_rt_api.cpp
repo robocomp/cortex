@@ -198,6 +198,10 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
 
+                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(BLOCK_SIZE);
+                if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+                if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+
                 auto timestamp_index = 0;
                 int index = 0;
                 bool update_index = true;
@@ -388,6 +392,10 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
 
+                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(BLOCK_SIZE);
+                if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+                if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+
                 auto timestamp_index = 0;
                 int index = 0;
                 bool update_index = true;
@@ -411,8 +419,9 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     if (pos == timestamp_index && *timestamp < time_stamps[pos]) {return;}
                     if (pos > timestamp_index) {
                         pos = timestamp_index;
-                        update_index=false;
+                        update_index = false;
                     }
+
                     time_stamps.erase(time_stamps.begin() + timestamp_index);
                     tr_pack.erase(tr_pack.begin() + index, tr_pack.begin() + index + 3);
                     rot_pack.erase(rot_pack.begin() + index, rot_pack.begin() + index + 3);
