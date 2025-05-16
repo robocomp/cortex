@@ -198,7 +198,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
 
-                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(BLOCK_SIZE);
+                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(HISTORY_SIZE);
                 if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
                 if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
 
@@ -392,7 +392,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
 
-                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(BLOCK_SIZE);
+                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(HISTORY_SIZE);
                 if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
                 if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
 
