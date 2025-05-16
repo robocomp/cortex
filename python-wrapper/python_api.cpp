@@ -159,7 +159,7 @@ PYBIND11_MODULE(pydsr, m) {
 
     uint64_t local_agent_id = -1;
 
-    std::thread signal_thread ([] {
+    /*std::thread signal_thread ([] {
         int argc = 0;
         char *argv[] = {nullptr};
         auto *QApp = new QCoreApplication(argc, argv);
@@ -167,7 +167,7 @@ PYBIND11_MODULE(pydsr, m) {
         QApp->exec();
     });
 
-    signal_thread.detach();
+    signal_thread.detach();*/
 
     // ugly busy wait until the QApp thread is running.
     while (app != nullptr){}
@@ -176,11 +176,9 @@ PYBIND11_MODULE(pydsr, m) {
         py::cpp_function{
         [&]() -> void {
             if (app) {
-                QCoreApplication::quit();
-                //app->quit();
-                //signal_thread.join();
+                //QCoreApplication::quit();
                 std::exit(0);
-            } 
+            }
         }
         }
     );
