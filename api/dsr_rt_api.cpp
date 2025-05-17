@@ -202,10 +202,24 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                 if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
                 if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
 
-                auto timestamp_index = 0;
-                int index = 0;
                 bool update_index = true;
-                if (timestamp.has_value()) {
+                auto timestamp_index = 0;
+                if (!head_o.has_value()) {
+                        timestamp_index = 0;
+                } else {
+                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
+                }
+                int index = timestamp_index * BLOCK_SIZE;
+
+                auto timestamp_v = (timestamp.has_value()) ? *timestamp : static_cast<std::uint64_t>(
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count());
+
+
+                constexpr auto next = [](auto v, auto size) { return (v + 1) % size; };
+                constexpr auto prev = [](auto v, auto size) { return (v > 0) ? v - 1 : size - 1; };
+
+                if (timestamp_v < time_stamps[prev(timestamp_index, HISTORY_SIZE)]) {
                     std::vector<int64_t> diffs;
                     std::transform(time_stamps.begin(), time_stamps.end(), std::back_inserter(diffs),
                                  [t = *timestamp](auto &val) {
@@ -214,18 +228,9 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
 
                     auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()))  % HISTORY_SIZE;
 
-                    if (!head_o.has_value()) {
-                        timestamp_index = 0;
-                    } else {
-                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
-                    }
-
-                    index = timestamp_index * BLOCK_SIZE;
-
                     // too old to insert it
-                    if (pos == timestamp_index && *timestamp < time_stamps[pos]) {return;}
+                    if (pos == timestamp_index && timestamp_v < time_stamps[pos]) {return;}
                     if (pos > timestamp_index) {
-                        pos = timestamp_index;
                         update_index = false;
                     }
 
@@ -242,12 +247,6 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                     time_stamps.insert(time_stamps.begin() + pos, *timestamp);
 
                 } else {
-                    if (!head_o.has_value()) {
-                        timestamp_index = 0;
-                    } else {
-                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
-                    }
-                    index = timestamp_index * BLOCK_SIZE;
 
                     tr_pack[index] = trans[0];
                     tr_pack[index + 1] = trans[1];
@@ -255,9 +254,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                     rot_pack[index] = rot_euler[0];
                     rot_pack[index + 1] = rot_euler[1];
                     rot_pack[index + 2] = rot_euler[2];
-                    time_stamps[timestamp_index] = static_cast<std::uint64_t>(
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch()).count());
+                    time_stamps[timestamp_index] = timestamp_v;
                 }
 
                 CRDTAttribute tr(std::move(tr_pack), get_unix_timestamp(), 0);
@@ -396,10 +393,22 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
                 if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
 
-                auto timestamp_index = 0;
-                int index = 0;
                 bool update_index = true;
-                if (timestamp.has_value()) {
+                auto timestamp_index = 0;
+                if (!head_o.has_value()) {
+                        timestamp_index = 0;
+                } else {
+                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
+                }
+                int index = timestamp_index * BLOCK_SIZE;
+                auto timestamp_v = (timestamp.has_value()) ? *timestamp : static_cast<std::uint64_t>(
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count());
+
+                constexpr auto next = [](auto v, auto size) { return (v + 1) % size; };
+                constexpr auto prev = [](auto v, auto size) { return (v > 0) ? v - 1 : size - 1; };
+
+                if (timestamp_v < time_stamps[prev(timestamp_index, HISTORY_SIZE)]) {
                     std::vector<int64_t> diffs;
                     std::transform(time_stamps.begin(), time_stamps.end(), std::back_inserter(diffs),
                                  [t = *timestamp](auto &val) {
@@ -407,18 +416,10 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                                  });
 
                     auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()))  % HISTORY_SIZE;
-
-                    if (!head_o.has_value()) {
-                        timestamp_index = 0;
-                    } else {
-                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
-                    }
-                    index = timestamp_index * BLOCK_SIZE;
-
+                    
                     // too old to insert it
-                    if (pos == timestamp_index && *timestamp < time_stamps[pos]) {return;}
-                    if (pos > timestamp_index) {
-                        pos = timestamp_index;
+                    if (pos == timestamp_index && timestamp_v < time_stamps[pos]) {return;}
+                    if (pos >= timestamp_index) {
                         update_index = false;
                     }
 
@@ -435,12 +436,6 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     time_stamps.insert(time_stamps.begin() + pos, *timestamp);
 
                 } else {
-                    if (!head_o.has_value()) {
-                        timestamp_index = 0;
-                    } else {
-                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
-                    }
-                    index = timestamp_index * BLOCK_SIZE;
 
                     tr_pack[index] = trans[0];
                     tr_pack[index + 1] = trans[1];
@@ -448,9 +443,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     rot_pack[index] = rot_euler[0];
                     rot_pack[index + 1] = rot_euler[1];
                     rot_pack[index + 2] = rot_euler[2];
-                    time_stamps[timestamp_index] = static_cast<std::uint64_t>(
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch()).count());
+                    time_stamps[timestamp_index] = timestamp_v;
                 }
 
 
