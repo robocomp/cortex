@@ -1171,8 +1171,8 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
         std::optional<Edge> deleted_edge;
         {
             auto crdt_delta = IDLEdge_to_CRDT(std::move(mvreg));
-            deleted_edge = get_edge_(from, to, type);
             std::unique_lock<std::shared_mutex> lock(_mutex);
+            deleted_edge = get_edge_(from, to, type);
             //Check if the node where we are joining the edge exist.
             bool cfrom{nodes.contains(from)}, cto{nodes.contains(to)};
             bool dfrom{deleted.contains(from)}, dto{deleted.contains(to)};
