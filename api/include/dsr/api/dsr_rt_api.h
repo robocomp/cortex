@@ -39,6 +39,9 @@ namespace DSR
 //            void del_edge_slot(const std::int32_t from, const std::int32_t to, const std::string &edge_type);
         private:
             DSR::DSRGraph *G;
+            static constexpr auto next = [](auto v, int size, int decr = 1) { return (v + decr) % size; };
+            static constexpr auto prev = [](auto v, int size, int inc = 1) { return (v > 0) ? v - inc : size - inc; };
+
     };
 }
 

@@ -55,9 +55,9 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
         const auto &r = r_o.value().get();
         if (timestamp == 0)  // return with the first 3 elements of the arrays
         {
-            if (head_o.has_value() and tstamps_o.has_value())
+            if (head_o.has_value())
             {
-                const auto &head = head_o.value();
+                const auto &head = prev(head_o.value(), t.size(), 3);
                 //qInfo() << __FUNCTION__ << " ZERO " << static_cast<int64_t>(timestamp) << static_cast<int64_t>(tstamps_o.value().get()[(int)(head/BLOCK_SIZE)]);
                 return Mat::RTMat(Eigen::Translation3d(t[head], t[head+1], t[head+2]) *
                                   Eigen::AngleAxisd(r[head], Eigen::Vector3d::UnitX()) *
@@ -117,9 +117,10 @@ std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t t
             const auto &t = t_o.value().get();
             if (timestamp == 0)
             {
-                if (head_o.has_value() and tstamps_o.has_value())
-                    return Eigen::Vector3d(t[head_o.value()], t[head_o.value() + 1], t[head_o.value() + 2]);
-                else
+                if (head_o.has_value() and tstamps_o.has_value()){
+                    auto h = prev(head_o.value(), t.size(), 3);
+                    return Eigen::Vector3d(t[h], t[h + 1], t[h + 2]);
+                } else
                     return Eigen::Vector3d(t[0], t[1], t[2]);
             }
             else  // timestamp not 0
@@ -216,8 +217,6 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
                             std::chrono::system_clock::now().time_since_epoch()).count());
 
 
-                constexpr auto next = [](auto v, auto size) { return (v + 1) % size; };
-                constexpr auto prev = [](auto v, auto size) { return (v > 0) ? v - 1 : size - 1; };
 
                 if (timestamp_v < time_stamps[prev(timestamp_index, HISTORY_SIZE)]) {
                     std::vector<int64_t> diffs;
@@ -405,8 +404,6 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                         std::chrono::duration_cast<std::chrono::milliseconds>(
                             std::chrono::system_clock::now().time_since_epoch()).count());
 
-                constexpr auto next = [](auto v, auto size) { return (v + 1) % size; };
-                constexpr auto prev = [](auto v, auto size) { return (v > 0) ? v - 1 : size - 1; };
 
                 if (timestamp_v < time_stamps[prev(timestamp_index, HISTORY_SIZE)]) {
                     std::vector<int64_t> diffs;
