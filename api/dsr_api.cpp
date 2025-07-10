@@ -65,7 +65,7 @@ DSRGraph::DSRGraph(GraphSettings settings) :
                                                                         std::cout << "Participant unmatched [" << info.participant_name.to_string() << "]" << std::endl;
                                                                         graph->delete_node(info.participant_name.to_string());
                                                                     }
-                                                                }));
+                                                                }), settings.domain_id);
 
 
     // RTPS Initialize publisher with general topic
@@ -122,8 +122,8 @@ DSRGraph::DSRGraph(GraphSettings settings) :
     qDebug() << __FUNCTION__ << "Constructor finished OK";
 }
 
-DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file, bool all_same_host)
-    : DSR::DSRGraph(GraphSettings {id, 5, 1, name, dsr_input_file, "", all_same_host, GraphSettings::LOGLEVEL::INFOL})
+DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_file, bool all_same_host, int8_t domain_id)
+    : DSR::DSRGraph(GraphSettings {id, 5, 1, name, dsr_input_file, "", all_same_host, GraphSettings::LOGLEVEL::INFOL, domain_id})
 {}
 
 

@@ -30,7 +30,7 @@ DSRParticipant::~DSRParticipant()
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn)
+std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id)
 {
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
@@ -86,7 +86,7 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
 
     int retry = 0;
     while (retry < 5) {
-        mp_participant = DomainParticipantFactory::get_instance()->create_participant(0, PParam, m_listener.get(), StatusMask::none());
+        mp_participant = DomainParticipantFactory::get_instance()->create_participant(domain_id, PParam, m_listener.get(), StatusMask::none());
         if(mp_participant != nullptr) break;
         retry++;
         qDebug() << "Error creating participant, retrying. [" << retry <<"/5]";

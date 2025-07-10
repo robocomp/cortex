@@ -57,9 +57,9 @@ namespace DSR
         size_t size() const;
 
         DSRGraph(GraphSettings settings);
-        DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true);
-        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true)
-                                : DSRGraph(name, id, dsr_input_file, all_same_host)
+        DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0);
+        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0)
+                                : DSRGraph(name, id, dsr_input_file, all_same_host, domain_id)
         {}
 
         ~DSRGraph() override;

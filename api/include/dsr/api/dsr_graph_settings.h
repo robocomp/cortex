@@ -16,7 +16,7 @@ struct GraphSettings {
     enum struct LOGLEVEL: uint8_t {
         DEBUGL = 0, INFOL, WARNINGL, ERRORL
     } log_level {LOGLEVEL::INFOL};
-
+    int8_t domain_id = 0;
 };
 
 }
