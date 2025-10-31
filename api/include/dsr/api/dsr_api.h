@@ -30,11 +30,13 @@
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_graph_settings.h"
+#include "dsr/api/dsr_signal_emitter.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/utils.h"
 #include "dsr/core/id_generator.h"
+#include "dsr_signal_emitter.h"
 #include "threadpool/threadpool.h"
 
 #include <QObject>
@@ -57,9 +59,9 @@ namespace DSR
         size_t size() const;
 
         DSRGraph(GraphSettings settings);
-        DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0);
-        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0)
-                                : DSRGraph(name, id, dsr_input_file, all_same_host, domain_id)
+        DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0, SignalMode = SignalMode::QT);
+        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0, SignalMode mode = SignalMode::QT)
+                                : DSRGraph(name, id, dsr_input_file, all_same_host, domain_id, mode)
         {}
 
         ~DSRGraph() override;
@@ -539,6 +541,14 @@ namespace DSR
             return ret_vec;
         }
 
+
+        //////////////////////////////////////////////////
+        ///// QueuedSignals for python
+        /////////////////////////////////////////////////
+
+        QueuedSignalRunner* get_signal_runner() {
+            return emitter.runner.get();
+        }
     private:
 
         DSRGraph(const DSRGraph& G); //Private constructor for DSRCopy
@@ -557,6 +567,40 @@ namespace DSR
         bool same_host;
         id_generator generator;
         GraphSettings::LOGLEVEL log_level;
+        signals_fns emitter;
+
+        //////////////////////////////////////////////////////////////////////////
+        // Signal method
+        ///////////////////////////////////////////////////////////////////////////
+
+        void set_qt_signals (){
+            emitter = {
+                [this](std::uint64_t a, const std::string & b, SignalInfo c = {}) { emit update_node_signal(a, b, c); },
+                [this](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { emit update_node_attr_signal(a, b, c); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { emit update_edge_signal(a, b, c, d); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, const std::vector<std::string> &d, SignalInfo e = {}) { emit update_edge_attr_signal(a, b, c, d, e); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { emit del_edge_signal(a, b, c, d); },
+                [this](std::uint64_t a, SignalInfo b = {}) { emit  del_node_signal(a, b); },
+                [this](const Node& a, SignalInfo b = {}) { emit deleted_node_signal(a, b); },
+                [this](const Edge& a, SignalInfo b = {}) { emit deleted_edge_signal(a, b); },
+                nullptr
+            };
+        }
+
+        void set_queued_signals (){
+            auto runner = new QueuedSignalRunner();
+            emitter = {
+                [runner](std::uint64_t a, const std::string & b, SignalInfo c = {}) { runner->run_update_node_signal(a, b, c); },
+                [runner](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { runner->run_update_node_attr_signal(a, b, c); },
+                [runner](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { runner->run_update_edge_signal(a, b, c, d); },
+                [runner](std::uint64_t a, std::uint64_t b, const std::string & c, const std::vector<std::string> &d, SignalInfo e = {}) { runner->run_update_edge_attr_signal(a, b, c, d, e); },
+                [runner](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { runner->run_del_edge_signal(a, b, c, d); },
+                [runner](std::uint64_t a, SignalInfo b = {}) { runner->run_del_node_signal(a, b); },
+                [runner](const Node& a, SignalInfo b = {}) { runner->run_deleted_node_signal(a, b); },
+                [runner](const Edge& a, SignalInfo b = {}) { runner->run_deleted_edge_signal(a, b); },
+                std::unique_ptr<QueuedSignalRunner>(runner)
+            };
+        }
 
         //////////////////////////////////////////////////////////////////////////
         // Cache maps

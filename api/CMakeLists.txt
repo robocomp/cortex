@@ -51,6 +51,7 @@ target_sources(dsr_api
         dsr_inner_eigen_api.cpp
         dsr_rt_api.cpp
         dsr_utils.cpp
+        dsr_signal_emitter.cpp
         GHistorySaver.cpp
         ${GEOM_API_SOURCES}
         ${headers_to_moc}
