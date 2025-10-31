@@ -341,12 +341,12 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<fl
 
         if (!no_send and node2.has_value()) G->dsrpub_node_attrs.write(&node2.value());
 
-        emit G->update_edge_attr_signal(n.id(), to, "RT" ,{"rt_rotation_euler_xyz", "rt_translation"}, SignalInfo{ G->agent_id });
-        emit G->update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
+        G->emitter.update_edge_attr_signal(n.id(), to, "RT" ,{"rt_rotation_euler_xyz", "rt_translation"}, SignalInfo{ G->agent_id });
+        G->emitter.update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
         if (!no_send)
         {
-            emit G->update_node_signal(to_n->id(), to_n->type(), SignalInfo{ G->agent_id });
-            emit G->update_node_attr_signal(to_n->id(), {"level", "parent"}, SignalInfo{ G->agent_id });
+            G->emitter.update_node_signal(to_n->id(), to_n->type(), SignalInfo{ G->agent_id });
+            G->emitter.update_node_attr_signal(to_n->id(), {"level", "parent"}, SignalInfo{ G->agent_id });
         }
     }
 }
@@ -528,12 +528,12 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
 
         if (!no_send and node2.has_value()) G->dsrpub_node_attrs.write(&node2.value());
 
-        emit G->update_edge_attr_signal(n.id(), to, "RT",{"rt_rotation_euler_xyz", "rt_translation"}, SignalInfo{ G->agent_id });
-        emit G->update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
+        G->emitter.update_edge_attr_signal(n.id(), to, "RT",{"rt_rotation_euler_xyz", "rt_translation"}, SignalInfo{ G->agent_id });
+        G->emitter.update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
         if (!no_send)
         {
-            emit G->update_node_signal(to_n->id(), to_n->type(), SignalInfo{ G->agent_id });
-            emit G->update_node_attr_signal(to_n->id(), {"level", "parent"}, SignalInfo{ G->agent_id });
+            G->emitter.update_node_signal(to_n->id(), to_n->type(), SignalInfo{ G->agent_id });
+            G->emitter.update_node_attr_signal(to_n->id(), {"level", "parent"}, SignalInfo{ G->agent_id });
         }
     }
 }
