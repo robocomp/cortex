@@ -4,6 +4,7 @@
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
 #include <dsr/gui/viewers/tree_viewer/tree_viewer.h>
+#include <qdebug.h>
 
 using namespace DSR ;
 
@@ -257,12 +258,11 @@ void TreeViewer::update_attribute_widgets(Node* node)
 			if(not q_attr)
 				throw std::runtime_error("Problem creating tree widget for node" +node->name()+" attribute "+key);
 		}
+
 		switch (value.selected()) {
             case 0: {
-
                 QLineEdit *ledit = qobject_cast<QLineEdit *>(this->itemWidget(q_attr, 1));
                 ledit->setText(QString::fromStdString(value.str()));
-
             }
                 break;
             case 1: {
@@ -277,6 +277,10 @@ void TreeViewer::update_attribute_widgets(Node* node)
                 break;
             case 3: {
                 QWidget *widget = qobject_cast<QWidget *>(this->itemWidget(q_attr, 1));
+				if (!widget) {
+					qDebug() << __PRETTY_FUNCTION__ << " Skip Attribute " << key.data()  << " widget doesn't exist " << "\n";
+					continue;
+				}
                 int count = 0;
                 for (auto spin : widget->findChildren<QDoubleSpinBox *>()) {
                     spin->setValue(value.float_vec()[count]);
