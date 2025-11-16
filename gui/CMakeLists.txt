@@ -38,6 +38,16 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenSceneGraph REQUIRED COMPONENTS osg osgDB osgGA)
 find_package(cppitertools)
 
+find_package(PkgConfig)
+pkg_check_modules(GRAPHVIZ libgvc libcgraph)
+if(GRAPHVIZ_FOUND)
+    message(STATUS "Found Graphviz via pkg-config")
+    #message(STATUS "  Include dirs: ${GRAPHVIZ_INCLUDE_DIRS}")
+    #message(STATUS "  Libraries: ${GRAPHVIZ_LIBRARIES}")
+    #message(STATUS "  Library dirs: ${GRAPHVIZ_LIBRARY_DIRS}")
+endif()
+
+
 SET(CMAKE_AUTOMOC ON)
 SET(CMAKE_AUTOUIC ON)
 
@@ -88,6 +98,7 @@ target_link_libraries(dsr_gui
         Qt6::OpenGL
         fastdds
         ${qt3d_libs}
+        ${GRAPHVIZ_LIBRARIES}
         )
 
 target_include_directories(dsr_gui
@@ -99,6 +110,7 @@ target_include_directories(dsr_gui
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
         $<INSTALL_INTERFACE:>
+        ${GRAPHVIZ_INCLUDE_DIRS}
         )
 
 set_target_properties(dsr_gui

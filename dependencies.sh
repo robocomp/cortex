@@ -12,6 +12,7 @@ sudo apt install libqglviewer-dev-qt6
 sudo apt install libeigen3-dev
 sudo apt install python3-dev python3-pybind11
 sudo apt install cmake gcc-13 g++-13
+sudo apt install libgraphviz-dev
 
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 1
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 1
