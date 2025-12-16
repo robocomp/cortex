@@ -394,13 +394,13 @@ void GraphViewer::compute_layout(const char * alg) {
         }
         // We don't need to process the edges to render them
         //Uncomment this is the layout propagation is desired
-        /*qDebug() << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id ;
+        //qDebug() << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id ;
         std::optional<Node> g_node = G->get_node(id);
         if (g_node.has_value()) {
             G->add_or_modify_attrib_local<pos_x_att>(*g_node, (float) x);
             G->add_or_modify_attrib_local<pos_y_att>(*g_node,  (float) y);
             G->update_node(*g_node);
-        }*/
+        }
     }
 
     centerOn(root_x, root_y);
