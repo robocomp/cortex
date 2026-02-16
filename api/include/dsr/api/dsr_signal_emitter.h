@@ -54,6 +54,7 @@ typedef std::variant<update_node_signal_noinfo_t, update_node_attr_signal_noinfo
 
 struct QueuedSignalRunner {
   ThreadPool tp;
+  uint8_t log_level{1}; // GraphSettings::LOGLEVEL as uint8_t (0=DEBUG, 1=INFO, 2=WARNING, 3=ERROR)
   std::vector<update_node_signal_noinfo_t> uns_fns;
   std::vector<update_node_attr_signal_noinfo_t> unas_fns;
   std::vector<update_edge_signal_noinfo_t> ues_fns;
@@ -62,7 +63,7 @@ struct QueuedSignalRunner {
   std::vector<del_node_signal_noinfo_t> den_fns;
   std::vector<deleted_node_signal_noinfo_t> dn_fns;
   std::vector<deleted_edge_signal_noinfo_t> de_fns;
-  explicit QueuedSignalRunner() : tp(2) 
+  explicit QueuedSignalRunner() : tp(2)
   {}
 
   void connect(signal_fn_ptr_t fn, const std::string& type) {

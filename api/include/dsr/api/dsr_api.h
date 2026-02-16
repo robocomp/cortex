@@ -30,6 +30,7 @@
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_graph_settings.h"
+#include "dsr/api/dsr_logging.h"
 #include "dsr/api/dsr_signal_emitter.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
@@ -575,20 +576,21 @@ namespace DSR
 
         void set_qt_signals (){
             emitter = {
-                [this](std::uint64_t a, const std::string & b, SignalInfo c = {}) { emit update_node_signal(a, b, c); },
-                [this](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { emit update_node_attr_signal(a, b, c); },
-                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { emit update_edge_signal(a, b, c, d); },
-                [this](std::uint64_t a, std::uint64_t b, const std::string & c, const std::vector<std::string> &d, SignalInfo e = {}) { emit update_edge_attr_signal(a, b, c, d, e); },
-                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { emit del_edge_signal(a, b, c, d); },
-                [this](std::uint64_t a, SignalInfo b = {}) { emit  del_node_signal(a, b); },
-                [this](const Node& a, SignalInfo b = {}) { emit deleted_node_signal(a, b); },
-                [this](const Edge& a, SignalInfo b = {}) { emit deleted_edge_signal(a, b); },
+                [this](std::uint64_t a, const std::string & b, SignalInfo c = {}) { DSR_LOG_DEBUG("[SIGNAL] update_node id:", a, "type:", b); emit update_node_signal(a, b, c); },
+                [this](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { DSR_LOG_DEBUG("[SIGNAL] update_node_attr id:", a); emit update_node_attr_signal(a, b, c); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { DSR_LOG_DEBUG("[SIGNAL] update_edge from:", a, "to:", b, "type:", c); emit update_edge_signal(a, b, c, d); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, const std::vector<std::string> &d, SignalInfo e = {}) { DSR_LOG_DEBUG("[SIGNAL] update_edge_attr from:", a, "to:", b, "type:", c); emit update_edge_attr_signal(a, b, c, d, e); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { DSR_LOG_DEBUG("[SIGNAL] del_edge from:", a, "to:", b, "type:", c); emit del_edge_signal(a, b, c, d); },
+                [this](std::uint64_t a, SignalInfo b = {}) { DSR_LOG_DEBUG("[SIGNAL] del_node id:", a); emit  del_node_signal(a, b); },
+                [this](const Node& a, SignalInfo b = {}) { DSR_LOG_DEBUG("[SIGNAL] deleted_node name:", a.name(), "id:", a.id()); emit deleted_node_signal(a, b); },
+                [this](const Edge& a, SignalInfo b = {}) { DSR_LOG_DEBUG("[SIGNAL] deleted_edge from:", a.from(), "to:", a.to(), "type:", a.type()); emit deleted_edge_signal(a, b); },
                 nullptr
             };
         }
 
         void set_queued_signals (){
             auto runner = new QueuedSignalRunner();
+            runner->log_level = static_cast<uint8_t>(log_level);
             emitter = {
                 [runner](std::uint64_t a, const std::string & b, SignalInfo c = {}) { runner->run_update_node_signal(a, b, c); },
                 [runner](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { runner->run_update_node_attr_signal(a, b, c); },
