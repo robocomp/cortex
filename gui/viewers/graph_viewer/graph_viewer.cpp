@@ -317,6 +317,8 @@ void GraphViewer::del_node_SLOT(uint64_t id)
         while (gmap.count(id) > 0) {
             auto item = gmap.at(id);
             scene.removeItem(item);
+            for (auto &[type, ids] : type_id_map)
+                ids.erase(id);
             delete item;
             gmap.erase(id);
             auto id_str = std::to_string(id);
@@ -330,7 +332,10 @@ void GraphViewer::del_node_SLOT(uint64_t id)
 
 void GraphViewer::hide_show_node_SLOT(uint64_t id, bool visible)
 {
-	auto item = gmap[id];
+	auto it = gmap.find(id);
+	if (it == gmap.end() || it->second == nullptr)
+		return;
+	auto item = it->second;
 	item->setVisible(visible);
 	for (const auto &gedge: item->edgeList)
 	{

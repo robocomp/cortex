@@ -155,7 +155,7 @@ void TreeViewer::category_change_SLOT(int value, QTreeWidgetItem* parent)
 void TreeViewer::node_change_SLOT(int value, uint64_t id, const std::string &type,  QTreeWidgetItem* parent)
 {
 	QCheckBox* sender = qobject_cast<QCheckBox*>(this->sender());
-	if(sender)
+	if(sender and G->get_node(id).has_value())
 	{
 		qDebug()<<"Emitting signal for "<<value<< qobject_cast<QCheckBox*>(this->itemWidget(parent,0))->text();
 		emit node_check_state_changed(value, id, type, parent);

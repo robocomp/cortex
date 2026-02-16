@@ -352,7 +352,7 @@ void DSRViewer::initialize_views(int options, view central)
                         tree_widget,
                         &TreeViewer::node_check_state_changed,
                         graph_widget,
-                        [=](int value, int id, const std::string &type, QTreeWidgetItem *)
+                        [=](int value, uint64_t id, const std::string &type, QTreeWidgetItem *)
                         {
                             graph_widget->hide_show_node_SLOT(id, value == 2);
                         });
