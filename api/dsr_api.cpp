@@ -1000,6 +1000,7 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
 
 
         std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple> map_new_to_edges = {};
+        std::unordered_set<std::tuple<uint64_t, uint64_t, std::string>,hash_tuple> map_new_from_edges = {};
 
         auto consume_unprocessed_deltas = [&](){
             decltype(unprocessed_delta_node_att)::node_type node_handle_node_att = unprocessed_delta_node_att.extract(id);
@@ -1047,7 +1048,7 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                 if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
                     qDebug() << "[JOIN_NODE] unprocessed_delta_edge_to" << from << id << QString::fromStdString(type) << (timestamp < timestamp_edge);
                 if (timestamp < timestamp_edge) {
-                    process_delta_edge(from, id, type, std::move(delta));
+                    if (process_delta_edge(from, id, type, std::move(delta))) map_new_from_edges.emplace(from, id, type);
                 }
                 if (nodes.contains(from) and nodes.at(from).read_reg().fano().contains({id, type})) {
                     decltype(unprocessed_delta_edge_att)::node_type node_handle_edge_att =  unprocessed_delta_edge_att.extract(att_key);
@@ -1103,6 +1104,13 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                     if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
                         qDebug() << "[JOIN_NODE] add edge TO:" << k << id << QString::fromStdString(v);
                     emitter.update_edge_signal(k, id, v, SignalInfo{ mvreg.agent_id() });
+                }
+
+                for (const auto &[from, to, type]: map_new_from_edges)
+                {
+                    if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                        qDebug() << "[JOIN_NODE] add edge FROM (unprocessed_to):" << from << to << QString::fromStdString(type);
+                    emitter.update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
                 }
             } else {
                 emitter.del_node_signal(id, SignalInfo{ mvreg.agent_id() });
