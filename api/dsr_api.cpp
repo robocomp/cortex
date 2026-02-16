@@ -207,6 +207,8 @@ std::optional<uint64_t> DSRGraph::insert_node(No &&node)
             if (delta.has_value())
             {
                 dsrpub_node.write(&delta.value());
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[INSERT_NODE] emitting update_node_signal" << node.id() << QString::fromStdString(node.type());
                 emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
                 for (const auto &[k, v]: node.fano())
                 {
@@ -296,6 +298,8 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
         if (!copy) {
             if (vec_node_attr.has_value()) {
                 dsrpub_node_attrs.write(&vec_node_attr.value());
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[UPDATE_NODE] emitting update_node_signal" << node.id() << QString::fromStdString(node.type());
                 emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
                 std::vector<std::string> atts_names(vec_node_attr->size());
                 std::transform(std::make_move_iterator(vec_node_attr->begin()),
@@ -388,6 +392,8 @@ bool DSRGraph::delete_node(const std::string &name)
 
     if (result) {
         if (!copy) {
+            if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                qDebug() << "[DELETE_NODE] emitting del_node_signal" << id.value();
             emitter.del_node_signal(id.value(), SignalInfo{agent_id});
             if (node_signal) emitter.deleted_node_signal(*node_signal, SignalInfo{agent_id});
             dsrpub_node.write(&deleted_node.value());
@@ -421,6 +427,8 @@ bool DSRGraph::delete_node(uint64_t id)
 
     if (result) {
         if (!copy) {
+            if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                qDebug() << "[DELETE_NODE] emitting del_node_signal" << id;
             emitter.del_node_signal(id, SignalInfo{ agent_id });
             if (node_signal) emitter.deleted_node_signal(*node_signal, SignalInfo{agent_id});
             dsrpub_node.write(&deleted_node.value());
@@ -637,6 +645,8 @@ requires (std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
     }
     if (result) {
         if (!copy) {
+            if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                qDebug() << "[INSERT_OR_ASSIGN_EDGE] emitting update_edge_signal" << attrs.from() << attrs.to() << QString::fromStdString(attrs.type());
             emitter.update_edge_signal(attrs.from(), attrs.to(), attrs.type(), SignalInfo{ agent_id });
 
             if (delta_edge.has_value()) { //Insert
@@ -692,6 +702,8 @@ bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
     if (delta.has_value())
     {
         if (!copy) {
+            if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                qDebug() << "[DELETE_EDGE] emitting del_edge_signal" << from << to << QString::fromStdString(key);
             emitter.del_edge_signal(from, to, key, SignalInfo{ agent_id });
             if (deleted_edge.has_value()) {
                 emitter.deleted_edge_signal(*deleted_edge, SignalInfo{ agent_id });
@@ -979,7 +991,7 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             {
                 node_handle = unprocessed_delta_edge_from.extract(id);
             }
-            
+
             std::erase_if(unprocessed_delta_edge_to,
                           [&](auto &it){ return std::get<0>(it.second) == id;});
             std::erase_if(unprocessed_delta_edge_att,
@@ -994,7 +1006,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             while (!node_handle_node_att.empty())
             {
                 auto &[att_name, delta, timestamp_node_att] = node_handle_node_att.mapped();
-                //std::cout << "node_att " << id<< ", " <<att_name << ", " << std::boolalpha << (timestamp < timestamp_node_att) << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_NODE] node_att" << id << QString::fromStdString(att_name) << (timestamp < timestamp_node_att);
                 if (timestamp < timestamp_node_att) {
                     process_delta_node_attr(id, att_name,std::move(delta));
                 }
@@ -1005,7 +1018,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             while (!node_handle_edge.empty()) {
                 auto &[to, type, delta, timestamp_edge] = node_handle_edge.mapped();
                 auto att_key = std::tuple{id, to, type};
-                //std::cout << "[OLD] Procesando delta edge almacenado (unprocessed_delta_edge_from) " << id<< ", " <<to << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_NODE] unprocessed_delta_edge_from" << id << to << QString::fromStdString(type) << (timestamp < timestamp_edge);
                 if (timestamp < timestamp_edge) {
                     if (process_delta_edge(id, to, type, std::move(delta))) map_new_to_edges.emplace(to, type);
                 }
@@ -1013,7 +1027,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                     decltype(unprocessed_delta_edge_att)::node_type node_handle_edge_att =  unprocessed_delta_edge_att.extract(att_key);
                     while (!node_handle_edge_att.empty()) {
                         auto &[att_name, delta, timestamp_edge_att] = node_handle_edge_att.mapped();
-                        std::cout << "edge_att " << id<< ", " <<to << ", " <<type <<", "<<att_name  << ", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_NODE] edge_att" << id << to << QString::fromStdString(type) << QString::fromStdString(att_name) << (timestamp < timestamp_edge);
                         if (timestamp < timestamp_edge_att) {
                             process_delta_edge_attr(id, to, type, att_name, std::move(delta));
                         }
@@ -1029,7 +1044,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             while (!node_handle_edge.empty()) {
                 auto &[from, type, delta, timestamp_edge] = node_handle_edge.mapped();
                 auto att_key = std::tuple{from, id, type};
-                //std::cout << "[OLD] Procesando delta edge almacenado (unprocessed_delta_edge_to) " << from << ", " <<id << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_NODE] unprocessed_delta_edge_to" << from << id << QString::fromStdString(type) << (timestamp < timestamp_edge);
                 if (timestamp < timestamp_edge) {
                     process_delta_edge(from, id, type, std::move(delta));
                 }
@@ -1037,7 +1053,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                     decltype(unprocessed_delta_edge_att)::node_type node_handle_edge_att =  unprocessed_delta_edge_att.extract(att_key);
                     while (!node_handle_edge_att.empty()) {
                         auto &[att_name, delta, timestamp_edge_att] = node_handle_edge_att.mapped();
-                        //std::cout << "edge_att " << from<< ", " <<id << ", " <<type <<", "<<att_name  << ", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_NODE] edge_att" << from << id << QString::fromStdString(type) << QString::fromStdString(att_name) << (timestamp < timestamp_edge);
                         if (timestamp < timestamp_edge_att) {
                             process_delta_edge_attr(from, id, type, att_name, std::move(delta));
                         }
@@ -1076,13 +1093,15 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             if (signal) {
                 emitter.update_node_signal(id, nodes.at(id).read_reg().type(), SignalInfo{ mvreg.agent_id() });
                 for (const auto &[k, v] : nodes.at(id).read_reg().fano()) {
-                    //std::cout << "[JOIN NODE] add edge FROM: "<< id << ", " << k.first << ", " << k.second << std::endl;
+                    if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                        qDebug() << "[JOIN_NODE] add edge FROM:" << id << k.first << QString::fromStdString(k.second);
                     emitter.update_edge_signal(id, k.first, k.second, SignalInfo{ mvreg.agent_id() });
                 }
 
                 for (const auto &[k, v]: map_new_to_edges)
                 {
-                    //std::cout << "[JOIN NODE] add edge TO: "<< k << ", " << id << ", " << v << std::endl;
+                    if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                        qDebug() << "[JOIN_NODE] add edge TO:" << k << id << QString::fromStdString(v);
                     emitter.update_edge_signal(k, id, v, SignalInfo{ mvreg.agent_id() });
                 }
             } else {
@@ -1091,7 +1110,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                     Node tmp_node(*maybe_deleted_node);
                     emitter.deleted_node_signal(tmp_node, SignalInfo{ agent_id });
                     for (const auto &node: maybe_deleted_node->fano()) {
-                        //std::cout << "[JOIN NODE] delete edge FROM: "<< node.second.read_reg().from() << ", " << node.second.read_reg().to() << ", " << node.second.read_reg().type() << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_NODE] delete edge FROM:" << node.second.read_reg().from() << node.second.read_reg().to() << QString::fromStdString(node.second.read_reg().type());
                         emitter.del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
                                              node.second.read_reg().type(), SignalInfo{ mvreg.agent_id() });
                         Edge tmp_edge(node.second.read_reg());
@@ -1101,7 +1121,8 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
 
                 //TODO: deleted_edge_signal. update_maps_node_delete was called before so the maps are probably wrong...
                 for (const auto &[from, type] : cache_map_to_edges.value()) {
-                    //std::cout << "[JOIN NODE] delete edge TO: "<< from << ", " << id << ", " << type << std::endl;
+                    if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                        qDebug() << "[JOIN_NODE] delete edge TO:" << from << id << QString::fromStdString(type);
                     emitter.del_edge_signal(from, id, type, SignalInfo{ mvreg.agent_id() });
                     //emitter.deleted_edge_signal(Edge(node.second.read_reg())); TODO: fix this
                 }
@@ -1199,7 +1220,8 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
                 for (auto [begin, end] = unprocessed_delta_edge_from.equal_range(from); begin != end; ++begin) { //There should not be many elements in this iteration
                     if (std::get<0>(begin->second) == to && std::get<1>(begin->second) == type){
                         std::get<2>(begin->second).join(::mvreg<CRDTEdge>(crdt_delta));
-                        //std::cout << "JOIN_DELTA_EDGE ID(" << from<< ", "<< to <<", "<< type << ") JOIN UNPROCESSED"  << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_EDGE] JOIN UNPROCESSED (from)" << from << to << QString::fromStdString(type);
                         find = true; break;
                     }
                 }
@@ -1207,28 +1229,31 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
                 for (auto [begin, end] = unprocessed_delta_edge_from.equal_range(to); begin != end; ++begin) { //There should not be many elements in this iteration
                     if (std::get<0>(begin->second) == from && std::get<1>(begin->second) == type){
                         std::get<2>(begin->second).join(std::move(crdt_delta));
-                        //std::cout << "JOIN_DELTA_EDGE ID(" << from<< ", "<< to <<", "<< type << ") JOIN UNPROCESSED"  << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_EDGE] JOIN UNPROCESSED (to)" << from << to << QString::fromStdString(type);
                         find = true; break;
                     }
                 }
 
                 if (!find) {
-                    //std::cout << "JOIN_DELTA_EDGE ID(" << from<< ", "<< to <<", "<< type << ") INSERT UNPROCESSED "  ;
-                    if (!cfrom) { 
-                        //std::cout << "No existe from (" << from << ") unprocessed_delta_edge_from" << std::endl; 
-                        unprocessed_delta_edge_from.emplace(from, std::tuple{to, type, crdt_delta, timestamp}); 
+                    if (!cfrom) {
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_EDGE] INSERT UNPROCESSED, no from" << from << "unprocessed_delta_edge_from";
+                        unprocessed_delta_edge_from.emplace(from, std::tuple{to, type, crdt_delta, timestamp});
                     }
-                    if (cfrom && !cto) 
+                    if (cfrom && !cto)
                     {
-                        //std::cout << "No existe to (" << to << ") unprocessed_delta_edge_to" << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_EDGE] INSERT UNPROCESSED, no to" << to << "unprocessed_delta_edge_to";
                         unprocessed_delta_edge_to.emplace(to, std::tuple{from, type, std::move(crdt_delta), timestamp});
                     }
                 } else {
-                    // We should sync the deleted_nodes set too...
-                    std::cout <<"TODO: Unhandled, we should sync the deleted_nodes set" << std::endl;
+                    if (log_level <= GraphSettings::LOGLEVEL::WARNINGL)
+                        qDebug() << "WARNING: Unhandled case, should sync deleted_nodes set";
                 }
             } else {
-                //std::cout << "THE EDGE IS PART OF A DELETED NODE, CLEAN FROM UNPROCESSED" << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_EDGE] edge is part of deleted node, cleaning unprocessed";
                 auto node_deleted = [&](uint64_t id){
                     unprocessed_delta_edge_from.erase(id);
                     unprocessed_delta_node_att.erase(id);
@@ -1244,10 +1269,12 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
 
         if (joined) {
             if (signal) {
-                //std::cout << "[JOIN EDGE] add edge: "<< from << ", " << to << ", " << type << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_EDGE] add edge:" << from << to << QString::fromStdString(type);
                 emitter.update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
             } else {
-                //std::cout << "[JOIN EDGE] delete edge: "<< from << ", " << to << ", " << type << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_EDGE] delete edge:" << from << to << QString::fromStdString(type);
                 emitter.del_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
                 if (deleted_edge.has_value()) {
                     emitter.deleted_edge_signal(*deleted_edge, SignalInfo{ agent_id });
@@ -1299,6 +1326,8 @@ std::optional<std::string> DSRGraph::join_delta_node_attr(IDL::MvregNodeAttr &&m
                     }
                 }
                 if (!find) {
+                    if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                        qDebug() << "[JOIN_NODE_ATTR] storing to unprocessed cache, node" << id << QString::fromStdString(att_name);
                     unprocessed_delta_node_att.emplace(id, std::tuple{att_name, std::move(crdt_delta), timestamp});
                 }
             } else {
@@ -1364,6 +1393,8 @@ std::optional<std::string> DSRGraph::join_delta_edge_attr(IDL::MvregEdgeAttr &&m
                     }
                 }
                 if (!find) {
+                    if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                        qDebug() << "[JOIN_EDGE_ATTR] storing to unprocessed cache, edge" << from << to << QString::fromStdString(type) << QString::fromStdString(att_name);
                     unprocessed_delta_edge_att.emplace(std::tuple{from, to, type},  std::tuple{att_name, std::move(crdt_delta), timestamp});
                 }
             }  else { //If the node is deleted
@@ -1422,7 +1453,8 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
             while (!node_handle_edge.empty()) {
                 auto &[to, type, delta, timestamp_edge] = node_handle_edge.mapped();
                 auto att_key = std::tuple{id, to, type};
-                //std::cout << "Procesando delta edge almacenado (unprocessed_delta_edge_from) " << id<< ", " <<to << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_FULL] unprocessed_delta_edge_from" << id << to << QString::fromStdString(type) << (timestamp < timestamp_edge);
                 if (timestamp < timestamp_edge) {
                 //TODO: este se debería hacer después de insertar el nodo?
                      process_delta_edge(id, to, type, std::move(delta));
@@ -1431,7 +1463,8 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
                     decltype(unprocessed_delta_edge_att)::node_type node_handle_edge_att =  unprocessed_delta_edge_att.extract(att_key);
                     while (!node_handle_edge_att.empty()) {
                         auto &[att_name, delta, timestamp_edge_att] = node_handle_edge_att.mapped();
-                        std::cout << "edge_att " << id<< ", " <<to << ", " <<type <<", "<<att_name  << ", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_FULL] edge_att" << id << to << QString::fromStdString(type) << QString::fromStdString(att_name) << (timestamp < timestamp_edge);
                         if (timestamp < timestamp_edge_att) {
                             process_delta_edge_attr(id, to, type, att_name, std::move(delta));
                         }
@@ -1449,7 +1482,8 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
             while (!node_handle_edge.empty()) {
                 auto &[from, type, delta, timestamp_edge] = node_handle_edge.mapped();
                 auto att_key = std::tuple{from, id, type};
-                //std::cout << "Procesando delta edge almacenado (unprocessed_delta_edge_to) " << from << ", " <<id << ", " <<type <<", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                    qDebug() << "[JOIN_FULL] unprocessed_delta_edge_to" << from << id << QString::fromStdString(type) << (timestamp < timestamp_edge);
                 if (timestamp < timestamp_edge) {
                     process_delta_edge(from, id, type, std::move(delta));
                 }
@@ -1457,7 +1491,8 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
                     decltype(unprocessed_delta_edge_att)::node_type node_handle_edge_att =  unprocessed_delta_edge_att.extract(att_key);
                     while (!node_handle_edge_att.empty()) {
                         auto &[att_name, delta, timestamp_edge_att] = node_handle_edge_att.mapped();
-                        //std::cout << "edge_att " << from<< ", " <<id << ", " <<type <<", "<<att_name  << ", "<<std::boolalpha << (timestamp < timestamp_edge) << std::endl;
+                        if (log_level <= GraphSettings::LOGLEVEL::DEBUGL)
+                            qDebug() << "[JOIN_FULL] edge_att" << from << id << QString::fromStdString(type) << QString::fromStdString(att_name) << (timestamp < timestamp_edge);
                         if (timestamp < timestamp_edge_att) {
                             process_delta_edge_attr(from, id, type, att_name, std::move(delta));
                         }
@@ -1579,7 +1614,7 @@ void print_sample_info(const eprosima::fastdds::dds::SampleInfo& info) {
     oss << "  ms diff reception: " << (milliseconds_recv - milliseconds_send) << "ms" << std::endl;
     oss << "  ms taken from dds: " << (now - milliseconds_send) << "ms" << std::endl;
     oss << "  Valid Data: " << (info.valid_data ? "true" : "false") << std::endl;
-    std::cout << oss.str();
+    qDebug() << QString::fromStdString(oss.str());
 }
 
 

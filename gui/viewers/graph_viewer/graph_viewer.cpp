@@ -280,7 +280,7 @@ GraphEdge* GraphViewer::new_visual_edge(std::uint64_t from, std::uint64_t to, co
 
 void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std::string &edge_tag)
 {
-    qDebug()<<__FUNCTION__<<":"<<__LINE__;
+    qDebug()<<__FUNCTION__<<"from:"<<from<<"to:"<<to<<"type:"<<QString::fromStdString(edge_tag);
 	try {
         //std::cout << "[SLOT] Delete edge:  "<<from << ", " << to << ", "<< edge_tag<< std::endl;
 		std::tuple<std::uint64_t, std::uint64_t, std::string> key = std::make_tuple(from, to, edge_tag);
@@ -311,7 +311,7 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
 // remove node from scene
 void GraphViewer::del_node_SLOT(uint64_t id)
 {
-    qDebug()<<__FUNCTION__<<":"<<__LINE__;
+    qDebug()<<__FUNCTION__<<"node id:"<<id;
     try {
         //std::cout << "[SLOT] Delete node:  "<<id<< std::endl;
         while (gmap.count(id) > 0) {
@@ -333,8 +333,10 @@ void GraphViewer::del_node_SLOT(uint64_t id)
 void GraphViewer::hide_show_node_SLOT(uint64_t id, bool visible)
 {
 	auto it = gmap.find(id);
-	if (it == gmap.end() || it->second == nullptr)
+	if (it == gmap.end() || it->second == nullptr) {
+		qDebug() << __FUNCTION__ << "skipping missing node" << id;
 		return;
+	}
 	auto item = it->second;
 	item->setVisible(visible);
 	for (const auto &gedge: item->edgeList)

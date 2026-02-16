@@ -71,6 +71,7 @@ void TreeViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type,  
 		auto node = G->get_node(id);
 		if (tree_map.count(id)==0)
 		{
+			qDebug() << __FUNCTION__ << "new node id:" << id << "type:" << QString::fromStdString(type);
 			QTreeWidgetItem* symbol_widget = nullptr;
 			if (types_map.count(type)) {
 				symbol_widget = types_map[type];
@@ -131,8 +132,7 @@ void TreeViewer::del_edge_SLOT(const std::uint64_t from, const std::uint64_t to,
 
 void TreeViewer::del_node_SLOT(uint64_t id)
 {
-
-    qDebug()<<__FUNCTION__<<":"<<__LINE__;
+    qDebug()<<__FUNCTION__<<"node id:"<<id;
 	while (tree_map.count(id) > 0) {
 		auto item = tree_map[id];
 		this->invisibleRootItem()->removeChild(item);
@@ -159,6 +159,8 @@ void TreeViewer::node_change_SLOT(int value, uint64_t id, const std::string &typ
 	{
 		qDebug()<<"Emitting signal for "<<value<< qobject_cast<QCheckBox*>(this->itemWidget(parent,0))->text();
 		emit node_check_state_changed(value, id, type, parent);
+	} else {
+		qDebug() << __FUNCTION__ << "skipping, node no longer exists in G, id:" << id;
 	}
 }
 
