@@ -225,6 +225,48 @@ template std::optional<uint64_t>  DSRGraph::insert_node<DSR::Node &&>(DSR::Node&
 template std::optional<uint64_t>  DSRGraph::insert_node<DSR::Node&>(DSR::Node&);
 
 
+template<typename No>
+std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
+    requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
+{
+    std::optional<IDL::MvregNode> delta;
+    bool inserted = false;
+    {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
+        std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+        //Check id
+        if (nodes.contains(node.id())) {
+            DSR_LOG_WARNING("[INSERT_NODE_WITH_ID] Node id already exists", node.id(), node.type());
+            return {};
+        }
+        if (node.name().empty() or name_map.contains(node.name()))
+            node.name(node.type() + "_" + id_generator::hex_string(node.id()));
+        lck_cache.unlock();
+        std::tie(inserted, delta) = insert_node_(user_node_to_crdt(std::forward<No>(node)));
+    }
+    if (inserted)
+    {
+        if (!copy)
+        {
+            if (delta.has_value())
+            {
+                dsrpub_node.write(&delta.value());
+                DSR_LOG_DEBUG("[INSERT_NODE_WITH_ID] emitting update_node_signal", node.id(), node.type());
+                emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+                for (const auto &[k, v]: node.fano())
+                {
+                    emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+                }
+            }
+        }
+        return node.id();
+    }
+    return {};
+}
+
+template std::optional<uint64_t>  DSRGraph::insert_node_with_id<DSR::Node &&>(DSR::Node&&);
+template std::optional<uint64_t>  DSRGraph::insert_node_with_id<DSR::Node&>(DSR::Node&);
+
 std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::update_node_(CRDTNode &&node)
 {
 

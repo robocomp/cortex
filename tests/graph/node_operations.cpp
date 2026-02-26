@@ -133,7 +133,70 @@ TEST_CASE("Graph node operations", "[NODE]") {
 }
 
 
-TEST_CASE("Node creation", 
+TEST_CASE("Insert node with specific id", "[NODE]") {
+
+    auto filename = make_empty_config_file();
+    DSRGraph G(random_string(10), rand() % 1200, filename);
+
+    SECTION("Insert a node with a specific id") {
+        auto node_name = random_string();
+        uint64_t specific_id = 5000;
+        auto n = Node::create<testtype_node_type>(node_name);
+        n.id(specific_id);
+        std::optional<uint64_t> r = G.insert_node_with_id(n);
+        REQUIRE(r.has_value());
+        REQUIRE(r.value() == specific_id);
+        std::optional<Node> retrieved = G.get_node(specific_id);
+        REQUIRE(retrieved.has_value());
+        REQUIRE(retrieved->name() == node_name);
+    }
+
+    SECTION("Insert a node with a duplicate id fails") {
+        auto n1 = Node::create<testtype_node_type>(random_string());
+        uint64_t specific_id = 6000;
+        n1.id(specific_id);
+        std::optional<uint64_t> r1 = G.insert_node_with_id(n1);
+        REQUIRE(r1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>(random_string());
+        n2.id(specific_id);
+        std::optional<uint64_t> r2 = G.insert_node_with_id(n2);
+        REQUIRE_FALSE(r2.has_value());
+    }
+
+    SECTION("Insert a node with empty name generates a name") {
+        uint64_t specific_id = 7000;
+        auto n = Node::create<testtype_node_type>("");
+        n.id(specific_id);
+        std::optional<uint64_t> r = G.insert_node_with_id(n);
+        REQUIRE(r.has_value());
+        std::optional<Node> retrieved = G.get_node(specific_id);
+        REQUIRE(retrieved.has_value());
+        REQUIRE_FALSE(retrieved->name().empty());
+    }
+
+    SECTION("Insert a node with a duplicate name generates a new name") {
+        auto shared_name = random_string();
+        uint64_t id1 = 8000, id2 = 8001;
+
+        auto n1 = Node::create<testtype_node_type>(shared_name);
+        n1.id(id1);
+        std::optional<uint64_t> r1 = G.insert_node_with_id(n1);
+        REQUIRE(r1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>(shared_name);
+        n2.id(id2);
+        std::optional<uint64_t> r2 = G.insert_node_with_id(n2);
+        REQUIRE(r2.has_value());
+
+        std::optional<Node> retrieved = G.get_node(id2);
+        REQUIRE(retrieved.has_value());
+        REQUIRE(retrieved->name() != shared_name);
+    }
+}
+
+
+TEST_CASE("Node creation",
           "[Node]") {
 
 
