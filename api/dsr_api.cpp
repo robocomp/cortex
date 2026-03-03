@@ -1660,6 +1660,12 @@ void DSRGraph::node_subscription_thread()
                     if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
                     if (m_info.valid_data) {
                         if (sample.agent_id() != agent_id) {
+                            if (sample.id() == CLEAR_DELETED_SIGNAL) {
+                                std::unique_lock<std::shared_mutex> lock(_mutex);
+                                std::unique_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+                                deleted.clear();
+                                continue;
+                            }
                             if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) {
                                 qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
                                         << m_info.sample_identity.writer_guid().entityId.value;

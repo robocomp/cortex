@@ -15,6 +15,7 @@
 #include <typeinfo>
 #include <optional>
 #include <type_traits>
+#include <limits>
 #include "dsr/core/crdt/delta_crdt.h"
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
@@ -48,6 +49,7 @@ namespace DSR
 {
     using Nodes = std::unordered_map<uint64_t , mvreg<CRDTNode>>;
     using IDType = uint64_t;
+    static constexpr uint64_t CLEAR_DELETED_SIGNAL = std::numeric_limits<uint64_t>::max();
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
@@ -474,6 +476,22 @@ namespace DSR
             nodeType.clear();
             to_edges.clear();
 
+        }
+
+        void clear_deleted()
+        {
+            {
+                std::unique_lock<std::shared_mutex> lock(_mutex);
+                std::unique_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+                deleted.clear();
+            }
+            if (!copy)
+            {
+                IDL::MvregNode signal;
+                signal.id(CLEAR_DELETED_SIGNAL);
+                signal.agent_id(agent_id);
+                dsrpub_node.write(&signal);
+            }
         }
 
 
