@@ -1,11 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <thread>
 #include <atomic>
 #include <barrier>
 #include <vector>
 #include <chrono>
+#include <iostream>
 
+#include <nanobench.h>
+#include "../core/nanobench_adapter.h"
 #include "../core/timing_utils.h"
 #include "../core/metrics_collector.h"
 #include "../core/report_generator.h"
@@ -28,43 +30,52 @@ TEST_CASE("Concurrent writers throughput", "[THROUGHPUT][concurrent]") {
 
     constexpr auto TEST_DURATION = std::chrono::seconds(5);
 
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
+
     auto run_concurrent_test = [&](uint32_t num_threads, const std::string& test_name) {
         std::atomic<uint64_t> total_operations{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(num_threads);
 
-        // Base node ID for each thread to avoid collisions
         std::vector<std::thread> threads;
         threads.reserve(num_threads);
 
         auto start = std::chrono::steady_clock::now();
 
-        for (uint32_t t = 0; t < num_threads; ++t) {
-            threads.emplace_back([&, thread_id = t]() {
-                uint64_t base_id = 100000 + thread_id * 100000;
-                uint64_t local_ops = 0;
+        bench.run(test_name, [&] {
+            for (uint32_t t = 0; t < num_threads; ++t) {
+                threads.emplace_back([&, thread_id = t]() {
+                    uint64_t base_id = 100000 + thread_id * 100000;
+                    uint64_t local_ops = 0;
 
-                // Synchronize start
-                sync_point.arrive_and_wait();
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    auto node = GraphGenerator::create_test_node(
-                        base_id + local_ops, graph->get_agent_id(),
-                        "thread_" + std::to_string(thread_id) + "_node_" + std::to_string(local_ops));
-                    graph->insert_node(node);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        auto node = GraphGenerator::create_test_node(
+                            base_id + local_ops, graph->get_agent_id(),
+                            "thread_" + std::to_string(thread_id) + "_node_" + std::to_string(local_ops));
+                        if (!graph->insert_node(node).has_value())
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
+                        local_ops++;
+                    }
 
-                total_operations.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    total_operations.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(TEST_DURATION);
-        stop_flag.store(true, std::memory_order_relaxed);
+            std::this_thread::sleep_for(TEST_DURATION);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& t : threads) t.join();
 
-        for (auto& t : threads) {
-            t.join();
-        }
+            bench.batch(total_operations.load());
+            ankerl::nanobench::doNotOptimizeAway(total_operations.load());
+        });
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH " << test_name << "] "
+                      << failed_ops.load() << " insert_node calls failed\n";
 
         auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start);
@@ -79,18 +90,18 @@ TEST_CASE("Concurrent writers throughput", "[THROUGHPUT][concurrent]") {
     };
 
     SECTION("2 concurrent writers") {
-        double ops = run_concurrent_test(2, "concurrent_insert_2_threads");
+        double ops = run_concurrent_test(2, "concurrent_insert_2t");
         INFO("2 threads: " << ops << " ops/sec");
         CHECK(ops >= MIN_EXPECTED_THROUGHPUT_OPS);
     }
 
     SECTION("4 concurrent writers") {
-        double ops = run_concurrent_test(4, "concurrent_insert_4_threads");
+        double ops = run_concurrent_test(4, "concurrent_insert_4t");
         INFO("4 threads: " << ops << " ops/sec");
     }
 
     SECTION("8 concurrent writers") {
-        double ops = run_concurrent_test(8, "concurrent_insert_8_threads");
+        double ops = run_concurrent_test(8, "concurrent_insert_8t");
         INFO("8 threads: " << ops << " ops/sec");
     }
 
@@ -114,16 +125,16 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent]") {
     std::vector<uint64_t> pre_node_ids;
     pre_node_ids.reserve(1000);
     for (uint64_t i = 0; i < 1000; ++i) {
-        auto node = GraphGenerator::create_test_node(
-            0, graph->get_agent_id());
+        auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto result = graph->insert_node(node);
-        if (result.has_value()) {
-            pre_node_ids.push_back(result.value());
-        }
+        REQUIRE(result.has_value());
+        pre_node_ids.push_back(result.value());
     }
-    REQUIRE(!pre_node_ids.empty());
 
     constexpr auto TEST_DURATION = std::chrono::seconds(5);
+
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
 
     SECTION("Mixed read-write workload") {
         constexpr uint32_t NUM_READERS = 4;
@@ -132,6 +143,7 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent]") {
 
         std::atomic<uint64_t> read_ops{0};
         std::atomic<uint64_t> write_ops{0};
+        std::atomic<uint64_t> write_failures{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(TOTAL_THREADS);
 
@@ -140,46 +152,54 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent]") {
 
         auto start = std::chrono::steady_clock::now();
 
-        // Reader threads
-        for (uint32_t t = 0; t < NUM_READERS; ++t) {
-            threads.emplace_back([&, thread_id = t]() {
-                uint64_t local_ops = 0;
-                sync_point.arrive_and_wait();
+        bench.run("mixed_read_write", [&] {
+            // Reader threads
+            for (uint32_t t = 0; t < NUM_READERS; ++t) {
+                threads.emplace_back([&, thread_id = t]() {
+                    uint64_t local_ops = 0;
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    uint64_t id = pre_node_ids[local_ops % pre_node_ids.size()];
-                    auto node = graph->get_node(id);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        uint64_t id = pre_node_ids[local_ops % pre_node_ids.size()];
+                        auto node = graph->get_node(id);
+                        ankerl::nanobench::doNotOptimizeAway(node);
+                        local_ops++;
+                    }
 
-                read_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    read_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        // Writer threads
-        for (uint32_t t = 0; t < NUM_WRITERS; ++t) {
-            threads.emplace_back([&, thread_id = t]() {
-                uint64_t base_id = 300000 + thread_id * 100000;
-                uint64_t local_ops = 0;
-                sync_point.arrive_and_wait();
+            // Writer threads
+            for (uint32_t t = 0; t < NUM_WRITERS; ++t) {
+                threads.emplace_back([&, thread_id = t]() {
+                    uint64_t base_id = 300000 + thread_id * 100000;
+                    uint64_t local_ops = 0;
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    auto node = GraphGenerator::create_test_node(
-                        base_id + local_ops, graph->get_agent_id());
-                    graph->insert_node(node);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        auto node = GraphGenerator::create_test_node(
+                            base_id + local_ops, graph->get_agent_id());
+                        if (!graph->insert_node(node).has_value())
+                            write_failures.fetch_add(1, std::memory_order_relaxed);
+                        local_ops++;
+                    }
 
-                write_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    write_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(TEST_DURATION);
-        stop_flag.store(true, std::memory_order_relaxed);
+            std::this_thread::sleep_for(TEST_DURATION);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& t : threads) t.join();
 
-        for (auto& t : threads) {
-            t.join();
-        }
+            bench.batch(read_ops.load() + write_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(read_ops.load());
+        });
+
+        if (write_failures.load() > 0)
+            std::cerr << "[BENCH concurrent_read_write] "
+                      << write_failures.load() << " insert_node calls failed\n";
 
         auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start);
@@ -218,35 +238,37 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent]") {
 
         auto start = std::chrono::steady_clock::now();
 
-        for (uint32_t t = 0; t < NUM_THREADS; ++t) {
-            threads.emplace_back([&, thread_id = t, node_id = contention_node_id]() {
-                uint64_t local_total = 0;
-                uint64_t local_success = 0;
-                sync_point.arrive_and_wait();
+        bench.run("update_contention", [&] {
+            for (uint32_t t = 0; t < NUM_THREADS; ++t) {
+                threads.emplace_back([&, thread_id = t, node_id = contention_node_id]() {
+                    uint64_t local_total = 0;
+                    uint64_t local_success = 0;
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    auto node = graph->get_node(node_id);
-                    if (node) {
-                        graph->add_or_modify_attrib_local<level_att>(
-                            *node, static_cast<int32_t>(thread_id * 1000 + local_total));
-                        if (graph->update_node(*node)) {
-                            local_success++;
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        auto node = graph->get_node(node_id);
+                        if (node) {
+                            graph->add_or_modify_attrib_local<level_att>(
+                                *node, static_cast<int32_t>(thread_id * 1000 + local_total));
+                            if (graph->update_node(*node)) {
+                                local_success++;
+                            }
                         }
+                        local_total++;
                     }
-                    local_total++;
-                }
 
-                total_ops.fetch_add(local_total, std::memory_order_relaxed);
-                successful_ops.fetch_add(local_success, std::memory_order_relaxed);
-            });
-        }
+                    total_ops.fetch_add(local_total, std::memory_order_relaxed);
+                    successful_ops.fetch_add(local_success, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(TEST_DURATION);
-        stop_flag.store(true, std::memory_order_relaxed);
+            std::this_thread::sleep_for(TEST_DURATION);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& t : threads) t.join();
 
-        for (auto& t : threads) {
-            t.join();
-        }
+            bench.batch(total_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(total_ops.load());
+        });
 
         auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start);
@@ -284,6 +306,7 @@ TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiag
 
     SECTION("Each agent writes independently") {
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(fixture.agent_count());
 
@@ -304,7 +327,8 @@ TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiag
                     auto node = GraphGenerator::create_test_node(
                         base_id + local_ops, graph->get_agent_id(),
                         "agent_" + std::to_string(agent_idx) + "_node_" + std::to_string(local_ops));
-                    graph->insert_node(node);
+                    if (!graph->insert_node(node).has_value())
+                        failed_ops.fetch_add(1, std::memory_order_relaxed);
                     local_ops++;
                 }
 
@@ -318,6 +342,10 @@ TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiag
         for (auto& t : threads) {
             t.join();
         }
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH multiagent_concurrent] "
+                      << failed_ops.load() << " insert_node calls failed\n";
 
         auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start);

@@ -8,6 +8,7 @@
 #include <numeric>
 #include <cmath>
 #include <stdexcept>
+#include <type_traits>
 #include <dsr/core/utils.h>
 
 namespace DSR::Benchmark {
@@ -238,6 +239,61 @@ void warmup(Func&& func, uint32_t iterations) {
     for (uint32_t i = 0; i < iterations; ++i) {
         std::forward<Func>(func)();
     }
+}
+
+struct SampledBenchmarkResult {
+    LatencyStats latency;
+    std::chrono::milliseconds wall_time{0};
+};
+
+template<typename MeasureFunc, typename MaintenanceFunc>
+SampledBenchmarkResult run_sampled_benchmark(
+    size_t warmup_iterations,
+    size_t measurement_iterations,
+    MeasureFunc&& measure_func,
+    MaintenanceFunc&& maintenance_func,
+    size_t maintenance_period = 1)
+{
+    auto maybe_maintain = [&](size_t iteration) {
+        if constexpr (std::is_invocable_v<MaintenanceFunc>) {
+            if (maintenance_period != 0 && ((iteration + 1) % maintenance_period) == 0) {
+                maintenance_func();
+            }
+        }
+    };
+
+    for (size_t i = 0; i < warmup_iterations; ++i) {
+        measure_func();
+        maybe_maintain(i);
+    }
+
+    LatencyTracker tracker(measurement_iterations);
+    auto wall_start = std::chrono::steady_clock::now();
+
+    for (size_t i = 0; i < measurement_iterations; ++i) {
+        tracker.record(measure_ns(measure_func));
+        maybe_maintain(i);
+    }
+
+    auto wall_end = std::chrono::steady_clock::now();
+    return {
+        .latency = tracker.stats(),
+        .wall_time = std::chrono::duration_cast<std::chrono::milliseconds>(wall_end - wall_start),
+    };
+}
+
+template<typename MeasureFunc>
+SampledBenchmarkResult run_sampled_benchmark(
+    size_t warmup_iterations,
+    size_t measurement_iterations,
+    MeasureFunc&& measure_func)
+{
+    return run_sampled_benchmark(
+        warmup_iterations,
+        measurement_iterations,
+        std::forward<MeasureFunc>(measure_func),
+        [] {},
+        0);
 }
 
 }  // namespace DSR::Benchmark

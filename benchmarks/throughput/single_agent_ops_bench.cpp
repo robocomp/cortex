@@ -1,9 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
-#include <chrono>
-#include <atomic>
 
-#include "../core/timing_utils.h"
+#include "../core/nanobench_adapter.h"
 #include "../core/metrics_collector.h"
 #include "../core/report_generator.h"
 #include "../fixtures/multi_agent_fixture.h"
@@ -12,8 +10,9 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-// Each operation gets its own TEST_CASE so Catch2 doesn't re-run setup for
-// every SECTION and overwrite the exported JSON with only the last result.
+// Each operation gets its own TEST_CASE.  nanobench replaces the manual
+// 5-second time-window loops: it auto-tunes warmup and iteration count,
+// and derives throughput from the mean latency (nb_throughput()).
 
 TEST_CASE("Node insertion throughput", "[THROUGHPUT][single]") {
     MultiAgentFixture fixture;
@@ -25,36 +24,20 @@ TEST_CASE("Node insertion throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
+    uint64_t id_counter = 0;
+    auto sampled = run_sampled_benchmark(
+        50,
+        1000,
+        [&] {
+        auto node = GraphGenerator::create_test_node(id_counter++, graph->get_agent_id());
+        auto res = graph->insert_node(node);
+        REQUIRE(res.has_value());
+        },
+        [&] { fixture.process_events(1); },
+        16);
 
-    // Warmup — 500ms discard to prime caches, branch predictor, allocators
-    {
-        auto warmup_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
-        while (std::chrono::steady_clock::now() < warmup_end) {
-            auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
-            graph->insert_node(node);
-        }
-    }
-
-    uint64_t operations = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
-
-    while (std::chrono::steady_clock::now() < end) {
-        auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
-        graph->insert_node(node);
-        operations++;
-    }
-
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("node_insert", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Node insert throughput: " << ops_per_sec << " ops/sec");
-    CHECK(ops_per_sec >= MIN_EXPECTED_THROUGHPUT_OPS);
+    collector.record_latency_stats("node_insert", sampled.latency);
+    collector.record_throughput("node_insert", sampled.latency.count, sampled.wall_time);
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -71,34 +54,33 @@ TEST_CASE("Node read throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
     std::vector<uint64_t> node_ids;
     node_ids.reserve(1000);
     for (uint64_t i = 0; i < 1000; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto result = graph->insert_node(node);
-        if (result.has_value()) node_ids.push_back(result.value());
-    }
-    REQUIRE(!node_ids.empty());
-
-    uint64_t operations = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
-
-    while (std::chrono::steady_clock::now() < end) {
-        auto node = graph->get_node(node_ids[operations % node_ids.size()]);
-        operations++;
+        REQUIRE(result.has_value());
+        node_ids.push_back(result.value());
     }
 
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
+    // Cache warmup
+    for (auto id : node_ids) { (void)graph->get_node(id); }
 
-    collector.record_throughput("node_read", operations, actual_duration);
+    // ~900 ns/op: 10 000 iters/epoch × 200 epochs ≈ 1.8 s
+    size_t idx = 0;
+    bool last_ok = true;
+    auto bench = make_latency_bench(200, 0); // manual warmup done above
+    bench.minEpochIterations(10000);
+    bench.run("node_read", [&] {
+        auto node = graph->get_node(node_ids[idx++ % node_ids.size()]);
+        last_ok = node.has_value();
+        ankerl::nanobench::doNotOptimizeAway(node);
+    });
+    REQUIRE(last_ok);
 
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Node read throughput: " << ops_per_sec << " ops/sec");
+    collector.record_latency_stats("node_read", nb_to_stats(bench));
+    collector.record("node_read", MetricCategory::Throughput,
+                     nb_throughput(bench), "ops/sec");
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -115,49 +97,28 @@ TEST_CASE("Node update throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
     auto test_node = GraphGenerator::create_test_node(0, graph->get_agent_id(), "update_test");
     auto insert_result = graph->insert_node(test_node);
     REQUIRE(insert_result.has_value());
     uint64_t node_id = insert_result.value();
 
-    // Warmup — 500ms discard
-    {
-        auto warmup_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
-        uint32_t w = 0;
-        while (std::chrono::steady_clock::now() < warmup_end) {
-            auto node = graph->get_node(node_id);
-            if (node) {
-                graph->add_or_modify_attrib_local<level_att>(*node, static_cast<int32_t>(w++ % 1000));
-                graph->update_node(*node);
-            }
-        }
-    }
-
-    uint64_t operations = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
-
-    while (std::chrono::steady_clock::now() < end) {
+    // ~38µs/op: 300 iters/epoch × 50 epochs ≈ 0.57 s
+    uint64_t update_counter = 0;
+    auto bench = make_latency_bench(50);
+    bench.minEpochIterations(300);
+    bench.run("node_update", [&] {
         auto node = graph->get_node(node_id);
-        if (node) {
-            graph->add_or_modify_attrib_local<level_att>(
-                *node, static_cast<int32_t>(operations % 1000));
-            graph->update_node(*node);
-            operations++;
-        }
-    }
+        REQUIRE(node.has_value());
+        graph->add_or_modify_attrib_local<level_att>(
+            *node, static_cast<int32_t>(update_counter++ % 1000));
+        bool ok = graph->update_node(*node);
+        REQUIRE(ok);
+        ankerl::nanobench::doNotOptimizeAway(ok);
+    });
 
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("node_update", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Node update throughput: " << ops_per_sec << " ops/sec");
-    CHECK(ops_per_sec >= MIN_EXPECTED_THROUGHPUT_OPS);
+    collector.record_latency_stats("node_update", nb_to_stats(bench));
+    collector.record("node_update", MetricCategory::Throughput,
+                     nb_throughput(bench), "ops/sec");
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -174,8 +135,6 @@ TEST_CASE("Edge insertion throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
     auto root = graph->get_node_root();
     REQUIRE(root.has_value());
 
@@ -184,30 +143,25 @@ TEST_CASE("Edge insertion throughput", "[THROUGHPUT][single]") {
     for (uint64_t i = 0; i < 10000; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto result = graph->insert_node(node);
-        if (result.has_value()) target_ids.push_back(result.value());
+        REQUIRE(result.has_value());
+        target_ids.push_back(result.value());
     }
-    REQUIRE(!target_ids.empty());
 
-    uint64_t operations = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
-
-    while (std::chrono::steady_clock::now() < end) {
-        uint64_t target = target_ids[operations % target_ids.size()];
+    size_t idx = 0;
+    auto sampled = run_sampled_benchmark(
+        50,
+        1000,
+        [&] {
+        uint64_t target = target_ids[idx++ % target_ids.size()];
         auto edge = GraphGenerator::create_test_edge(root->id(), target, graph->get_agent_id());
-        graph->insert_or_assign_edge(edge);
-        operations++;
-    }
+        bool ok = graph->insert_or_assign_edge(edge);
+        REQUIRE(ok);
+        },
+        [&] { fixture.process_events(1); },
+        8);
 
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("edge_insert", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Edge insert throughput: " << ops_per_sec << " ops/sec");
-    CHECK(ops_per_sec >= MIN_EXPECTED_THROUGHPUT_OPS);
+    collector.record_latency_stats("edge_insert", sampled.latency);
+    collector.record_throughput("edge_insert", sampled.latency.count, sampled.wall_time);
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -224,8 +178,6 @@ TEST_CASE("Edge read throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
     auto root = graph->get_node_root();
     REQUIRE(root.has_value());
 
@@ -234,33 +186,30 @@ TEST_CASE("Edge read throughput", "[THROUGHPUT][single]") {
     for (uint64_t i = 0; i < 1000; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto result = graph->insert_node(node);
-        if (result.has_value()) {
-            target_ids.push_back(result.value());
-            auto edge = GraphGenerator::create_test_edge(
-                root->id(), result.value(), graph->get_agent_id());
-            graph->insert_or_assign_edge(edge);
-        }
+        REQUIRE(result.has_value());
+        target_ids.push_back(result.value());
+        auto edge = GraphGenerator::create_test_edge(
+            root->id(), result.value(), graph->get_agent_id());
+        REQUIRE(graph->insert_or_assign_edge(edge));
     }
-    REQUIRE(!target_ids.empty());
 
-    uint64_t operations = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
+    // Cache warmup
+    for (auto tid : target_ids) { (void)graph->get_edge(root->id(), tid, "test_edge"); }
 
-    while (std::chrono::steady_clock::now() < end) {
-        uint64_t target = target_ids[operations % target_ids.size()];
+    size_t idx = 0;
+    bool last_ok = true;
+    auto bench = make_latency_bench(1000, 0); // manual warmup done above
+    bench.run("edge_read", [&] {
+        uint64_t target = target_ids[idx++ % target_ids.size()];
         auto edge = graph->get_edge(root->id(), target, "test_edge");
-        operations++;
-    }
+        last_ok = edge.has_value();
+        ankerl::nanobench::doNotOptimizeAway(edge);
+    });
+    REQUIRE(last_ok);
 
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("edge_read", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Edge read throughput: " << ops_per_sec << " ops/sec");
+    collector.record_latency_stats("edge_read", nb_to_stats(bench));
+    collector.record("edge_read", MetricCategory::Throughput,
+                     nb_throughput(bench), "ops/sec");
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -277,52 +226,47 @@ TEST_CASE("Mixed operations throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
     auto root = graph->get_node_root();
     REQUIRE(root.has_value());
 
     std::vector<uint64_t> node_ids;
-    node_ids.reserve(500);
+    node_ids.reserve(600); // 500 initial + up to ~100 inserts from 30% insert rate × 1100 calls
     for (uint64_t i = 0; i < 500; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto result = graph->insert_node(node);
-        if (result.has_value()) node_ids.push_back(result.value());
+        REQUIRE(result.has_value());
+        node_ids.push_back(result.value());
     }
-    REQUIRE(!node_ids.empty());
 
-    uint64_t operations = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
-
-    while (std::chrono::steady_clock::now() < end) {
-        int op_type = operations % 10;
+    uint64_t ops = 0;
+    auto sampled = run_sampled_benchmark(
+        50,
+        1000,
+        [&] {
+        int op_type = static_cast<int>(ops % 10);
         if (op_type < 4) {
-            auto node = graph->get_node(node_ids[operations % node_ids.size()]);
+            auto node = graph->get_node(node_ids[ops % node_ids.size()]);
+            ankerl::nanobench::doNotOptimizeAway(node);
         } else if (op_type < 7) {
-            auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
+            auto node = GraphGenerator::create_test_node(ops, graph->get_agent_id());
             auto result = graph->insert_node(node);
-            if (result.has_value()) node_ids.push_back(result.value());
+            REQUIRE(result.has_value());
+            node_ids.push_back(result.value());
         } else {
-            auto node = graph->get_node(node_ids[operations % node_ids.size()]);
-            if (node) {
-                graph->add_or_modify_attrib_local<level_att>(
-                    *node, static_cast<int32_t>(operations));
-                graph->update_node(*node);
-            }
+            auto node = graph->get_node(node_ids[ops % node_ids.size()]);
+            REQUIRE(node.has_value());
+            graph->add_or_modify_attrib_local<level_att>(
+                *node, static_cast<int32_t>(ops));
+            bool ok = graph->update_node(*node);
+            REQUIRE(ok);
         }
-        operations++;
-    }
+        ++ops;
+        },
+        [&] { fixture.process_events(1); },
+        16);
 
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("mixed_ops", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Mixed ops throughput: " << ops_per_sec << " ops/sec");
-    CHECK(ops_per_sec >= MIN_EXPECTED_THROUGHPUT_OPS);
+    collector.record_latency_stats("mixed_ops", sampled.latency);
+    collector.record_throughput("mixed_ops", sampled.latency.count, sampled.wall_time);
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -339,38 +283,31 @@ TEST_CASE("Node deletion throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
-    // Pre-populate a large pool so we can delete without running out.
-    // We refill the pool when it drops below a threshold.
+    // Pool is 3× the expected maximum (warmup + epochs) so nanobench auto-tuning
+    // cannot exhaust it; the REQUIRE fires loudly if it somehow does.
     std::vector<uint64_t> node_ids;
-    node_ids.reserve(50000);
-    for (uint64_t i = 0; i < 50000; ++i) {
+    node_ids.reserve(3000);
+    for (uint64_t i = 0; i < 3000; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto res = graph->insert_node(node);
-        if (res.has_value()) node_ids.push_back(res.value());
+        REQUIRE(res.has_value());
+        node_ids.push_back(res.value());
     }
-    REQUIRE(!node_ids.empty());
 
-    uint64_t operations = 0;
     size_t pool_idx = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
+    auto sampled = run_sampled_benchmark(
+        50,
+        1000,
+        [&] {
+        REQUIRE(pool_idx < node_ids.size());
+        bool ok = graph->delete_node(node_ids[pool_idx++]);
+        REQUIRE(ok);
+        },
+        [&] { fixture.process_events(1); },
+        16);
 
-    while (std::chrono::steady_clock::now() < end) {
-        if (pool_idx >= node_ids.size()) break;
-        graph->delete_node(node_ids[pool_idx++]);
-        operations++;
-    }
-
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("node_delete", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Node delete throughput: " << ops_per_sec << " ops/sec");
+    collector.record_latency_stats("node_delete", sampled.latency);
+    collector.record_throughput("node_delete", sampled.latency.count, sampled.wall_time);
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");
@@ -387,45 +324,37 @@ TEST_CASE("Edge deletion throughput", "[THROUGHPUT][single]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
-
     auto root = graph->get_node_root();
     REQUIRE(root.has_value());
 
-    // Pre-populate 50K nodes with edges from root → node
+    // Pool is 3× the expected maximum (warmup + epochs) so nanobench auto-tuning
+    // cannot exhaust it; the REQUIRE fires loudly if it somehow does.
     std::vector<uint64_t> target_ids;
-    target_ids.reserve(50000);
-    for (uint64_t i = 0; i < 50000; ++i) {
+    target_ids.reserve(3000);
+    for (uint64_t i = 0; i < 3000; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto res = graph->insert_node(node);
-        if (res.has_value()) {
-            auto edge = GraphGenerator::create_test_edge(
-                root->id(), res.value(), graph->get_agent_id());
-            graph->insert_or_assign_edge(edge);
-            target_ids.push_back(res.value());
-        }
+        REQUIRE(res.has_value());
+        auto edge = GraphGenerator::create_test_edge(
+            root->id(), res.value(), graph->get_agent_id());
+        REQUIRE(graph->insert_or_assign_edge(edge));
+        target_ids.push_back(res.value());
     }
-    REQUIRE(!target_ids.empty());
 
-    uint64_t operations = 0;
     size_t pool_idx = 0;
-    auto start = std::chrono::steady_clock::now();
-    auto end = start + TEST_DURATION;
+    auto sampled = run_sampled_benchmark(
+        50,
+        1000,
+        [&] {
+        REQUIRE(pool_idx < target_ids.size());
+        bool ok = graph->delete_edge(root->id(), target_ids[pool_idx++], "test_edge");
+        REQUIRE(ok);
+        },
+        [&] { fixture.process_events(1); },
+        8);
 
-    while (std::chrono::steady_clock::now() < end) {
-        if (pool_idx >= target_ids.size()) break;
-        graph->delete_edge(root->id(), target_ids[pool_idx++], "test_edge");
-        operations++;
-    }
-
-    auto actual_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    collector.record_throughput("edge_delete", operations, actual_duration);
-
-    double ops_per_sec = static_cast<double>(operations) /
-                        (static_cast<double>(actual_duration.count()) / 1000.0);
-    INFO("Edge delete throughput: " << ops_per_sec << " ops/sec");
+    collector.record_latency_stats("edge_delete", sampled.latency);
+    collector.record_throughput("edge_delete", sampled.latency.count, sampled.wall_time);
 
     auto result = collector.finalize();
     ReportGenerator reporter("results");

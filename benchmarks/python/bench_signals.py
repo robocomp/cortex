@@ -3,6 +3,11 @@
 Benchmark: Signal/callback performance.
 
 Measures signal connection, emission, and callback invocation overhead.
+
+pyperf is intentionally not used here: the signal benchmarks use async
+patterns (threading.Event, callback_received.wait()) that are incompatible
+with pyperf's tight synchronous loop model.  The queued-signal benchmark
+also relies on Qt's event loop processing between operations.
 """
 
 import sys
@@ -41,7 +46,8 @@ def benchmark_signal_callback_latency(graph: pydsr.DSRGraph, collector: MetricsC
     # Warmup
     for i in range(20):
         node = pydsr.Node(agent_id, "testtype", f"warmup_sig_{i}")
-        graph.insert_node(node)
+        result = graph.insert_node(node)
+        assert result is not None, f"Warmup insert_node failed at i={i}"
         time.sleep(0.05)
 
     # Measure
@@ -51,6 +57,7 @@ def benchmark_signal_callback_latency(graph: pydsr.DSRGraph, collector: MetricsC
 
         send_time = time.perf_counter_ns()
         expected_id[0] = graph.insert_node(node)
+        assert expected_id[0] is not None, f"insert_node failed at signal measurement i={i}"
 
         # Wait for callback
         if callback_received.wait(timeout=2.0):
@@ -85,7 +92,8 @@ def benchmark_signal_throughput(graph: pydsr.DSRGraph, collector: MetricsCollect
 
     for i in range(INSERT_COUNT):
         node = pydsr.Node(agent_id, "testtype", f"sig_tp_{i}")
-        graph.insert_node(node)
+        result = graph.insert_node(node)
+        assert result is not None, f"insert_node failed at signal throughput i={i}"
 
     # Wait for callbacks to drain, but give up after a timeout so teardown
     # isn't blocked indefinitely if the callback rate is very slow.
@@ -129,7 +137,8 @@ def benchmark_multiple_handlers(graph: pydsr.DSRGraph, collector: MetricsCollect
 
         for i in range(insert_count):
             node = pydsr.Node(agent_id, "testtype", f"mh_{num_handlers}_{i}")
-            graph.insert_node(node)
+            result = graph.insert_node(node)
+            assert result is not None, f"insert_node failed for mh_{num_handlers}_{i}"
 
         time.sleep(0.3)  # Let callbacks process
         duration = time.perf_counter() - start

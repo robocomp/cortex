@@ -42,7 +42,7 @@ def load_run_metrics(run_dir: str) -> list:
       - <run_dir>/*.json          Python benchmark output
       - <run_dir>/cpp/results/*.json   C++ benchmark output (written by dsr_benchmarks)
     """
-    SKIP = {"run_info.json"}
+    SKIP = {"run_info.json", "stability_summary.json"}
     search_paths = [
         (run_dir, "*.json"),
         (os.path.join(run_dir, "cpp", "results"), "*.json"),
@@ -102,9 +102,36 @@ def _to_ns(value: float, unit: str) -> float:
     return value * _UNIT_TO_NS.get(unit.strip(), 1)
 
 
+def infer_profile(bench: dict, metric: Optional[dict] = None) -> str:
+    metadata = bench.get("metadata", {}) or {}
+    meta_profile = str(metadata.get("profile", "")).strip().lower()
+    if meta_profile in {"baseline", "extended", "other"}:
+        return meta_profile
+
+    tags = (metric or {}).get("tags", {}) or {}
+    tag_values = {str(v).upper() for v in tags.values()}
+    tag_keys = {str(k).upper() for k in tags.keys()}
+
+    if "BASELINE" in tag_keys or "BASELINE" in tag_values:
+        return "baseline"
+    if "EXTENDED" in tag_keys or "EXTENDED" in tag_values:
+        return "extended"
+
+    source = bench.get("_source_file", "").lower()
+    bench_name = bench.get("benchmark_name", "").lower()
+    if "baseline" in source or "baseline" in bench_name:
+        return "baseline"
+    if "extended" in source or "extended" in bench_name:
+        return "extended"
+    if bench_name.startswith("crdt_") or source.startswith("crdt_"):
+        return "baseline"
+    return "other"
+
+
 def flatten_metrics(bench_files: list) -> tuple[list, list]:
     """Return (latency_metrics, throughput_metrics) as flat lists."""
     latency, throughput = [], []
+    latency_keys: set = set()   # (bench_name, metric_name) pairs with real latency data
     for bench in bench_files:
         bench_name = bench.get("benchmark_name", bench["_source_file"])
         lang = bench.get("_lang", "python")
@@ -113,13 +140,14 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
             tags = m.get("tags", {})
             unit = m.get("unit", "")
             category = m.get("category", "")
+            profile = infer_profile(bench, m)
 
             # For scalability metrics with repeated names, append the tag that
             # differentiates them (e.g. graph_size) so each row is unique.
             metric_name = m["name"]
             if tags:
                 tag_suffix = "_".join(f"{k}={v}" for k, v in tags.items()
-                                      if k in ("graph_size", "num_threads", "scale_factor"))
+                                      if k in ("graph_size", "num_threads", "threads", "scale_factor"))
                 if tag_suffix:
                     metric_name = f"{metric_name}@{tag_suffix}"
 
@@ -127,6 +155,7 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
                 "benchmark": bench_name,
                 "metric": metric_name,
                 "lang": lang,
+                "profile": profile,
                 "value": m["value"],
                 "unit": unit,
                 "additional": add,
@@ -141,8 +170,10 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
                     "min_ns": add.get("min_ns", 0),
                     "max_ns": add.get("max_ns", 0),
                     "count": int(add.get("count", 0)),
+                    "has_percentiles": True,
                 })
                 latency.append(entry)
+                latency_keys.add((bench_name, metric_name))
             elif category == "throughput":
                 entry.update({
                     "ops_per_sec": m["value"],
@@ -151,8 +182,10 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
                 })
                 throughput.append(entry)
             elif category == "scalability" and unit in _UNIT_TO_NS:
-                # Scalability metrics are time-based (value already in the
-                # declared unit). Promote them to the latency list.
+                # Only promote scalability entries that have no proper latency
+                # counterpart — avoids duplicates and preserves percentile data.
+                if (bench_name, metric_name) in latency_keys:
+                    continue
                 mean_ns = _to_ns(m["value"], unit)
                 entry.update({
                     "mean_ns": mean_ns,
@@ -161,7 +194,8 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
                     "p99_ns": 0,
                     "min_ns": 0,
                     "max_ns": 0,
-                    "count": int(add.get("count", add.get("scale_factor", 0))),
+                    "count": int(add.get("count", 0)),
+                    "has_percentiles": False,
                 })
                 latency.append(entry)
     return latency, throughput
@@ -198,6 +232,7 @@ def flatten_scalability(bench_files: list) -> list:
                 "benchmark": bench_name,
                 "operation": m["name"],
                 "lang": lang,
+                "profile": infer_profile(bench, m),
                 "category": cat,
                 "scale_dim": scale_dim,
                 "scale_val": scale_val,
@@ -303,6 +338,7 @@ def generate_html(
     for b in bench_files:
         summary.append({
             "benchmark": b.get("benchmark_name", b["_source_file"]),
+            "profile": infer_profile(b),
             "timestamp": b.get("timestamp", ""),
             "duration": f"{b.get('total_duration_sec', 0):.1f}s",
             "metrics": len(b.get("metrics", [])),
@@ -401,6 +437,9 @@ def generate_html(
   .badge-throughput {{ background: rgba(79,195,247,0.18); color: var(--accent2); }}
   .badge-cpp {{ background: rgba(251,146,60,0.18); color: #fb923c; }}
   .badge-python {{ background: rgba(96,165,250,0.18); color: #60a5fa; }}
+  .badge-baseline {{ background: rgba(129,201,149,0.18); color: var(--accent3); }}
+  .badge-extended {{ background: rgba(255,183,77,0.18); color: #ffb74d; }}
+  .badge-other {{ background: rgba(139,143,168,0.18); color: var(--muted); }}
   .lang-toggle {{ display: flex; gap: 0; }}
   .lang-toggle button {{
     background: var(--surface); border: 1px solid var(--border);
@@ -417,7 +456,37 @@ def generate_html(
   .delta-bad {{ color: var(--accent4); }}
   .delta-neutral {{ color: var(--muted); }}
 
+  .lang-section-title {{
+    display: flex; align-items: center; gap: 10px;
+    margin: 32px 0 16px; font-size: 1.05rem; font-weight: 600;
+    border-bottom: 1px solid var(--border); padding-bottom: 10px;
+  }}
+  .cmp-chips {{
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+  }}
+  .cmp-chip {{
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text);
+    transition: all 0.15s; user-select: none;
+  }}
+  .cmp-chip:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .cmp-chip.hidden-chip {{
+    opacity: 0.35; text-decoration: line-through; color: var(--muted);
+  }}
+  .btn-sm {{
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); cursor: pointer; font-family: var(--font);
+    font-size: 0.78rem; padding: 4px 10px; transition: all 0.15s;
+  }}
+  .btn-sm:hover {{ color: var(--text); border-color: var(--accent); }}
+
   .section {{ margin-bottom: 36px; }}
+  .subsection-title {{
+    display:flex; align-items:center; justify-content:space-between;
+    margin: 20px 0 10px; font-size: 0.95rem; font-weight: 600;
+  }}
   .filter-bar {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }}
   .filter-bar select {{
     background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
@@ -493,6 +562,12 @@ def generate_html(
   <div class="section">
     <div class="filter-bar">
       <select id="lat-filter" onchange="renderLatency()"><option value="">All benchmarks</option></select>
+      <select id="lat-profile-filter" onchange="renderLatency()">
+        <option value="">All profiles</option>
+        <option value="baseline">Baseline</option>
+        <option value="extended">Extended</option>
+        <option value="other">Other</option>
+      </select>
       <div class="lang-toggle">
         <button class="active" onclick="setLangFilter('lat','',this)">All</button>
         <button onclick="setLangFilter('lat','cpp',this)">C++</button>
@@ -507,14 +582,7 @@ def generate_html(
     </div>
     <div class="card">
       <h3>Latency Detail</h3>
-      <table>
-        <thead><tr>
-          <th>Lang</th><th>Benchmark</th><th>Operation</th><th>n</th>
-          <th>Mean</th><th>p50</th><th>p95</th><th>p99</th><th>Min</th><th>Max</th>
-          <th title="Coefficient of Variation = stddev/mean. Green &lt;10%, Yellow 10-30%, Red &gt;30%">CV%</th>
-        </tr></thead>
-        <tbody id="lat-table"></tbody>
-      </table>
+      <div id="lat-detail-sections"></div>
     </div>
   </div>
 </div>
@@ -524,6 +592,12 @@ def generate_html(
   <div class="section">
     <div class="filter-bar">
       <select id="thr-filter" onchange="renderThroughput()"><option value="">All benchmarks</option></select>
+      <select id="thr-profile-filter" onchange="renderThroughput()">
+        <option value="">All profiles</option>
+        <option value="baseline">Baseline</option>
+        <option value="extended">Extended</option>
+        <option value="other">Other</option>
+      </select>
       <div class="lang-toggle">
         <button class="active" onclick="setLangFilter('thr','',this)">All</button>
         <button onclick="setLangFilter('thr','cpp',this)">C++</button>
@@ -536,12 +610,7 @@ def generate_html(
     </div>
     <div class="card">
       <h3>Throughput Detail</h3>
-      <table>
-        <thead><tr>
-          <th>Lang</th><th>Benchmark</th><th>Operation</th><th>Ops/sec</th><th>Total Ops</th><th>Duration</th>
-        </tr></thead>
-        <tbody id="thr-table"></tbody>
-      </table>
+      <div id="thr-detail-sections"></div>
     </div>
   </div>
 </div>
@@ -633,6 +702,17 @@ function fmtDelta(pct, higherIsBetter) {{
   const cls = deltaClass(pct, higherIsBetter);
   return `<span class="delta ${{cls}}">${{sign}}${{pct.toFixed(1)}}%</span>`;
 }}
+function profileLabel(profile) {{
+  if (profile === 'baseline') return 'Baseline';
+  if (profile === 'extended') return 'Extended';
+  return 'Other';
+}}
+function profileBadge(profile) {{
+  return `<span class="badge badge-${{profile}}">${{profileLabel(profile)}}</span>`;
+}}
+function profileOrder(profile) {{
+  return profile === 'baseline' ? 0 : profile === 'extended' ? 1 : 2;
+}}
 
 // ── Chart defaults ────────────────────────────────────────────────────────────
 const CD = {{
@@ -683,10 +763,14 @@ function renderOverview() {{
   const total = LAT.length + THR.length;
   const benchNames = [...new Set([...LAT.map(m=>m.benchmark), ...THR.map(m=>m.benchmark)])];
   const avgMean = LAT.length ? LAT.reduce((s,m)=>s+m.mean_ns,0)/LAT.length : 0;
+  const baselineCount = new Set([...LAT.filter(m=>m.profile==='baseline').map(m=>m.benchmark), ...THR.filter(m=>m.profile==='baseline').map(m=>m.benchmark)]).size;
+  const extendedCount = new Set([...LAT.filter(m=>m.profile==='extended').map(m=>m.benchmark), ...THR.filter(m=>m.profile==='extended').map(m=>m.benchmark)]).size;
   document.getElementById('stat-cards').innerHTML = `
     <div class="stat-card"><div class="val">${{benchNames.length}}</div><div class="lbl">Benchmark Suites</div></div>
     <div class="stat-card"><div class="val">${{total}}</div><div class="lbl">Total Metrics</div></div>
     <div class="stat-card"><div class="val">${{LAT.length ? fmtNs(avgMean) : 'N/A'}}</div><div class="lbl">Avg Mean Latency</div></div>
+    <div class="stat-card"><div class="val">${{baselineCount}}</div><div class="lbl">Baseline Suites</div></div>
+    <div class="stat-card"><div class="val">${{extendedCount}}</div><div class="lbl">Extended Suites</div></div>
   `;
 
   // Run info table
@@ -699,7 +783,7 @@ function renderOverview() {{
   // Summary table
   document.getElementById('summary-table').innerHTML = SUMMARY.map(r => `
     <tr>
-      <td>${{r.benchmark}}</td><td>${{r.timestamp}}</td>
+      <td>${{r.benchmark}} ${{profileBadge(r.profile)}}</td><td>${{r.timestamp}}</td>
       <td>${{r.duration}}</td><td>${{r.metrics}}</td>
       <td style="color:var(--muted)">${{r.source}}</td>
     </tr>`).join('');
@@ -760,7 +844,9 @@ function langBadge(lang) {{
 function renderLatency() {{
   let data = LAT;
   const benchF = document.getElementById('lat-filter').value;
+  const profileF = document.getElementById('lat-profile-filter').value;
   if (benchF) data = data.filter(m => m.benchmark === benchF);
+  if (profileF) data = data.filter(m => m.profile === profileF);
   if (langFilter.lat) data = data.filter(m => m.lang === langFilter.lat);
   const bMap = COMPARING ? Object.fromEntries(B_LAT.map(m => [m.benchmark+'/'+m.metric, m])) : {{}};
 
@@ -776,7 +862,7 @@ function renderLatency() {{
     let p = canvas.parentElement.querySelector('.lat-empty-msg');
     if (!p) {{ p = document.createElement('p'); p.className = 'empty lat-empty-msg'; canvas.parentElement.appendChild(p); }}
     p.textContent = `No latency data for current filter.${{hint}}`;
-    document.getElementById('lat-table').innerHTML = '<tr><td colspan="10" class="empty">No data</td></tr>';
+    document.getElementById('lat-detail-sections').innerHTML = '<p class="empty">No data</p>';
     return;
   }}
   // Restore canvas if previously hidden
@@ -814,27 +900,52 @@ function renderLatency() {{
     }},
   }});
 
-  document.getElementById('lat-table').innerHTML = data.map(m => {{
+  const renderLatencyRows = rows => rows.map(m => {{
     const b = bMap[m.benchmark+'/'+m.metric];
     const deltaCell = b ? fmtDelta(((m.mean_ns - b.mean_ns) / b.mean_ns)*100, false) : '';
     const stddev = m.additional?.stddev_ns ?? 0;
     const cv = m.mean_ns > 0 ? (stddev / m.mean_ns) * 100 : 0;
     const cvColor = cv < 10 ? 'var(--accent3)' : cv < 30 ? '#ffb74d' : 'var(--accent4)';
-    const cvCell = m.count > 1 ? `<span style="color:${{cvColor}};font-weight:600">${{cv.toFixed(1)}}%</span>` : '—';
+    const cvCell = m.count > 1 && m.has_percentiles ? `<span style="color:${{cvColor}};font-weight:600">${{cv.toFixed(1)}}%</span>` : '—';
+    const na = `<span style="color:var(--muted)">—</span>`;
+    const p50  = m.has_percentiles ? fmtNs(m.p50_ns) : na;
+    const p95  = m.has_percentiles ? fmtNs(m.p95_ns) : na;
+    const p99  = m.has_percentiles ? `<span style="color:var(--accent4)">${{fmtNs(m.p99_ns)}}</span>` : na;
+    const pmin = m.has_percentiles ? fmtNs(m.min_ns) : na;
+    const pmax = m.has_percentiles ? fmtNs(m.max_ns) : na;
     return `<tr>
       <td>${{langBadge(m.lang)}}</td>
       <td><span class="badge badge-latency">${{m.benchmark}}</span></td>
       <td>${{m.metric}}</td>
-      <td style="color:var(--muted)">${{m.count.toLocaleString()}}</td>
+      <td style="color:var(--muted)">${{m.count > 0 ? m.count.toLocaleString() : na}}</td>
       <td>${{fmtNs(m.mean_ns)}}${{deltaCell ? ' ' + deltaCell : ''}}</td>
-      <td>${{fmtNs(m.p50_ns)}}</td>
-      <td>${{fmtNs(m.p95_ns)}}</td>
-      <td style="color:var(--accent4)">${{fmtNs(m.p99_ns)}}</td>
-      <td style="color:var(--muted)">${{fmtNs(m.min_ns)}}</td>
-      <td style="color:var(--muted)">${{fmtNs(m.max_ns)}}</td>
+      <td>${{p50}}</td>
+      <td>${{p95}}</td>
+      <td>${{p99}}</td>
+      <td style="color:var(--muted)">${{pmin}}</td>
+      <td style="color:var(--muted)">${{pmax}}</td>
       <td>${{cvCell}}</td>
     </tr>`;
-  }}).join('') || '<tr><td colspan="11" class="empty">No data</td></tr>';
+  }}).join('');
+
+  const grouped = ['baseline', 'extended', 'other'].map(profile => {{
+    const rows = data.filter(m => m.profile === profile);
+    if (!rows.length) return '';
+    return `
+      <div class="subsection-title">
+        <span>${{profileLabel(profile)}} ${{profileBadge(profile)}}</span>
+        <span style="color:var(--muted);font-size:0.78rem">${{rows.length}} metric(s)</span>
+      </div>
+      <table style="margin-bottom:18px;">
+        <thead><tr>
+          <th>Lang</th><th>Benchmark</th><th>Operation</th><th>n</th>
+          <th>Mean</th><th>p50</th><th>p95</th><th>p99</th><th>Min</th><th>Max</th>
+          <th title="Coefficient of Variation = stddev/mean. Green &lt;10%, Yellow 10-30%, Red &gt;30%">CV%</th>
+        </tr></thead>
+        <tbody>${{renderLatencyRows(rows) || '<tr><td colspan="11" class="empty">No data</td></tr>'}}</tbody>
+      </table>`;
+  }}).join('');
+  document.getElementById('lat-detail-sections').innerHTML = grouped || '<p class="empty">No data</p>';
 }}
 
 // ── Throughput ────────────────────────────────────────────────────────────────
@@ -842,7 +953,9 @@ let thrChart = null;
 function renderThroughput() {{
   let data = THR;
   const benchF = document.getElementById('thr-filter').value;
+  const profileF = document.getElementById('thr-profile-filter').value;
   if (benchF) data = data.filter(m => m.benchmark === benchF);
+  if (profileF) data = data.filter(m => m.profile === profileF);
   if (langFilter.thr) data = data.filter(m => m.lang === langFilter.thr);
   const bMap = COMPARING ? Object.fromEntries(B_THR.map(m => [m.benchmark+'/'+m.metric, m])) : {{}};
 
@@ -860,18 +973,35 @@ function renderThroughput() {{
     }},
   }});
 
-  document.getElementById('thr-table').innerHTML = data.map(m => {{
+  const renderThroughputRows = rows => rows.map(m => {{
     const b = bMap[m.benchmark+'/'+m.metric];
     const deltaCell = b ? fmtDelta(((m.ops_per_sec - b.ops_per_sec) / b.ops_per_sec)*100, true) : '';
     return `<tr>
       <td>${{langBadge(m.lang)}}</td>
-      <td><span class="badge badge-throughput">${{m.benchmark}}</span></td>
+      <td><span class="badge badge-throughput">${{m.benchmark}}</span> ${{profileBadge(m.profile)}}</td>
       <td>${{m.metric}}</td>
       <td style="color:var(--accent2)">${{fmtOps(m.ops_per_sec)}}${{deltaCell ? ' ' + deltaCell : ''}}</td>
       <td style="color:var(--muted)">${{m.total_ops.toLocaleString()}}</td>
       <td style="color:var(--muted)">${{m.duration_sec.toFixed(2)}}s</td>
     </tr>`;
-  }}).join('') || '<tr><td colspan="6" class="empty">No data</td></tr>';
+  }}).join('');
+
+  const grouped = ['baseline', 'extended', 'other'].map(profile => {{
+    const rows = data.filter(m => m.profile === profile);
+    if (!rows.length) return '';
+    return `
+      <div class="subsection-title">
+        <span>${{profileLabel(profile)}} ${{profileBadge(profile)}}</span>
+        <span style="color:var(--muted);font-size:0.78rem">${{rows.length}} metric(s)</span>
+      </div>
+      <table style="margin-bottom:18px;">
+        <thead><tr>
+          <th>Lang</th><th>Benchmark</th><th>Operation</th><th>Ops/sec</th><th>Total Ops</th><th>Duration</th>
+        </tr></thead>
+        <tbody>${{renderThroughputRows(rows) || '<tr><td colspan="6" class="empty">No data</td></tr>'}}</tbody>
+      </table>`;
+  }}).join('');
+  document.getElementById('thr-detail-sections').innerHTML = grouped || '<p class="empty">No data</p>';
 }}
 
 // ── Scalability Tab ───────────────────────────────────────────────────────────
@@ -1093,30 +1223,127 @@ function renderScalability() {{
 }}
 
 // ── Compare Tab ───────────────────────────────────────────────────────────────
-function renderCompare() {{
-  const el = document.getElementById('tab-compare');
-  if (!el || !COMPARING) return;
+const cmpHidden = {{ python: new Set(), cpp: new Set() }};
+const cmpCharts = {{ python: null, cpp: null }};
 
-  // Build delta table for latency
-  const bLatMap = Object.fromEntries(B_LAT.map(m => [m.benchmark+'/'+m.metric, m]));
-  const bThrMap = Object.fromEntries(B_THR.map(m => [m.benchmark+'/'+m.metric, m]));
+function cmpToggle(lang, key) {{
+  const h = cmpHidden[lang];
+  if (h.has(key)) h.delete(key); else h.add(key);
+  updateCmpChart(lang);
+}}
 
-  const latRows = LAT.map(m => {{
+function cmpShowAll(lang) {{
+  cmpHidden[lang].clear();
+  updateCmpChart(lang);
+}}
+
+function updateCmpChart(lang) {{
+  const chart = cmpCharts[lang];
+  if (!chart) return;
+  const h = cmpHidden[lang];
+  chart.data.datasets[0].data = chart._cmpMeta.map(d => h.has(d.key) ? null : d.pct);
+  chart.data.datasets[0].backgroundColor = chart._cmpMeta.map(d => {{
+    if (h.has(d.key)) return 'transparent';
+    return d.pct > 5 ? '#f28b8288' : d.pct < -5 ? '#81c99588' : '#8b8fa855';
+  }});
+  chart.update('none');
+  document.querySelectorAll(`#cmp-chips-${{lang}} .cmp-chip`).forEach(chip => {{
+    chip.classList.toggle('hidden-chip', h.has(chip.dataset.key));
+  }});
+}}
+
+function buildCmpDeltaChart(lang, items) {{
+  const canvasId = `cmp-delta-${{lang}}`;
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !items.length) return;
+  if (cmpCharts[lang]) cmpCharts[lang].destroy();
+  const h = cmpHidden[lang];
+  const labels = items.map(d => d.label);
+  const data   = items.map(d => h.has(d.key) ? null : d.pct);
+  const colors = items.map(d => h.has(d.key) ? 'transparent' : (d.pct > 5 ? '#f28b8288' : d.pct < -5 ? '#81c99588' : '#8b8fa855'));
+  const chart = new Chart(canvas, {{
+    type: 'bar',
+    data: {{ labels, datasets: [{{ label: 'Δ Mean Latency (%)', data, backgroundColor: colors, borderWidth: 0 }}] }},
+    options: {{ ...CD, indexAxis: 'y',
+      scales: {{ ...CD.scales,
+        x: {{ ...CD.scales.x,
+          title: {{ display:true, text:'% change (positive = slower)', color:'#8b8fa8' }},
+          ticks: {{ callback: v => v + '%', color:'#8b8fa8', font:{{size:11}} }},
+        }},
+        y: {{ ...CD.scales.y, ticks: {{ ...CD.scales.y.ticks, font:{{size:11}} }} }},
+      }},
+      plugins: {{ ...CD.plugins,
+        tooltip: {{ ...CD.plugins.tooltip, callbacks: {{ label: ctx => ctx.raw !== null ? ` ${{ctx.raw.toFixed(1)}}%` : ' (hidden)' }} }},
+      }},
+      onClick: (evt) => {{
+        const pts = chart.getElementsAtEventForMode(evt, 'index', {{intersect: false}}, false);
+        if (pts.length) cmpToggle(lang, items[pts[0].index].key);
+      }},
+    }},
+  }});
+  chart._cmpMeta = items;
+  cmpCharts[lang] = chart;
+
+  // Render chips
+  const chipsEl = document.getElementById(`cmp-chips-${{lang}}`);
+  if (chipsEl) {{
+    chipsEl.innerHTML = items.map(d => {{
+      const col = d.pct > 5 ? '#f28b82' : d.pct < -5 ? '#81c995' : '#8b8fa8';
+      return `<span class="cmp-chip" data-key="${{d.key}}" onclick="cmpToggle('${{lang}}', '${{d.key}}')">`
+           + `<span style="width:8px;height:8px;border-radius:50%;background:${{col}};display:inline-block"></span>`
+           + `${{d.label}}</span>`;
+    }}).join('');
+  }}
+}}
+
+function buildLangSection(lang, lat, bLatMap, thr, bThrMap) {{
+  const langLat = lat.filter(m => m.lang === lang);
+  const langThr = thr.filter(m => m.lang === lang);
+  if (!langLat.length && !langThr.length) return {{ html: '', items: [] }};
+
+  const badgeCls  = lang === 'cpp' ? 'badge-cpp' : 'badge-python';
+  const langLabel = lang === 'cpp' ? 'C++' : 'Python';
+
+  // Deduplicate for chart (first-seen per key)
+  const seenChart = new Set(), chartItems = [];
+  for (const m of langLat) {{
+    const key = m.benchmark + '/' + m.metric;
+    const b = bLatMap[key];
+    if (b && !seenChart.has(key)) {{
+      seenChart.add(key);
+      const pct = ((m.mean_ns - b.mean_ns) / b.mean_ns) * 100;
+      chartItems.push({{ key, label: m.metric + '  [' + m.benchmark + ']', pct }});
+    }}
+  }}
+
+  const chartH = Math.max(240, chartItems.length * 26);
+  const chartSection = chartItems.length ? `
+    <div class="card section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3>Latency Change vs Baseline (%)</h3>
+        <button class="btn-sm" onclick="cmpShowAll('${{lang}}')">Show All</button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;">Click a bar or chip to hide/show it</p>
+      <div class="chart-wrap" style="height:${{chartH}}px"><canvas id="cmp-delta-${{lang}}"></canvas></div>
+      <div id="cmp-chips-${{lang}}" class="cmp-chips"></div>
+    </div>` : '';
+
+  const latRows = langLat.map(m => {{
     const b = bLatMap[m.benchmark+'/'+m.metric];
     if (!b) return `<tr><td><span class="badge badge-latency">${{m.benchmark}}</span></td><td>${{m.metric}}</td><td colspan="4" style="color:var(--muted)">no baseline</td></tr>`;
-    const pct = ((m.mean_ns - b.mean_ns) / b.mean_ns) * 100;
-    const p99pct = ((m.p99_ns - b.p99_ns) / b.p99_ns) * 100;
+    const pct    = ((m.mean_ns - b.mean_ns) / b.mean_ns) * 100;
+    const p99pct = (m.has_percentiles && b.has_percentiles && b.p99_ns) ? ((m.p99_ns - b.p99_ns) / b.p99_ns) * 100 : null;
     return `<tr>
       <td><span class="badge badge-latency">${{m.benchmark}}</span></td>
       <td>${{m.metric}}</td>
       <td>${{fmtNs(b.mean_ns)}}</td>
       <td>${{fmtNs(m.mean_ns)}}</td>
       <td>${{fmtDelta(pct, false)}}</td>
-      <td>${{fmtDelta(p99pct, false)}}</td>
+      <td>${{p99pct !== null ? fmtDelta(p99pct, false) : '<span class="delta delta-neutral">—</span>'}}</td>
     </tr>`;
   }}).join('');
 
-  const thrRows = THR.map(m => {{
+  const thrRows = langThr.map(m => {{
     const b = bThrMap[m.benchmark+'/'+m.metric];
     if (!b) return `<tr><td><span class="badge badge-throughput">${{m.benchmark}}</span></td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
     const pct = ((m.ops_per_sec - b.ops_per_sec) / b.ops_per_sec) * 100;
@@ -1129,19 +1356,50 @@ function renderCompare() {{
     </tr>`;
   }}).join('');
 
-  // Delta bar chart — mean latency
-  const allMetrics = [...new Set([...LAT.map(m=>m.benchmark+'/'+m.metric), ...B_LAT.map(m=>m.benchmark+'/'+m.metric)])];
-  const deltaLabels = [], deltaValues = [], deltaColors = [];
-  for (const key of allMetrics) {{
-    const cur = LAT.find(m => m.benchmark+'/'+m.metric === key);
-    const base = bLatMap[key];
-    if (cur && base) {{
-      deltaLabels.push(cur.metric);
-      const pct = ((cur.mean_ns - base.mean_ns) / base.mean_ns) * 100;
-      deltaValues.push(pct);
-      deltaColors.push(pct > 5 ? '#f28b8288' : pct < -5 ? '#81c99588' : '#8b8fa855');
-    }}
-  }}
+  const latSection = langLat.length ? `
+    <div class="card section">
+      <h3>Latency Comparison</h3>
+      <table>
+        <thead><tr>
+          <th>Benchmark</th><th>Operation</th>
+          <th>Baseline Mean</th><th>Current Mean</th><th>Δ Mean</th><th>Δ p99</th>
+        </tr></thead>
+        <tbody>${{latRows}}</tbody>
+      </table>
+    </div>` : '';
+
+  const thrSection = langThr.length ? `
+    <div class="card section">
+      <h3>Throughput Comparison</h3>
+      <table>
+        <thead><tr>
+          <th>Benchmark</th><th>Operation</th>
+          <th>Baseline</th><th>Current</th><th>Δ</th>
+        </tr></thead>
+        <tbody>${{thrRows}}</tbody>
+      </table>
+    </div>` : '';
+
+  const html = `
+    <div class="lang-section-title">
+      <span class="badge ${{badgeCls}}" style="font-size:0.88rem;padding:4px 14px;">${{langLabel}}</span>
+    </div>
+    ${{chartSection}}
+    ${{latSection}}
+    ${{thrSection}}`;
+
+  return {{ html, items: chartItems }};
+}}
+
+function renderCompare() {{
+  const el = document.getElementById('tab-compare');
+  if (!el || !COMPARING) return;
+
+  const bLatMap = Object.fromEntries(B_LAT.map(m => [m.benchmark+'/'+m.metric, m]));
+  const bThrMap = Object.fromEntries(B_THR.map(m => [m.benchmark+'/'+m.metric, m]));
+
+  const pySection  = buildLangSection('python', LAT, bLatMap, THR, bThrMap);
+  const cppSection = buildLangSection('cpp',    LAT, bLatMap, THR, bThrMap);
 
   el.innerHTML = `
     <div class="section">
@@ -1150,63 +1408,32 @@ function renderCompare() {{
         <span style="color:var(--muted)">vs baseline</span>
         <div class="run-pill"><span class="dot" style="background:${{BASE_COLOR}}"></span>{b_label}</div>
       </div>
+      ${{pySection.html}}
+      ${{cppSection.html}}
+    </div>`;
 
-      ${{deltaLabels.length ? `
-      <div class="card section">
-        <h3>Latency Change vs Baseline (mean, %)</h3>
-        <div class="chart-wrap tall"><canvas id="cmp-delta-chart"></canvas></div>
-      </div>` : ''}}
-
-      <div class="card section">
-        <h3>Latency Comparison</h3>
-        <table>
-          <thead><tr>
-            <th>Benchmark</th><th>Operation</th>
-            <th>Baseline Mean</th><th>Current Mean</th><th>Δ Mean</th><th>Δ p99</th>
-          </tr></thead>
-          <tbody>${{latRows || '<tr><td colspan="6" class="empty">No latency data</td></tr>'}}</tbody>
-        </table>
-      </div>
-
-      <div class="card section">
-        <h3>Throughput Comparison</h3>
-        <table>
-          <thead><tr>
-            <th>Benchmark</th><th>Operation</th>
-            <th>Baseline</th><th>Current</th><th>Δ</th>
-          </tr></thead>
-          <tbody>${{thrRows || '<tr><td colspan="5" class="empty">No throughput data</td></tr>'}}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  if (deltaLabels.length) {{
-    new Chart(document.getElementById('cmp-delta-chart'), {{
-      type: 'bar',
-      data: {{ labels: deltaLabels, datasets: [{{ label: 'Δ Mean Latency (%)', data: deltaValues, backgroundColor: deltaColors, borderWidth: 0 }}] }},
-      options: {{ ...CD, indexAxis: 'y',
-        scales: {{ ...CD.scales,
-          x: {{ ...CD.scales.x,
-            title: {{ display:true, text:'% change (positive = slower)', color:'#8b8fa8' }},
-            ticks: {{ callback: v => v + '%', color:'#8b8fa8', font:{{size:11}} }},
-          }},
-        }},
-        plugins: {{ ...CD.plugins,
-          tooltip: {{ ...CD.plugins.tooltip, callbacks: {{ label: ctx => ` ${{ctx.raw.toFixed(1)}}%` }} }},
-          annotation: {{ annotations: {{ zero: {{ type:'line', xMin:0, xMax:0, borderColor:'#8b8fa855', borderWidth:1 }} }} }},
-        }},
-      }},
-    }});
-  }}
+  buildCmpDeltaChart('python', pySection.items);
+  buildCmpDeltaChart('cpp',    cppSection.items);
 }}
 
 // ── Raw ───────────────────────────────────────────────────────────────────────
 function renderRaw() {{
   const all = [...LAT.map(m=>({{'type':'latency',...m}})), ...THR.map(m=>({{'type':'throughput',...m}}))];
-  document.getElementById('raw-content').innerHTML = `
+  const byProfile = ['baseline', 'extended', 'other'].sort((a,b)=>profileOrder(a)-profileOrder(b)).map(profile => {{
+    const rows = all.filter(m => m.profile === profile);
+    if (!rows.length) return '';
+    return `
+      <div class="card" style="margin-bottom:18px;">
+        <div class="subsection-title" style="margin-top:0;">
+          <span>${{profileLabel(profile)}} ${{profileBadge(profile)}}</span>
+          <span style="color:var(--muted);font-size:0.78rem">${{rows.length}} metric(s)</span>
+        </div>
+        <pre style="overflow:auto;font-family:var(--mono);font-size:0.78rem;color:var(--muted);max-height:600px;">${{JSON.stringify(rows, null, 2)}}</pre>
+      </div>`;
+  }}).join('');
+  document.getElementById('raw-content').innerHTML = byProfile || `
     <div class="card">
-      <pre style="overflow:auto;font-family:var(--mono);font-size:0.78rem;color:var(--muted);max-height:600px;">${{JSON.stringify(all, null, 2)}}</pre>
+      <p class="empty">No data</p>
     </div>`;
 }}
 

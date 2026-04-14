@@ -5,6 +5,7 @@
 #include <vector>
 #include <chrono>
 #include <string>
+#include <iostream>
 
 #include "../core/timing_utils.h"
 #include "../core/metrics_collector.h"
@@ -38,6 +39,7 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi]") {
         fixture.wait_for_sync();
 
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -62,8 +64,10 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi]") {
                     auto node = GraphGenerator::create_test_node(
                         base_id + local_ops, graph->get_agent_id());
                     uint64_t ts = bench_now();
-                    graph->insert_node(node);
+                    auto res = graph->insert_node(node);
                     samples.push_back(bench_now() - ts);
+                    if (!res.has_value())
+                        failed_ops.fetch_add(1, std::memory_order_relaxed);
                     local_ops++;
                 }
 
@@ -74,6 +78,10 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi]") {
         std::this_thread::sleep_for(AGENT_DUR);
         stop_flag.store(true, std::memory_order_relaxed);
         for (auto& th : threads) th.join();
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH node_insert agents=" << N << "] "
+                      << failed_ops.load() << " insert_node calls failed\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
@@ -118,14 +126,15 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi]") {
         for (uint64_t i = 0; i < 1000; ++i) {
             auto node = GraphGenerator::create_test_node(0, graph0->get_agent_id());
             auto res = graph0->insert_node(node);
-            if (res.has_value()) node_ids.push_back(res.value());
+            REQUIRE(res.has_value());
+            node_ids.push_back(res.value());
         }
-        REQUIRE(!node_ids.empty());
         fixture.wait_for_sync();
 
         const size_t pool_size = node_ids.size();
 
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -150,6 +159,8 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi]") {
                     uint64_t ts = bench_now();
                     auto node = graph->get_node(id);
                     samples.push_back(bench_now() - ts);
+                    if (!node.has_value())
+                        failed_ops.fetch_add(1, std::memory_order_relaxed);
                     local_ops++;
                 }
 
@@ -160,6 +171,10 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi]") {
         std::this_thread::sleep_for(AGENT_DUR);
         stop_flag.store(true, std::memory_order_relaxed);
         for (auto& th : threads) th.join();
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH node_read agents=" << N << "] "
+                      << failed_ops.load() << " get_node calls returned empty\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
@@ -211,6 +226,7 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi]") {
         fixture.wait_for_sync();
 
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -237,9 +253,13 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi]") {
                         graph->add_or_modify_attrib_local<level_att>(
                             *node, static_cast<int32_t>(local_ops % 1000));
                         uint64_t ts = bench_now();
-                        graph->update_node(*node);
+                        bool ok = graph->update_node(*node);
                         samples.push_back(bench_now() - ts);
+                        if (!ok)
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
                         local_ops++;
+                    } else {
+                        failed_ops.fetch_add(1, std::memory_order_relaxed);
                     }
                 }
 
@@ -250,6 +270,10 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi]") {
         std::this_thread::sleep_for(AGENT_DUR);
         stop_flag.store(true, std::memory_order_relaxed);
         for (auto& th : threads) th.join();
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH node_update agents=" << N << "] "
+                      << failed_ops.load() << " get_node/update_node calls failed\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 

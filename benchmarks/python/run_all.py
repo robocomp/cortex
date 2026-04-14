@@ -18,11 +18,16 @@ import argparse
 import platform
 from datetime import datetime
 
-BENCHMARKS = [
+ALL_BENCHMARKS = [
     "bench_binding_overhead.py",
+    "bench_baseline_graph.py",
     "bench_graph_operations.py",
     "bench_throughput.py",
     "bench_signals.py",
+]
+
+BASELINE_BENCHMARKS = [
+    "bench_baseline_graph.py",
 ]
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,14 +40,21 @@ RUNS_INDEX = os.path.join(DEFAULT_RESULTS_ROOT, "runs.json")
 def load_runs() -> list:
     if not os.path.isfile(RUNS_INDEX):
         return []
-    with open(RUNS_INDEX) as f:
-        return json.load(f)
+    try:
+        with open(RUNS_INDEX) as f:
+            return json.load(f)
+    except PermissionError:
+        print(f"WARNING: cannot read benchmark index: {RUNS_INDEX} (permission denied)")
+        return []
 
 
 def save_runs(runs: list):
     os.makedirs(DEFAULT_RESULTS_ROOT, exist_ok=True)
-    with open(RUNS_INDEX, "w") as f:
-        json.dump(runs, f, indent=2)
+    try:
+        with open(RUNS_INDEX, "w") as f:
+            json.dump(runs, f, indent=2)
+    except PermissionError:
+        print(f"WARNING: cannot update benchmark index: {RUNS_INDEX} (permission denied)")
 
 
 def register_run(run_info: dict):
@@ -80,7 +92,7 @@ def cmd_delete(run_id: str):
     print(f"Removed run '{run_id}' from index (result files kept on disk).")
 
 
-def cmd_run_direct() -> int:
+def cmd_run_direct(benchmarks) -> int:
     """Run benchmarks using BENCH_RESULTS_DIR already set in the environment.
 
     Called by the top-level run_benchmarks.py wrapper so it can manage the
@@ -97,7 +109,7 @@ def cmd_run_direct() -> int:
     results = []
     suite_start = time.time()
 
-    for bench in BENCHMARKS:
+    for bench in benchmarks:
         bench_path = os.path.join(SCRIPT_DIR, bench)
         print(f"\n{'=' * 70}")
         print(f"Running: {bench}")
@@ -118,7 +130,7 @@ def cmd_run_direct() -> int:
     return 0 if all(ok for _, ok in results) else 1
 
 
-def cmd_run(label, results_root):
+def cmd_run(label, results_root, benchmarks):
     ts = datetime.now()
     run_id = ts.strftime("%Y%m%dT%H%M%S")
     dir_name = run_id if not label else f"{run_id}_{label.replace(' ', '-')}"
@@ -139,7 +151,7 @@ def cmd_run(label, results_root):
     results = []
     suite_start = time.time()
 
-    for bench in BENCHMARKS:
+    for bench in benchmarks:
         bench_path = os.path.join(SCRIPT_DIR, bench)
         print(f"\n{'=' * 70}")
         print(f"Running: {bench}")
@@ -214,7 +226,11 @@ def main():
     parser.add_argument("--delete", metavar="RUN_ID", help="Remove a run from the index")
     parser.add_argument("--direct", action="store_true",
                         help="Run benchmarks using BENCH_RESULTS_DIR from env, skip index registration")
+    parser.add_argument("--baseline", action="store_true",
+                        help="Run only the curated low-noise Python baseline set")
     args = parser.parse_args()
+
+    benchmarks = BASELINE_BENCHMARKS if args.baseline else ALL_BENCHMARKS
 
     if args.list:
         cmd_list()
@@ -225,9 +241,9 @@ def main():
         return 0
 
     if args.direct:
-        return cmd_run_direct()
+        return cmd_run_direct(benchmarks)
 
-    return cmd_run(args.label, args.results_root)
+    return cmd_run(args.label, args.results_root, benchmarks)
 
 
 if __name__ == "__main__":

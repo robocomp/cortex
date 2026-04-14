@@ -13,7 +13,13 @@ FetchContent_Declare(
   GIT_TAG        v3.8.0
 )
 
-FetchContent_MakeAvailable(Catch2)
+FetchContent_Declare(
+  nanobench
+  GIT_REPOSITORY https://github.com/martinus/nanobench.git
+  GIT_TAG        v4.3.11
+)
+
+FetchContent_MakeAvailable(Catch2 nanobench)
 
 # Find required packages
 find_package(Boost REQUIRED)
@@ -33,6 +39,7 @@ set(BENCHMARK_SOURCES
     throughput/single_agent_ops_bench.cpp
     throughput/concurrent_writers_bench.cpp
     throughput/single_agent_ops_with_latency_bench.cpp
+    throughput/query_ops_bench.cpp
 
     # Scalability benchmarks
     scalability/multi_agent_sync_bench.cpp
@@ -51,6 +58,7 @@ set(BENCHMARK_HEADERS
     core/benchmark_config.h
     core/timing_utils.h
     core/metrics_collector.h
+    core/nanobench_adapter.h
     core/report_generator.h
     fixtures/multi_agent_fixture.h
     fixtures/graph_generator.h
@@ -81,6 +89,7 @@ target_include_directories(dsr_benchmarks PRIVATE
 # Link libraries
 target_link_libraries(dsr_benchmarks PRIVATE
     Catch2::Catch2
+    nanobench
     dsr_api
     dsr_core
     Qt6::Core
@@ -115,4 +124,5 @@ message(STATUS "DSR Benchmarks Configuration:")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ Standard: C++23")
 message(STATUS "  Catch2 version: 3.8.0")
+message(STATUS "  nanobench version: 4.3.11")
 message(STATUS "")

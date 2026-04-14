@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <atomic>
 #include <random>
 #include <vector>
 #include <cstdlib>
@@ -36,7 +37,9 @@ struct GraphGeneratorConfig {
 
 class GraphGenerator {
 public:
-    explicit GraphGenerator(unsigned int seed = std::random_device{}())
+    static constexpr unsigned int DEFAULT_SEED = 0x5A17B3C1u;
+
+    explicit GraphGenerator(unsigned int seed = DEFAULT_SEED)
         : rng_(seed)
     {
         // Ensure test types are registered (safe to call multiple times)
@@ -187,9 +190,8 @@ public:
 
 private:
     std::string temp_filename() {
-        std::string base = "/tmp/dsr_bench_";
-        std::uniform_int_distribution<uint64_t> dist;
-        return base + std::to_string(dist(rng_)) + ".json";
+        static std::atomic<uint64_t> next_id{0};
+        return "/tmp/dsr_bench_" + std::to_string(next_id.fetch_add(1, std::memory_order_relaxed)) + ".json";
     }
 
     std::vector<uint64_t> generate_node_ids(uint32_t count) {

@@ -3,7 +3,7 @@
 
 #include <dsr/core/crdt/delta_crdt.h>
 #include <dsr/core/types/crdt_types.h>
-#include "../core/timing_utils.h"
+#include "../core/nanobench_adapter.h"
 #include "../core/metrics_collector.h"
 #include "../core/report_generator.h"
 
@@ -19,58 +19,54 @@ static DSR::CRDTAttribute make_test_attribute(uint32_t agent_id, int32_t value) 
 }
 
 // All four mvreg operations in a single TEST_CASE so they export together
-// to one JSON file.  No Catch2 SECTIONs — each measurement block runs
-// sequentially so all metrics accumulate in one collector.
-TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg]") {
+// to one JSON file.
+TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
     MetricsCollector collector("crdt_mvreg");
+    collector.add_metadata("profile", "baseline");
 
     // ── mvreg write ───────────────────────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
         mvreg<DSR::CRDTAttribute> reg;
         reg.id = 100;
+        int i = 0;
 
-        for (int i = 0; i < 1000; ++i) {
-            auto attr = make_test_attribute(100, i);
-            uint64_t start = bench_now();
+        auto bench = make_latency_bench();
+        bench.run("mvreg_write", [&] {
+            auto attr = make_test_attribute(100, i++);
             auto delta = reg.write(attr);
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("mvreg_write", tracker.stats());
-        INFO("mvreg::write mean: " << tracker.stats().mean_ns << " ns");
+            ankerl::nanobench::doNotOptimizeAway(delta);
+        });
+        collector.record_latency_stats("mvreg_write", nb_to_stats(bench));
     }
 
     // ── mvreg join (same agent) ───────────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
         mvreg<DSR::CRDTAttribute> reg;
         reg.id = 100;
-
         auto init_attr = make_test_attribute(100, 0);
         reg.write(init_attr);
+        int i = 0;
 
-        for (int i = 0; i < 1000; ++i) {
+        auto bench = make_latency_bench();
+        bench.run("mvreg_join_same_agent", [&] {
             mvreg<DSR::CRDTAttribute> delta_reg;
             delta_reg.id = 100;
-            auto new_attr = make_test_attribute(100, i);
+            auto new_attr = make_test_attribute(100, i++);
             auto delta = delta_reg.write(new_attr);
-
-            uint64_t start = bench_now();
             reg.join(std::move(delta));
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("mvreg_join_same_agent", tracker.stats());
-        INFO("mvreg::join (same agent) mean: " << tracker.stats().mean_ns << " ns");
+            ankerl::nanobench::doNotOptimizeAway(reg);
+        });
+        collector.record_latency_stats("mvreg_join_same_agent", nb_to_stats(bench));
     }
 
     // ── mvreg join (different agents) ────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
+        int i = 0;
 
-        for (int i = 0; i < 1000; ++i) {
+        auto bench = make_latency_bench();
+        bench.run("mvreg_join_different_agent", [&] {
             mvreg<DSR::CRDTAttribute> reg;
             reg.id = 100;
-
             auto attr = make_test_attribute(100, 0);
             auto delta = reg.write(attr);
 
@@ -81,30 +77,28 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg]") {
             auto new_attr = make_test_attribute(other_agent, i * 2);
             delta = delta_reg.write(new_attr);
 
-            uint64_t start = bench_now();
             reg.join(std::move(delta));
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("mvreg_join_different_agent", tracker.stats());
-        INFO("mvreg::join (different agent) mean: " << tracker.stats().mean_ns << " ns");
+            ankerl::nanobench::doNotOptimizeAway(reg);
+            ++i;
+        });
+        collector.record_latency_stats("mvreg_join_different_agent", nb_to_stats(bench));
     }
 
     // ── mvreg read ────────────────────────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
         mvreg<DSR::CRDTAttribute> reg;
         reg.id = 100;
-
         auto attr = make_test_attribute(100, 42);
         reg.write(attr);
 
-        for (int i = 0; i < 1000; ++i) {
-            uint64_t start = bench_now();
-            [[maybe_unused]] const auto& value = reg.read_reg();
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("mvreg_read", tracker.stats());
-        INFO("mvreg::read mean: " << tracker.stats().mean_ns << " ns");
+        // Read is pure — no warmup needed (cache already warm after write)
+        auto bench = make_latency_bench(1000, 0);
+        bench.minEpochIterations(10);
+        bench.run("mvreg_read", [&] {
+            const auto& value = reg.read_reg();
+            ankerl::nanobench::doNotOptimizeAway(value);
+        });
+        collector.record_latency_stats("mvreg_read", nb_to_stats(bench));
     }
 
     auto result = collector.finalize();
@@ -112,72 +106,66 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg]") {
     reporter.export_all(result, "crdt_mvreg");
 }
 
-TEST_CASE("CRDT dot_context operations", "[CRDT][dot_context]") {
+TEST_CASE("CRDT dot_context operations", "[CRDT][dot_context][BASELINE]") {
     MetricsCollector collector("crdt_dot_context");
+    collector.add_metadata("profile", "baseline");
 
     // ── makedot ───────────────────────────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
         dot_context ctx;
+        int i = 0;
 
-        for (int i = 0; i < 1000; ++i) {
-            uint64_t start = bench_now();
-            auto dot = ctx.makedot(100 + (i % 10));
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("dot_context_makedot", tracker.stats());
-        INFO("dot_context::makedot mean: " << tracker.stats().mean_ns << " ns");
+        auto bench = make_latency_bench();
+        bench.minEpochIterations(10);
+        bench.run("dot_context_makedot", [&] {
+            auto dot = ctx.makedot(100 + (i++ % 10));
+            ankerl::nanobench::doNotOptimizeAway(dot);
+        });
+        collector.record_latency_stats("dot_context_makedot", nb_to_stats(bench));
     }
 
     // ── dotin ─────────────────────────────────────────────────────────────────
     {
         dot_context ctx;
         for (int i = 0; i < 100; ++i) ctx.makedot(100 + (i % 10));
+        int i = 0;
 
-        LatencyTracker tracker(1000);
-        for (int i = 0; i < 1000; ++i) {
-            std::pair<key_type, int> dot{100 + (i % 10), i % 50};
-            uint64_t start = bench_now();
-            [[maybe_unused]] bool r = ctx.dotin(dot);
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("dot_context_dotin", tracker.stats());
-        INFO("dot_context::dotin mean: " << tracker.stats().mean_ns << " ns");
+        auto bench = make_latency_bench(1000, 0);
+        bench.minEpochIterations(10);
+        bench.run("dot_context_dotin", [&] {
+            std::pair<key_type, int> dot{100 + (i++ % 10), i % 50};
+            bool r = ctx.dotin(dot);
+            ankerl::nanobench::doNotOptimizeAway(r);
+        });
+        collector.record_latency_stats("dot_context_dotin", nb_to_stats(bench));
     }
 
     // ── join ──────────────────────────────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
-
-        for (int i = 0; i < 1000; ++i) {
+        auto bench = make_latency_bench();
+        bench.run("dot_context_join", [&] {
             dot_context ctx1;
             dot_context ctx2;
             for (int j = 0; j < 10; ++j) {
                 ctx1.makedot(100);
                 ctx2.makedot(200);
             }
-            uint64_t start = bench_now();
             ctx1.join(ctx2);
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("dot_context_join", tracker.stats());
-        INFO("dot_context::join mean: " << tracker.stats().mean_ns << " ns");
+            ankerl::nanobench::doNotOptimizeAway(ctx1);
+        });
+        collector.record_latency_stats("dot_context_join", nb_to_stats(bench));
     }
 
     // ── compact ───────────────────────────────────────────────────────────────
     {
-        LatencyTracker tracker(1000);
-
-        for (int i = 0; i < 1000; ++i) {
+        auto bench = make_latency_bench();
+        bench.run("dot_context_compact", [&] {
             dot_context ctx;
             for (int j = 0; j < 50; ++j) ctx.insertdot({100, j * 2}, false);
-
-            uint64_t start = bench_now();
             ctx.compact();
-            tracker.record(bench_now() - start);
-        }
-        collector.record_latency_stats("dot_context_compact", tracker.stats());
-        INFO("dot_context::compact mean: " << tracker.stats().mean_ns << " ns");
+            ankerl::nanobench::doNotOptimizeAway(ctx);
+        });
+        collector.record_latency_stats("dot_context_compact", nb_to_stats(bench));
     }
 
     auto result = collector.finalize();

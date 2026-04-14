@@ -64,7 +64,9 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
                 "bench_node_" + std::to_string(i));
 
             uint64_t send_time = get_unix_timestamp();
-            expected_node_id = agent_a->insert_node(node).value_or(0);
+            auto ins_result = agent_a->insert_node(node);
+            REQUIRE(ins_result.has_value());
+            expected_node_id = ins_result.value();
             
             // Wait for signal with timeout
             auto start = std::chrono::steady_clock::now();
@@ -103,7 +105,9 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
         for (int i = 0; i < 110; ++i) {
             auto node = GraphGenerator::create_test_node(
                 4000 + i, agent_a->get_agent_id(), "edge_node_" + std::to_string(i));
-            node_to_ids.emplace_back(agent_a->insert_node(node).value_or(0));
+            auto ins = agent_a->insert_node(node);
+            REQUIRE(ins.has_value());
+            node_to_ids.push_back(ins.value());
         }
 
         // Wait for all nodes to sync to agent B before creating edges
@@ -294,9 +298,8 @@ TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][delta][scala
 
                 uint64_t send_time = get_unix_timestamp();
                 auto result = sender->insert_node(node);
-                if (result.has_value()) {
-                    current_expected_id.store(result.value());
-                }
+                REQUIRE(result.has_value());
+                current_expected_id.store(result.value());
 
                 // Wait for all receivers
                 auto start = std::chrono::steady_clock::now();

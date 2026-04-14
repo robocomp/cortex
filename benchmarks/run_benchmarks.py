@@ -8,6 +8,7 @@ Usage:
     python run_benchmarks.py --cpp-only              # skip Python
     python run_benchmarks.py --python-only           # skip C++
     python run_benchmarks.py --build                 # cmake build before running
+    python run_benchmarks.py --all                   # include hidden tests ([.multi], [.extended])
     python run_benchmarks.py --cpp-filter "[LATENCY]"# pass filter to dsr_benchmarks
     python run_benchmarks.py --report                # open HTML report when done
     python run_benchmarks.py --compare <run-id>      # compare against a previous run
@@ -16,6 +17,7 @@ Usage:
     python run_benchmarks.py --repeat 5              # run C++ 5× and report median
     python run_benchmarks.py --priority -10          # run with higher OS priority (requires root)
     python run_benchmarks.py --taskset 0,1           # pin C++ benchmarks to CPU cores 0 and 1
+    python run_benchmarks.py --no-cpu-tune           # skip governor/turbo tuning (Linux)
 """
 
 import sys
@@ -26,6 +28,7 @@ import json
 import argparse
 import platform
 import shlex
+import tempfile
 from typing import Optional
 from datetime import datetime
 
@@ -34,6 +37,13 @@ PYTHON_DIR = os.path.join(SCRIPT_DIR, "python")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 RESULTS_ROOT = os.path.join(SCRIPT_DIR, "results")
 RUNS_INDEX = os.path.join(RESULTS_ROOT, "runs.json")
+BASELINE_CPP_FILTER = "[BASELINE]~[.multi]"
+# Catch2 v3 has no single spec that matches both visible and hidden tests.
+# _run_cpp_once detects this sentinel and runs the binary twice:
+#   1. no filter   → all visible tests
+#   2. "[.]"        → all hidden tests (tags starting with '.')
+ALL_CPP_FILTER = "__ALL_INCLUDING_HIDDEN__"
+DEFAULT_STABILITY_WARN_PCT = 5.0
 
 
 # ── Index helpers (mirrors python/run_all.py) ──────────────────────────────────
@@ -41,14 +51,30 @@ RUNS_INDEX = os.path.join(RESULTS_ROOT, "runs.json")
 def load_runs() -> list:
     if not os.path.isfile(RUNS_INDEX):
         return []
-    with open(RUNS_INDEX) as f:
-        return json.load(f)
+    try:
+        with open(RUNS_INDEX) as f:
+            return json.load(f)
+    except PermissionError:
+        print(f"WARNING: cannot read benchmark index: {RUNS_INDEX} (permission denied)")
+        return []
 
 
 def save_runs(runs: list):
     os.makedirs(RESULTS_ROOT, exist_ok=True)
-    with open(RUNS_INDEX, "w") as f:
-        json.dump(runs, f, indent=2)
+    try:
+        fd, tmp_path = tempfile.mkstemp(prefix="runs.", suffix=".json.tmp", dir=RESULTS_ROOT)
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(runs, f, indent=2)
+            os.replace(tmp_path, RUNS_INDEX)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+    except PermissionError:
+        print(f"WARNING: cannot update benchmark index: {RUNS_INDEX} (permission denied)")
 
 
 def register_run(run_info: dict):
@@ -117,6 +143,88 @@ def _median(values: list) -> float:
     return statistics.median(values) if values else 0.0
 
 
+def _summarize_repeat_stability(src_dirs: list[str], dest_dir: str,
+                                warn_pct: Optional[float] = DEFAULT_STABILITY_WARN_PCT):
+    import statistics
+
+    summaries = []
+    all_files: set[str] = set()
+    for d in src_dirs:
+        results_d = os.path.join(d, "results")
+        if os.path.isdir(results_d):
+            for f in os.listdir(results_d):
+                if f.endswith(".json"):
+                    all_files.add(f)
+
+    def metric_key(m: dict) -> str:
+        tags = m.get("tags", {})
+        tag_str = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
+        return f"{m.get('category', '')}|{m['name']}|{m.get('unit', '')}|{tag_str}"
+
+    for basename in sorted(all_files):
+        loaded = []
+        for d in src_dirs:
+            path = os.path.join(d, "results", basename)
+            if os.path.isfile(path):
+                with open(path) as fh:
+                    loaded.append(json.load(fh))
+
+        metric_runs: dict[str, list[dict]] = {}
+        for run_data in loaded:
+            for m in run_data.get("metrics", []):
+                metric_runs.setdefault(metric_key(m), []).append(m)
+
+        for key, peers in sorted(metric_runs.items()):
+            values = [p["value"] for p in peers if isinstance(p.get("value"), (int, float))]
+            if len(values) < 2:
+                continue
+            median = statistics.median(values)
+            min_v = min(values)
+            max_v = max(values)
+            spread_pct = ((max_v - min_v) / median * 100.0) if median else 0.0
+            stdev_pct = ((statistics.stdev(values) / median) * 100.0) if len(values) > 1 and median else 0.0
+            exemplar = peers[0]
+            summaries.append({
+                "source_file": basename,
+                "name": exemplar["name"],
+                "category": exemplar.get("category", ""),
+                "unit": exemplar.get("unit", ""),
+                "tags": exemplar.get("tags", {}),
+                "repeat_values": values,
+                "median": median,
+                "min": min_v,
+                "max": max_v,
+                "spread_pct": round(spread_pct, 2),
+                "stdev_pct": round(stdev_pct, 2),
+            })
+
+    os.makedirs(dest_dir, exist_ok=True)
+    out_path = os.path.join(dest_dir, "stability_summary.json")
+    with open(out_path, "w") as fh:
+        json.dump({"metrics": summaries}, fh, indent=2)
+
+    warnings = []
+    if summaries:
+        print("\nRepeat stability summary:")
+        for s in summaries:
+            print(f"  {s['category']}/{s['name']}: median={s['median']:.3f} {s['unit']} "
+                  f"spread={s['spread_pct']:.2f}% stdev={s['stdev_pct']:.2f}%")
+            if warn_pct is not None and s["spread_pct"] > warn_pct:
+                warnings.append(s)
+
+    if warnings:
+        print(f"\nStability warnings (spread > {warn_pct:.2f}%):")
+        for s in warnings:
+            print(f"  {s['category']}/{s['name']} tags={s['tags']} spread={s['spread_pct']:.2f}%")
+
+    return {
+        "warn_threshold_pct": warn_pct,
+        "warning_count": len(warnings),
+        "warnings": warnings,
+        "metrics": summaries,
+    }
+
+
 def merge_cpp_results(src_dirs: list[str], dest_dir: str):
     """
     Load the same JSON result files from N run directories and write a merged
@@ -166,11 +274,12 @@ def merge_cpp_results(src_dirs: list[str], dest_dir: str):
         # Build merged result: start from first run's structure
         merged = json.loads(json.dumps(loaded[0]))  # deep copy
 
-        # Index metrics by name+tags key so we match the right metric across runs
+        # Index metrics by category+name+unit+tags so latency/throughput records
+        # for the same operation do not get merged into each other.
         def metric_key(m: dict) -> str:
             tags = m.get("tags", {})
             tag_str = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
-            return f"{m['name']}|{tag_str}"
+            return f"{m.get('category', '')}|{m['name']}|{m.get('unit', '')}|{tag_str}"
 
         per_run_metrics: dict[str, list[dict]] = {}
         for run_data in loaded:
@@ -216,6 +325,115 @@ def merge_cpp_results(src_dirs: list[str], dest_dir: str):
     print(f"  Merged {merged_count} result file(s) from {len(src_dirs)} runs (median)")
 
 
+# ── CPU tuning ────────────────────────────────────────────────────────────────
+
+def _cpu_count() -> int:
+    try:
+        import multiprocessing
+        return multiprocessing.cpu_count()
+    except Exception:
+        return 1
+
+
+def _read_sysfs(path: str) -> Optional[str]:
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def _write_sysfs(path: str, value: str) -> bool:
+    try:
+        with open(path, "w") as f:
+            f.write(value + "\n")
+        return True
+    except OSError:
+        return False
+
+
+def setup_cpu_for_benchmarking() -> dict:
+    """
+    Configure the CPU for stable benchmarking:
+      - Set scaling governor to 'performance' on all CPUs
+      - Disable turbo boost (Intel pstate or generic cpufreq boost)
+
+    Returns a dict of original settings so restore_cpu_settings() can revert them.
+    Prints a warning and returns an empty dict if the process lacks write permission.
+    """
+    if platform.system() != "Linux":
+        return {}
+
+    saved = {"governors": {}, "intel_no_turbo": None, "amd_boost": None}
+    any_written = False
+    permission_error = False
+
+    n_cpus = _cpu_count()
+    for i in range(n_cpus):
+        gov_path = f"/sys/devices/system/cpu/cpu{i}/cpufreq/scaling_governor"
+        current = _read_sysfs(gov_path)
+        if current is None:
+            continue
+        saved["governors"][gov_path] = current
+        if current != "performance":
+            if _write_sysfs(gov_path, "performance"):
+                any_written = True
+            else:
+                permission_error = True
+
+    # Intel pstate: write "1" to disable turbo
+    intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
+    val = _read_sysfs(intel_path)
+    if val is not None:
+        saved["intel_no_turbo"] = val
+        if val != "1":
+            if _write_sysfs(intel_path, "1"):
+                any_written = True
+            else:
+                permission_error = True
+
+    # AMD / generic: write "0" to disable boost
+    amd_path = "/sys/devices/system/cpu/cpufreq/boost"
+    val = _read_sysfs(amd_path)
+    if val is not None:
+        saved["amd_boost"] = val
+        if val != "0":
+            if _write_sysfs(amd_path, "0"):
+                any_written = True
+            else:
+                permission_error = True
+
+    if permission_error:
+        print(
+            "\nWARNING: Could not set CPU governor/turbo (permission denied).\n"
+            "  Run with sudo, or manually run:  sudo pyperf system tune\n"
+            "  Benchmarks may show instability due to frequency scaling.\n"
+        )
+        return {}
+
+    if any_written:
+        print("  CPU tuning: governor=performance, turbo disabled")
+
+    return saved
+
+
+def restore_cpu_settings(saved: dict):
+    """Revert CPU governor and turbo settings to the values captured by setup_cpu_for_benchmarking()."""
+    if not saved:
+        return
+
+    for path, value in saved.get("governors", {}).items():
+        _write_sysfs(path, value)
+
+    if saved.get("intel_no_turbo") is not None:
+        _write_sysfs("/sys/devices/system/cpu/intel_pstate/no_turbo", saved["intel_no_turbo"])
+
+    if saved.get("amd_boost") is not None:
+        _write_sysfs("/sys/devices/system/cpu/cpufreq/boost", saved["amd_boost"])
+
+    print("  CPU settings restored")
+
+
 # ── Run C++ suite ─────────────────────────────────────────────────────────────
 
 def _build_cpp_cmd(binary: str, catch2_filter: Optional[str], verbose: bool,
@@ -237,6 +455,13 @@ def _build_cpp_cmd(binary: str, catch2_filter: Optional[str], verbose: bool,
 
 def _run_cpp_once(binary: str, cpp_cwd: str, catch2_filter: Optional[str],
                   verbose: bool, priority: Optional[int], taskset: Optional[str]) -> tuple[bool, float]:
+    # Catch2 v3 has no single-spec "run everything including hidden".
+    # Handle the sentinel by running visible tests then hidden tests in the same cwd.
+    if catch2_filter == ALL_CPP_FILTER:
+        ok1, dur1 = _run_cpp_once(binary, cpp_cwd, None,  verbose, priority, taskset)
+        ok2, dur2 = _run_cpp_once(binary, cpp_cwd, "[.]", verbose, priority, taskset)
+        return ok1 and ok2, dur1 + dur2
+
     os.makedirs(cpp_cwd, exist_ok=True)
     start = time.time()
     if is_wsl_needed():
@@ -261,7 +486,8 @@ def _run_cpp_once(binary: str, cpp_cwd: str, catch2_filter: Optional[str],
 
 
 def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bool,
-            repeat: int = 1, priority: Optional[int] = None, taskset: Optional[str] = None):
+            repeat: int = 1, priority: Optional[int] = None, taskset: Optional[str] = None,
+            stability_warn_pct: Optional[float] = DEFAULT_STABILITY_WARN_PCT):
     """
     Run dsr_benchmarks 'repeat' times.  If repeat > 1, each invocation writes
     to a separate cpp_N/ subdirectory; results are then median-merged into
@@ -269,7 +495,9 @@ def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bo
     """
     print(f"\n{'=' * 70}")
     print(f"Running: C++ benchmarks ({os.path.basename(binary)})")
-    if catch2_filter:
+    if catch2_filter == ALL_CPP_FILTER:
+        print("Filter : (all — visible + hidden)")
+    elif catch2_filter:
         print(f"Filter : {catch2_filter}")
     if repeat > 1:
         print(f"Repeat : {repeat}× (median aggregation)")
@@ -281,6 +509,7 @@ def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bo
 
     total_start = time.time()
     all_ok = True
+    stability = None
 
     if repeat <= 1:
         # Single run — original behaviour
@@ -304,15 +533,16 @@ def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bo
         dest = os.path.join(run_dir, "cpp", "results")
         print(f"\nMerging {repeat} runs → {dest}")
         merge_cpp_results(run_cwds, dest)
+        stability = _summarize_repeat_stability(run_cwds, dest, warn_pct=stability_warn_pct)
 
     total_dur = time.time() - total_start
     print(f"\nC++ suite {'PASSED' if all_ok else 'FAILED'} in {total_dur:.1f}s")
-    return all_ok, total_dur
+    return all_ok, total_dur, stability
 
 
 # ── Run Python suite ──────────────────────────────────────────────────────────
 
-def run_python(run_dir: str, label: Optional[str]):
+def run_python(run_dir: str, label: Optional[str], baseline: bool = False):
     """
     Delegate to python/run_all.py passing BENCH_RESULTS_DIR so Python files
     land directly in <run_dir>/ (not a subdirectory).
@@ -324,6 +554,8 @@ def run_python(run_dir: str, label: Optional[str]):
 
     env = {**os.environ, "BENCH_RESULTS_DIR": run_dir}
     cmd = [sys.executable, os.path.join(PYTHON_DIR, "run_all.py"), "--direct"]
+    if baseline:
+        cmd.append("--baseline")
     # --direct: benchmarks write to BENCH_RESULTS_DIR, skip run_all.py's own
     # index registration so run_benchmarks.py stays the single source of truth.
 
@@ -334,6 +566,75 @@ def run_python(run_dir: str, label: Optional[str]):
     ok = result.returncode == 0
     print(f"\nPython suite {'PASSED' if ok else 'FAILED'} in {duration:.1f}s")
     return ok, duration
+
+
+# ── Ownership / permission helpers ───────────────────────────────────────────
+
+def _fix_run_permissions(run_dir: str):
+    """
+    When the script is run via sudo, chown the run directory and the shared
+    results index back to the original user so they remain accessible without
+    root.  Falls back to world-readable permissions when the original user
+    cannot be determined (e.g. direct root login).
+    """
+    if os.getuid() != 0:
+        return  # Not running as root — nothing to do.
+
+    sudo_uid_str = os.environ.get("SUDO_UID")
+    sudo_gid_str = os.environ.get("SUDO_GID")
+
+    if sudo_uid_str:
+        uid = int(sudo_uid_str)
+        gid = int(sudo_gid_str) if sudo_gid_str else uid
+
+        def _chown_tree(path: str):
+            for dirpath, dirnames, filenames in os.walk(path, topdown=False):
+                for name in filenames:
+                    try:
+                        os.chown(os.path.join(dirpath, name), uid, gid)
+                    except OSError:
+                        pass
+                try:
+                    os.chown(dirpath, uid, gid)
+                except OSError:
+                    pass
+
+        _chown_tree(run_dir)
+
+        # Also fix the shared index file and RESULTS_ROOT itself so the user
+        # can write new runs later without sudo.
+        for path in (RUNS_INDEX, RESULTS_ROOT):
+            try:
+                os.chown(path, uid, gid)
+            except OSError:
+                pass
+
+        try:
+            import pwd as _pwd
+            username = _pwd.getpwuid(uid).pw_name
+            print(f"  Ownership transferred to {username} (uid={uid}, gid={gid})")
+        except Exception:
+            print(f"  Ownership transferred to uid={uid}, gid={gid}")
+    else:
+        # Direct root login — make results world-readable as a fallback.
+        import stat
+        _file_mode = (stat.S_IRUSR | stat.S_IWUSR |
+                      stat.S_IRGRP |
+                      stat.S_IROTH)
+        _dir_mode  = _file_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+
+        for dirpath, dirnames, filenames in os.walk(run_dir, topdown=False):
+            for name in filenames:
+                try:
+                    os.chmod(os.path.join(dirpath, name), _file_mode)
+                except OSError:
+                    pass
+            try:
+                os.chmod(dirpath, _dir_mode)
+            except OSError:
+                pass
+
+        print("  Results made world-readable (root without sudo; SUDO_UID not set)")
 
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -365,7 +666,7 @@ def cmd_delete(run_id: str):
 
 def cmd_run(args):
     ts = datetime.now()
-    run_id = ts.strftime("%Y%m%dT%H%M%S")
+    run_id = ts.strftime("%Y%m%dT%H%M%S%f")
     dir_name = run_id if not args.label else f"{run_id}_{args.label.replace(' ', '-')}"
     run_dir = os.path.join(RESULTS_ROOT, dir_name)
     os.makedirs(run_dir, exist_ok=True)
@@ -378,6 +679,12 @@ def cmd_run(args):
     print(f"  Output : {run_dir}")
     print("=" * 70)
 
+    effective_cpp_filter = args.cpp_filter
+    if args.all and not effective_cpp_filter:
+        effective_cpp_filter = ALL_CPP_FILTER
+    elif args.baseline and not effective_cpp_filter:
+        effective_cpp_filter = BASELINE_CPP_FILTER
+
     # Optionally build C++
     if args.build:
         if not build_cpp():
@@ -388,24 +695,36 @@ def cmd_run(args):
     results = {}
     total_start = time.time()
 
-    # C++ suite
-    if not args.python_only:
-        binary = find_cpp_binary(args.cpp_binary)
-        if binary:
-            ok, dur = run_cpp(binary, run_dir, args.cpp_filter, args.verbose,
-                              repeat=args.repeat, priority=args.priority, taskset=args.taskset)
-            results["cpp"] = {"ok": ok, "duration_sec": dur}
-            suites_run.append("cpp")
-        else:
-            print("\nWARNING: C++ binary not found. Use --cpp-binary or --build.")
-            print(f"  Searched: {os.path.join(BUILD_DIR, 'dsr_benchmarks')}")
-            results["cpp"] = {"ok": False, "duration_sec": 0, "skipped": True}
+    # CPU tuning (Linux only, skipped with --no-cpu-tune or when Python-only)
+    cpu_saved = {}
+    if not getattr(args, "no_cpu_tune", False) and not args.python_only:
+        cpu_saved = setup_cpu_for_benchmarking()
 
-    # Python suite
-    if not args.cpp_only:
-        ok, dur = run_python(run_dir, args.label)
-        results["python"] = {"ok": ok, "duration_sec": dur}
-        suites_run.append("python")
+    try:
+        # C++ suite
+        if not args.python_only:
+            binary = find_cpp_binary(args.cpp_binary)
+            if binary:
+                ok, dur, stability = run_cpp(
+                    binary, run_dir, effective_cpp_filter, args.verbose,
+                    repeat=args.repeat, priority=args.priority, taskset=args.taskset,
+                    stability_warn_pct=args.stability_warn_pct,
+                )
+                results["cpp"] = {"ok": ok, "duration_sec": dur, "stability": stability}
+                suites_run.append("cpp")
+            else:
+                print("\nWARNING: C++ binary not found. Use --cpp-binary or --build.")
+                print(f"  Searched: {os.path.join(BUILD_DIR, 'dsr_benchmarks')}")
+                results["cpp"] = {"ok": False, "duration_sec": 0, "skipped": True}
+
+        # Python suite
+        if not args.cpp_only:
+            ok, dur = run_python(run_dir, args.label, baseline=args.baseline)
+            results["python"] = {"ok": ok, "duration_sec": dur}
+            suites_run.append("python")
+
+    finally:
+        restore_cpu_settings(cpu_saved)
 
     total_duration = time.time() - total_start
 
@@ -430,6 +749,13 @@ def cmd_run(args):
         "platform": platform.platform(),
         "python": sys.version.split()[0],
     }
+
+    cpp_stability = results.get("cpp", {}).get("stability")
+    if cpp_stability:
+        run_info["cpp_stability"] = {
+            "warn_threshold_pct": cpp_stability.get("warn_threshold_pct"),
+            "warning_count": cpp_stability.get("warning_count", 0),
+        }
 
     with open(os.path.join(run_dir, "run_info.json"), "w") as f:
         json.dump(run_info, f, indent=2)
@@ -475,6 +801,7 @@ def cmd_run(args):
             import webbrowser
             webbrowser.open(f"file://{report_path}")
 
+    _fix_run_permissions(run_dir)
     return 0 if all_ok else 1
 
 
@@ -494,6 +821,10 @@ def main():
                         help="Build C++ benchmarks before running")
     parser.add_argument("--cpp-only", action="store_true", help="Skip Python suite")
     parser.add_argument("--python-only", action="store_true", help="Skip C++ suite")
+    parser.add_argument("--all", action="store_true",
+                        help="Run all C++ tests including hidden ones ([.multi], [.extended])")
+    parser.add_argument("--baseline", action="store_true",
+                        help="Run only the curated low-noise baseline benchmark set")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Pass --verbose to C++ binary (shows Qt debug messages)")
     parser.add_argument("--report", action="store_true",
@@ -511,6 +842,11 @@ def main():
                         help="Set process nice level (e.g. -10); values < 0 require root/sudo")
     parser.add_argument("--taskset", metavar="CPULIST",
                         help="Pin C++ benchmarks to CPU cores via taskset (e.g. '0,1')")
+    parser.add_argument("--no-cpu-tune", action="store_true",
+                        help="Skip automatic CPU governor/turbo configuration (Linux only)")
+    parser.add_argument("--stability-warn-pct", type=float, default=DEFAULT_STABILITY_WARN_PCT,
+                        metavar="PCT",
+                        help="Warn when repeated C++ metrics exceed this spread percentage")
 
     args = parser.parse_args()
 
@@ -521,6 +857,10 @@ def main():
     if args.delete:
         cmd_delete(args.delete)
         return 0
+
+    if args.all and args.baseline:
+        print("Error: --all and --baseline are mutually exclusive.")
+        return 1
 
     if args.cpp_only and args.python_only:
         print("Error: --cpp-only and --python-only are mutually exclusive.")

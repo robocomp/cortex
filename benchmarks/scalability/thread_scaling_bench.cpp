@@ -5,7 +5,10 @@
 #include <vector>
 #include <chrono>
 #include <string>
+#include <iostream>
 
+#include <nanobench.h>
+#include "../core/nanobench_adapter.h"
 #include "../core/timing_utils.h"
 #include "../core/metrics_collector.h"
 #include "../core/report_generator.h"
@@ -21,6 +24,10 @@ using namespace std::chrono;
 // samples are merged into a single LatencyTracker for aggregate stats.
 // A record_scalability() entry is added so the Scalability tab can plot
 // the efficiency curve (scale_dim = "threads").
+//
+// nanobench wraps each (op, thread-count) run so results appear in the shared
+// nanobench table (stdout + results/nanobench_report.md).  bench.batch() is
+// set to total_ops so the table shows per-operation throughput, not wall time.
 
 static constexpr auto THREAD_DUR = std::chrono::seconds(5);
 
@@ -36,8 +43,12 @@ TEST_CASE("Node insert thread scaling", "[SCALABILITY][threads]") {
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
+
     for (uint32_t N : {1u, 2u, 4u, 8u}) {
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -49,30 +60,41 @@ TEST_CASE("Node insert thread scaling", "[SCALABILITY][threads]") {
 
         auto wall_start = steady_clock::now();
 
-        for (uint32_t t = 0; t < N; ++t) {
-            threads.emplace_back([&, tid = t]() {
-                uint64_t base_id = 200000ULL + tid * 200000ULL;
-                uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[tid];
+        bench.run("node_insert_" + std::to_string(N) + "t", [&] {
+            for (uint32_t t = 0; t < N; ++t) {
+                threads.emplace_back([&, tid = t]() {
+                    uint64_t base_id = 200000ULL + tid * 200000ULL;
+                    uint64_t local_ops = 0;
+                    auto& samples = per_thread_samples[tid];
 
-                sync_point.arrive_and_wait();
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    auto node = GraphGenerator::create_test_node(
-                        base_id + local_ops, graph->get_agent_id());
-                    uint64_t ts = bench_now();
-                    graph->insert_node(node);
-                    samples.push_back(bench_now() - ts);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        auto node = GraphGenerator::create_test_node(
+                            base_id + local_ops, graph->get_agent_id());
+                        uint64_t ts = bench_now();
+                        auto res = graph->insert_node(node);
+                        samples.push_back(bench_now() - ts);
+                        if (!res.has_value())
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
+                        local_ops++;
+                    }
 
-                total_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    total_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(THREAD_DUR);
-        stop_flag.store(true, std::memory_order_relaxed);
-        for (auto& th : threads) th.join();
+            std::this_thread::sleep_for(THREAD_DUR);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& th : threads) th.join();
+
+            bench.batch(total_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(total_ops.load());
+        });
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH node_insert threads=" << N << "] "
+                      << failed_ops.load() << " insert_node calls failed\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
@@ -116,13 +138,17 @@ TEST_CASE("Node read thread scaling", "[SCALABILITY][threads]") {
     for (uint64_t i = 0; i < 1000; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto res = graph->insert_node(node);
-        if (res.has_value()) node_ids.push_back(res.value());
+        REQUIRE(res.has_value());
+        node_ids.push_back(res.value());
     }
-    REQUIRE(!node_ids.empty());
     const size_t pool_size = node_ids.size();
+
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
 
     for (uint32_t N : {1u, 2u, 4u, 8u}) {
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -134,28 +160,39 @@ TEST_CASE("Node read thread scaling", "[SCALABILITY][threads]") {
 
         auto wall_start = steady_clock::now();
 
-        for (uint32_t t = 0; t < N; ++t) {
-            threads.emplace_back([&, tid = t]() {
-                uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[tid];
+        bench.run("node_read_" + std::to_string(N) + "t", [&] {
+            for (uint32_t t = 0; t < N; ++t) {
+                threads.emplace_back([&, tid = t]() {
+                    uint64_t local_ops = 0;
+                    auto& samples = per_thread_samples[tid];
 
-                sync_point.arrive_and_wait();
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    uint64_t id = node_ids[local_ops % pool_size];
-                    uint64_t ts = bench_now();
-                    auto node = graph->get_node(id);
-                    samples.push_back(bench_now() - ts);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        uint64_t id = node_ids[local_ops % pool_size];
+                        uint64_t ts = bench_now();
+                        auto node = graph->get_node(id);
+                        samples.push_back(bench_now() - ts);
+                        if (!node.has_value())
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
+                        local_ops++;
+                    }
 
-                total_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    total_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(THREAD_DUR);
-        stop_flag.store(true, std::memory_order_relaxed);
-        for (auto& th : threads) th.join();
+            std::this_thread::sleep_for(THREAD_DUR);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& th : threads) th.join();
+
+            bench.batch(total_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(total_ops.load());
+        });
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH node_read threads=" << N << "] "
+                      << failed_ops.load() << " get_node calls returned empty\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
@@ -207,8 +244,12 @@ TEST_CASE("Node update thread scaling", "[SCALABILITY][threads]") {
         node_ids.push_back(res.value());
     }
 
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
+
     for (uint32_t N : {1u, 2u, 4u, 8u}) {
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -220,33 +261,46 @@ TEST_CASE("Node update thread scaling", "[SCALABILITY][threads]") {
 
         auto wall_start = steady_clock::now();
 
-        for (uint32_t t = 0; t < N; ++t) {
-            threads.emplace_back([&, tid = t]() {
-                uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[tid];
-                uint64_t nid = node_ids[tid];
+        bench.run("node_update_" + std::to_string(N) + "t", [&] {
+            for (uint32_t t = 0; t < N; ++t) {
+                threads.emplace_back([&, tid = t]() {
+                    uint64_t local_ops = 0;
+                    auto& samples = per_thread_samples[tid];
+                    uint64_t nid = node_ids[tid];
 
-                sync_point.arrive_and_wait();
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    auto node = graph->get_node(nid);
-                    if (node) {
-                        graph->add_or_modify_attrib_local<level_att>(
-                            *node, static_cast<int32_t>(local_ops % 1000));
-                        uint64_t ts = bench_now();
-                        graph->update_node(*node);
-                        samples.push_back(bench_now() - ts);
-                        local_ops++;
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        auto node = graph->get_node(nid);
+                        if (node) {
+                            graph->add_or_modify_attrib_local<level_att>(
+                                *node, static_cast<int32_t>(local_ops % 1000));
+                            uint64_t ts = bench_now();
+                            bool ok = graph->update_node(*node);
+                            samples.push_back(bench_now() - ts);
+                            if (!ok)
+                                failed_ops.fetch_add(1, std::memory_order_relaxed);
+                            local_ops++;
+                        } else {
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
+                        }
                     }
-                }
 
-                total_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    total_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(THREAD_DUR);
-        stop_flag.store(true, std::memory_order_relaxed);
-        for (auto& th : threads) th.join();
+            std::this_thread::sleep_for(THREAD_DUR);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& th : threads) th.join();
+
+            bench.batch(total_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(total_ops.load());
+        });
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH node_update threads=" << N << "] "
+                      << failed_ops.load() << " get_node/update_node calls failed\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
@@ -294,13 +348,17 @@ TEST_CASE("Edge insert thread scaling", "[SCALABILITY][threads]") {
     for (uint64_t i = 0; i < POOL_SIZE; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto res = graph->insert_node(node);
-        if (res.has_value()) pool.push_back(res.value());
+        REQUIRE(res.has_value());
+        pool.push_back(res.value());
     }
-    REQUIRE(!pool.empty());
     const size_t pool_size = pool.size();
+
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
 
     for (uint32_t N : {1u, 2u, 4u, 8u}) {
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -313,30 +371,41 @@ TEST_CASE("Edge insert thread scaling", "[SCALABILITY][threads]") {
         const uint32_t stride = static_cast<uint32_t>(pool_size / N) + 1;
         auto wall_start = steady_clock::now();
 
-        for (uint32_t t = 0; t < N; ++t) {
-            threads.emplace_back([&, tid = t]() {
-                uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[tid];
+        bench.run("edge_insert_" + std::to_string(N) + "t", [&] {
+            for (uint32_t t = 0; t < N; ++t) {
+                threads.emplace_back([&, tid = t]() {
+                    uint64_t local_ops = 0;
+                    auto& samples = per_thread_samples[tid];
 
-                sync_point.arrive_and_wait();
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    uint64_t idx = (local_ops + tid * stride) % pool_size;
-                    auto edge = GraphGenerator::create_test_edge(
-                        root->id(), pool[idx], graph->get_agent_id());
-                    uint64_t ts = bench_now();
-                    graph->insert_or_assign_edge(edge);
-                    samples.push_back(bench_now() - ts);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        uint64_t idx = (local_ops + tid * stride) % pool_size;
+                        auto edge = GraphGenerator::create_test_edge(
+                            root->id(), pool[idx], graph->get_agent_id());
+                        uint64_t ts = bench_now();
+                        bool ok = graph->insert_or_assign_edge(edge);
+                        samples.push_back(bench_now() - ts);
+                        if (!ok)
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
+                        local_ops++;
+                    }
 
-                total_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    total_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(THREAD_DUR);
-        stop_flag.store(true, std::memory_order_relaxed);
-        for (auto& th : threads) th.join();
+            std::this_thread::sleep_for(THREAD_DUR);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& th : threads) th.join();
+
+            bench.batch(total_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(total_ops.load());
+        });
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH edge_insert threads=" << N << "] "
+                      << failed_ops.load() << " insert_or_assign_edge calls failed\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
@@ -384,18 +453,20 @@ TEST_CASE("Edge read thread scaling", "[SCALABILITY][threads]") {
     for (uint64_t i = 0; i < POOL_SIZE; ++i) {
         auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
         auto res = graph->insert_node(node);
-        if (res.has_value()) {
-            pool.push_back(res.value());
-            auto edge = GraphGenerator::create_test_edge(
-                root->id(), res.value(), graph->get_agent_id());
-            graph->insert_or_assign_edge(edge);
-        }
+        REQUIRE(res.has_value());
+        pool.push_back(res.value());
+        auto edge = GraphGenerator::create_test_edge(
+            root->id(), res.value(), graph->get_agent_id());
+        REQUIRE(graph->insert_or_assign_edge(edge));
     }
-    REQUIRE(!pool.empty());
     const size_t pool_size = pool.size();
+
+    ankerl::nanobench::Bench bench;
+    bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
 
     for (uint32_t N : {1u, 2u, 4u, 8u}) {
         std::atomic<uint64_t> total_ops{0};
+        std::atomic<uint64_t> failed_ops{0};
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
@@ -408,28 +479,39 @@ TEST_CASE("Edge read thread scaling", "[SCALABILITY][threads]") {
         const uint32_t stride = static_cast<uint32_t>(pool_size / N) + 1;
         auto wall_start = steady_clock::now();
 
-        for (uint32_t t = 0; t < N; ++t) {
-            threads.emplace_back([&, tid = t]() {
-                uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[tid];
+        bench.run("edge_read_" + std::to_string(N) + "t", [&] {
+            for (uint32_t t = 0; t < N; ++t) {
+                threads.emplace_back([&, tid = t]() {
+                    uint64_t local_ops = 0;
+                    auto& samples = per_thread_samples[tid];
 
-                sync_point.arrive_and_wait();
+                    sync_point.arrive_and_wait();
 
-                while (!stop_flag.load(std::memory_order_relaxed)) {
-                    uint64_t idx = (local_ops + tid * stride) % pool_size;
-                    uint64_t ts = bench_now();
-                    auto edge = graph->get_edge(root->id(), pool[idx], "test_edge");
-                    samples.push_back(bench_now() - ts);
-                    local_ops++;
-                }
+                    while (!stop_flag.load(std::memory_order_relaxed)) {
+                        uint64_t idx = (local_ops + tid * stride) % pool_size;
+                        uint64_t ts = bench_now();
+                        auto edge = graph->get_edge(root->id(), pool[idx], "test_edge");
+                        samples.push_back(bench_now() - ts);
+                        if (!edge.has_value())
+                            failed_ops.fetch_add(1, std::memory_order_relaxed);
+                        local_ops++;
+                    }
 
-                total_ops.fetch_add(local_ops, std::memory_order_relaxed);
-            });
-        }
+                    total_ops.fetch_add(local_ops, std::memory_order_relaxed);
+                });
+            }
 
-        std::this_thread::sleep_for(THREAD_DUR);
-        stop_flag.store(true, std::memory_order_relaxed);
-        for (auto& th : threads) th.join();
+            std::this_thread::sleep_for(THREAD_DUR);
+            stop_flag.store(true, std::memory_order_relaxed);
+            for (auto& th : threads) th.join();
+
+            bench.batch(total_ops.load());
+            ankerl::nanobench::doNotOptimizeAway(total_ops.load());
+        });
+
+        if (failed_ops.load() > 0)
+            std::cerr << "[BENCH edge_read threads=" << N << "] "
+                      << failed_ops.load() << " get_edge calls returned empty\n";
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 

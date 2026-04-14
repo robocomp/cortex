@@ -66,8 +66,11 @@ public:
             return false;
         }
 
-        // Generate unique base ID for this test run
-        base_agent_id_ = static_cast<uint32_t>(rand() % 3095);
+        // Keep agent IDs deterministic while remaining disjoint across fixture
+        // instances in the same process.
+        static std::atomic<uint32_t> next_base_agent_id{1000};
+        base_agent_id_ = next_base_agent_id.fetch_add(config_.max_agent_count + 1,
+                                                      std::memory_order_relaxed);
 
         agents_.clear();
         agents_.reserve(num_agents);
@@ -82,7 +85,8 @@ public:
                 agent->graph = std::make_unique<DSRGraph>(
                     agent->name,
                     agent->id,
-                    config_file
+                    config_file,
+                    true
                 );
                 agents_.push_back(std::move(agent));
             } catch (const std::exception& e) {
@@ -104,7 +108,9 @@ public:
                 // No config file - agent receives graph from DDS
                 agent->graph = std::make_unique<DSRGraph>(
                     agent->name,
-                    agent->id
+                    agent->id,
+                    std::string{},
+                    true
                 );
                 agents_.push_back(std::move(agent));
             } catch (const std::exception& e) {

@@ -243,3 +243,53 @@ def warmup(func: Callable, iterations: int = 10):
     """Run warmup iterations."""
     for _ in range(iterations):
         func()
+
+
+# ── pyperf integration ────────────────────────────────────────────────────────
+
+try:
+    import pyperf as _pyperf  # type: ignore
+    HAS_PYPERF = True
+except ImportError:
+    _pyperf = None  # type: ignore
+    HAS_PYPERF = False
+
+
+def pyperf_to_latency_stats(bm) -> LatencyStats:
+    """Convert a pyperf Benchmark to LatencyStats.
+
+    pyperf 'values' are mean elapsed time per operation (in seconds) for each
+    run.  With the default 3 processes × 5 values we get ~15 data points.
+    Note: these are per-run averages, not individual-op samples, so percentiles
+    reflect variability across runs rather than per-op tail latency.
+    """
+    if bm is None:
+        return LatencyStats()
+    try:
+        values_ns = [v * 1e9 for v in bm.get_values()]
+    except Exception:
+        return LatencyStats()
+    if not values_ns:
+        return LatencyStats()
+
+    sorted_v = sorted(values_ns)
+    n = len(sorted_v)
+
+    def pct(p: float) -> float:
+        idx = p * (n - 1)
+        lo = int(idx)
+        hi = min(lo + 1, n - 1)
+        f = idx - lo
+        return sorted_v[lo] * (1 - f) + sorted_v[hi] * f
+
+    return LatencyStats(
+        count=n,
+        mean_ns=statistics.mean(sorted_v),
+        stddev_ns=statistics.stdev(sorted_v) if n > 1 else 0.0,
+        min_ns=sorted_v[0],
+        max_ns=sorted_v[-1],
+        p50_ns=pct(0.50),
+        p90_ns=pct(0.90),
+        p95_ns=pct(0.95),
+        p99_ns=pct(0.99),
+    )

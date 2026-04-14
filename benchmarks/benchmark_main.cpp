@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QtGlobal>
 #include <iostream>
+#include <stdexcept>
 
 // Custom Qt message handler to filter debug output during benchmarks
 static bool g_verbose = false;
@@ -39,7 +40,9 @@ void benchmarkMessageHandler(QtMsgType type, const QMessageLogContext& context, 
             break;
         case QtFatalMsg:
             std::cout << "[FATAL] " << localMsg.constData() << std::endl;
-            abort();
+            // Throw instead of abort() so the fixture's try/catch can catch it,
+            // mark the test as failed, and let Catch2 continue to the next test.
+            throw std::runtime_error(localMsg.constData());
     }
 }
 
@@ -73,6 +76,8 @@ int main(int argc, char* argv[]) {
     std::cout << " DSR Benchmarking Suite\n";
     std::cout << "=================================\n\n";
     std::cout << "Available benchmark categories:\n";
+    std::cout << "  [BASELINE]     - Curated low-noise regression baseline\n";
+    std::cout << "  [EXTENDED]     - Slower supplementary baseline coverage\n";
     std::cout << "  [LATENCY]      - Signal emission, CRDT operations\n";
     std::cout << "  [THROUGHPUT]   - Single agent insert/read/update/delete, concurrent writers\n";
     std::cout << "  [CRDT]         - mvreg and dot_context micro-benchmarks\n";
@@ -81,6 +86,8 @@ int main(int argc, char* argv[]) {
     std::cout << "\n";
     std::cout << "Usage examples:\n";
     std::cout << "  ./dsr_benchmarks                    # Run all non-hidden benchmarks\n";
+    std::cout << "  ./dsr_benchmarks \"[BASELINE]\"       # Run curated baseline benchmarks\n";
+    std::cout << "  ./dsr_benchmarks \"[EXTENDED]\"       # Run slower supplementary coverage\n";
     std::cout << "  ./dsr_benchmarks \"[LATENCY]\"        # Run latency benchmarks\n";
     std::cout << "  ./dsr_benchmarks \"[THROUGHPUT]\"     # Run throughput benchmarks\n";
     std::cout << "  ./dsr_benchmarks \"[CRDT]\"           # Run CRDT micro-benchmarks\n";
@@ -88,7 +95,7 @@ int main(int argc, char* argv[]) {
     std::cout << "  ./dsr_benchmarks -r json::out=x.json # Export to JSON\n";
     std::cout << "  ./dsr_benchmarks --verbose          # Show Qt debug messages\n";
     std::cout << "\n";
-    std::cout << "Note: Only multi-agent [.multi] tests are hidden by default.\n";
+    std::cout << "Note: [.multi] and [.extended] tests are hidden by default.\n";
     std::cout << "\n";
 
     return session.run();

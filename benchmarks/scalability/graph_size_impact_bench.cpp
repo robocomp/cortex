@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include "../core/timing_utils.h"
+#include "../core/nanobench_adapter.h"
 #include "../core/metrics_collector.h"
 #include "../core/report_generator.h"
 #include "../fixtures/multi_agent_fixture.h"
@@ -26,26 +26,27 @@ TEST_CASE("Graph size impact on performance", "[SCALABILITY][graphsize]") {
             // Populate graph and store actual IDs
             std::vector<uint64_t> node_ids;
             node_ids.reserve(size);
-            for (uint32_t i = 0; i < size; ++i) {
-                auto node = GraphGenerator::create_test_node(
-                    0, graph->get_agent_id());
+            for (uint32_t i = 0; i < static_cast<uint32_t>(size); ++i) {
+                auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
                 auto result = graph->insert_node(node);
-                if (result.has_value()) {
-                    node_ids.push_back(result.value());
-                }
-            }
-            REQUIRE(!node_ids.empty());
-
-            // Measure lookup performance
-            LatencyTracker tracker(1000);
-
-            for (int i = 0; i < 1000; ++i) {
-                uint64_t id = node_ids[i % node_ids.size()];
-                auto timer = tracker.scoped_record();
-                auto node = graph->get_node(id);
+                REQUIRE(result.has_value());
+                node_ids.push_back(result.value());
             }
 
-            auto stats = tracker.stats();
+            // Cache warmup: touch every node once
+            for (const auto id : node_ids) { (void)graph->get_node(id); }
+
+            size_t idx = 0;
+            bool last_ok = true;
+            auto bench = make_latency_bench(1000, 0); // manual warmup done above
+            bench.run("node_lookup", [&] {
+                auto node = graph->get_node(node_ids[idx++ % node_ids.size()]);
+                last_ok = node.has_value();
+                ankerl::nanobench::doNotOptimizeAway(node);
+            });
+            REQUIRE(last_ok);
+
+            auto stats = nb_to_stats(bench);
             collector.record_scalability(
                 "node_lookup",
                 size,
@@ -67,24 +68,26 @@ TEST_CASE("Graph size impact on performance", "[SCALABILITY][graphsize]") {
             REQUIRE(graph != nullptr);
 
             // Populate graph to target size
-            for (uint32_t i = 0; i < size; ++i) {
+            for (uint32_t i = 0; i < static_cast<uint32_t>(size); ++i) {
                 auto node = GraphGenerator::create_test_node(
                     2000000 + i, graph->get_agent_id());
-                graph->insert_node(node);
+                auto res = graph->insert_node(node);
+                REQUIRE(res.has_value());
             }
 
-            // Measure insertion performance
-            LatencyTracker tracker(100);
-
-            for (int i = 0; i < 100; ++i) {
+            // ~35µs/op: 300 iters/epoch × 50 epochs ≈ 0.53 s
+            uint64_t id_counter = 3000000;
+            auto bench = make_latency_bench(50);
+            bench.minEpochIterations(300);
+            bench.run("node_insert", [&] {
                 auto node = GraphGenerator::create_test_node(
-                    3000000 + i, graph->get_agent_id());
+                    id_counter++, graph->get_agent_id());
+                auto res = graph->insert_node(node);
+                REQUIRE(res.has_value());
+                ankerl::nanobench::doNotOptimizeAway(res);
+            });
 
-                auto timer = tracker.scoped_record();
-                graph->insert_node(node);
-            }
-
-            auto stats = tracker.stats();
+            auto stats = nb_to_stats(bench);
             collector.record_scalability(
                 "node_insert_latency",
                 size,
@@ -112,31 +115,41 @@ TEST_CASE("Graph size impact on performance", "[SCALABILITY][graphsize]") {
             std::vector<uint64_t> node_ids;
             node_ids.reserve(edge_count + 100);
             for (uint32_t i = 0; i < edge_count + 100; ++i) {
-                auto node = GraphGenerator::create_test_node(
-                    0, graph->get_agent_id());
+                auto node = GraphGenerator::create_test_node(0, graph->get_agent_id());
                 auto result = graph->insert_node(node);
-                if (result.has_value()) {
-                    node_ids.push_back(result.value());
-                }
+                REQUIRE(result.has_value());
+                node_ids.push_back(result.value());
             }
-            REQUIRE(node_ids.size() >= edge_count);
 
-            // Create edges
+            // Create edges for the first edge_count nodes
             for (uint32_t i = 0; i < edge_count; ++i) {
                 auto edge = GraphGenerator::create_test_edge(
                     root->id(), node_ids[i], graph->get_agent_id());
-                graph->insert_or_assign_edge(edge);
+                REQUIRE(graph->insert_or_assign_edge(edge));
+            }
+
+            // Cache warmup: touch every existing edge once
+            for (uint32_t i = 0; i < edge_count; ++i) {
+                (void)graph->get_edge(root->id(), node_ids[i], "test_edge");
             }
 
             // Measure edge lookup performance
-            LatencyTracker lookup_tracker(1000);
-            for (int i = 0; i < 1000; ++i) {
-                uint64_t target = node_ids[i % edge_count];
-                auto timer = lookup_tracker.scoped_record();
+            // ~32µs at edge_count=100 (unstable, needs 300 iters); larger counts are stable.
+            size_t lookup_min_iters = (edge_count <= 100) ? 300 : 1;
+            size_t lookup_epochs   = (edge_count <= 100) ? 50  : 200;
+            size_t lookup_idx = 0;
+            bool last_ok = true;
+            auto lookup_bench = make_latency_bench(lookup_epochs, 0); // manual warmup done above
+            lookup_bench.minEpochIterations(lookup_min_iters);
+            lookup_bench.run("edge_lookup", [&] {
+                uint64_t target = node_ids[lookup_idx++ % edge_count];
                 auto edge = graph->get_edge(root->id(), target, "test_edge");
-            }
+                last_ok = edge.has_value();
+                ankerl::nanobench::doNotOptimizeAway(edge);
+            });
+            REQUIRE(last_ok);
 
-            auto lookup_stats = lookup_tracker.stats();
+            auto lookup_stats = nb_to_stats(lookup_bench);
             collector.record_scalability(
                 "edge_lookup",
                 edge_count,
@@ -144,18 +157,21 @@ TEST_CASE("Graph size impact on performance", "[SCALABILITY][graphsize]") {
                 "ns",
                 {{"edge_count", std::to_string(edge_count)}});
 
-            // Measure edge insertion performance
-            LatencyTracker insert_tracker(100);
-            for (int i = 0; i < 100; ++i) {
-                uint64_t target = node_ids[edge_count + i];
+            // Measure edge insertion performance (last 100 nodes have no edges yet)
+            // ~13µs/op (idempotent upsert): 800 iters/epoch × 50 epochs ≈ 0.52 s
+            size_t insert_idx = 0;
+            auto insert_bench = make_latency_bench(50);
+            insert_bench.minEpochIterations(800);
+            insert_bench.run("edge_insert", [&] {
+                uint64_t target = node_ids[edge_count + (insert_idx++ % 100)];
                 auto edge = GraphGenerator::create_test_edge(
                     root->id(), target, graph->get_agent_id());
+                bool ok = graph->insert_or_assign_edge(edge);
+                REQUIRE(ok);
+                ankerl::nanobench::doNotOptimizeAway(ok);
+            });
 
-                auto timer = insert_tracker.scoped_record();
-                graph->insert_or_assign_edge(edge);
-            }
-
-            auto insert_stats = insert_tracker.stats();
+            auto insert_stats = nb_to_stats(insert_bench);
             collector.record_scalability(
                 "edge_insert_latency",
                 edge_count,
@@ -178,20 +194,20 @@ TEST_CASE("Graph size impact on performance", "[SCALABILITY][graphsize]") {
             REQUIRE(graph != nullptr);
 
             // Populate
-            for (uint32_t i = 0; i < size; ++i) {
+            for (uint32_t i = 0; i < static_cast<uint32_t>(size); ++i) {
                 auto node = GraphGenerator::create_test_node(
                     5000000 + i, graph->get_agent_id());
-                graph->insert_node(node);
+                auto res = graph->insert_node(node);
+                REQUIRE(res.has_value());
             }
 
-            // Measure full scan
-            LatencyTracker tracker(100);
-            for (int i = 0; i < 100; ++i) {
-                auto timer = tracker.scoped_record();
+            auto bench = make_latency_bench(100);
+            bench.run("get_all_nodes", [&] {
                 auto nodes = graph->get_nodes();
-            }
+                ankerl::nanobench::doNotOptimizeAway(nodes);
+            });
 
-            auto stats = tracker.stats();
+            auto stats = nb_to_stats(bench);
             collector.record_scalability(
                 "get_all_nodes",
                 size,
@@ -229,20 +245,23 @@ TEST_CASE("Memory pressure impact", "[SCALABILITY][memory]") {
             for (uint64_t i = current_size; i < target_size; ++i) {
                 auto node = GraphGenerator::create_test_node(
                     6000000 + i, graph->get_agent_id());
-                graph->insert_node(node);
+                auto res = graph->insert_node(node);
+                REQUIRE(res.has_value());
             }
 
-            // Measure insertion latency
-            LatencyTracker tracker(50);
-            for (int i = 0; i < 50; ++i) {
+            // ~28–41µs/op: 500 iters/epoch × 50 epochs ≈ 0.7–1.0 s
+            uint64_t id_counter = 7000000 + static_cast<uint64_t>(target_size) * 100;
+            auto bench = make_latency_bench(50);
+            bench.minEpochIterations(500);
+            bench.run("insert_under_pressure", [&] {
                 auto node = GraphGenerator::create_test_node(
-                    7000000 + target_size * 100 + i, graph->get_agent_id());
+                    id_counter++, graph->get_agent_id());
+                auto res = graph->insert_node(node);
+                REQUIRE(res.has_value());
+                ankerl::nanobench::doNotOptimizeAway(res);
+            });
 
-                auto timer = tracker.scoped_record();
-                graph->insert_node(node);
-            }
-
-            auto stats = tracker.stats();
+            auto stats = nb_to_stats(bench);
             collector.record_scalability(
                 "insert_under_pressure",
                 target_size,
