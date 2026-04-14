@@ -488,6 +488,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
     std::vector<Node> nodes_;
     if (nodeType.contains(type))
     {
+        nodes_.reserve(nodeType.at(type).size());
         for (auto &id: nodeType.at(type))
         {
             std::optional<CRDTNode> n = get_(id);
@@ -520,6 +521,12 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
     std::shared_lock<std::shared_mutex> lck(_mutex_cache_maps);
 
     std::vector<Node> nodes_;
+    {
+        size_t total = 0;
+        for (const auto &type : types)
+            if (nodeType.contains(type)) total += nodeType.at(type).size();
+        nodes_.reserve(total);
+    }
     for (auto &type : types)
     {
         if (nodeType.contains(type))
@@ -781,6 +788,7 @@ std::vector<DSR::Edge> DSRGraph::get_edges_by_type(const std::string &type)
     std::shared_lock<std::shared_mutex> lock_cache(_mutex_cache_maps);
     std::vector<Edge> edges_;
     if (edgeType.contains(type)) {
+        edges_.reserve(edgeType.at(type).size());
         for (auto &[from, to] : edgeType.at(type)) {
             auto n = get_edge_(from, to, type);
             if (n.has_value())
@@ -796,6 +804,7 @@ std::vector<DSR::Edge> DSRGraph::get_edges_to_id(uint64_t id)
     std::shared_lock<std::shared_mutex> lock_cache(_mutex_cache_maps);
     std::vector<Edge> edges_;
     if (to_edges.contains(id)) {
+        edges_.reserve(to_edges.at(id).size());
         for (const auto &[k, v] : to_edges.at(id)) {
             auto n = get_edge_(k, id, v);
             if (n.has_value())
