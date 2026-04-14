@@ -547,17 +547,17 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
 //////////////////////////////////////////////////////////////////////////////////
 std::optional<CRDTEdge> DSRGraph::get_edge_(uint64_t from, uint64_t to, const std::string &key)
 {
-    //std::shared_lock<std::shared_mutex> lock(_mutex);
-    if (nodes.contains(from) && nodes.contains(to))
-    {
-        auto n = get_(from);
-        if (n.has_value()) {
-            auto edge = n.value().fano().find({to, key});
-            if (edge != n.value().fano().end()) {
-                return edge->second.read_reg();
-            }
-        }
+    auto from_it = nodes.find(from);
+    if (from_it == nodes.end() || from_it->second.empty() || !nodes.contains(to)) {
+        return {};
     }
+
+    auto& fano = from_it->second.read_reg().fano();
+    auto edge = fano.find({to, key});
+    if (edge != fano.end() && !edge->second.empty()) {
+        return edge->second.read_reg();
+    }
+
     return {};
 }
 
