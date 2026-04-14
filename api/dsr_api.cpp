@@ -272,21 +272,18 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
 
     if (!deleted.contains(node.id()))
     {
-        if (nodes.contains(node.id()) and !nodes.at(node.id()).empty())
+        auto nit = nodes.find(node.id());
+        if (nit != nodes.end() && !nit->second.empty())
         {
-
             std::vector<IDL::MvregNodeAttr> atts_deltas;
-            auto &iter = nodes.at(node.id()).read_reg().attrs();
+            auto &iter = nit->second.read_reg().attrs();
             //New attributes and updates.
             for (auto &[k, att]: node.attrs()) {
-                if (!iter.contains(k)) {
-                    iter.emplace(k, mvreg<CRDTAttribute>());
-                }
-                if (iter.at(k).empty() or att.read_reg() != iter.at(k).read_reg()) {
-                    auto delta = iter.at(k).write(std::move(att.read_reg()));
+                auto &attr_reg = iter.try_emplace(k, mvreg<CRDTAttribute>()).first->second;
+                if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
+                    auto delta = attr_reg.write(std::move(att.read_reg()));
                     atts_deltas.emplace_back(
                             CRDTNodeAttr_to_IDL(agent_id, node.id(), node.id(), k, delta));
-
                 }
             }
             //Remove old attributes.
@@ -296,7 +293,7 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
                 if (ignored_attributes.contains(k)) {
                     it_a = iter.erase(it_a);
                 } else if (!node.attrs().contains(k)) {
-                    auto delta = iter.at(k).reset();
+                    auto delta = it_a->second.reset();
                     atts_deltas.emplace_back(
                             CRDTNodeAttr_to_IDL(node.agent_id(), node.id(), node.id(), k, delta));
                     it_a = iter.erase(it_a);
@@ -609,43 +606,33 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
     {
         auto &node = nodes.at(from).read_reg();
         //check if we are creating an edge or we are updating it.
-        //Update
-        if (node.fano().contains({to, attrs.type()}))
+        auto fano_it = node.fano().find({to, attrs.type()});
+        if (fano_it != node.fano().end())
         {
-            auto iter = nodes.at(from).read_reg().fano().find({attrs.to(), attrs.type()});
-            auto end = nodes.at(from).read_reg().fano().end();
-            if (iter != end) {
-                std::vector<IDL::MvregEdgeAttr> atts_deltas;
-                auto &iter_edge = iter->second.read_reg().attrs();
-                for (auto &[k, att]: attrs.attrs()) {
-                    //comparar igualdad o inexistencia
-                    if (!iter_edge.contains(k)) {
-                        iter_edge.emplace(k, mvreg<CRDTAttribute>());
-                    }
-                    if (iter_edge.at(k).empty() or
-                        att.read_reg() !=
-                        iter_edge.at(k).read_reg()) {
-                        auto delta = iter_edge.at(k).write(std::move(att.read_reg()));
-                        atts_deltas.emplace_back(
-                                CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), k, delta));
-
-                    }
+            //Update
+            std::vector<IDL::MvregEdgeAttr> atts_deltas;
+            auto &iter_edge = fano_it->second.read_reg().attrs();
+            for (auto &[k, att]: attrs.attrs()) {
+                auto &attr_reg = iter_edge.try_emplace(k, mvreg<CRDTAttribute>()).first->second;
+                if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
+                    auto delta = attr_reg.write(std::move(att.read_reg()));
+                    atts_deltas.emplace_back(
+                            CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), k, delta));
                 }
-                auto it = iter_edge.begin();
-                while (it != iter_edge.end()) {
-                    if (!attrs.attrs().contains(it->first)) {
-                        std::string att = it->first;
-                        auto delta = iter_edge.at(it->first).reset();
-                        it = iter_edge.erase(it);
-                        atts_deltas.emplace_back(
-                                CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), att, delta));
-
-                    } else {
-                        ++it;
-                    }
-                }
-                return {true, {}, std::move(atts_deltas)};
             }
+            auto it = iter_edge.begin();
+            while (it != iter_edge.end()) {
+                if (!attrs.attrs().contains(it->first)) {
+                    std::string att = it->first;
+                    auto delta = it->second.reset();
+                    it = iter_edge.erase(it);
+                    atts_deltas.emplace_back(
+                            CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), att, delta));
+                } else {
+                    ++it;
+                }
+            }
+            return {true, {}, std::move(atts_deltas)};
         } else
         { // Insert
             //node.fano().insert({{to, attrs.type()}, mvreg<CRDTEdge>()});
