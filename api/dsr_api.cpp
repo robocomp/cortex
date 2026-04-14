@@ -580,18 +580,17 @@ std::optional<Edge> DSRGraph::get_edge(const Node &n, const std::string &to, con
     std::optional<uint64_t> id_to = get_id_from_name(to);
     if (id_to.has_value())
     {
-        return (n.fano().contains({id_to.value(), key})) ?
-               std::make_optional(n.fano().find({id_to.value(), key})->second) :
-               std::nullopt;
+        auto it = n.fano().find({id_to.value(), key});
+        if (it != n.fano().end()) return it->second;
     }
     return {};
 }
 
 std::optional<Edge> DSRGraph::get_edge(const Node &n, uint64_t to, const std::string &key)
 {
-    return (n.fano().contains({to, key})) ?
-           std::make_optional(n.fano().find({to, key})->second) :
-           std::nullopt;
+    auto it = n.fano().find({to, key});
+    if (it != n.fano().end()) return it->second;
+    return {};
 }
 
 
