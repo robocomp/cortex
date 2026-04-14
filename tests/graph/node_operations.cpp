@@ -6,6 +6,7 @@
 #include "catch2/catch_test_macros.hpp"
 
 #include "dsr/core/types/user_types.h"
+#include "dsr/core/types/type_checking/dsr_edge_type.h"
 
 #include "dsr/api/dsr_api.h"
 #include "../utils.h"
@@ -118,6 +119,28 @@ TEST_CASE("Graph node operations", "[NODE]") {
     SECTION("Delete a node that does not exists by id") {
         bool r = G.delete_node(rand());
         REQUIRE_FALSE(r);
+    }
+
+    SECTION("Deleting a node removes incoming edges from other nodes") {
+        auto n1 = Node::create<testtype_node_type>();
+        auto id1 = G.insert_node(n1);
+        REQUIRE(id1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>();
+        auto id2 = G.insert_node(n2);
+        REQUIRE(id2.has_value());
+
+        // Create edge n1 -> n2
+        auto e = Edge::create<in_edge_type>(*id1, *id2);
+        REQUIRE(G.insert_or_assign_edge(e));
+        REQUIRE(G.get_edge(*id1, *id2, std::string(in_edge_type::attr_name)).has_value());
+
+        // Deleting n2 must also remove the incoming edge from n1
+        REQUIRE(G.delete_node(*id2));
+        REQUIRE_FALSE(G.get_edge(*id1, *id2, std::string(in_edge_type::attr_name)).has_value());
+
+        // n1 should still exist
+        REQUIRE(G.get_node(*id1).has_value());
     }
 
     SECTION("Create a node with an user defined name") {

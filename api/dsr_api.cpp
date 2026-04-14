@@ -378,27 +378,23 @@ DSRGraph::delete_node_(uint64_t id) {
     // Get remove delta.
     auto delta = nodes[id].reset();
     IDL::MvregNode delta_remove = CRDTNode_to_IDL(agent_id, id, delta);
-    //search and remove edges.
-    //For each node check if there is an edge to remove.
-    //TODO: use to_edges.
-    for (auto &[k, v] : nodes)
+    // Search and remove incoming edges using to_edges cache: O(k) instead of O(n).
     {
-        std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
-        if (!edges.contains({k, id})) continue;
-        // Remove all edges between them
-        auto &visited_node = v.read_reg();
-        auto keys = deleted_edges.size();
-        for (const auto &key : edges.at({k, id}))
+        decltype(to_edges)::mapped_type incoming;
         {
-            deleted_edges.emplace_back(visited_node.fano().at({id, key}).read_reg());
-            auto delta_fano = visited_node.fano().at({id, key}).reset();
-            delta_vec.emplace_back(CRDTEdge_to_IDL(agent_id, k, id, key, delta_fano));
-            visited_node.fano().erase({id, key});
+            std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+            if (to_edges.contains(id))
+                incoming = to_edges.at(id);
         }
-        lck_cache.unlock();
-        //Remove all from cache
-        for (auto i = keys; i < deleted_edges.size(); i++) {
-            update_maps_edge_delete(k, id, deleted_edges[i].type());
+        for (const auto &[from, type] : incoming)
+        {
+            if (!nodes.contains(from)) continue;
+            auto &visited_node = nodes.at(from).read_reg();
+            deleted_edges.emplace_back(visited_node.fano().at({id, type}).read_reg());
+            auto delta_fano = visited_node.fano().at({id, type}).reset();
+            delta_vec.emplace_back(CRDTEdge_to_IDL(agent_id, from, id, type, delta_fano));
+            visited_node.fano().erase({id, type});
+            update_maps_edge_delete(from, id, type);
         }
     }
     update_maps_node_delete(id, node.value());
