@@ -123,10 +123,8 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
             }
         }
         // update node cache reference
-        uint64_t dst_id = G->get_node(dest).value().id();
-        node_map[dst_id].push_back(key);
-        uint64_t orig_id = G->get_node(orig).value().id();
-        node_map[orig_id].push_back(key);
+        node_map[bn.value().id()].push_back(key);
+        node_map[an.value().id()].push_back(key);
 
         // update cache
         auto ret = btotal.inverse() * atotal;
