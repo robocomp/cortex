@@ -943,7 +943,7 @@ inline void DSRGraph::update_maps_edge_delete(uint64_t from, uint64_t to, const 
     std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
     if (const auto tuple = std::pair{from, to}; edges.contains(tuple)) {
         edges.at(tuple).erase(key);
-        edges.erase({from, to});
+        if (edges.at(tuple).empty()) edges.erase(tuple);
     }
 
     if (to_edges.contains(to)) {

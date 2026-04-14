@@ -130,6 +130,33 @@ auto n = Node::create<testtype_node_type>();
         REQUIRE_FALSE(r);
     }
 
+    SECTION("Deleting one edge type between a pair leaves other types intact") {
+        auto n1 = Node::create<testtype_node_type>();
+        auto id1 = G.insert_node(n1);
+        REQUIRE(id1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>();
+        auto id2 = G.insert_node(n2);
+        REQUIRE(id2.has_value());
+
+        // Two different edge types between the same node pair
+        auto e_in    = Edge::create<in_edge_type>(*id1, *id2);
+        auto e_knows = Edge::create<knows_edge_type>(*id1, *id2);
+        REQUIRE(G.insert_or_assign_edge(e_in));
+        REQUIRE(G.insert_or_assign_edge(e_knows));
+
+        // Delete only the "in" edge
+        REQUIRE(G.delete_edge(*id1, *id2, std::string(in_edge_type::attr_name)));
+
+        // "in" must be gone
+        REQUIRE_FALSE(G.get_edge(*id1, *id2, std::string(in_edge_type::attr_name)).has_value());
+
+        // "knows" must still be visible
+        REQUIRE(G.get_edge(*id1, *id2, std::string(knows_edge_type::attr_name)).has_value());
+        auto remaining = G.get_edges_by_type(std::string(knows_edge_type::attr_name));
+        REQUIRE(remaining.size() == 1);
+    }
+
 }
 
 
