@@ -75,14 +75,14 @@ DSRGraph::DSRGraph(GraphSettings settings) :
 
 
     // RTPS Initialize publisher with general topic
-    auto [res, pub, writer] = dsrpub_node.init(participant_handle, dsrparticipant.getNodeTopic());
-    auto [res2, pub2, writer2] = dsrpub_node_attrs.init(participant_handle, dsrparticipant.getAttNodeTopic());
+    auto [res, pub, writer] = dsrpub_node.init(participant_handle, dsrparticipant.getNodeTopic(), dsrparticipant.get_domain_id());
+    auto [res2, pub2, writer2] = dsrpub_node_attrs.init(participant_handle, dsrparticipant.getAttNodeTopic(), dsrparticipant.get_domain_id());
 
-    auto [res3, pub3, writer3] = dsrpub_edge.init(participant_handle, dsrparticipant.getEdgeTopic());
-    auto [res4, pub4, writer4] = dsrpub_edge_attrs.init(participant_handle, dsrparticipant.getAttEdgeTopic());
+    auto [res3, pub3, writer3] = dsrpub_edge.init(participant_handle, dsrparticipant.getEdgeTopic(), dsrparticipant.get_domain_id());
+    auto [res4, pub4, writer4] = dsrpub_edge_attrs.init(participant_handle, dsrparticipant.getAttEdgeTopic(), dsrparticipant.get_domain_id());
 
-    auto [res5, pub5, writer5] = dsrpub_graph_request.init(participant_handle, dsrparticipant.getGraphRequestTopic());
-    auto [res6, pub6, writer6] = dsrpub_request_answer.init(participant_handle, dsrparticipant.getGraphTopic());
+    auto [res5, pub5, writer5] = dsrpub_graph_request.init(participant_handle, dsrparticipant.getGraphRequestTopic(), dsrparticipant.get_domain_id());
+    auto [res6, pub6, writer6] = dsrpub_request_answer.init(participant_handle, dsrparticipant.getGraphTopic(), dsrparticipant.get_domain_id());
 
     dsrparticipant.add_publisher(dsrparticipant.getNodeTopic()->get_name(), {pub, writer});
     dsrparticipant.add_publisher(dsrparticipant.getAttNodeTopic()->get_name(), {pub2, writer2});
@@ -1681,7 +1681,7 @@ void DSRGraph::node_subscription_thread()
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
     dsrpub_call_node = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader] = dsrsub_node.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), dsrpub_call_node, mtx_entity_creation);
+    auto [res, sub, reader] = dsrsub_node.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_node, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), {sub, reader});
 }
 
@@ -1715,7 +1715,7 @@ void DSRGraph::edge_subscription_thread()
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
     dsrpub_call_edge = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader]  = dsrsub_edge.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), dsrpub_call_edge, mtx_entity_creation);
+    auto [res, sub, reader]  = dsrsub_edge.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_edge, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getEdgeTopic()->get_name(), {sub, reader});
 
 }
@@ -1781,7 +1781,7 @@ void DSRGraph::edge_attrs_subscription_thread()
 
     };
     dsrpub_call_edge_attrs = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader] = dsrsub_edge_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(),
+    auto [res, sub, reader] = dsrsub_edge_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_edge_attrs, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getAttEdgeTopic()->get_name(), {sub, reader});
     //dsrsub_edge_attrs_stream.init(dsrparticipant.getParticipant(), "DSR_EDGE_ATTRS_STREAM", dsrparticipant.getEdgeAttrTopicName(),
@@ -1850,7 +1850,7 @@ void DSRGraph::node_attrs_subscription_thread()
 
     };
     dsrpub_call_node_attrs = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader] = dsrsub_node_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(),
+    auto [res, sub, reader] = dsrsub_node_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_node_attrs, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getAttNodeTopic()->get_name(), {sub, reader});
 
@@ -1904,7 +1904,7 @@ void DSRGraph::fullgraph_server_thread()
         }
     };
     dsrpub_graph_request_call = NewMessageFunctor(this, lambda_graph_request);
-    auto [res, sub, reader] = dsrsub_graph_request.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(),
+    auto [res, sub, reader] = dsrsub_graph_request.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(), dsrparticipant.get_domain_id(),
                               dsrpub_graph_request_call, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getGraphRequestTopic()->get_name(), {sub, reader});
 
@@ -1946,7 +1946,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
     };
 
     dsrpub_request_answer_call = NewMessageFunctor(this, lambda_request_answer);
-    auto [res, sub, reader] = dsrsub_request_answer.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(),
+    auto [res, sub, reader] = dsrsub_request_answer.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(), dsrparticipant.get_domain_id(),
                                dsrpub_request_answer_call, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getGraphTopic()->get_name(), {sub, reader});
 

@@ -10,6 +10,23 @@
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
 
+namespace {
+std::vector<std::string> host_ipv4_interfaces()
+{
+    std::vector<std::string> ips{"127.0.0.1"};
+    std::vector<IPFinder::info_IP> found;
+    IPFinder::getIPs(&found, false);
+    for (const auto& ip : found) {
+        if (ip.type == IPFinder::IP4) {
+            if (std::find(ips.begin(), ips.end(), ip.name) == ips.end()) {
+                ips.push_back(ip.name);
+            }
+        }
+    }
+    return ips;
+}
+}
+
 DSRParticipant::DSRParticipant() : mp_participant(nullptr),
                                    dsrgraphType(new MvregNodePubSubType()),
                                    graphrequestType(new GraphRequestPubSubType()),
@@ -32,6 +49,7 @@ DSRParticipant::~DSRParticipant()
 
 std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id)
 {
+    domain_id_ = domain_id;
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
     PParam.name(("Participant_" + std::to_string(agent_id)+ " ( " + agent_name + " )").data() );
@@ -40,32 +58,24 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     //Disable the built-in Transport Layer.
     PParam.transport().use_builtin_transports = false;
 
-    //Create a descriptor for the new transport.
-    auto custom_transport = std::make_shared<UDPv4TransportDescriptor>();
-    //auto custom_transport = std::make_shared<SharedMemTransportDescriptor>();
-    //custom_transport->sendBufferSize = 33554432; // commented it will use the OS default
-    //custom_transport->receiveBufferSize = 33554432; // commented it will use the OS default
-    custom_transport->maxMessageSize = 65000;
+    if (localhost) {
+        // Same-host deployments should prefer shared memory. Keep loopback UDP
+        // as a discovery/data fallback for environments where SHM is limited.
+        auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+        PParam.transport().user_transports.push_back(shm_transport);
 
-    PParam.transport().user_transports.push_back(custom_transport);
-
-
-    custom_transport->interface_allowlist.emplace_back("127.0.0.1");
-
-    /*if (not localhost)
-    {
-
-        
-        std::vector<eprosima::fastdds::rtps::IPFinder::info_IP> ips;
-        eprosima::fastdds::rtps::IPFinder::getIPs(&ips, false);
-
-        for (auto &ip : ips) {
-            if (ip.type == eprosima::fastdds::rtps::IPFinder::IP4 ) {
-                //custom_transport->interfaceWhiteList.emplace_back(ip.name);
-            }
+        auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+        udp_transport->maxMessageSize = 65000;
+        udp_transport->interface_allowlist.emplace_back("127.0.0.1");
+        PParam.transport().user_transports.push_back(udp_transport);
+    } else {
+        auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+        udp_transport->maxMessageSize = 65000;
+        for (const auto& ip : host_ipv4_interfaces()) {
+            udp_transport->interface_allowlist.emplace_back(ip);
         }
-
-    }*/
+        PParam.transport().user_transports.push_back(udp_transport);
+    }
 
     PParam.transport().send_socket_buffer_size = 33554432;
     PParam.transport().listen_socket_buffer_size = 33554432;

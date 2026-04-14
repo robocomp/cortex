@@ -16,7 +16,11 @@ class DSRPublisher
 public:
     DSRPublisher();
     virtual ~DSRPublisher();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic,  bool isStreamData = false);
+    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init(
+        eprosima::fastdds::dds::DomainParticipant *mp_participant_,
+        eprosima::fastdds::dds::Topic *topic,
+        int8_t domain_id,
+        bool isStreamData = false);
     [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID() const;
     bool write(IDL::GraphRequest *object);
     bool write(IDL::MvregNode *object);
