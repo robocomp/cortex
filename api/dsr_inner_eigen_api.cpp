@@ -212,7 +212,6 @@ std::optional<Mat::Vector6d> InnerEigenAPI::transform_axis(const std::string &de
 
 std::optional<Mat::Vector6d> InnerEigenAPI::transform_axis( const std::string &dest,  const std::string & orig, std::uint64_t timestamp)
 {
-    Mat::Vector6d v;
 	return transform_axis(dest, Mat::Vector6d::Zero(), orig, timestamp);
 }
 
