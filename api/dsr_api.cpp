@@ -1539,17 +1539,22 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
             auto mv = IDLNode_to_CRDT(std::move(val));
             bool mv_empty = mv.empty();
             agent_id_ch = val.agent_id();
-            std::optional<CRDTNode> nd = (nodes[k].empty()) ? std::nullopt : std::make_optional(nodes[k].read_reg());
+            auto it = nodes.find(k);
+            std::optional<CRDTNode> nd =
+                    (it != nodes.end() and !it->second.empty()) ? std::make_optional(it->second.read_reg()) : std::nullopt;
             id = k;
             if (!deleted.contains(k)) {
-                nodes[k].join(std::move(mv));
-                if (mv_empty or nodes.at(k).empty()) {
+                if (it == nodes.end()) {
+                    it = nodes.emplace(k, mvreg<CRDTNode>{}).first;
+                }
+                it->second.join(std::move(mv));
+                if (mv_empty or it->second.empty()) {
                     update_maps_node_delete(k, nd);
                     updates.emplace_back(false, k, "", std::nullopt);
                     delete_unprocessed_deltas();
                 } else {
-                    update_maps_node_insert(k, nodes.at(k).read_reg());
-                    updates.emplace_back(true, k, nodes.at(k).read_reg().type(), nd);
+                    update_maps_node_insert(k, it->second.read_reg());
+                    updates.emplace_back(true, k, it->second.read_reg().type(), nd);
                     consume_unprocessed_deltas();
                 }
             }

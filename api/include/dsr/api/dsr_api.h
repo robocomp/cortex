@@ -57,6 +57,7 @@ namespace DSR
     class DSRGraph : public QObject
     {
         friend RT_API;
+        friend class DSRGraphTestAccess;
 
         public:
         size_t size() const;
