@@ -123,11 +123,14 @@ summary = {
 }
 (case_dir / "transport_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-if not uses_multicast:
-    raise SystemExit("multicast evidence not found")
-
 if same_host == "true" and not uses_shm:
     raise SystemExit("shared-memory evidence not found for same_host=true")
+
+# Multicast is the discovery mechanism for cross-host (same_host=false).
+# For same_host=true, DSR uses SHM + loopback-UDP unicast — no multicast
+# group is joined, so absence of 239.255.x.x evidence is expected and correct.
+if same_host == "false" and not uses_multicast:
+    raise SystemExit("multicast evidence not found for same_host=false")
 
 if same_host == "false" and uses_shm:
     raise SystemExit("unexpected shared-memory evidence found for same_host=false")
