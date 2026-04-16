@@ -585,7 +585,6 @@ namespace DSR
         const bool copy;
         std::unique_ptr<Utilities> utils;
         std::unordered_set<std::string_view> ignored_attributes;
-        ThreadPool tp, tp_delta_attr;
         bool same_host;
         id_generator generator;
         GraphSettings::LOGLEVEL log_level;
@@ -677,6 +676,11 @@ namespace DSR
         std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_from;
         std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_to;
         std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att;
+
+        // ThreadPools are declared after all data they access so that their
+        // destructors (which join worker threads) run before the data members
+        // are destroyed, preventing use-after-free data races on shutdown.
+        ThreadPool tp, tp_delta_attr;
 
         //Custom function for each rtps topic
         class NewMessageFunctor {

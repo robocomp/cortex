@@ -1093,11 +1093,20 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
         };
 
         std::optional<std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple>> cache_map_to_edges = {};
+        // Snapshot the data needed for signal emission while the lock is held.
+        // nodes.at(id) must NOT be accessed after the lock is released: a concurrent
+        // insert_node_/update_node call on the same id runs nodes[id].write() which
+        // calls dk.rmv() (clears dk.ds) followed by dk.add(), leaving a window where
+        // read_reg()'s assert(dk.ds.size() >= 1) would fire.
+        std::string node_type_snapshot;
+        std::vector<std::pair<uint64_t, std::string>> from_edges_snapshot;
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             if (!deleted.contains(id)) {
                 joined = true;
-                maybe_deleted_node = (nodes[id].empty()) ? std::nullopt : std::make_optional(nodes.at(id).read_reg());
+                if (auto it = nodes.find(id); it != nodes.end() && !it->second.empty()) {
+                    maybe_deleted_node = it->second.read_reg();
+                }
                 nodes[id].join(std::move(crdt_delta));
                 if (nodes.at(id).empty() or d_empty) {
                     nodes.erase(id);
@@ -1106,8 +1115,14 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                     delete_unprocessed_deltas();
                 } else {
                     signal = true;
-                    update_maps_node_insert(id, nodes.at(id).read_reg());
+                    const auto& reg = nodes.at(id).read_reg();
+                    update_maps_node_insert(id, reg);
                     consume_unprocessed_deltas();
+                    // Snapshot type and outgoing edges before the lock is released.
+                    node_type_snapshot = reg.type();
+                    for (const auto &[k, v] : reg.fano()) {
+                        from_edges_snapshot.emplace_back(k.first, k.second);
+                    }
                 }
             } else {
                 delete_unprocessed_deltas();
@@ -1116,11 +1131,11 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
 
         if (joined) {
             if (signal) {
-                DSR_LOG_DEBUG("[JOIN_NODE] node inserted/updated:", id, nodes.at(id).read_reg().type());
-                emitter.update_node_signal(id, nodes.at(id).read_reg().type(), SignalInfo{ mvreg.agent_id() });
-                for (const auto &[k, v] : nodes.at(id).read_reg().fano()) {
-                    DSR_LOG_DEBUG("[JOIN_NODE] add edge FROM:", id, k.first, k.second);
-                    emitter.update_edge_signal(id, k.first, k.second, SignalInfo{ mvreg.agent_id() });
+                DSR_LOG_DEBUG("[JOIN_NODE] node inserted/updated:", id, node_type_snapshot);
+                emitter.update_node_signal(id, node_type_snapshot, SignalInfo{ mvreg.agent_id() });
+                for (const auto &[to_id, edge_type] : from_edges_snapshot) {
+                    DSR_LOG_DEBUG("[JOIN_NODE] add edge FROM:", id, to_id, edge_type);
+                    emitter.update_edge_signal(id, to_id, edge_type, SignalInfo{ mvreg.agent_id() });
                 }
 
                 for (const auto &[k, v]: map_new_to_edges)
@@ -1443,7 +1458,10 @@ std::optional<std::string> DSRGraph::join_delta_edge_attr(IDL::MvregEdgeAttr &&m
 
 void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
 {
-    std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDTNode>>> updates;
+    // 5th element: post-join node snapshot captured inside the lock, used for
+    // signal emission after the lock is released to avoid racing with
+    // insert_node_/update_node (same pattern as join_delta_node).
+    std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDTNode>, std::optional<CRDTNode>>> updates;
 
     uint64_t id{0}, timestamp{0};
     uint32_t agent_id_ch{0};
@@ -1541,24 +1559,26 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
                 it->second.join(std::move(mv));
                 if (mv_empty or it->second.empty()) {
                     update_maps_node_delete(k, nd);
-                    updates.emplace_back(false, k, "", std::nullopt);
+                    updates.emplace_back(false, k, "", std::nullopt, std::nullopt);
                     delete_unprocessed_deltas();
                 } else {
-                    update_maps_node_insert(k, it->second.read_reg());
-                    updates.emplace_back(true, k, it->second.read_reg().type(), nd);
+                    const auto& reg = it->second.read_reg();
+                    update_maps_node_insert(k, reg);
+                    updates.emplace_back(true, k, reg.type(), nd, reg);
                     consume_unprocessed_deltas();
                 }
             }
         }
 
     }
-    for (auto &[signal, id, type, nd] : updates)
+    for (auto &[signal, id, type, nd, current_nd] : updates)
         if (signal) {
-            //check what change is joined
-            if (!nd.has_value() || nd->attrs() != nodes[id].read_reg().attrs()) {
-                emitter.update_node_signal(id, nodes[id].read_reg().type(), SignalInfo{ agent_id_ch });
-            } else if (nd.value() != nodes[id].read_reg()) {
-                auto iter = nodes[id].read_reg().fano();
+            //check what change is joined — use the snapshot captured inside the lock,
+            //not nodes[id], which races with concurrent insert_node_/update_node calls.
+            if (!nd.has_value() || nd->attrs() != current_nd->attrs()) {
+                emitter.update_node_signal(id, type, SignalInfo{ agent_id_ch });
+            } else if (nd.value() != *current_nd) {
+                const auto& iter = current_nd->fano();
                 for (const auto &[k, v] : nd->fano()) {
                     if (!iter.contains(k)) {
                         emitter.del_edge_signal(id, k.first, k.second, SignalInfo{ agent_id_ch });
@@ -1908,8 +1928,8 @@ void DSRGraph::fullgraph_server_thread()
 
 std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 {
-    bool sync = false;
-    bool repeated = false;
+    std::atomic<bool> sync{false};
+    std::atomic<bool> repeated{false};
     auto lambda_request_answer = [&](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         while (true)

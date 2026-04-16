@@ -65,6 +65,10 @@ public:
             qWarning("Can't create agents");
             return false;
         }
+        if (config_file.empty()) {
+            qWarning("create_agents: config_file is empty — graph generator likely failed to write to /tmp (check permissions)");
+            return false;
+        }
 
         // Keep agent IDs deterministic while remaining disjoint across fixture
         // instances in the same process.

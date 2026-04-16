@@ -215,9 +215,9 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi]") {
         for (int round = 0; round < NUM_ROUNDS; ++round) {
             // Both agents try to create the same edge simultaneously
             auto edge_a = GraphGenerator::create_test_edge(
-                node1_id, node2_id, agent_a->get_agent_id(), "conflict_edge");
+                node1_id, node2_id, agent_a->get_agent_id(), "test_edge");
             auto edge_b = GraphGenerator::create_test_edge(
-                node1_id, node2_id, agent_b->get_agent_id(), "conflict_edge");
+                node1_id, node2_id, agent_b->get_agent_id(), "test_edge");
 
             std::thread ta([&]() { agent_a->insert_or_assign_edge(edge_a); });
             std::thread tb([&]() { agent_b->insert_or_assign_edge(edge_b); });
@@ -228,15 +228,15 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi]") {
             fixture.wait_for_sync(std::chrono::milliseconds(200));
 
             // Check both agents see the edge
-            auto edge_on_a = agent_a->get_edge(node1_id, node2_id, "conflict_edge");
-            auto edge_on_b = agent_b->get_edge(node1_id, node2_id, "conflict_edge");
+            auto edge_on_a = agent_a->get_edge(node1_id, node2_id, "test_edge");
+            auto edge_on_b = agent_b->get_edge(node1_id, node2_id, "test_edge");
 
             if (!edge_on_a.has_value() || !edge_on_b.has_value()) {
                 conflicts++;
             }
 
             // Delete edge for next round
-            agent_a->delete_edge(node1_id, node2_id, "conflict_edge");
+            agent_a->delete_edge(node1_id, node2_id, "test_edge");
             fixture.wait_for_sync(std::chrono::milliseconds(100));
         }
 

@@ -79,6 +79,16 @@ set_target_properties(dsr_benchmarks PROPERTIES
 
 target_compile_options(dsr_benchmarks PUBLIC -g -std=c++23)
 
+# -DTSAN=ON  enables ThreadSanitizer.  Requires the dsr_api/dsr_core libraries
+# to also be built with TSAN=ON (via the root CMakeLists.txt), otherwise TSan
+# will report false positives from uninstrumented library code.
+option(TSAN "Enable ThreadSanitizer" OFF)
+if (TSAN)
+    message(STATUS "ThreadSanitizer enabled for benchmarks")
+    target_compile_options(dsr_benchmarks PRIVATE -fsanitize=thread -fno-omit-frame-pointer)
+    target_link_options(dsr_benchmarks PRIVATE -fsanitize=thread)
+endif()
+
 # Include directories
 target_include_directories(dsr_benchmarks PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -105,6 +115,28 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/results)
 add_custom_command(TARGET dsr_benchmarks POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:dsr_benchmarks>/results
     COMMENT "Creating results directory"
+)
+
+# Flamegraph target — generates one SVG per benchmark test case via perf.
+# Requires: perf, and FlameGraph scripts (flamegraph.pl + stackcollapse-perf.pl).
+# Set FG_DIR to the FlameGraph checkout if the scripts aren't on PATH, e.g.:
+#   cmake --build . --target flamegraph -j1 -- FG_DIR=/opt/FlameGraph
+# Or pass a Catch2 filter to profile a subset:
+#   cmake --build . --target flamegraph -j1 -- BENCH_FILTER=[LATENCY]
+set(FLAMEGRAPH_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/flamegraph.sh)
+set(FLAMEGRAPH_OUTDIR ${CMAKE_CURRENT_BINARY_DIR}/results/flamegraphs)
+add_custom_target(flamegraph
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${FLAMEGRAPH_OUTDIR}
+    COMMAND env
+        FG_DIR=$ENV{FG_DIR}
+        ${FLAMEGRAPH_SCRIPT}
+            -b $<TARGET_FILE:dsr_benchmarks>
+            -o ${FLAMEGRAPH_OUTDIR}
+            $ENV{BENCH_FILTER}
+    DEPENDS dsr_benchmarks
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Generating per-benchmark flamegraphs in ${FLAMEGRAPH_OUTDIR}"
+    USES_TERMINAL
 )
 
 # Register tests with CTest (optional)

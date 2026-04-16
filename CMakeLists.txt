@@ -6,6 +6,19 @@ project(dsr
 
 include(GNUInstallDirs)
 
+# -DTSAN=ON  enables ThreadSanitizer across the whole build (library + tests/benchmarks).
+# Must be applied before any add_subdirectory so every TU is instrumented.
+# Incompatible with SANITIZER (ASan/UBSan) — enforce that here.
+option(TSAN "Enable ThreadSanitizer" OFF)
+if (TSAN)
+    if (SANITIZER)
+        message(FATAL_ERROR "TSAN and SANITIZER (ASan+UBSan) are mutually exclusive")
+    endif()
+    message(STATUS "ThreadSanitizer enabled")
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
+endif()
+
 add_definitions(-I/usr/include/x86_64-linux-gnu/qt6/QtOpenGLWidgets/)
 
 include_directories(/home/robocomp/robocomp/classes)

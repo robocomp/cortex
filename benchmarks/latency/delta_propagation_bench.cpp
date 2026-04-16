@@ -36,12 +36,12 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
         LatencyTracker tracker(100);
         std::atomic<uint64_t> receive_time{0};
         std::atomic<bool> received{false};
-        uint64_t expected_node_id = 0;
+        std::atomic<uint64_t> expected_node_id{0};
 
         // Connect to agent B's signal
         QObject::connect(agent_b, &DSR::DSRGraph::update_node_signal, agent_b,
             [&](uint64_t id, const std::string& type, DSR::SignalInfo) {
-                if (id == expected_node_id) {
+                if (id == expected_node_id.load(std::memory_order_acquire)) {
                     receive_time.store(get_unix_timestamp());
                     received.store(true);
                 }
@@ -66,7 +66,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
             uint64_t send_time = get_unix_timestamp();
             auto ins_result = agent_a->insert_node(node);
             REQUIRE(ins_result.has_value());
-            expected_node_id = ins_result.value();
+            expected_node_id.store(ins_result.value(), std::memory_order_release);
             
             // Wait for signal with timeout
             auto start = std::chrono::steady_clock::now();
@@ -115,11 +115,12 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
         REQUIRE(fixture.verify_convergence(std::chrono::seconds(10)));
 
         // Connect to agent B's edge signal
-        uint64_t expected_from = 0;
-        uint64_t expected_to = 0;
+        std::atomic<uint64_t> expected_from{0};
+        std::atomic<uint64_t> expected_to{0};
         QObject::connect(agent_b, &DSR::DSRGraph::update_edge_signal, agent_b,
             [&](uint64_t from, uint64_t to, const std::string& type, DSR::SignalInfo) {
-                if (from == expected_from && to == expected_to) {
+                if (from == expected_from.load(std::memory_order_acquire) &&
+                    to   == expected_to.load(std::memory_order_acquire)) {
                     receive_time.store(get_unix_timestamp());
                     received.store(true);
                 }
@@ -135,8 +136,8 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
 
         // Measurement iterations
         for (int i = 10; i < 110; ++i) {
-            expected_from = root->id();
-            expected_to = node_to_ids[i];
+            expected_from.store(root->id(), std::memory_order_release);
+            expected_to.store(node_to_ids[i], std::memory_order_release);
             received.store(false);
 
             auto edge = GraphGenerator::create_test_edge(

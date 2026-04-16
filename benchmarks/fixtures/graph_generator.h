@@ -191,7 +191,8 @@ public:
 private:
     std::string temp_filename() {
         static std::atomic<uint64_t> next_id{0};
-        return "/tmp/dsr_bench_" + std::to_string(next_id.fetch_add(1, std::memory_order_relaxed)) + ".json";
+        return "/tmp/dsr_bench_" + std::to_string(getpid()) + "_"
+               + std::to_string(next_id.fetch_add(1, std::memory_order_relaxed)) + ".json";
     }
 
     std::vector<uint64_t> generate_node_ids(uint32_t count) {
