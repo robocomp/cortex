@@ -790,9 +790,16 @@ std::vector<DSR::Edge> DSRGraph::get_edges_by_type(const std::string &type)
     if (edgeType.contains(type)) {
         edges_.reserve(edgeType.at(type).size());
         for (auto &[from, to] : edgeType.at(type)) {
-            auto n = get_edge_(from, to, type);
-            if (n.has_value())
-                edges_.emplace_back(std::move(n.value()));
+            auto node_it = nodes.find(from);
+            if (node_it == nodes.end() || node_it->second.empty()) {
+                continue;
+            }
+
+            auto &fano = node_it->second.read_reg().fano();
+            auto edge_it = fano.find({to, type});
+            if (edge_it != fano.end()) {
+                edges_.emplace_back(edge_it->second.read_reg());
+            }
         }
     }
     return edges_;
@@ -817,12 +824,16 @@ std::vector<DSR::Edge> DSRGraph::get_edges_to_id(uint64_t id)
 
 std::optional<std::map<std::pair<uint64_t, std::string>, DSR::Edge>> DSRGraph::get_edges(uint64_t id) {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    std::optional<Node> n = get_node(id);
-    if (n.has_value())
-    {
-        return n->fano();
+    auto node_it = nodes.find(id);
+    if (node_it == nodes.end() || node_it->second.empty()) {
+        return std::nullopt;
     }
-    return std::nullopt;
+
+    std::map<std::pair<uint64_t, std::string>, DSR::Edge> edges_;
+    for (const auto &[key, edge_reg] : node_it->second.read_reg().fano()) {
+        edges_.emplace(key, DSR::Edge(edge_reg.read_reg()));
+    }
+    return edges_;
 }
 
 
