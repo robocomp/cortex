@@ -13,7 +13,7 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi]") {
+TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("convergence_time");
 
@@ -189,7 +189,7 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi]") {
     reporter.export_all(result, "convergence_time");
 }
 
-TEST_CASE("Attribute convergence", "[CONSISTENCY][convergence][attributes][.multi]") {
+TEST_CASE("Attribute convergence", "[CONSISTENCY][convergence][attributes][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("attribute_convergence");
 

@@ -28,7 +28,7 @@ static constexpr auto AGENT_DUR = std::chrono::seconds(3);
 
 // ── Node insert ───────────────────────────────────────────────────────────────
 
-TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi]") {
+TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("node_insert_agent_scaling");
 
@@ -109,7 +109,7 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi]") {
 
 // ── Node read ─────────────────────────────────────────────────────────────────
 
-TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi]") {
+TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("node_read_agent_scaling");
 
@@ -202,7 +202,7 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi]") {
 
 // ── Node update ───────────────────────────────────────────────────────────────
 
-TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi]") {
+TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("node_update_agent_scaling");
 

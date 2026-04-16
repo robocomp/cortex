@@ -216,7 +216,7 @@ TEST_CASE("Node signal queued latency", "[LATENCY][signal]") {
     reporter.export_all(result, "signal_node_queued");
 }
 
-TEST_CASE("Signal emission under load", "[LATENCY][signal][stress]") {
+TEST_CASE("Signal emission under load", "[LATENCY][signal][stress][PROFILE][LOAD]") {
     MultiAgentFixture fixture;
     GraphGenerator generator;
     MetricsCollector collector("signal_latency_stress");

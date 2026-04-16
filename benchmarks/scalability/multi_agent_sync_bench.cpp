@@ -12,7 +12,7 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-TEST_CASE("Multi-agent synchronization benchmarks", "[SCALABILITY][sync][.multi]") {
+TEST_CASE("Multi-agent synchronization benchmarks", "[SCALABILITY][sync][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("multi_agent_sync");
 
@@ -196,7 +196,7 @@ TEST_CASE("Multi-agent synchronization benchmarks", "[SCALABILITY][sync][.multi]
     reporter.export_all(result, "multi_agent_sync");
 }
 
-TEST_CASE("Scaling efficiency", "[SCALABILITY][efficiency][.multi]") {
+TEST_CASE("Scaling efficiency", "[SCALABILITY][efficiency][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("scaling_efficiency");
 

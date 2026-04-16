@@ -17,7 +17,7 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-TEST_CASE("Concurrent writers throughput", "[THROUGHPUT][concurrent]") {
+TEST_CASE("Concurrent writers throughput", "[THROUGHPUT][concurrent][PROFILE][LOAD]") {
     MultiAgentFixture fixture;
     GraphGenerator generator;
     MetricsCollector collector("concurrent_writers");
@@ -110,7 +110,7 @@ TEST_CASE("Concurrent writers throughput", "[THROUGHPUT][concurrent]") {
     reporter.export_all(result, "concurrent_writers");
 }
 
-TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent]") {
+TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent][PROFILE][LOAD]") {
     MultiAgentFixture fixture;
     GraphGenerator generator;
     MetricsCollector collector("concurrent_read_write");
@@ -293,7 +293,7 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent]") {
     reporter.export_all(result, "concurrent_read_write");
 }
 
-TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiagent][.multi]") {
+TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiagent][.multi][PROFILE][LOAD][MULTIAGENT]") {
     MultiAgentFixture fixture;
     GraphGenerator generator;
     MetricsCollector collector("multiagent_concurrent");

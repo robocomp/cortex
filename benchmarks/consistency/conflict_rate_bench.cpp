@@ -13,7 +13,7 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi]") {
+TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("conflict_rate");
 
@@ -254,7 +254,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi]") {
     reporter.export_all(result, "conflict_rate");
 }
 
-TEST_CASE("CRDT eventual consistency verification", "[CONSISTENCY][eventual][.multi]") {
+TEST_CASE("CRDT eventual consistency verification", "[CONSISTENCY][eventual][.multi][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("eventual_consistency");
 

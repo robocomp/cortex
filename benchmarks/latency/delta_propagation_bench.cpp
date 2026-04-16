@@ -14,7 +14,7 @@ using namespace DSR::Benchmark;
 
 // Multi-agent tests require working DDS synchronization
 // Skip these by default - run with "[delta]" tag explicitly to test
-TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]") {
+TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][PROFILE][MULTIAGENT]") {
     // Setup
     MultiAgentFixture fixture;
     GraphGenerator generator;
@@ -246,7 +246,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi]"
     reporter.export_all(result, "delta_propagation");
 }
 
-TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][delta][scalability][.multi]") {
+TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][delta][scalability][.multi][PROFILE][MULTIAGENT]") {
     MetricsCollector collector("delta_propagation_scaling");
     GraphGenerator generator;
 
