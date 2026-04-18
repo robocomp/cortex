@@ -14,10 +14,10 @@ namespace DSR {
 
     // ---- CRDT → DSR message type helpers ------------------------------------
 
-    inline static DSR::MvregNodeMsg CRDTNode_to_Msg(uint32_t agent_id, uint64_t id, mvreg<DSR::CRDTNode>& data)
+    inline static DSR::MvregNodeMsg CRDTNode_to_Msg(uint32_t agent_id, uint64_t id, mvreg<DSR::CRDTNode>&& data)
     {
         DSR::MvregNodeMsg msg;
-        msg.dk        = data;
+        msg.dk        = std::move(data);
         msg.id        = id;
         msg.agent_id  = agent_id;
         msg.timestamp = get_unix_timestamp();
@@ -25,47 +25,50 @@ namespace DSR {
         return msg;
     }
 
+    template<typename S>
     inline static DSR::MvregEdgeMsg CRDTEdge_to_Msg(uint32_t agent_id, uint64_t from, uint64_t to,
-                                                     const std::string& type, mvreg<DSR::CRDTEdge>& data)
+                                                     S&& type, mvreg<DSR::CRDTEdge>&& data)
     {
         DSR::MvregEdgeMsg msg;
-        msg.dk        = data;
+        msg.dk        = std::move(data);
         msg.id        = from;
         msg.to        = to;
         msg.from      = from;
-        msg.type      = type;
+        msg.type      = std::forward<S>(type);
         msg.agent_id  = agent_id;
         msg.timestamp = get_unix_timestamp();
         msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
         return msg;
     }
 
+    template<typename S>
     inline static DSR::MvregNodeAttrMsg CRDTNodeAttr_to_Msg(uint32_t agent_id, uint64_t id, uint64_t node,
-                                                             const std::string& attr, mvreg<DSR::CRDTAttribute>& data)
+                                                             S&& attr, mvreg<DSR::CRDTAttribute>&& data)
     {
         DSR::MvregNodeAttrMsg msg;
-        msg.dk        = data;
+        msg.dk        = std::move(data);
         msg.id        = id;
         msg.node      = node;
-        msg.attr_name = attr;
+        msg.attr_name = std::forward<S>(attr);
         msg.agent_id  = agent_id;
         msg.timestamp = get_unix_timestamp();
         msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
         return msg;
     }
 
+    template<typename TS, typename AS>
     inline static DSR::MvregEdgeAttrMsg CRDTEdgeAttr_to_Msg(uint32_t agent_id, uint64_t id,
                                                              uint64_t from, uint64_t to,
-                                                             const std::string& type, const std::string& attr,
-                                                             mvreg<DSR::CRDTAttribute>& data)
+                                                             TS&& type, AS&& attr,
+                                                             mvreg<DSR::CRDTAttribute>&& data)
     {
         DSR::MvregEdgeAttrMsg msg;
-        msg.dk        = data;
+        msg.dk        = std::move(data);
         msg.id        = id;
         msg.from_node = from;
         msg.to_node   = to;
-        msg.type      = type;
-        msg.attr_name = attr;
+        msg.type      = std::forward<TS>(type);
+        msg.attr_name = std::forward<AS>(attr);
         msg.agent_id  = agent_id;
         msg.timestamp = get_unix_timestamp();
         msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
