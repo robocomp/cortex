@@ -218,7 +218,7 @@ std::tuple<bool, std::optional<DSR::MvregNodeMsg>> DSRGraph::insert_node_(CRDTNo
         update_maps_node_insert(id, node);
         mvreg<CRDTNode> delta = nodes[id].write(std::move(node));
 
-        return {true, CRDTNode_to_Msg(agent_id, id, delta)};
+        return {true, CRDTNode_to_Msg(agent_id, id, std::move(delta))};
     }
     return {false, {}};
 }
@@ -321,7 +321,7 @@ std::tuple<bool, std::optional<DSR::MvregNodeAttrVec>> DSRGraph::update_node_(CR
                 if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
                     auto delta = attr_reg.write(std::move(att.read_reg()));
                     atts_deltas.vec.emplace_back(
-                            CRDTNodeAttr_to_Msg(agent_id, node.id(), node.id(), k, delta));
+                            CRDTNodeAttr_to_Msg(agent_id, node.id(), node.id(), k, std::move(delta)));
                 }
             }
             //Remove old attributes.
@@ -333,7 +333,7 @@ std::tuple<bool, std::optional<DSR::MvregNodeAttrVec>> DSRGraph::update_node_(CR
                 } else if (!node.attrs().contains(k)) {
                     auto delta = it_a->second.reset();
                     atts_deltas.vec.emplace_back(
-                            CRDTNodeAttr_to_Msg(node.agent_id(), node.id(), node.id(), k, delta));
+                            CRDTNodeAttr_to_Msg(node.agent_id(), node.id(), node.id(), k, std::move(delta)));
                     it_a = iter.erase(it_a);
                 } else {
                     ++it_a;
@@ -412,7 +412,7 @@ DSRGraph::delete_node_(uint64_t id) {
     }
     // Get remove delta.
     auto delta = nodes[id].reset();
-    DSR::MvregNodeMsg delta_remove = CRDTNode_to_Msg(agent_id, id, delta);
+    DSR::MvregNodeMsg delta_remove = CRDTNode_to_Msg(agent_id, id, std::move(delta));
     // Search and remove incoming edges using to_edges cache: O(k) instead of O(n).
     {
         decltype(to_edges)::mapped_type incoming;
@@ -427,7 +427,7 @@ DSRGraph::delete_node_(uint64_t id) {
             auto &visited_node = nodes.at(from).read_reg();
             deleted_edges.emplace_back(visited_node.fano().at({id, type}).read_reg());
             auto delta_fano = visited_node.fano().at({id, type}).reset();
-            delta_vec.emplace_back(CRDTEdge_to_Msg(agent_id, from, id, type, delta_fano));
+            delta_vec.emplace_back(CRDTEdge_to_Msg(agent_id, from, id, type, std::move(delta_fano)));
             visited_node.fano().erase({id, type});
             update_maps_edge_delete(from, id, type);
         }
@@ -661,7 +661,7 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
                 if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
                     auto delta = attr_reg.write(std::move(att.read_reg()));
                     atts_deltas.vec.emplace_back(
-                            CRDTEdgeAttr_to_Msg(agent_id, from, from, to, attrs.type(), k, delta));
+                            CRDTEdgeAttr_to_Msg(agent_id, from, from, to, attrs.type(), k, std::move(delta)));
                 }
             }
             auto it = iter_edge.begin();
@@ -671,7 +671,7 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
                     auto delta = it->second.reset();
                     it = iter_edge.erase(it);
                     atts_deltas.vec.emplace_back(
-                            CRDTEdgeAttr_to_Msg(agent_id, from, from, to, attrs.type(), att, delta));
+                            CRDTEdgeAttr_to_Msg(agent_id, from, from, to, attrs.type(), std::move(att), std::move(delta)));
                 } else {
                     ++it;
                 }
@@ -682,7 +682,7 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
             std::string att_type = attrs.type();
             auto delta = node.fano()[{to, attrs.type()}].write(std::move(attrs));
             update_maps_edge_insert(from, to, att_type);
-            return {true, CRDTEdge_to_Msg(agent_id, from, to, att_type, delta), {}};
+            return {true, CRDTEdge_to_Msg(agent_id, from, to, std::move(att_type), std::move(delta)), {}};
         }
     }
     return {false, {}, {}};
@@ -747,7 +747,7 @@ std::optional<DSR::MvregEdgeMsg> DSRGraph::delete_edge_(uint64_t from, uint64_t 
             auto delta = node.fano().at({to, key}).reset();
             node.fano().erase({to, key});
             update_maps_edge_delete(from, to, key);
-            return CRDTEdge_to_Msg(agent_id, from, to, key, delta);
+            return CRDTEdge_to_Msg(agent_id, from, to, key, std::move(delta));
         }
     }
     return {};
