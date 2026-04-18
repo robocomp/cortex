@@ -32,12 +32,8 @@ target_sources(dsr_core
         include/dsr/core/rtps/dsrpublisher.h
         include/dsr/core/rtps/dsrsubscriber.h
 
-        topics/IDLGraphPubSubTypes.cxx
-        #topics/IDLGraph.cxx
-        topics/IDLGraphCdrAux.ipp
-        include/dsr/core/topics/IDLGraph.hpp
-        include/dsr/core/topics/IDLGraphPubSubTypes.hpp
-        include/dsr/core/topics/IDLGraphCdrAux.hpp
+        include/dsr/core/rtps/CRDTPubSubTypes.h
+        include/dsr/core/serialization/serializable.h
 
         include/dsr/core/crdt/delta_crdt.h
 
