@@ -7,7 +7,8 @@
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/rtps/builtin/data/ParticipantBuiltinTopicData.hpp>
 
-#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
+#include <dsr/core/rtps/CRDTPubSubTypes.h>
+#include <dsr/core/types/internal_types.h>
 #include <dsr/core/rtps/dsrpublisher.h>
 #include <dsr/core/rtps/dsrsubscriber.h>
 

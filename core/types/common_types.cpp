@@ -8,72 +8,109 @@
 namespace DSR {
 
     /////////////////////////////////////////////////////
-    /// Attribute
+    /// Attribute — CDR serialization
     ////////////////////////////////////////////////////
 
-    IDL::Attrib Attribute::to_IDL_attrib() {
-        IDL::Attrib att;
-        att.timestamp(m_timestamp);
-        att.type(m_value.index());
-        att.value(to_IDL_val());
-        att.agent_id(m_agent_id);
-        return att;
+    void Attribute::serialize_impl(eprosima::fastcdr::Cdr& cdr) const
+    {
+        auto disc = static_cast<uint32_t>(m_value.index());
+        cdr << disc;
+        switch (disc) {
+            case 0:  cdr << std::get<std::string>(m_value);             break;
+            case 1:  cdr << std::get<int32_t>(m_value);                 break;
+            case 2:  cdr << std::get<float>(m_value);                   break;
+            case 3:  cdr << std::get<std::vector<float>>(m_value);      break;
+            case 4:  cdr << std::get<bool>(m_value);                    break;
+            case 5:  cdr << std::get<std::vector<uint8_t>>(m_value);    break;
+            case 6:  cdr << std::get<uint32_t>(m_value);                break;
+            case 7:  cdr << std::get<uint64_t>(m_value);                break;
+            case 8:  cdr << std::get<double>(m_value);                  break;
+            case 9:  cdr << std::get<std::vector<uint64_t>>(m_value);   break;
+            case 10: {
+                const auto& a = std::get<std::array<float,2>>(m_value);
+                for (float f : a) cdr << f;
+                break;
+            }
+            case 11: {
+                const auto& a = std::get<std::array<float,3>>(m_value);
+                for (float f : a) cdr << f;
+                break;
+            }
+            case 12: {
+                const auto& a = std::get<std::array<float,4>>(m_value);
+                for (float f : a) cdr << f;
+                break;
+            }
+            case 13: {
+                const auto& a = std::get<std::array<float,6>>(m_value);
+                for (float f : a) cdr << f;
+                break;
+            }
+            default: assert(false);
+        }
+        cdr << m_timestamp << m_agent_id;
     }
 
-    IDL::Val Attribute::to_IDL_val()
+    void Attribute::deserialize_impl(eprosima::fastcdr::Cdr& cdr)
     {
-        IDL::Val value;
-
-        switch (m_value.index()) {
-            case 0:
-                value.str(std::get<std::string>(m_value));
-                break;
-            case 1:
-                value.dec(std::get<int32_t>(m_value));
-                break;
-            case 2:
-                value.fl(std::get<float>(m_value));
-                break;
-            case 3:
-                value.float_vec(std::get<std::vector<float>>(m_value));
-                break;
-            case 4:
-                value.bl(std::get<bool>(m_value));
-                break;
-            case 5:
-                value.byte_vec(std::get<std::vector<uint8_t>>(m_value));
-                break;
-            case 6:
-                value.uint(std::get<std::uint32_t>(m_value));
-                break;
-            case 7:
-                value.u64(std::get<std::uint64_t>(m_value));
-                break;
-            case 8:
-                value.dob(std::get<double>(m_value));
-                break;
-            case 9:
-                value.uint64_vec(std::get<std::vector<uint64_t>>(m_value));
-                break;
-            case 10:
-                value.vec_float2(std::get<std::array<float, 2>>(m_value));
-                break;
-            case 11:
-                value.vec_float3(std::get<std::array<float, 3>>(m_value));
-                break;
-            case 12:
-                value.vec_float4(std::get<std::array<float, 4>>(m_value));
-                break;
-            case 13:
-                value.vec_float6(std::get<std::array<float, 6>>(m_value));
-                break;
-            default:
-                throw std::runtime_error(
-                        ("Error converting DSR::Attribute to IDL::Attrib. The Attribute is uninitialized. " +
-                         std::to_string(__LINE__) + " " + __FILE__).data());
+        uint32_t disc = 0;
+        cdr >> disc;
+        switch (disc) {
+            case 0:  { std::string v; cdr >> v; m_value = std::move(v); break; }
+            case 1:  { int32_t   v; cdr >> v; m_value = v; break; }
+            case 2:  { float     v; cdr >> v; m_value = v; break; }
+            case 3:  { std::vector<float>    v; cdr >> v; m_value = std::move(v); break; }
+            case 4:  { bool      v; cdr >> v; m_value = v; break; }
+            case 5:  { std::vector<uint8_t>  v; cdr >> v; m_value = std::move(v); break; }
+            case 6:  { uint32_t  v; cdr >> v; m_value = v; break; }
+            case 7:  { uint64_t  v; cdr >> v; m_value = v; break; }
+            case 8:  { double    v; cdr >> v; m_value = v; break; }
+            case 9:  { std::vector<uint64_t> v; cdr >> v; m_value = std::move(v); break; }
+            case 10: { std::array<float,2> a{}; for (float& f : a) cdr >> f; m_value = a; break; }
+            case 11: { std::array<float,3> a{}; for (float& f : a) cdr >> f; m_value = a; break; }
+            case 12: { std::array<float,4> a{}; for (float& f : a) cdr >> f; m_value = a; break; }
+            case 13: { std::array<float,6> a{}; for (float& f : a) cdr >> f; m_value = a; break; }
+            default: assert(false);
         }
+        cdr >> m_timestamp >> m_agent_id;
+    }
 
-        return value;
+    size_t Attribute::serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const
+    {
+        size_t s = 0;
+        uint32_t dummy_u32 = 0;
+        uint64_t dummy_u64 = 0;
+        int32_t  dummy_i32 = 0;
+        float    dummy_f   = 0.f;
+        double   dummy_d   = 0.0;
+        bool     dummy_b   = false;
+
+        // discriminant
+        s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca);
+        switch (m_value.index()) {
+            case 0: { const auto& v = std::get<std::string>(m_value);
+                      s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), v, ca); break; }
+            case 1: s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_i32, ca); break;
+            case 2: s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_f,   ca); break;
+            case 3: { const auto& v = std::get<std::vector<float>>(m_value);
+                      s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), v, ca); break; }
+            case 4: s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_b,   ca); break;
+            case 5: { const auto& v = std::get<std::vector<uint8_t>>(m_value);
+                      s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), v, ca); break; }
+            case 6: s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca); break;
+            case 7: s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca); break;
+            case 8: s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_d,   ca); break;
+            case 9: { const auto& v = std::get<std::vector<uint64_t>>(m_value);
+                      s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), v, ca); break; }
+            case 10: for (int i = 0; i < 2; ++i) s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_f, ca); break;
+            case 11: for (int i = 0; i < 3; ++i) s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_f, ca); break;
+            case 12: for (int i = 0; i < 4; ++i) s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_f, ca); break;
+            case 13: for (int i = 0; i < 6; ++i) s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_f, ca); break;
+            default: break;
+        }
+        s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca); // timestamp
+        s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca); // agent_id
+        return s;
     }
 
     const ValType &Attribute::value() const

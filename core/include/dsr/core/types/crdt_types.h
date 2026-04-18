@@ -10,24 +10,20 @@
 #include <map>
 
 #include "../crdt/delta_crdt.h"
-#include "../topics/IDLGraph.hpp"
+#include "../serialization/serializable.h"
 #include "common_types.h"
 
 namespace DSR {
 
     typedef DSR::Attribute CRDTAttribute;
 
-    class CRDTEdge
+    class CRDTEdge : public ISerializable<CRDTEdge>
     {
     public:
 
         CRDTEdge() : m_to(0), m_from(0), m_agent_id(0) {}
 
         ~CRDTEdge() = default;
-
-        explicit CRDTEdge (IDL::IDLEdge &&x) noexcept;
-
-        CRDTEdge &operator=(IDL::IDLEdge &&x);
 
         void to(uint64_t  _to);
 
@@ -57,8 +53,10 @@ namespace DSR {
 
         [[nodiscard]] uint32_t agent_id() const;
 
-        [[nodiscard]] IDL::IDLEdge to_IDL_edge(uint64_t id);
-
+        // ---- ISerializable implementation ----
+        void serialize_impl(eprosima::fastcdr::Cdr& cdr) const;
+        void deserialize_impl(eprosima::fastcdr::Cdr& cdr);
+        size_t serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const;
 
         bool operator==(const CRDTEdge &rhs) const
         {
@@ -122,7 +120,7 @@ namespace DSR {
         uint32_t m_agent_id{};
     };
 
-    class CRDTNode {
+    class CRDTNode : public ISerializable<CRDTNode> {
 
     public:
 
@@ -139,8 +137,6 @@ namespace DSR {
             m_attrs = x.m_attrs;
             m_fano = x.m_fano;
         }
-
-        explicit CRDTNode(IDL::IDLNode &&x);
 
         void type(const std::string &type);
 
@@ -182,7 +178,10 @@ namespace DSR {
 
         [[nodiscard]] const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &fano() const;
 
-        [[nodiscard]] IDL::IDLNode to_IDL_node(uint64_t id);
+        // ---- ISerializable implementation ----
+        void serialize_impl(eprosima::fastcdr::Cdr& cdr) const;
+        void deserialize_impl(eprosima::fastcdr::Cdr& cdr);
+        size_t serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const;
 
         bool operator==(const CRDTNode &rhs) const
         {

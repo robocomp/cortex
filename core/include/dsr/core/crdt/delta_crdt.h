@@ -11,14 +11,22 @@ Reimplementation from https://github.com/CBaquero/delta-enabled-crdts
 #include <map>
 #include <set>
 
+#include "dsr/core/serialization/serializable.h"
+
 using key_type = uint64_t;
 
 // Autonomous causal context, for context sharing in maps
-class dot_context {
+class dot_context : public ISerializable<dot_context> {
 public:
 
     std::map<key_type, int> cc; // Compact causal context
     std::set<std::pair<key_type, int> > dc; // Dot cloud
+
+    dot_context() = default;
+
+    dot_context(const dot_context &o) : cc(o.cc), dc(o.dc) {}
+
+    dot_context(dot_context &&o) noexcept : cc(std::move(o.cc)), dc(std::move(o.dc)) {}
 
     dot_context &operator=(const dot_context &o) {
         if (&o == this) return *this;
@@ -178,12 +186,70 @@ public:
     bool operator>=(const dot_context &rhs) const {
         return !(*this < rhs);
     }
+
+    // ---- ISerializable implementation ----
+    void serialize_impl(eprosima::fastcdr::Cdr& cdr) const
+    {
+        // cc: serialize as sequence of (uint64_t, int32_t) pairs
+        auto cc_size = static_cast<uint32_t>(cc.size());
+        cdr << cc_size;
+        for (const auto& [k, v] : cc) {
+            cdr << k;
+            cdr << static_cast<int32_t>(v);
+        }
+        // dc: serialize as sequence of (uint64_t, int32_t) pairs
+        auto dc_size = static_cast<uint32_t>(dc.size());
+        cdr << dc_size;
+        for (const auto& [k, v] : dc) {
+            cdr << k;
+            cdr << static_cast<int32_t>(v);
+        }
+    }
+
+    void deserialize_impl(eprosima::fastcdr::Cdr& cdr)
+    {
+        cc.clear();
+        uint32_t cc_size = 0;
+        cdr >> cc_size;
+        for (uint32_t i = 0; i < cc_size; ++i) {
+            key_type k = 0; int32_t v = 0;
+            cdr >> k >> v;
+            cc.emplace(k, static_cast<int>(v));
+        }
+        dc.clear();
+        uint32_t dc_size = 0;
+        cdr >> dc_size;
+        for (uint32_t i = 0; i < dc_size; ++i) {
+            key_type k = 0; int32_t v = 0;
+            cdr >> k >> v;
+            dc.emplace(k, static_cast<int>(v));
+        }
+    }
+
+    size_t serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const
+    {
+        size_t s = 0;
+        uint32_t dummy_u32 = 0;
+        key_type dummy_u64 = 0;
+        int32_t dummy_i32 = 0;
+        s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca);
+        for (const auto& [k, v] : cc) {
+            s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca);
+            s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_i32, ca);
+        }
+        s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca);
+        for (const auto& [k, v] : dc) {
+            s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca);
+            s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_i32, ca);
+        }
+        return s;
+    }
 };
 
 
 
 template<typename T>
-class dot_kernel {
+class dot_kernel : public ISerializable<dot_kernel<T>> {
 public:
 
     std::map<std::pair<key_type, int>, T> ds;  // Map of dots to vals
@@ -341,10 +407,55 @@ public:
     bool operator>=(const dot_kernel &rhs) const {
         return !(*this < rhs);
     }
+
+    // ---- ISerializable implementation ----
+    void serialize_impl(eprosima::fastcdr::Cdr& cdr) const
+    {
+        // ds: sequence of (uint64, int32, T) triples
+        auto ds_size = static_cast<uint32_t>(ds.size());
+        cdr << ds_size;
+        for (const auto& [key, val] : ds) {
+            cdr << key.first;
+            cdr << static_cast<int32_t>(key.second);
+            val.serialize(cdr);
+        }
+        c.serialize(cdr);
+    }
+
+    void deserialize_impl(eprosima::fastcdr::Cdr& cdr)
+    {
+        ds.clear();
+        uint32_t ds_size = 0;
+        cdr >> ds_size;
+        for (uint32_t i = 0; i < ds_size; ++i) {
+            key_type kf = 0; int32_t ks = 0;
+            cdr >> kf >> ks;
+            T val;
+            val.deserialize(cdr);
+            ds.emplace(std::make_pair(kf, static_cast<int>(ks)), std::move(val));
+        }
+        c.deserialize(cdr);
+    }
+
+    size_t serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const
+    {
+        size_t s = 0;
+        uint32_t dummy_u32 = 0;
+        key_type dummy_u64 = 0;
+        int32_t dummy_i32 = 0;
+        s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca);
+        for (const auto& [key, val] : ds) {
+            s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca);
+            s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_i32, ca);
+            s += val.serialized_size(calc, ca);
+        }
+        s += c.serialized_size(calc, ca);
+        return s;
+    }
 };
 
 template<typename V>
-class mvreg    // Multi-value register, Optimized
+class mvreg : public ISerializable<mvreg<V>>   // Multi-value register, Optimized
 {
 public:
     key_type id;
@@ -459,6 +570,14 @@ public:
 
     bool operator>=(const mvreg &rhs) const {
         return !(*this < rhs);
+    }
+
+    // ---- ISerializable implementation ----
+    void serialize_impl(eprosima::fastcdr::Cdr& cdr) const { dk.serialize(cdr); }
+    void deserialize_impl(eprosima::fastcdr::Cdr& cdr)     { dk.deserialize(cdr); }
+    size_t serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const
+    {
+        return dk.serialized_size(calc, ca);
     }
 };
 

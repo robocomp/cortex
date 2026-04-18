@@ -392,9 +392,9 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
     bool no_send = true;
     const bool with_covariance = covariance.has_value();
 
-    std::optional<IDL::MvregEdge> node1_insert;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> node1_update;
-    std::optional<std::vector<IDL::MvregNodeAttr>> node2;
+    std::optional<DSR::MvregEdgeMsg> node1_insert;
+    std::optional<DSR::MvregEdgeAttrVec> node1_update;
+    std::optional<DSR::MvregNodeAttrVec> node2;
     std::optional<CRDTNode> to_n;
     {
         std::unique_lock<std::shared_mutex> lock(G->_mutex);
@@ -557,14 +557,14 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             //Check if RT edge exist.
             if (!n.fano().contains({to, "RT"}))
             {
-                //Create -> from: IDL::MvregEdge, to: vector<IDL::MvregNodeAttr>
+                //Create -> insert edge, update to-node attrs
                 std::tie(r1, node1_insert, std::ignore) = G->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n.value()));
 
             }
             else
             {
-                //Update -> from: IDL::MvregEdgeAttr, to: vector<IDL::MvregNodeAttr>
+                //Update -> update edge attrs, update to-node attrs
                 std::tie(r1, std::ignore, node1_update) = G->insert_or_assign_edge_(std::move(e), n.id(), to);
                 if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n.value()));
 

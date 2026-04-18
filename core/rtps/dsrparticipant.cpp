@@ -6,6 +6,8 @@
 
 #include <QDebug>
 #include <dsr/core/rtps/dsrparticipant.h>
+#include <dsr/core/rtps/CRDTPubSubTypes.h>
+#include <dsr/core/types/internal_types.h>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
@@ -28,12 +30,12 @@ std::vector<std::string> host_ipv4_interfaces()
 }
 
 DSRParticipant::DSRParticipant() : mp_participant(nullptr),
-                                   dsrgraphType(new MvregNodePubSubType()),
-                                   graphrequestType(new GraphRequestPubSubType()),
-                                   graphRequestAnswerType(new OrMapPubSubType()),
-                                   dsrEdgeType(new MvregEdgePubSubType()),
-                                   dsrNodeAttrType(new MvregNodeAttrVecPubSubType()),
-                                   dsrEdgeAttrType(new MvregEdgeAttrVecPubSubType()),
+                                   dsrgraphType(new CRDTPubSubType<DSR::MvregNodeMsg>("MvregNodeMsg")),
+                                   graphrequestType(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest")),
+                                   graphRequestAnswerType(new CRDTPubSubType<DSR::OrMap>("OrMap")),
+                                   dsrEdgeType(new CRDTPubSubType<DSR::MvregEdgeMsg>("MvregEdgeMsg")),
+                                   dsrNodeAttrType(new CRDTPubSubType<DSR::MvregNodeAttrVec>("MvregNodeAttrVec")),
+                                   dsrEdgeAttrType(new CRDTPubSubType<DSR::MvregEdgeAttrVec>("MvregEdgeAttrVec")),
                                    m_listener(nullptr)
 
 {}

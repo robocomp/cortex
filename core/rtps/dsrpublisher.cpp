@@ -109,7 +109,7 @@ GUID_t DSRPublisher::getParticipantID() const
 }
 
 
-bool DSRPublisher::write(IDL::MvregNode *object)
+bool DSRPublisher::write(DSR::MvregNodeMsg *object)
 {
     ReturnCode_t rt;
     int retry = 0;
@@ -117,12 +117,12 @@ bool DSRPublisher::write(IDL::MvregNode *object)
         if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
         retry++;
     }
-    qInfo() << "Error writing NODE " << object->id() << " after 5 attempts. error code: " << rt;
+    qInfo() << "Error writing NODE " << object->id << " after 5 attempts. error code: " << rt;
     return false;
 }
 
 
-bool DSRPublisher::write(IDL::MvregEdge *object)
+bool DSRPublisher::write(DSR::MvregEdgeMsg *object)
 {
     ReturnCode_t rt;
     int retry = 0;
@@ -130,12 +130,12 @@ bool DSRPublisher::write(IDL::MvregEdge *object)
         if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
         retry++;
     }
-    qInfo() << "Error writing EDGE " << object->from() << " " << object->to() << " " << object->type().data() << " after 5 attempts. error code: " << rt;
+    qInfo() << "Error writing EDGE " << object->from << " " << object->to << " " << object->type.data() << " after 5 attempts. error code: " << rt;
     return false;
 }
 
 
-bool DSRPublisher::write(IDL::OrMap *object)
+bool DSRPublisher::write(DSR::OrMap *object)
 {
     ReturnCode_t rt;
     int retry = 0;
@@ -143,11 +143,11 @@ bool DSRPublisher::write(IDL::OrMap *object)
         if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
         retry++;
     }
-    qInfo() << "Error writing GRAPH " << object->m().size() << " after 5 attempts. error code: " << rt;
+    qInfo() << "Error writing GRAPH " << object->m.size() << " after 5 attempts. error code: " << rt;
     return false;
 }
 
-bool DSRPublisher::write(IDL::GraphRequest *object)
+bool DSRPublisher::write(DSR::GraphRequest *object)
 {
     ReturnCode_t rt;
     int retry = 0;
@@ -159,7 +159,7 @@ bool DSRPublisher::write(IDL::GraphRequest *object)
     return false;
 }
 
-bool DSRPublisher::write(std::vector<IDL::MvregEdgeAttr> *object)
+bool DSRPublisher::write(DSR::MvregEdgeAttrVec *object)
 {
     ReturnCode_t rt;
     int retry = 0;
@@ -167,18 +167,18 @@ bool DSRPublisher::write(std::vector<IDL::MvregEdgeAttr> *object)
         if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
         retry++;
     }
-    qInfo() << "Error writing EDGE ATTRIBUTE VECTOR  after 5 attempts. error code: " << rt;
+    qInfo() << "Error writing EDGE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
     return false;
 }
 
-bool DSRPublisher::write(std::vector<IDL::MvregNodeAttr> *object) {
+bool DSRPublisher::write(DSR::MvregNodeAttrVec *object) {
     ReturnCode_t rt;
     int retry = 0;
     while (retry < 5) {
         if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
         retry++;
     }
-    qInfo() << "Error writing EDGE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
+    qInfo() << "Error writing NODE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
     return false;
 }
 

@@ -6,6 +6,8 @@ project(dsr
 
 include(GNUInstallDirs)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # -DTSAN=ON  enables ThreadSanitizer across the whole build (library + tests/benchmarks).
 # Must be applied before any add_subdirectory so every TU is instrumented.
 # Incompatible with SANITIZER (ASan/UBSan) — enforce that here.

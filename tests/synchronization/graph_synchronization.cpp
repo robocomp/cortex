@@ -8,7 +8,7 @@
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/generators/catch_generators.hpp"
 
-#include "dsr/core/topics/IDLGraph.hpp"
+#include "dsr/core/types/internal_types.h"
 
 using namespace DSR;
 using namespace std::chrono_literals;
@@ -18,12 +18,17 @@ namespace DSR
 class DSRGraphTestAccess
 {
 public:
-    static std::map<uint64_t, IDL::MvregNode> Map(DSRGraph& graph)
+    static std::map<uint64_t, DSR::MvregNodeMsg> Map(DSRGraph& graph)
     {
         return graph.Map();
     }
 
-    static void join_full_graph(DSRGraph& graph, IDL::OrMap&& full_graph)
+    static void join_delta_node(DSRGraph& graph, DSR::MvregNodeMsg&& delta)
+    {
+        graph.join_delta_node(std::move(delta));
+    }
+
+    static void join_full_graph(DSRGraph& graph, DSR::OrMap&& full_graph)
     {
         graph.join_full_graph(std::move(full_graph));
     }
@@ -108,10 +113,10 @@ TEST_CASE("Full graph join does not leave empty node registers after local delet
     REQUIRE(graph.insert_node_with_id(node).has_value());
     REQUIRE(graph.size() == initial_size + 1);
 
-    IDL::OrMap full_graph;
-    full_graph.id(graph.get_agent_id());
-    full_graph.to_id(graph.get_agent_id());
-    full_graph.m(DSRGraphTestAccess::Map(graph));
+    DSR::OrMap full_graph;
+    full_graph.id = graph.get_agent_id();
+    full_graph.to_id = graph.get_agent_id();
+    full_graph.m = DSRGraphTestAccess::Map(graph);
 
     REQUIRE(graph.delete_node(node.id()));
     REQUIRE(graph.size() == initial_size);
@@ -121,4 +126,52 @@ TEST_CASE("Full graph join does not leave empty node registers after local delet
 
     REQUIRE(graph.size() == initial_size);
     REQUIRE_FALSE(graph.get_node(node.id()).has_value());
+}
+
+TEST_CASE("Full graph join rejects incompatible protocol versions", "[SYNCHRONIZATION][GRAPH][VERSION]")
+{
+    auto ctx = make_empty_config_file();
+    DSRGraph sender(random_string(10), static_cast<uint32_t>(rand() % 2000 + 1000), ctx);
+    DSRGraph receiver(random_string(10), static_cast<uint32_t>(rand() % 1000 + 3000), ctx);
+
+    auto node = Node::create<testtype_node_type>("version_mismatch_node");
+    node.id(2000);
+    node.agent_id(sender.get_agent_id());
+
+    REQUIRE(sender.insert_node_with_id(node).has_value());
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+
+    DSR::OrMap full_graph;
+    full_graph.id = static_cast<int32_t>(sender.get_agent_id());
+    full_graph.to_id = receiver.get_agent_id();
+    full_graph.protocol_version = DSR::DSR_PROTOCOL_VERSION + 1;
+    full_graph.m = DSRGraphTestAccess::Map(sender);
+
+    DSRGraphTestAccess::join_full_graph(receiver, std::move(full_graph));
+
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+}
+
+TEST_CASE("Node delta join rejects incompatible protocol versions", "[SYNCHRONIZATION][GRAPH][VERSION]")
+{
+    auto ctx = make_empty_config_file();
+    DSRGraph sender(random_string(10), static_cast<uint32_t>(rand() % 2000 + 1000), ctx);
+    DSRGraph receiver(random_string(10), static_cast<uint32_t>(rand() % 1000 + 3000), ctx);
+
+    auto node = Node::create<testtype_node_type>("delta_version_mismatch_node");
+    node.id(3000);
+    node.agent_id(sender.get_agent_id());
+
+    REQUIRE(sender.insert_node_with_id(node).has_value());
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+
+    auto map = DSRGraphTestAccess::Map(sender);
+    auto it = map.find(node.id());
+    REQUIRE(it != map.end());
+
+    auto delta = std::move(it->second);
+    delta.protocol_version = DSR::DSR_PROTOCOL_VERSION + 1;
+    DSRGraphTestAccess::join_delta_node(receiver, std::move(delta));
+
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
 }
