@@ -9,9 +9,9 @@
 #include <iostream>
 #include <map>
 
-#include "../crdt/delta_crdt.h"
-#include "../serialization/serializable.h"
-#include "common_types.h"
+#include "dsr/core/crdt/delta_crdt.h"
+#include "dsr/core/serialization/serializable.h"
+#include "dsr/core/types/common_types.h"
 
 namespace DSR {
 
@@ -104,7 +104,7 @@ namespace DSR {
 
         friend std::ostream &operator<<(std::ostream &output, const CRDTEdge &rhs)
         {
-            output << "IDL::EdgeAttribs[" << rhs.m_type << ", from:" << std::to_string(rhs.from()) << "-> to:" << std::to_string(rhs.to())
+            output << " CRDTEdge [" << rhs.m_type << ", from:" << std::to_string(rhs.from()) << "-> to:" << std::to_string(rhs.to())
                    << " Attribs:[";
             for (const auto &v : rhs.attrs())
                 output << v.first << ":" << v.second << " - ";
@@ -229,7 +229,7 @@ namespace DSR {
 
         friend std::ostream &operator<<(std::ostream &output, CRDTNode &rhs)
         {
-            output << "IDL::Node:[" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type() << "], Attribs:[";
+            output << "CRDTNode: [" << std::to_string(rhs.id()) << "," << rhs.name() << "," << rhs.type() << "], Attribs:[";
             for (const auto &v : rhs.attrs())
                 output << v.first << ":(" << v.second << ");";
             output << "], FanOut:[";

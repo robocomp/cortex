@@ -42,7 +42,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     auto edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
     
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -56,7 +56,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -70,7 +70,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -84,7 +84,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -97,7 +97,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -111,7 +111,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -124,7 +124,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -138,7 +138,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -151,7 +151,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
