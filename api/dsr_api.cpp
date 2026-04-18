@@ -3,9 +3,9 @@
 //
 
 #include "dsr/api/dsr_graph_settings.h"
-#include "dsr/core/topics/IDLGraph.hpp"
+#include "dsr/core/types/internal_types.h"
 #include "dsr/core/types/translator.h"
-#include "include/dsr/api/dsr_signal_emitter.h"
+#include "dsr/api/dsr_signal_emitter.h"
 #include <chrono>
 #include <ctime>
 #include <dsr/api/dsr_api.h>
@@ -28,6 +28,24 @@
 using namespace DSR;
 
 using namespace std::literals;
+
+namespace {
+bool protocol_version_matches(
+    DSR::GraphSettings::LOGLEVEL log_level,
+    const char* channel,
+    uint32_t remote_version)
+{
+    if (remote_version == DSR::DSR_PROTOCOL_VERSION) {
+        return true;
+    }
+
+    DSR_LOG_ERROR(
+        "[PROTOCOL] incompatible", channel,
+        "remote:", remote_version,
+        "local:", DSR::DSR_PROTOCOL_VERSION);
+    return false;
+}
+}
 
 /////////////////////////////////////////////////
 ///// PUBLIC METHODS
@@ -187,7 +205,7 @@ std::optional<DSR::Node> DSRGraph::get_node(uint64_t id)
     return {};
 }
 
-std::tuple<bool, std::optional<IDL::MvregNode>> DSRGraph::insert_node_(CRDTNode &&node)
+std::tuple<bool, std::optional<DSR::MvregNodeMsg>> DSRGraph::insert_node_(CRDTNode &&node)
 {
     if (!deleted.contains(node.id()))
     {
@@ -200,7 +218,7 @@ std::tuple<bool, std::optional<IDL::MvregNode>> DSRGraph::insert_node_(CRDTNode 
         update_maps_node_insert(id, node);
         mvreg<CRDTNode> delta = nodes[id].write(std::move(node));
 
-        return {true, CRDTNode_to_IDL(agent_id, id, delta)};
+        return {true, CRDTNode_to_Msg(agent_id, id, delta)};
     }
     return {false, {}};
 }
@@ -209,7 +227,7 @@ template<typename No>
 std::optional<uint64_t> DSRGraph::insert_node(No &&node)
     requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
-    std::optional<IDL::MvregNode> delta;
+    std::optional<DSR::MvregNodeMsg> delta;
     bool inserted = false;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -249,7 +267,7 @@ template<typename No>
 std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
     requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
-    std::optional<IDL::MvregNode> delta;
+    std::optional<DSR::MvregNodeMsg> delta;
     bool inserted = false;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -287,7 +305,7 @@ std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
 template std::optional<uint64_t>  DSRGraph::insert_node_with_id<DSR::Node &&>(DSR::Node&&);
 template std::optional<uint64_t>  DSRGraph::insert_node_with_id<DSR::Node&>(DSR::Node&);
 
-std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::update_node_(CRDTNode &&node)
+std::tuple<bool, std::optional<DSR::MvregNodeAttrVec>> DSRGraph::update_node_(CRDTNode &&node)
 {
 
     if (!deleted.contains(node.id()))
@@ -295,15 +313,15 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
         auto nit = nodes.find(node.id());
         if (nit != nodes.end() && !nit->second.empty())
         {
-            std::vector<IDL::MvregNodeAttr> atts_deltas;
+            DSR::MvregNodeAttrVec atts_deltas;
             auto &iter = nit->second.read_reg().attrs();
             //New attributes and updates.
             for (auto &[k, att]: node.attrs()) {
                 auto &attr_reg = iter.try_emplace(k, mvreg<CRDTAttribute>()).first->second;
                 if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
                     auto delta = attr_reg.write(std::move(att.read_reg()));
-                    atts_deltas.emplace_back(
-                            CRDTNodeAttr_to_IDL(agent_id, node.id(), node.id(), k, delta));
+                    atts_deltas.vec.emplace_back(
+                            CRDTNodeAttr_to_Msg(agent_id, node.id(), node.id(), k, delta));
                 }
             }
             //Remove old attributes.
@@ -314,8 +332,8 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
                     it_a = iter.erase(it_a);
                 } else if (!node.attrs().contains(k)) {
                     auto delta = it_a->second.reset();
-                    atts_deltas.emplace_back(
-                            CRDTNodeAttr_to_IDL(node.agent_id(), node.id(), node.id(), k, delta));
+                    atts_deltas.vec.emplace_back(
+                            CRDTNodeAttr_to_Msg(node.agent_id(), node.id(), node.id(), k, delta));
                     it_a = iter.erase(it_a);
                 } else {
                     ++it_a;
@@ -334,7 +352,7 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
 {
 
     bool updated = false;
-    std::optional<std::vector<IDL::MvregNodeAttr>> vec_node_attr;
+    std::optional<DSR::MvregNodeAttrVec> vec_node_attr;
 
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -359,11 +377,11 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
                 dsrpub_node_attrs.write(&vec_node_attr.value());
                 DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", node.id(), node.type());
                 emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
-                std::vector<std::string> atts_names(vec_node_attr->size());
-                std::transform(std::make_move_iterator(vec_node_attr->begin()),
-                               std::make_move_iterator(vec_node_attr->end()),
+                std::vector<std::string> atts_names(vec_node_attr->vec.size());
+                std::transform(std::make_move_iterator(vec_node_attr->vec.begin()),
+                               std::make_move_iterator(vec_node_attr->vec.end()),
                                atts_names.begin(),
-                               [](auto &&x) { return x.attr_name(); });
+                               [](auto &&x) { return x.attr_name; });
                 emitter.update_node_attr_signal(node.id(), atts_names, SignalInfo{agent_id});
 
             }
@@ -379,11 +397,11 @@ template bool DSRGraph::update_node<DSR::Node>(DSR::Node&&);
 
 
 
-std::tuple<bool, std::vector<Edge>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>>
+std::tuple<bool, std::vector<Edge>, std::optional<DSR::MvregNodeMsg>, std::vector<DSR::MvregEdgeMsg>>
 DSRGraph::delete_node_(uint64_t id) {
 
     std::vector<Edge> deleted_edges;
-    std::vector<IDL::MvregEdge> delta_vec;
+    std::vector<DSR::MvregEdgeMsg> delta_vec;
 
     //Get and remove node.
     auto node = get_(id);
@@ -394,7 +412,7 @@ DSRGraph::delete_node_(uint64_t id) {
     }
     // Get remove delta.
     auto delta = nodes[id].reset();
-    IDL::MvregNode delta_remove = CRDTNode_to_IDL(agent_id, id, delta);
+    DSR::MvregNodeMsg delta_remove = CRDTNode_to_Msg(agent_id, id, delta);
     // Search and remove incoming edges using to_edges cache: O(k) instead of O(n).
     {
         decltype(to_edges)::mapped_type incoming;
@@ -409,7 +427,7 @@ DSRGraph::delete_node_(uint64_t id) {
             auto &visited_node = nodes.at(from).read_reg();
             deleted_edges.emplace_back(visited_node.fano().at({id, type}).read_reg());
             auto delta_fano = visited_node.fano().at({id, type}).reset();
-            delta_vec.emplace_back(CRDTEdge_to_IDL(agent_id, from, id, type, delta_fano));
+            delta_vec.emplace_back(CRDTEdge_to_Msg(agent_id, from, id, type, delta_fano));
             visited_node.fano().erase({id, type});
             update_maps_edge_delete(from, id, type);
         }
@@ -429,8 +447,8 @@ bool DSRGraph::delete_node(const std::string &name)
 
     bool result = false;
     std::vector<Edge> deleted_edges;
-    std::optional<IDL::MvregNode> deleted_node;
-    std::vector<IDL::MvregEdge> delta_vec;
+    std::optional<DSR::MvregNodeMsg> deleted_node;
+    std::vector<DSR::MvregEdgeMsg> delta_vec;
     std::optional<Node> node_signal;
     std::optional<uint64_t> id = {};
     {
@@ -469,9 +487,9 @@ bool DSRGraph::delete_node(uint64_t id)
 
     bool result = false;
     std::vector<Edge> deleted_edges;
-    std::optional<IDL::MvregNode> deleted_node;
+    std::optional<DSR::MvregNodeMsg> deleted_node;
     std::optional<Node> node_signal;
-    std::vector<IDL::MvregEdge> delta_vec;
+    std::vector<DSR::MvregEdgeMsg> delta_vec;
     {
         node_signal = get_(id);
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -621,12 +639,12 @@ std::optional<Edge> DSRGraph::get_edge(const Node &n, uint64_t to, const std::st
 }
 
 
-std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>>
+std::tuple<bool, std::optional<DSR::MvregEdgeMsg>, std::optional<DSR::MvregEdgeAttrVec>>
 DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
 {
 
-    std::optional<IDL::MvregEdge> delta_edge;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> delta_attrs;
+    std::optional<DSR::MvregEdgeMsg> delta_edge;
+    std::optional<DSR::MvregEdgeAttrVec> delta_attrs;
 
     if (nodes.contains(from))
     {
@@ -636,14 +654,14 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
         if (fano_it != node.fano().end())
         {
             //Update
-            std::vector<IDL::MvregEdgeAttr> atts_deltas;
+            DSR::MvregEdgeAttrVec atts_deltas;
             auto &iter_edge = fano_it->second.read_reg().attrs();
             for (auto &[k, att]: attrs.attrs()) {
                 auto &attr_reg = iter_edge.try_emplace(k, mvreg<CRDTAttribute>()).first->second;
                 if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
                     auto delta = attr_reg.write(std::move(att.read_reg()));
-                    atts_deltas.emplace_back(
-                            CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), k, delta));
+                    atts_deltas.vec.emplace_back(
+                            CRDTEdgeAttr_to_Msg(agent_id, from, from, to, attrs.type(), k, delta));
                 }
             }
             auto it = iter_edge.begin();
@@ -652,8 +670,8 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
                     std::string att = it->first;
                     auto delta = it->second.reset();
                     it = iter_edge.erase(it);
-                    atts_deltas.emplace_back(
-                            CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), att, delta));
+                    atts_deltas.vec.emplace_back(
+                            CRDTEdgeAttr_to_Msg(agent_id, from, from, to, attrs.type(), att, delta));
                 } else {
                     ++it;
                 }
@@ -661,11 +679,10 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
             return {true, {}, std::move(atts_deltas)};
         } else
         { // Insert
-            //node.fano().insert({{to, attrs.type()}, mvreg<CRDTEdge>()});
             std::string att_type = attrs.type();
             auto delta = node.fano()[{to, attrs.type()}].write(std::move(attrs));
             update_maps_edge_insert(from, to, att_type);
-            return {true, CRDTEdge_to_IDL(agent_id, from, to, att_type, delta), {}};
+            return {true, CRDTEdge_to_Msg(agent_id, from, to, att_type, delta), {}};
         }
     }
     return {false, {}, {}};
@@ -676,8 +693,8 @@ bool DSRGraph::insert_or_assign_edge(Ed &&attrs)
 requires (std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
 {
     bool result = false;
-    std::optional<IDL::MvregEdge> delta_edge;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> delta_attrs;
+    std::optional<DSR::MvregEdgeMsg> delta_edge;
+    std::optional<DSR::MvregEdgeAttrVec> delta_attrs;
 
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -701,11 +718,11 @@ requires (std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
             }
             if (delta_attrs.has_value()) { //Update
                 dsrpub_edge_attrs.write(&delta_attrs.value());
-                std::vector<std::string> atts_names(delta_attrs->size());
-                std::transform(std::make_move_iterator(delta_attrs->begin()),
-                               std::make_move_iterator(delta_attrs->end()),
+                std::vector<std::string> atts_names(delta_attrs->vec.size());
+                std::transform(std::make_move_iterator(delta_attrs->vec.begin()),
+                               std::make_move_iterator(delta_attrs->vec.end()),
                                atts_names.begin(),
-                               [](auto &&x) { return x.attr_name(); });
+                               [](auto &&x) { return x.attr_name; });
 
                 emitter.update_edge_attr_signal(attrs.from(), attrs.to(), attrs.type(), atts_names, SignalInfo{ agent_id });
 
@@ -722,7 +739,7 @@ template bool DSRGraph::insert_or_assign_edge<DSR::Edge&>(DSR::Edge&);
 template bool DSRGraph::insert_or_assign_edge<const DSR::Edge&>(const DSR::Edge&);
 
 
-std::optional<IDL::MvregEdge> DSRGraph::delete_edge_(uint64_t from, uint64_t to, const std::string &key)
+std::optional<DSR::MvregEdgeMsg> DSRGraph::delete_edge_(uint64_t from, uint64_t to, const std::string &key)
 {
     if (nodes.contains(from)) {
         auto &node = nodes.at(from).read_reg();
@@ -730,7 +747,7 @@ std::optional<IDL::MvregEdge> DSRGraph::delete_edge_(uint64_t from, uint64_t to,
             auto delta = node.fano().at({to, key}).reset();
             node.fano().erase({to, key});
             update_maps_edge_delete(from, to, key);
-            return CRDTEdge_to_IDL(agent_id, from, to, key, delta);
+            return CRDTEdge_to_Msg(agent_id, from, to, key, delta);
         }
     }
     return {};
@@ -739,7 +756,7 @@ std::optional<IDL::MvregEdge> DSRGraph::delete_edge_(uint64_t from, uint64_t to,
 bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
 {
 
-    std::optional<IDL::MvregEdge> delta;
+    std::optional<DSR::MvregEdgeMsg> delta;
     std::optional<Edge> deleted_edge;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -766,7 +783,7 @@ bool DSRGraph::delete_edge(const std::string &from, const std::string &to, const
 
     std::optional<uint64_t> id_from = {};
     std::optional<uint64_t> id_to = {};
-    std::optional<IDL::MvregEdge> delta;
+    std::optional<DSR::MvregEdgeMsg> delta;
     std::optional<Edge> deleted_edge;
     {
         id_from = get_id_from_name(from);
@@ -1030,17 +1047,20 @@ bool DSRGraph::empty(const uint64_t &id)
         return false;
 }
 
-void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
+void DSRGraph::join_delta_node(DSR::MvregNodeMsg &&mvreg)
 {
 
     std::optional<CRDTNode> maybe_deleted_node = {};
     try {
+        if (!protocol_version_matches(log_level, "DSR_NODE", mvreg.protocol_version)) {
+            return;
+        }
         bool signal = false, joined = false;
-        auto id = mvreg.id();
-        uint64_t timestamp = mvreg.timestamp();
+        auto id = mvreg.id;
+        uint64_t timestamp = mvreg.timestamp;
 
-        DSR_LOG_DEBUG("[JOIN_NODE] id:", id, "timestamp:", timestamp, "agent:", mvreg.agent_id());
-        auto crdt_delta = IDLNode_to_CRDT(std::move(mvreg));
+        DSR_LOG_DEBUG("[JOIN_NODE] id:", id, "timestamp:", timestamp, "agent:", mvreg.agent_id);
+        auto crdt_delta = std::move(mvreg.dk);
         bool d_empty = crdt_delta.empty();
 
 
@@ -1160,36 +1180,37 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
             }
         }
 
+        uint32_t msg_agent_id = mvreg.agent_id;
         if (joined) {
             if (signal) {
                 DSR_LOG_DEBUG("[JOIN_NODE] node inserted/updated:", id, node_type_snapshot);
-                emitter.update_node_signal(id, node_type_snapshot, SignalInfo{ mvreg.agent_id() });
+                emitter.update_node_signal(id, node_type_snapshot, SignalInfo{ msg_agent_id });
                 for (const auto &[to_id, edge_type] : from_edges_snapshot) {
                     DSR_LOG_DEBUG("[JOIN_NODE] add edge FROM:", id, to_id, edge_type);
-                    emitter.update_edge_signal(id, to_id, edge_type, SignalInfo{ mvreg.agent_id() });
+                    emitter.update_edge_signal(id, to_id, edge_type, SignalInfo{ msg_agent_id });
                 }
 
                 for (const auto &[k, v]: map_new_to_edges)
                 {
                     DSR_LOG_DEBUG("[JOIN_NODE] add edge TO:", k, id, v);
-                    emitter.update_edge_signal(k, id, v, SignalInfo{ mvreg.agent_id() });
+                    emitter.update_edge_signal(k, id, v, SignalInfo{ msg_agent_id });
                 }
 
                 for (const auto &[from, to, type]: map_new_from_edges)
                 {
                     DSR_LOG_DEBUG("[JOIN_NODE] add edge FROM (unprocessed_to):", from, to, type);
-                    emitter.update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
+                    emitter.update_edge_signal(from, to, type, SignalInfo{ msg_agent_id });
                 }
             } else {
                 DSR_LOG_DEBUG("[JOIN_NODE] node deleted:", id);
-                emitter.del_node_signal(id, SignalInfo{ mvreg.agent_id() });
+                emitter.del_node_signal(id, SignalInfo{ msg_agent_id });
                 if (maybe_deleted_node.has_value()) {
                     Node tmp_node(*maybe_deleted_node);
                     emitter.deleted_node_signal(tmp_node, SignalInfo{ agent_id });
                     for (const auto &node: maybe_deleted_node->fano()) {
                         DSR_LOG_DEBUG("[JOIN_NODE] delete edge FROM:", node.second.read_reg().from(), node.second.read_reg().to(), node.second.read_reg().type());
                         emitter.del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
-                                             node.second.read_reg().type(), SignalInfo{ mvreg.agent_id() });
+                                             node.second.read_reg().type(), SignalInfo{ msg_agent_id });
                         Edge tmp_edge(node.second.read_reg());
                         emitter.deleted_edge_signal(tmp_edge, SignalInfo{ agent_id });
                     }
@@ -1198,7 +1219,7 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                 //TODO: deleted_edge_signal. update_maps_node_delete was called before so the maps are probably wrong...
                 for (const auto &[from, type] : cache_map_to_edges.value()) {
                     DSR_LOG_DEBUG("[JOIN_NODE] delete edge TO:", from, id, type);
-                    emitter.del_edge_signal(from, id, type, SignalInfo{ mvreg.agent_id() });
+                    emitter.del_edge_signal(from, id, type, SignalInfo{ msg_agent_id });
                     //emitter.deleted_edge_signal(Edge(node.second.read_reg())); TODO: fix this
                 }
 
@@ -1228,16 +1249,19 @@ bool DSRGraph::process_delta_edge(uint64_t from, uint64_t to, const std::string&
 }
 
 
-void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
+void DSRGraph::join_delta_edge(DSR::MvregEdgeMsg &&mvreg)
 {
     try {
+        if (!protocol_version_matches(log_level, "DSR_EDGE", mvreg.protocol_version)) {
+            return;
+        }
         bool signal = false, joined = false;
-        auto from = mvreg.id();
-        auto to = mvreg.to();
-        std::string type = mvreg.type();
-        DSR_LOG_DEBUG("[JOIN_EDGE] from:", from, "to:", to, "type:", type, "agent:", mvreg.agent_id());
+        auto from = mvreg.id;
+        auto to = mvreg.to;
+        std::string type = mvreg.type;
+        DSR_LOG_DEBUG("[JOIN_EDGE] from:", from, "to:", to, "type:", type, "agent:", mvreg.agent_id);
 
-        uint64_t timestamp = mvreg.timestamp();
+        uint64_t timestamp = mvreg.timestamp;
 
         //Clean remaining delta edges.
         auto delete_unprocessed_deltas = [&](){
@@ -1272,9 +1296,10 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
                                             [&](auto &it){ return it.first == from && std::get<0>(it.second) == to && std::get<1>(it.second) == type; });
         };
 
+        uint32_t msg_agent_id = mvreg.agent_id;
         std::optional<Edge> deleted_edge;
         {
-            auto crdt_delta = IDLEdge_to_CRDT(std::move(mvreg));
+            auto crdt_delta = std::move(mvreg.dk);
             std::unique_lock<std::shared_mutex> lock(_mutex);
             deleted_edge = get_edge_(from, to, type);
             //Check if the node where we are joining the edge exist.
@@ -1340,10 +1365,10 @@ void DSRGraph::join_delta_edge(IDL::MvregEdge &&mvreg)
         if (joined) {
             if (signal) {
                 DSR_LOG_DEBUG("[JOIN_EDGE] add edge:", from, to, type);
-                emitter.update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
+                emitter.update_edge_signal(from, to, type, SignalInfo{ msg_agent_id });
             } else {
                 DSR_LOG_DEBUG("[JOIN_EDGE] delete edge:", from, to, type);
-                emitter.del_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id() });
+                emitter.del_edge_signal(from, to, type, SignalInfo{ msg_agent_id });
                 if (deleted_edge.has_value()) {
                     emitter.deleted_edge_signal(*deleted_edge, SignalInfo{ agent_id });
                 }
@@ -1368,17 +1393,20 @@ void DSRGraph::process_delta_node_attr(uint64_t id, const std::string& att_name,
     }
 }
 
-std::optional<std::string> DSRGraph::join_delta_node_attr(IDL::MvregNodeAttr &&mvreg)
+std::optional<std::string> DSRGraph::join_delta_node_attr(DSR::MvregNodeAttrMsg &&mvreg)
 {
 
     try {
+        if (!protocol_version_matches(log_level, "DSR_NODE_ATTS", mvreg.protocol_version)) {
+            return std::nullopt;
+        }
         bool joined = false;
-        auto id = mvreg.id();
-        std::string att_name = mvreg.attr_name();
-        uint64_t timestamp = mvreg.timestamp();
+        auto id = mvreg.id;
+        std::string att_name = mvreg.attr_name;
+        uint64_t timestamp = mvreg.timestamp;
         DSR_LOG_DEBUG("[JOIN_NODE_ATTR] node:", id, "attr:", att_name);
         {
-            auto crdt_delta = IDLNodeAttr_to_CRDT(std::move(mvreg));
+            auto crdt_delta = std::move(mvreg.dk);
             std::unique_lock<std::shared_mutex> lock(_mutex);
             //Check if the node where we are joining the edge exist.
             if (nodes.contains(id)) {
@@ -1432,19 +1460,22 @@ void DSRGraph::process_delta_edge_attr(uint64_t from, uint64_t to, const std::st
 }
 
 
-std::optional<std::string> DSRGraph::join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg)
+std::optional<std::string> DSRGraph::join_delta_edge_attr(DSR::MvregEdgeAttrMsg &&mvreg)
 {
     try {
+        if (!protocol_version_matches(log_level, "DSR_EDGE_ATTS", mvreg.protocol_version)) {
+            return std::nullopt;
+        }
         bool joined = false;
-        auto from = mvreg.id();
-        auto to = mvreg.to();
-        std::string type = mvreg.type();
-        std::string att_name = mvreg.attr_name();
-        uint64_t timestamp = mvreg.timestamp();
+        auto from = mvreg.id;
+        auto to = mvreg.to_node;
+        std::string type = mvreg.type;
+        std::string att_name = mvreg.attr_name;
+        uint64_t timestamp = mvreg.timestamp;
         DSR_LOG_DEBUG("[JOIN_EDGE_ATTR] edge:", from, to, type, "attr:", att_name);
 
         {
-            auto crdt_delta = IDLEdgeAttr_to_CRDT(std::move(mvreg));
+            auto crdt_delta = std::move(mvreg.dk);
             std::unique_lock<std::shared_mutex> lock(_mutex);
             //Check if the node where we are joining the edge exist.
             if (nodes.contains(from)  and nodes.at(from).read_reg().fano().contains({to, type}))
@@ -1487,8 +1518,11 @@ std::optional<std::string> DSRGraph::join_delta_edge_attr(IDL::MvregEdgeAttr &&m
     return std::nullopt;
 }
 
-void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
+void DSRGraph::join_full_graph(DSR::OrMap &&full_graph)
 {
+    if (!protocol_version_matches(log_level, "GRAPH_ANSWER", full_graph.protocol_version)) {
+        return;
+    }
     // 5th element: post-join node snapshot captured inside the lock, used for
     // signal emission after the lock is released to avoid racing with
     // insert_node_/update_node (same pattern as join_delta_node).
@@ -1575,10 +1609,10 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
 
-        for (auto &[k, val] : full_graph.m()) {
-            auto mv = IDLNode_to_CRDT(std::move(val));
+        for (auto &[k, val] : full_graph.m) {
+            auto mv = std::move(val.dk);
             bool mv_empty = mv.empty();
-            agent_id_ch = val.agent_id();
+            agent_id_ch = val.agent_id;
             auto it = nodes.find(k);
             std::optional<CRDTNode> nd =
                     (it != nodes.end() and !it->second.empty()) ? std::make_optional(it->second.read_reg()) : std::nullopt;
@@ -1658,12 +1692,18 @@ void DSRGraph::start_subscription_threads()
     if (delta_edge_attrs_thread.joinable()) delta_edge_attrs_thread.join();
 }
 
-std::map<uint64_t , IDL::MvregNode> DSRGraph::Map()
+std::map<uint64_t, DSR::MvregNodeMsg> DSRGraph::Map()
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    std::map<uint64_t, IDL::MvregNode> m;
-    for (auto kv : nodes) {
-        m.emplace(kv.first, CRDTNode_to_IDL(agent_id, kv.first, kv.second));
+    std::map<uint64_t, DSR::MvregNodeMsg> m;
+    for (auto &kv : nodes) {
+        DSR::MvregNodeMsg msg;
+        msg.dk        = kv.second;
+        msg.id        = kv.first;
+        msg.agent_id  = agent_id;
+        msg.timestamp = get_unix_timestamp();
+        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+        m.emplace(kv.first, std::move(msg));
     }
     return m;
 }
@@ -1702,19 +1742,22 @@ void DSRGraph::node_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregNode sample;
+                DSR::MvregNodeMsg sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
                     if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
                     if (m_info.valid_data) {
-                        if (sample.agent_id() != agent_id) {
-                            if (sample.id() == CLEAR_DELETED_SIGNAL) {
+                        if (sample.agent_id != agent_id) {
+                            if (!protocol_version_matches(log_level, "DSR_NODE", sample.protocol_version)) {
+                                continue;
+                            }
+                            if (sample.id == CLEAR_DELETED_SIGNAL) {
                                 std::unique_lock<std::shared_mutex> lock(_mutex);
                                 std::unique_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
                                 deleted.clear();
                                 continue;
                             }
                             if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) {
-                                qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
+                                qDebug() << name << " Received:" << std::to_string(sample.id).c_str() << " node from: "
                                         << m_info.sample_identity.writer_guid().entityId.value;
                             }
                             tp.spawn_task(&DSRGraph::join_delta_node, this, std::move(sample));
@@ -1742,13 +1785,13 @@ void DSRGraph::edge_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregEdge sample;
+                DSR::MvregEdgeMsg sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
                     if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
                     if (m_info.valid_data) {
-                        if (sample.agent_id() != agent_id) {
+                        if (sample.agent_id != agent_id) {
                             if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) {
-                                qDebug() << name << " Received:" << std::to_string(sample.id()).c_str() << " node from: "
+                                qDebug() << name << " Received:" << std::to_string(sample.id).c_str() << " node from: "
                                         << m_info.sample_identity.writer_guid().entityId.value;
                             }
                             tp.spawn_task(&DSRGraph::join_delta_edge, this, std::move(sample));
@@ -1777,27 +1820,28 @@ void DSRGraph::edge_attrs_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregEdgeAttrVec samples;
+                DSR::MvregEdgeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
                     if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
                     if (m_info.valid_data) {
                         if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
-                            qDebug() << name << " Received:" << samples.vec().size() << " edge attr from: "
+                            qDebug() << name << " Received:" << samples.vec.size() << " edge attr from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
                         }
-                        if (!samples.vec().empty() and samples.vec().at(0).agent_id() != agent_id)
+                        if (!samples.vec.empty() and samples.vec.at(0).agent_id != agent_id)
                         {
                             tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
-                                if (samples.vec().empty()) return;
+                                if (samples.vec.empty()) return;
 
-                                auto from = samples.vec().at(0).from();
-                                auto to = samples.vec().at(0).to();
-                                auto type = samples.vec().at(0).type();
+                                auto from = samples.vec.at(0).from_node;
+                                auto to = samples.vec.at(0).to_node;
+                                auto type = samples.vec.at(0).type;
+                                auto sample_agent_id = samples.vec.at(0).agent_id;
 
                                 std::vector<std::future<std::optional<std::string>>> futures;
 
-                                for (auto &&sample: samples.vec()) {
-                                    if (!ignored_attributes.contains(sample.attr_name())) {
+                                for (auto &&sample: samples.vec) {
+                                    if (!ignored_attributes.contains(sample.attr_name)) {
                                         futures.emplace_back(tp.spawn_task_waitable([this, sample = std::move(sample)]() mutable {
                                                 return join_delta_edge_attr(std::move(sample));
                                         }));
@@ -1813,8 +1857,8 @@ void DSRGraph::edge_attrs_subscription_thread()
                                 }
 
 
-                                emitter.update_edge_attr_signal(from, to, type, sig, SignalInfo{samples.vec().at(0).agent_id()});
-                                emitter.update_edge_signal(from, to, type, SignalInfo{samples.vec().at(0).agent_id()});
+                                emitter.update_edge_attr_signal(from, to, type, sig, SignalInfo{sample_agent_id});
+                                emitter.update_edge_signal(from, to, type, SignalInfo{sample_agent_id});
 
                             });
                         }
@@ -1845,28 +1889,29 @@ void DSRGraph::node_attrs_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                IDL::MvregNodeAttrVec samples;
+                DSR::MvregNodeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
                     if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
                     if (m_info.valid_data) {
                         if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
-                            qDebug() << name << " Received:" << samples.vec().size() << " node attrs from: "
+                            qDebug() << name << " Received:" << samples.vec.size() << " node attrs from: "
                                     << m_info.sample_identity.writer_guid().entityId.value;
                         }
-                        if (!samples.vec().empty() and samples.vec().at(0).agent_id() != agent_id) {
+                        if (!samples.vec.empty() and samples.vec.at(0).agent_id != agent_id) {
                             tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
 
-                                if (samples.vec().empty()) return;
+                                if (samples.vec.empty()) return;
 
-                                auto id = samples.vec().at(0).id();
+                                auto id = samples.vec.at(0).id;
+                                auto sample_agent_id = samples.vec.at(0).agent_id;
                                 std::string type;
                                 {
                                     std::shared_lock<std::shared_mutex> lock(_mutex);
                                     if (auto itn = nodes.find(id); itn != nodes.end())  type = itn->second.read_reg().type() ;
                                 }
                                 std::vector<std::future<std::optional<std::string>>> futures;
-                                for (auto &&s: samples.vec()) {
-                                    if (!ignored_attributes.contains(s.attr_name())) {
+                                for (auto &&s: samples.vec) {
+                                    if (!ignored_attributes.contains(s.attr_name)) {
                                         futures.emplace_back(tp.spawn_task_waitable([this, samp{std::move(s)}]() mutable {
                                             auto f = join_delta_node_attr(std::move(samp));
                                             return f;
@@ -1883,8 +1928,8 @@ void DSRGraph::node_attrs_subscription_thread()
                                         sig.emplace_back(std::move(opt_str.value()));
                                 }
 
-                                emitter.update_node_attr_signal(id, sig, SignalInfo{samples.vec().at(0).agent_id()});
-                                emitter.update_node_signal(id, type, SignalInfo{samples.vec().at(0).agent_id()});
+                                emitter.update_node_attr_signal(id, sig, SignalInfo{sample_agent_id});
+                                emitter.update_node_signal(id, type, SignalInfo{sample_agent_id});
                             });
                         }
                     }
@@ -1910,20 +1955,24 @@ void DSRGraph::fullgraph_server_thread()
         while (true)
         {
             eprosima::fastdds::dds::SampleInfo m_info;
-            IDL::GraphRequest sample;
+            DSR::GraphRequest sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
                 if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);
                 if (m_info.valid_data) {
+                    if (!protocol_version_matches(log_level, "GRAPH_REQUEST", sample.protocol_version)) {
+                        continue;
+                    }
                     {
                         std::unique_lock<std::mutex> lck(participant_set_mutex);
-                        if (auto [it, ok] = participant_set.emplace(sample.from(), true);
+                        if (auto [it, ok] = participant_set.emplace(sample.from, true);
                             it->second and !ok)
                         {
                             if (it->second) {
                                 lck.unlock();
-                                IDL::OrMap mp;
-                                mp.id(-1);
-                                mp.to_id(sample.id());
+                                DSR::OrMap mp;
+                                mp.id = -1;
+                                mp.to_id = static_cast<uint32_t>(sample.id);
+                                mp.protocol_version = DSR::DSR_PROTOCOL_VERSION;
                                 dsrpub_request_answer.write(&mp);
                                 continue;
                             } else {}
@@ -1932,13 +1981,14 @@ void DSRGraph::fullgraph_server_thread()
                             lck.unlock();
                         }
                     }
-                    if (static_cast<uint32_t>(sample.id()) != agent_id ) {
+                    if (static_cast<uint32_t>(sample.id) != agent_id ) {
 
                         qDebug() << " Received Full Graph request: from "
                                 << m_info.sample_identity.writer_guid().entityId.value;
-                        IDL::OrMap mp;
-                        mp.id(graph->get_agent_id());
-                        mp.m(graph->Map());
+                        DSR::OrMap mp;
+                        mp.id = static_cast<int32_t>(graph->get_agent_id());
+                        mp.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+                        mp.m = graph->Map();
                         dsrpub_request_answer.write(&mp);
 
                         qDebug() << "Full graph written";
@@ -1966,21 +2016,26 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
         while (true)
         {
             eprosima::fastdds::dds::SampleInfo m_info;
-            IDL::OrMap sample;
+            DSR::OrMap sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
                 if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);
                 if (m_info.valid_data) {
-                    if (sample.id() != graph->get_agent_id()) {
-                        if (sample.id() != static_cast<uint32_t>(-1)) {
+                    if (!protocol_version_matches(log_level, "GRAPH_ANSWER", sample.protocol_version)) {
+                        continue;
+                    }
+                    if (static_cast<uint32_t>(sample.id) != graph->get_agent_id()) {
+                        if (sample.id != -1) {
                             qDebug() << " Received Full Graph from " << m_info.sample_identity.writer_guid().entityId.value
                                     << " whith "
-                                    << sample.m().size() << " elements";
-                            tp.spawn_task(&DSRGraph::join_full_graph, this, std::move(sample));
+                                    << sample.m.size() << " elements";
+                            tp.spawn_task([this, s = std::move(sample)]() mutable {
+                                join_full_graph(std::move(s));
+                            });
                             qDebug() << "Synchronized.";
                             sync = true;
                             break;
                         }
-                        else if (!sync && sample.to_id() == agent_id)
+                        else if (!sync && sample.to_id == agent_id)
                         {
                             repeated = true;
                         }
@@ -2001,9 +2056,10 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 
     qDebug() << " Requesting the complete graph ";
 
-    IDL::GraphRequest gr;
-    gr.from( dsrparticipant.getParticipant()->get_qos().name().to_string());
-    gr.id(static_cast<int32_t>(agent_id));
+    DSR::GraphRequest gr;
+    gr.from = dsrparticipant.getParticipant()->get_qos().name().to_string();
+    gr.id = static_cast<int32_t>(agent_id);
+    gr.protocol_version = DSR::DSR_PROTOCOL_VERSION;
     dsrpub_graph_request.write(&gr);
 
 

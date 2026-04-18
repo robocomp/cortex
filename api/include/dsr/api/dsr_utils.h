@@ -4,7 +4,7 @@
 
 #include <string>
 #include <optional>
-#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
+#include <dsr/core/types/internal_types.h>
 #include <dsr/core/types/crdt_types.h>
 #include <dsr/core/types/user_types.h>
 #include <dsr/api/dsr_exceptions.h>

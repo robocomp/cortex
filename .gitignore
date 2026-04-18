@@ -9,3 +9,5 @@ experiment/
 **.pyc
 **/_pychache__
 .artifacts/
+.vscode/*
+.claude/*

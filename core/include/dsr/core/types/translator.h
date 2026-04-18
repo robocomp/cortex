@@ -7,237 +7,72 @@
 
 #include "user_types.h"
 #include "crdt_types.h"
+#include "internal_types.h"
 #include <cassert>
 
 namespace DSR {
 
-    // Translators
-    inline static IDL::MvregNode CRDTNode_to_IDL(uint32_t agent_id, uint64_t id, mvreg<DSR::CRDTNode> &data)
+    // ---- CRDT → DSR message type helpers ------------------------------------
+
+    inline static DSR::MvregNodeMsg CRDTNode_to_Msg(uint32_t agent_id, uint64_t id, mvreg<DSR::CRDTNode>& data)
     {
-        IDL::MvregNode delta_crdt;
-        for (auto &kv_dots : data.dk.ds) {
-            IDL::PairInt pi;
-            pi.first(kv_dots.first.first);
-            pi.second(kv_dots.first.second);
-
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_node(id)));
-            delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
-        }
-
-        for (auto &kv_dc : data.dk.c.dc) {
-            IDL::PairInt pi;
-            pi.first(kv_dc.first);
-            pi.second(kv_dc.second);
-
-            delta_crdt.dk().cbase().dc().emplace_back(std::move(pi));
-        }
-
-        delta_crdt.dk().cbase().cc(data.dk.c.cc);
-
-        delta_crdt.id(id);
-        delta_crdt.agent_id(agent_id);
-        delta_crdt.timestamp(get_unix_timestamp());
-
-        return delta_crdt;
+        DSR::MvregNodeMsg msg;
+        msg.dk        = data;
+        msg.id        = id;
+        msg.agent_id  = agent_id;
+        msg.timestamp = get_unix_timestamp();
+        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+        return msg;
     }
 
-    inline static mvreg<CRDTNode> IDLNode_to_CRDT(IDL::MvregNode &&data)
+    inline static DSR::MvregEdgeMsg CRDTEdge_to_Msg(uint32_t agent_id, uint64_t from, uint64_t to,
+                                                     const std::string& type, mvreg<DSR::CRDTEdge>& data)
     {
-        // Context
-        dot_context dotcontext_aux;
-        std::map<uint64_t , int> m = std::move(data.dk().cbase().cc());
-        std::set<std::pair<uint64_t , int>> s;
-        for (auto &v : data.dk().cbase().dc())
-            s.emplace(std::make_pair(v.first(), v.second()));
-        dotcontext_aux.setContext(std::move(m), std::move(s));
-        // Dots
-        std::map<std::pair<uint64_t , int>, CRDTNode> ds_aux;
-        for (auto &&val : std::move(data.dk().ds()))
-            ds_aux.emplace(std::pair<uint64_t , int>(val.first.first(), val.first.second()), CRDTNode(std::move(val.second)));
-
-        // Join
-        mvreg<CRDTNode> aw;
-        aw.dk.c = std::move(dotcontext_aux);
-        aw.dk.dot_map(std::move(ds_aux));
-        return aw;
+        DSR::MvregEdgeMsg msg;
+        msg.dk        = data;
+        msg.id        = from;
+        msg.to        = to;
+        msg.from      = from;
+        msg.type      = type;
+        msg.agent_id  = agent_id;
+        msg.timestamp = get_unix_timestamp();
+        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+        return msg;
     }
 
-    inline static IDL::MvregEdgeAttr
-    CRDTEdgeAttr_to_IDL(uint32_t agent_id, uint64_t id, uint64_t from, uint64_t to, const std::string &type,
-                                      const std::string &attr, mvreg<CRDTAttribute> &data)
+    inline static DSR::MvregNodeAttrMsg CRDTNodeAttr_to_Msg(uint32_t agent_id, uint64_t id, uint64_t node,
+                                                             const std::string& attr, mvreg<DSR::CRDTAttribute>& data)
     {
-        IDL::MvregEdgeAttr delta_crdt;
-
-        for (auto &kv_dots : data.dk.ds) {
-            IDL::PairInt pi;
-            pi.first(kv_dots.first.first);
-            pi.second(kv_dots.first.second);
-
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
-            delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
-        }
-
-        for (auto &kv_dc : data.context().dc) {
-            IDL::PairInt pi;
-            pi.first(kv_dc.first);
-            pi.second(kv_dc.second);
-
-            delta_crdt.dk().cbase().dc().emplace_back(std::move(pi));
-        }
-
-        delta_crdt.dk().cbase().cc(data.dk.c.cc);
-
-        delta_crdt.type(type);
-        delta_crdt.id(id);
-        delta_crdt.attr_name(attr);
-        delta_crdt.from(from);
-        delta_crdt.to(to);
-        delta_crdt.agent_id(agent_id);
-        delta_crdt.timestamp(get_unix_timestamp());
-        return delta_crdt;
-
+        DSR::MvregNodeAttrMsg msg;
+        msg.dk        = data;
+        msg.id        = id;
+        msg.node      = node;
+        msg.attr_name = attr;
+        msg.agent_id  = agent_id;
+        msg.timestamp = get_unix_timestamp();
+        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+        return msg;
     }
 
-    inline static mvreg<CRDTAttribute> IDLEdgeAttr_to_CRDT(IDL::MvregEdgeAttr &&data)
+    inline static DSR::MvregEdgeAttrMsg CRDTEdgeAttr_to_Msg(uint32_t agent_id, uint64_t id,
+                                                             uint64_t from, uint64_t to,
+                                                             const std::string& type, const std::string& attr,
+                                                             mvreg<DSR::CRDTAttribute>& data)
     {
-        // Context
-        dot_context dotcontext_aux;
-        std::map<uint64_t, int> m = std::move(data.dk().cbase().cc());
-
-        std::set<std::pair<uint64_t, int>> s;
-        for (auto &v : data.dk().cbase().dc())
-            s.emplace(std::make_pair(v.first(), v.second()));
-        dotcontext_aux.setContext(std::move(m), std::move(s));
-        // Dots
-        std::map<std::pair<uint64_t, int>, CRDTAttribute> ds_aux;
-        for (auto &val : data.dk().ds()) {
-            auto&& attrib  = std::move(val.second);
-            ds_aux.emplace(std::pair<uint64_t, int>(val.first.first(), val.first.second()),
-                           CRDTAttribute(std::move(attrib)));
-        }
-        // Join
-        mvreg<CRDTAttribute> aw;
-        aw.dk.c = std::move(dotcontext_aux);
-        aw.dk.dot_map(std::move(ds_aux));
-        return aw;
+        DSR::MvregEdgeAttrMsg msg;
+        msg.dk        = data;
+        msg.id        = id;
+        msg.from_node = from;
+        msg.to_node   = to;
+        msg.type      = type;
+        msg.attr_name = attr;
+        msg.agent_id  = agent_id;
+        msg.timestamp = get_unix_timestamp();
+        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+        return msg;
     }
 
-    inline static IDL::MvregNodeAttr
-    CRDTNodeAttr_to_IDL(uint32_t agent_id, uint64_t id, uint64_t node, const std::string &attr,
-                        mvreg<CRDTAttribute> &data)
-    {
-        IDL::MvregNodeAttr delta_crdt;
-
-        for (auto &kv_dots : data.dk.ds) {
-            IDL::PairInt pi;
-            pi.first(kv_dots.first.first);
-            pi.second(kv_dots.first.second);
-
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
-            delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
-        }
-
-        for (auto &kv_dc : data.context().dc) {
-            IDL::PairInt pi;
-            pi.first(kv_dc.first);
-            pi.second(kv_dc.second);
-
-            delta_crdt.dk().cbase().dc().emplace_back(std::move(pi));
-        }
-
-        delta_crdt.dk().cbase().cc(data.dk.c.cc);
-
-
-        delta_crdt.id(id);
-        delta_crdt.attr_name(attr);
-        delta_crdt.node(node);
-        delta_crdt.agent_id(agent_id);
-        delta_crdt.timestamp(get_unix_timestamp());
-
-        return delta_crdt;
-    }
-
-    inline static mvreg<CRDTAttribute> IDLNodeAttr_to_CRDT(IDL::MvregNodeAttr &&data)
-    {
-        // Context
-        dot_context dotcontext_aux;
-        std::map<uint64_t, int> m = std::move(*(std::map<uint64_t, int32_t>*)&data.dk().cbase().cc());
-
-        std::set<std::pair<uint64_t, int>> s;
-        for (auto &v : data.dk().cbase().dc())
-            s.emplace(std::make_pair(v.first(), v.second()));
-        dotcontext_aux.setContext(std::move(m), std::move(s));
-        // Dots
-        std::map<std::pair<uint64_t, int>, CRDTAttribute> ds_aux;
-        for (auto &val : data.dk().ds()) {
-            auto&& attrib  = std::move(val.second);
-            ds_aux.emplace(std::pair<uint64_t, int>(val.first.first(), val.first.second()),
-                           CRDTAttribute(std::move(attrib)));
-        }
-        // Join
-        mvreg<CRDTAttribute> aw;
-        aw.dk.c = std::move(dotcontext_aux);
-        aw.dk.dot_map(std::move(ds_aux));
-        return aw;
-    }
-
-    inline static mvreg<CRDTEdge> IDLEdge_to_CRDT(IDL::MvregEdge &&data)
-    {
-        // Context
-        dot_context dotcontext_aux;
-        std::map<uint64_t, int> m = std::move(*(std::map<uint64_t, int32_t>*)&data.dk().cbase().cc());
-        std::set<std::pair<uint64_t, int>> s;
-        for (auto &v : data.dk().cbase().dc())
-            s.emplace(std::make_pair(v.first(), v.second()));
-        dotcontext_aux.setContext(std::move(m), std::move(s));
-        // Dots
-        std::map<std::pair<uint64_t, int>, CRDTEdge> ds_aux;
-        for (auto &val : data.dk().ds()) {
-            auto&& attrib  = std::move(val.second);
-            ds_aux.emplace(std::pair<uint64_t, int>(val.first.first(), val.first.second()),
-                           CRDTEdge(std::move(attrib)));
-        }
-        mvreg<CRDTEdge> aw;
-        aw.dk.c = std::move(dotcontext_aux);
-        aw.dk.dot_map(std::move(ds_aux));
-        return aw;
-    }
-
-    inline static IDL::MvregEdge CRDTEdge_to_IDL(uint32_t agent_id, uint64_t from, uint64_t to, const std::string& type,
-                                                 mvreg<CRDTEdge> &data)
-    {
-        IDL::MvregEdge delta_crdt;
-
-        for (auto &kv_dots : data.dk.ds) {
-            IDL::PairInt pi;
-            pi.first(kv_dots.first.first);
-            pi.second(kv_dots.first.second);
-
-            auto edge = kv_dots.second.to_IDL_edge(from);
-            delta_crdt.dk().ds().emplace(std::make_pair(pi, edge));
-            delta_crdt.dk().cbase().cc().emplace(kv_dots.first);
-
-        }
-
-        for (auto &kv_dc : data.context().dc) {
-            IDL::PairInt pi;
-            pi.first(kv_dc.first);
-            pi.second(kv_dc.second);
-
-            delta_crdt.dk().cbase().dc().emplace_back(std::move(pi));
-        }
-
-        delta_crdt.dk().cbase().cc(data.dk.c.cc);
-
-        delta_crdt.from(from);
-        delta_crdt.to(to);
-        delta_crdt.type(type);
-        delta_crdt.id(from);
-        delta_crdt.agent_id(agent_id);
-        delta_crdt.timestamp(get_unix_timestamp());
-
-        return delta_crdt;
-    }
+    // ---- User ↔ CRDT helpers (kept unchanged) --------------------------------
 
     inline static CRDTEdge user_edge_to_crdt(Edge&& edge)
     {

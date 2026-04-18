@@ -490,9 +490,10 @@ namespace DSR
             }
             if (!copy)
             {
-                IDL::MvregNode signal;
-                signal.id(CLEAR_DELETED_SIGNAL);
-                signal.agent_id(agent_id);
+                DSR::MvregNodeMsg signal;
+                signal.id = CLEAR_DELETED_SIGNAL;
+                signal.agent_id = agent_id;
+                signal.protocol_version = DSR::DSR_PROTOCOL_VERSION;
                 dsrpub_node.write(&signal);
             }
         }
@@ -657,25 +658,25 @@ namespace DSR
         //////////////////////////////////////////////////////////////////////////
         std::optional<CRDTNode> get_(uint64_t id);
         std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
-        std::tuple<bool, std::optional<IDL::MvregNode>> insert_node_(CRDTNode &&node);
-        std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> update_node_(CRDTNode &&node);
-        std::tuple<bool, std::vector<Edge>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>> delete_node_(uint64_t id);
-        std::optional<IDL::MvregEdge> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
-        std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
+        std::tuple<bool, std::optional<DSR::MvregNodeMsg>> insert_node_(CRDTNode &&node);
+        std::tuple<bool, std::optional<DSR::MvregNodeAttrVec>> update_node_(CRDTNode &&node);
+        std::tuple<bool, std::vector<Edge>, std::optional<DSR::MvregNodeMsg>, std::vector<DSR::MvregEdgeMsg>> delete_node_(uint64_t id);
+        std::optional<DSR::MvregEdgeMsg> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
+        std::tuple<bool, std::optional<DSR::MvregEdgeMsg>, std::optional<DSR::MvregEdgeAttrVec>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
 
         //////////////////////////////////////////////////////////////////////////
         // Other methods
         //////////////////////////////////////////////////////////////////////////
-        std::map<uint64_t , IDL::MvregNode> Map();
+        std::map<uint64_t, DSR::MvregNodeMsg> Map();
 
         //////////////////////////////////////////////////////////////////////////
         // CRDT join operations
         ///////////////////////////////////////////////////////////////////////////
-        void join_delta_node(IDL::MvregNode &&mvreg);
-        void join_delta_edge(IDL::MvregEdge &&mvreg);
-        std::optional<std::string> join_delta_node_attr(IDL::MvregNodeAttr &&mvreg);
-        std::optional<std::string> join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg);
-        void join_full_graph(IDL::OrMap &&full_graph);
+        void join_delta_node(DSR::MvregNodeMsg &&mvreg);
+        void join_delta_edge(DSR::MvregEdgeMsg &&mvreg);
+        std::optional<std::string> join_delta_node_attr(DSR::MvregNodeAttrMsg &&mvreg);
+        std::optional<std::string> join_delta_edge_attr(DSR::MvregEdgeAttrMsg &&mvreg);
+        void join_full_graph(DSR::OrMap &&full_graph);
 
         bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta);
         void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute> && attr);

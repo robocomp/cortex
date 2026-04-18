@@ -9,7 +9,7 @@
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 
-#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
+#include <dsr/core/types/internal_types.h>
 
 class DSRPublisher
 {
@@ -22,12 +22,12 @@ public:
         int8_t domain_id,
         bool isStreamData = false);
     [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID() const;
-    bool write(IDL::GraphRequest *object);
-    bool write(IDL::MvregNode *object);
-    bool write(IDL::OrMap *object);
-    bool write(IDL::MvregEdge *object);
-    bool write(std::vector<IDL::MvregEdgeAttr> *object);
-    bool write(std::vector<IDL::MvregNodeAttr> *object);
+    bool write(DSR::GraphRequest *object);
+    bool write(DSR::MvregNodeMsg *object);
+    bool write(DSR::OrMap *object);
+    bool write(DSR::MvregEdgeMsg *object);
+    bool write(DSR::MvregEdgeAttrVec *object);
+    bool write(DSR::MvregNodeAttrVec *object);
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;
