@@ -212,9 +212,8 @@ namespace DSR
         {
             using ret_type = std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>;
             std::shared_lock<std::shared_mutex> lock(_mutex);
-            std::optional<CRDTNode> n = get_(id);
-            if (n.has_value()) {
-                auto tmp = get_attrib_by_name<name>(n.value());
+            if (const auto* n = get_node_ptr_(id); n != nullptr) {
+                auto tmp = get_attrib_by_name<name>(*n);
                 if (tmp.has_value())
                 {
                     if constexpr(is_reference_wrapper<decltype(name::type)>::value) {
@@ -256,12 +255,11 @@ namespace DSR
         {
             using ret_type = std::tuple<std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>> ...>;
             std::shared_lock<std::shared_mutex> lock(_mutex);
-            std::optional<CRDTNode> node = get_(id);
-            if (node.has_value())
+            if (const auto* node = get_node_ptr_(id); node != nullptr)
             {
                 auto get_by_name = [&]<typename n>(n* dummy) -> std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(n::type)>>>
                 {
-                    auto tmp = get_attrib_by_name<n>(node.value());
+                    auto tmp = get_attrib_by_name<n>(*node);
                     if (tmp.has_value())
                     {
                         if constexpr(is_reference_wrapper<decltype(n::type)>::value) {
@@ -657,11 +655,12 @@ namespace DSR
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
+        const CRDTNode* get_node_ptr_(uint64_t id) const;
         std::optional<CRDTNode> get_(uint64_t id);
         std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
         std::tuple<bool, std::optional<DSR::MvregNodeMsg>> insert_node_(CRDTNode &&node);
         std::tuple<bool, std::optional<DSR::MvregNodeAttrVec>> update_node_(CRDTNode &&node);
-        std::tuple<bool, std::vector<Edge>, std::optional<DSR::MvregNodeMsg>, std::vector<DSR::MvregEdgeMsg>> delete_node_(uint64_t id);
+        std::tuple<bool, std::vector<Edge>, std::optional<DSR::MvregNodeMsg>, std::vector<DSR::MvregEdgeMsg>> delete_node_(uint64_t id, const CRDTNode &node);
         std::optional<DSR::MvregEdgeMsg> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
         std::tuple<bool, std::optional<DSR::MvregEdgeMsg>, std::optional<DSR::MvregEdgeAttrVec>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
 

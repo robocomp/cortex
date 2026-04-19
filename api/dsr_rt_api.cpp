@@ -395,11 +395,15 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
     std::optional<DSR::MvregEdgeMsg> node1_insert;
     std::optional<DSR::MvregEdgeAttrVec> node1_update;
     std::optional<DSR::MvregNodeAttrVec> node2;
-    std::optional<CRDTNode> to_n;
+    std::optional<CRDTNode> to_n_mut;
+    std::optional<uint64_t> to_n_id;
+    std::optional<std::string> to_n_type;
     {
         std::unique_lock<std::shared_mutex> lock(G->_mutex);
-        if (G->nodes.contains(to))
+        if (const auto* to_n = G->get_node_ptr_(to); to_n != nullptr)
         {
+            to_n_id = to_n->id();
+            to_n_type = to_n->type();
             CRDTEdge e;
             if (HISTORY_SIZE <= 0)
             {
@@ -529,29 +533,33 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
                 it->second.write(std::move(timestamps));
             }
 
-            to_n = G->get_(to).value();
-            if (auto x = G->get_crdt_attrib_by_name<parent_att>(to_n.value()); x.has_value())
+            const auto ensure_mutable_to_n = [&]() -> CRDTNode& {
+                if (!to_n_mut.has_value()) to_n_mut = *to_n;
+                return to_n_mut.value();
+            };
+
+            if (auto x = G->get_crdt_attrib_by_name<parent_att>(*to_n); x.has_value())
             {
                 if (x.value() != n.id())
                 {
-                    no_send = !G->modify_attrib_local<parent_att>(to_n.value(), n.id());
+                    no_send = !G->modify_attrib_local<parent_att>(ensure_mutable_to_n(), n.id());
                 }
             }
             else
             {
-                no_send = !G->add_attrib_local<parent_att>(to_n.value(), n.id());
+                no_send = !G->add_attrib_local<parent_att>(ensure_mutable_to_n(), n.id());
             }
 
-            if (auto x = G->get_crdt_attrib_by_name<level_att>(to_n.value()); x.has_value())
+            if (auto x = G->get_crdt_attrib_by_name<level_att>(*to_n); x.has_value())
             {
                 if (x.value() != G->get_node_level(n).value() + 1)
                 {
-                    no_send = !G->modify_attrib_local<level_att>(to_n.value(),  G->get_node_level(n).value() + 1 );
+                    no_send = !G->modify_attrib_local<level_att>(ensure_mutable_to_n(),  G->get_node_level(n).value() + 1 );
                 }
             }
             else
             {
-                no_send = !G->add_attrib_local<level_att>(to_n.value(),  G->get_node_level(n).value() + 1 );
+                no_send = !G->add_attrib_local<level_att>(ensure_mutable_to_n(),  G->get_node_level(n).value() + 1 );
             }
 
             //Check if RT edge exist.
@@ -559,14 +567,14 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             {
                 //Create -> insert edge, update to-node attrs
                 std::tie(r1, node1_insert, std::ignore) = G->insert_or_assign_edge_(std::move(e), n.id(), to);
-                if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n.value()));
+                if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n_mut.value()));
 
             }
             else
             {
                 //Update -> update edge attrs, update to-node attrs
                 std::tie(r1, std::ignore, node1_update) = G->insert_or_assign_edge_(std::move(e), n.id(), to);
-                if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n.value()));
+                if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n_mut.value()));
 
             }
             if (!r1)
@@ -578,7 +586,7 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             if (!r2 and !no_send)
             {
                 throw std::runtime_error(
-                        "Could not insert Node " + std::to_string(to_n->id()) + " in G in insert_or_assign_edge_RT() " +
+                        "Could not insert Node " + std::to_string(to_n_id.value()) + " in G in insert_or_assign_edge_RT() " +
                         __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
             }
         } else
@@ -604,8 +612,8 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
         G->emitter.update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
         if (!no_send)
         {
-            G->emitter.update_node_signal(to_n->id(), to_n->type(), SignalInfo{ G->agent_id });
-            G->emitter.update_node_attr_signal(to_n->id(), {"level", "parent"}, SignalInfo{ G->agent_id });
+            G->emitter.update_node_signal(to_n_id.value(), to_n_type.value(), SignalInfo{ G->agent_id });
+            G->emitter.update_node_attr_signal(to_n_id.value(), {"level", "parent"}, SignalInfo{ G->agent_id });
         }
     }
 }

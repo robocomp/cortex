@@ -527,6 +527,10 @@ public:
         return dk.ds.empty();
     }
 
+    bool empty() const {
+        return dk.ds.empty();
+    }
+
     friend std::ostream &operator<<(std::ostream &output, const mvreg<V> &o) {
         output << "MVReg:" << o.dk;
         return output;
