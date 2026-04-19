@@ -75,14 +75,14 @@ DSRGraph::DSRGraph(GraphSettings settings) :
 
 
     // RTPS Initialize publisher with general topic
-    auto [res, pub, writer] = dsrpub_node.init(participant_handle, dsrparticipant.getNodeTopic());
-    auto [res2, pub2, writer2] = dsrpub_node_attrs.init(participant_handle, dsrparticipant.getAttNodeTopic());
+    auto [res, pub, writer] = dsrpub_node.init(participant_handle, dsrparticipant.getNodeTopic(), dsrparticipant.get_domain_id());
+    auto [res2, pub2, writer2] = dsrpub_node_attrs.init(participant_handle, dsrparticipant.getAttNodeTopic(), dsrparticipant.get_domain_id());
 
-    auto [res3, pub3, writer3] = dsrpub_edge.init(participant_handle, dsrparticipant.getEdgeTopic());
-    auto [res4, pub4, writer4] = dsrpub_edge_attrs.init(participant_handle, dsrparticipant.getAttEdgeTopic());
+    auto [res3, pub3, writer3] = dsrpub_edge.init(participant_handle, dsrparticipant.getEdgeTopic(), dsrparticipant.get_domain_id());
+    auto [res4, pub4, writer4] = dsrpub_edge_attrs.init(participant_handle, dsrparticipant.getAttEdgeTopic(), dsrparticipant.get_domain_id());
 
-    auto [res5, pub5, writer5] = dsrpub_graph_request.init(participant_handle, dsrparticipant.getGraphRequestTopic());
-    auto [res6, pub6, writer6] = dsrpub_request_answer.init(participant_handle, dsrparticipant.getGraphTopic());
+    auto [res5, pub5, writer5] = dsrpub_graph_request.init(participant_handle, dsrparticipant.getGraphRequestTopic(), dsrparticipant.get_domain_id());
+    auto [res6, pub6, writer6] = dsrpub_request_answer.init(participant_handle, dsrparticipant.getGraphTopic(), dsrparticipant.get_domain_id());
 
     dsrparticipant.add_publisher(dsrparticipant.getNodeTopic()->get_name(), {pub, writer});
     dsrparticipant.add_publisher(dsrparticipant.getAttNodeTopic()->get_name(), {pub2, writer2});
@@ -272,21 +272,18 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
 
     if (!deleted.contains(node.id()))
     {
-        if (nodes.contains(node.id()) and !nodes.at(node.id()).empty())
+        auto nit = nodes.find(node.id());
+        if (nit != nodes.end() && !nit->second.empty())
         {
-
             std::vector<IDL::MvregNodeAttr> atts_deltas;
-            auto &iter = nodes.at(node.id()).read_reg().attrs();
+            auto &iter = nit->second.read_reg().attrs();
             //New attributes and updates.
             for (auto &[k, att]: node.attrs()) {
-                if (!iter.contains(k)) {
-                    iter.emplace(k, mvreg<CRDTAttribute>());
-                }
-                if (iter.at(k).empty() or att.read_reg() != iter.at(k).read_reg()) {
-                    auto delta = iter.at(k).write(std::move(att.read_reg()));
+                auto &attr_reg = iter.try_emplace(k, mvreg<CRDTAttribute>()).first->second;
+                if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
+                    auto delta = attr_reg.write(std::move(att.read_reg()));
                     atts_deltas.emplace_back(
                             CRDTNodeAttr_to_IDL(agent_id, node.id(), node.id(), k, delta));
-
                 }
             }
             //Remove old attributes.
@@ -296,7 +293,7 @@ std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> DSRGraph::updat
                 if (ignored_attributes.contains(k)) {
                     it_a = iter.erase(it_a);
                 } else if (!node.attrs().contains(k)) {
-                    auto delta = iter.at(k).reset();
+                    auto delta = it_a->second.reset();
                     atts_deltas.emplace_back(
                             CRDTNodeAttr_to_IDL(node.agent_id(), node.id(), node.id(), k, delta));
                     it_a = iter.erase(it_a);
@@ -378,27 +375,23 @@ DSRGraph::delete_node_(uint64_t id) {
     // Get remove delta.
     auto delta = nodes[id].reset();
     IDL::MvregNode delta_remove = CRDTNode_to_IDL(agent_id, id, delta);
-    //search and remove edges.
-    //For each node check if there is an edge to remove.
-    //TODO: use to_edges.
-    for (auto &[k, v] : nodes)
+    // Search and remove incoming edges using to_edges cache: O(k) instead of O(n).
     {
-        std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
-        if (!edges.contains({k, id})) continue;
-        // Remove all edges between them
-        auto &visited_node = v.read_reg();
-        auto keys = deleted_edges.size();
-        for (const auto &key : edges.at({k, id}))
+        decltype(to_edges)::mapped_type incoming;
         {
-            deleted_edges.emplace_back(visited_node.fano().at({id, key}).read_reg());
-            auto delta_fano = visited_node.fano().at({id, key}).reset();
-            delta_vec.emplace_back(CRDTEdge_to_IDL(agent_id, k, id, key, delta_fano));
-            visited_node.fano().erase({id, key});
+            std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+            if (to_edges.contains(id))
+                incoming = to_edges.at(id);
         }
-        lck_cache.unlock();
-        //Remove all from cache
-        for (auto i = keys; i < deleted_edges.size(); i++) {
-            update_maps_edge_delete(k, id, deleted_edges[i].type());
+        for (const auto &[from, type] : incoming)
+        {
+            if (!nodes.contains(from)) continue;
+            auto &visited_node = nodes.at(from).read_reg();
+            deleted_edges.emplace_back(visited_node.fano().at({id, type}).read_reg());
+            auto delta_fano = visited_node.fano().at({id, type}).reset();
+            delta_vec.emplace_back(CRDTEdge_to_IDL(agent_id, from, id, type, delta_fano));
+            visited_node.fano().erase({id, type});
+            update_maps_edge_delete(from, id, type);
         }
     }
     update_maps_node_delete(id, node.value());
@@ -495,6 +488,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
     std::vector<Node> nodes_;
     if (nodeType.contains(type))
     {
+        nodes_.reserve(nodeType.at(type).size());
         for (auto &id: nodeType.at(type))
         {
             std::optional<CRDTNode> n = get_(id);
@@ -527,6 +521,12 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
     std::shared_lock<std::shared_mutex> lck(_mutex_cache_maps);
 
     std::vector<Node> nodes_;
+    {
+        size_t total = 0;
+        for (const auto &type : types)
+            if (nodeType.contains(type)) total += nodeType.at(type).size();
+        nodes_.reserve(total);
+    }
     for (auto &type : types)
     {
         if (nodeType.contains(type))
@@ -547,17 +547,17 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
 //////////////////////////////////////////////////////////////////////////////////
 std::optional<CRDTEdge> DSRGraph::get_edge_(uint64_t from, uint64_t to, const std::string &key)
 {
-    //std::shared_lock<std::shared_mutex> lock(_mutex);
-    if (nodes.contains(from) && nodes.contains(to))
-    {
-        auto n = get_(from);
-        if (n.has_value()) {
-            auto edge = n.value().fano().find({to, key});
-            if (edge != n.value().fano().end()) {
-                return edge->second.read_reg();
-            }
-        }
+    auto from_it = nodes.find(from);
+    if (from_it == nodes.end() || from_it->second.empty() || !nodes.contains(to)) {
+        return {};
     }
+
+    auto& fano = from_it->second.read_reg().fano();
+    auto edge = fano.find({to, key});
+    if (edge != fano.end() && !edge->second.empty()) {
+        return edge->second.read_reg();
+    }
+
     return {};
 }
 
@@ -587,18 +587,17 @@ std::optional<Edge> DSRGraph::get_edge(const Node &n, const std::string &to, con
     std::optional<uint64_t> id_to = get_id_from_name(to);
     if (id_to.has_value())
     {
-        return (n.fano().contains({id_to.value(), key})) ?
-               std::make_optional(n.fano().find({id_to.value(), key})->second) :
-               std::nullopt;
+        auto it = n.fano().find({id_to.value(), key});
+        if (it != n.fano().end()) return it->second;
     }
     return {};
 }
 
 std::optional<Edge> DSRGraph::get_edge(const Node &n, uint64_t to, const std::string &key)
 {
-    return (n.fano().contains({to, key})) ?
-           std::make_optional(n.fano().find({to, key})->second) :
-           std::nullopt;
+    auto it = n.fano().find({to, key});
+    if (it != n.fano().end()) return it->second;
+    return {};
 }
 
 
@@ -613,43 +612,33 @@ DSRGraph::insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to)
     {
         auto &node = nodes.at(from).read_reg();
         //check if we are creating an edge or we are updating it.
-        //Update
-        if (node.fano().contains({to, attrs.type()}))
+        auto fano_it = node.fano().find({to, attrs.type()});
+        if (fano_it != node.fano().end())
         {
-            auto iter = nodes.at(from).read_reg().fano().find({attrs.to(), attrs.type()});
-            auto end = nodes.at(from).read_reg().fano().end();
-            if (iter != end) {
-                std::vector<IDL::MvregEdgeAttr> atts_deltas;
-                auto &iter_edge = iter->second.read_reg().attrs();
-                for (auto &[k, att]: attrs.attrs()) {
-                    //comparar igualdad o inexistencia
-                    if (!iter_edge.contains(k)) {
-                        iter_edge.emplace(k, mvreg<CRDTAttribute>());
-                    }
-                    if (iter_edge.at(k).empty() or
-                        att.read_reg() !=
-                        iter_edge.at(k).read_reg()) {
-                        auto delta = iter_edge.at(k).write(std::move(att.read_reg()));
-                        atts_deltas.emplace_back(
-                                CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), k, delta));
-
-                    }
+            //Update
+            std::vector<IDL::MvregEdgeAttr> atts_deltas;
+            auto &iter_edge = fano_it->second.read_reg().attrs();
+            for (auto &[k, att]: attrs.attrs()) {
+                auto &attr_reg = iter_edge.try_emplace(k, mvreg<CRDTAttribute>()).first->second;
+                if (attr_reg.empty() or att.read_reg() != attr_reg.read_reg()) {
+                    auto delta = attr_reg.write(std::move(att.read_reg()));
+                    atts_deltas.emplace_back(
+                            CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), k, delta));
                 }
-                auto it = iter_edge.begin();
-                while (it != iter_edge.end()) {
-                    if (!attrs.attrs().contains(it->first)) {
-                        std::string att = it->first;
-                        auto delta = iter_edge.at(it->first).reset();
-                        it = iter_edge.erase(it);
-                        atts_deltas.emplace_back(
-                                CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), att, delta));
-
-                    } else {
-                        ++it;
-                    }
-                }
-                return {true, {}, std::move(atts_deltas)};
             }
+            auto it = iter_edge.begin();
+            while (it != iter_edge.end()) {
+                if (!attrs.attrs().contains(it->first)) {
+                    std::string att = it->first;
+                    auto delta = it->second.reset();
+                    it = iter_edge.erase(it);
+                    atts_deltas.emplace_back(
+                            CRDTEdgeAttr_to_IDL(agent_id, from, from, to, attrs.type(), att, delta));
+                } else {
+                    ++it;
+                }
+            }
+            return {true, {}, std::move(atts_deltas)};
         } else
         { // Insert
             //node.fano().insert({{to, attrs.type()}, mvreg<CRDTEdge>()});
@@ -799,10 +788,18 @@ std::vector<DSR::Edge> DSRGraph::get_edges_by_type(const std::string &type)
     std::shared_lock<std::shared_mutex> lock_cache(_mutex_cache_maps);
     std::vector<Edge> edges_;
     if (edgeType.contains(type)) {
+        edges_.reserve(edgeType.at(type).size());
         for (auto &[from, to] : edgeType.at(type)) {
-            auto n = get_edge_(from, to, type);
-            if (n.has_value())
-                edges_.emplace_back(std::move(n.value()));
+            auto node_it = nodes.find(from);
+            if (node_it == nodes.end() || node_it->second.empty()) {
+                continue;
+            }
+
+            auto &fano = node_it->second.read_reg().fano();
+            auto edge_it = fano.find({to, type});
+            if (edge_it != fano.end()) {
+                edges_.emplace_back(edge_it->second.read_reg());
+            }
         }
     }
     return edges_;
@@ -814,6 +811,7 @@ std::vector<DSR::Edge> DSRGraph::get_edges_to_id(uint64_t id)
     std::shared_lock<std::shared_mutex> lock_cache(_mutex_cache_maps);
     std::vector<Edge> edges_;
     if (to_edges.contains(id)) {
+        edges_.reserve(to_edges.at(id).size());
         for (const auto &[k, v] : to_edges.at(id)) {
             auto n = get_edge_(k, id, v);
             if (n.has_value())
@@ -826,12 +824,16 @@ std::vector<DSR::Edge> DSRGraph::get_edges_to_id(uint64_t id)
 
 std::optional<std::map<std::pair<uint64_t, std::string>, DSR::Edge>> DSRGraph::get_edges(uint64_t id) {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    std::optional<Node> n = get_node(id);
-    if (n.has_value())
-    {
-        return n->fano();
+    auto node_it = nodes.find(id);
+    if (node_it == nodes.end() || node_it->second.empty()) {
+        return std::nullopt;
     }
-    return std::nullopt;
+
+    std::map<std::pair<uint64_t, std::string>, DSR::Edge> edges_;
+    for (const auto &[key, edge_reg] : node_it->second.read_reg().fano()) {
+        edges_.emplace(key, DSR::Edge(edge_reg.read_reg()));
+    }
+    return edges_;
 }
 
 
@@ -952,7 +954,7 @@ inline void DSRGraph::update_maps_edge_delete(uint64_t from, uint64_t to, const 
     std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
     if (const auto tuple = std::pair{from, to}; edges.contains(tuple)) {
         edges.at(tuple).erase(key);
-        edges.erase({from, to});
+        if (edges.at(tuple).empty()) edges.erase(tuple);
     }
 
     if (to_edges.contains(to)) {
@@ -1102,11 +1104,20 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
         };
 
         std::optional<std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple>> cache_map_to_edges = {};
+        // Snapshot the data needed for signal emission while the lock is held.
+        // nodes.at(id) must NOT be accessed after the lock is released: a concurrent
+        // insert_node_/update_node call on the same id runs nodes[id].write() which
+        // calls dk.rmv() (clears dk.ds) followed by dk.add(), leaving a window where
+        // read_reg()'s assert(dk.ds.size() >= 1) would fire.
+        std::string node_type_snapshot;
+        std::vector<std::pair<uint64_t, std::string>> from_edges_snapshot;
         {
             std::unique_lock<std::shared_mutex> lock(_mutex);
             if (!deleted.contains(id)) {
                 joined = true;
-                maybe_deleted_node = (nodes[id].empty()) ? std::nullopt : std::make_optional(nodes.at(id).read_reg());
+                if (auto it = nodes.find(id); it != nodes.end() && !it->second.empty()) {
+                    maybe_deleted_node = it->second.read_reg();
+                }
                 nodes[id].join(std::move(crdt_delta));
                 if (nodes.at(id).empty() or d_empty) {
                     nodes.erase(id);
@@ -1115,8 +1126,14 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
                     delete_unprocessed_deltas();
                 } else {
                     signal = true;
-                    update_maps_node_insert(id, nodes.at(id).read_reg());
+                    const auto& reg = nodes.at(id).read_reg();
+                    update_maps_node_insert(id, reg);
                     consume_unprocessed_deltas();
+                    // Snapshot type and outgoing edges before the lock is released.
+                    node_type_snapshot = reg.type();
+                    for (const auto &[k, v] : reg.fano()) {
+                        from_edges_snapshot.emplace_back(k.first, k.second);
+                    }
                 }
             } else {
                 delete_unprocessed_deltas();
@@ -1125,11 +1142,11 @@ void DSRGraph::join_delta_node(IDL::MvregNode &&mvreg)
 
         if (joined) {
             if (signal) {
-                DSR_LOG_DEBUG("[JOIN_NODE] node inserted/updated:", id, nodes.at(id).read_reg().type());
-                emitter.update_node_signal(id, nodes.at(id).read_reg().type(), SignalInfo{ mvreg.agent_id() });
-                for (const auto &[k, v] : nodes.at(id).read_reg().fano()) {
-                    DSR_LOG_DEBUG("[JOIN_NODE] add edge FROM:", id, k.first, k.second);
-                    emitter.update_edge_signal(id, k.first, k.second, SignalInfo{ mvreg.agent_id() });
+                DSR_LOG_DEBUG("[JOIN_NODE] node inserted/updated:", id, node_type_snapshot);
+                emitter.update_node_signal(id, node_type_snapshot, SignalInfo{ mvreg.agent_id() });
+                for (const auto &[to_id, edge_type] : from_edges_snapshot) {
+                    DSR_LOG_DEBUG("[JOIN_NODE] add edge FROM:", id, to_id, edge_type);
+                    emitter.update_edge_signal(id, to_id, edge_type, SignalInfo{ mvreg.agent_id() });
                 }
 
                 for (const auto &[k, v]: map_new_to_edges)
@@ -1452,7 +1469,10 @@ std::optional<std::string> DSRGraph::join_delta_edge_attr(IDL::MvregEdgeAttr &&m
 
 void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
 {
-    std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDTNode>>> updates;
+    // 5th element: post-join node snapshot captured inside the lock, used for
+    // signal emission after the lock is released to avoid racing with
+    // insert_node_/update_node (same pattern as join_delta_node).
+    std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDTNode>, std::optional<CRDTNode>>> updates;
 
     uint64_t id{0}, timestamp{0};
     uint32_t agent_id_ch{0};
@@ -1539,30 +1559,37 @@ void DSRGraph::join_full_graph(IDL::OrMap &&full_graph)
             auto mv = IDLNode_to_CRDT(std::move(val));
             bool mv_empty = mv.empty();
             agent_id_ch = val.agent_id();
-            std::optional<CRDTNode> nd = (nodes[k].empty()) ? std::nullopt : std::make_optional(nodes[k].read_reg());
+            auto it = nodes.find(k);
+            std::optional<CRDTNode> nd =
+                    (it != nodes.end() and !it->second.empty()) ? std::make_optional(it->second.read_reg()) : std::nullopt;
             id = k;
             if (!deleted.contains(k)) {
-                nodes[k].join(std::move(mv));
-                if (mv_empty or nodes.at(k).empty()) {
+                if (it == nodes.end()) {
+                    it = nodes.emplace(k, mvreg<CRDTNode>{}).first;
+                }
+                it->second.join(std::move(mv));
+                if (mv_empty or it->second.empty()) {
                     update_maps_node_delete(k, nd);
-                    updates.emplace_back(false, k, "", std::nullopt);
+                    updates.emplace_back(false, k, "", std::nullopt, std::nullopt);
                     delete_unprocessed_deltas();
                 } else {
-                    update_maps_node_insert(k, nodes.at(k).read_reg());
-                    updates.emplace_back(true, k, nodes.at(k).read_reg().type(), nd);
+                    const auto& reg = it->second.read_reg();
+                    update_maps_node_insert(k, reg);
+                    updates.emplace_back(true, k, reg.type(), nd, reg);
                     consume_unprocessed_deltas();
                 }
             }
         }
 
     }
-    for (auto &[signal, id, type, nd] : updates)
+    for (auto &[signal, id, type, nd, current_nd] : updates)
         if (signal) {
-            //check what change is joined
-            if (!nd.has_value() || nd->attrs() != nodes[id].read_reg().attrs()) {
-                emitter.update_node_signal(id, nodes[id].read_reg().type(), SignalInfo{ agent_id_ch });
-            } else if (nd.value() != nodes[id].read_reg()) {
-                auto iter = nodes[id].read_reg().fano();
+            //check what change is joined — use the snapshot captured inside the lock,
+            //not nodes[id], which races with concurrent insert_node_/update_node calls.
+            if (!nd.has_value() || nd->attrs() != current_nd->attrs()) {
+                emitter.update_node_signal(id, type, SignalInfo{ agent_id_ch });
+            } else if (nd.value() != *current_nd) {
+                const auto& iter = current_nd->fano();
                 for (const auto &[k, v] : nd->fano()) {
                     if (!iter.contains(k)) {
                         emitter.del_edge_signal(id, k.first, k.second, SignalInfo{ agent_id_ch });
@@ -1681,7 +1708,7 @@ void DSRGraph::node_subscription_thread()
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
     dsrpub_call_node = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader] = dsrsub_node.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), dsrpub_call_node, mtx_entity_creation);
+    auto [res, sub, reader] = dsrsub_node.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_node, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), {sub, reader});
 }
 
@@ -1715,7 +1742,7 @@ void DSRGraph::edge_subscription_thread()
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
     dsrpub_call_edge = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader]  = dsrsub_edge.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), dsrpub_call_edge, mtx_entity_creation);
+    auto [res, sub, reader]  = dsrsub_edge.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_edge, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getEdgeTopic()->get_name(), {sub, reader});
 
 }
@@ -1781,7 +1808,7 @@ void DSRGraph::edge_attrs_subscription_thread()
 
     };
     dsrpub_call_edge_attrs = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader] = dsrsub_edge_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(),
+    auto [res, sub, reader] = dsrsub_edge_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_edge_attrs, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getAttEdgeTopic()->get_name(), {sub, reader});
     //dsrsub_edge_attrs_stream.init(dsrparticipant.getParticipant(), "DSR_EDGE_ATTRS_STREAM", dsrparticipant.getEdgeAttrTopicName(),
@@ -1850,7 +1877,7 @@ void DSRGraph::node_attrs_subscription_thread()
 
     };
     dsrpub_call_node_attrs = NewMessageFunctor(this, lambda_general_topic);
-    auto [res, sub, reader] = dsrsub_node_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(),
+    auto [res, sub, reader] = dsrsub_node_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_node_attrs, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getAttNodeTopic()->get_name(), {sub, reader});
 
@@ -1904,7 +1931,7 @@ void DSRGraph::fullgraph_server_thread()
         }
     };
     dsrpub_graph_request_call = NewMessageFunctor(this, lambda_graph_request);
-    auto [res, sub, reader] = dsrsub_graph_request.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(),
+    auto [res, sub, reader] = dsrsub_graph_request.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(), dsrparticipant.get_domain_id(),
                               dsrpub_graph_request_call, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getGraphRequestTopic()->get_name(), {sub, reader});
 
@@ -1912,8 +1939,8 @@ void DSRGraph::fullgraph_server_thread()
 
 std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 {
-    bool sync = false;
-    bool repeated = false;
+    std::atomic<bool> sync{false};
+    std::atomic<bool> repeated{false};
     auto lambda_request_answer = [&](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         while (true)
@@ -1946,7 +1973,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
     };
 
     dsrpub_request_answer_call = NewMessageFunctor(this, lambda_request_answer);
-    auto [res, sub, reader] = dsrsub_request_answer.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(),
+    auto [res, sub, reader] = dsrsub_request_answer.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(), dsrparticipant.get_domain_id(),
                                dsrpub_request_answer_call, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getGraphTopic()->get_name(), {sub, reader});
 

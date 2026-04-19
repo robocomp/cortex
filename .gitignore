@@ -5,3 +5,7 @@
 .cache/
 bench/
 experiment/
+**/results
+**.pyc
+**/_pychache__
+.artifacts/

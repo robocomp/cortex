@@ -15,6 +15,19 @@ using namespace eprosima::fastdds;
 using namespace eprosima::fastdds::rtps;
 using namespace eprosima::fastdds::dds;
 
+namespace {
+Locator_t domain_multicast_locator(int8_t domain_id)
+{
+    const auto domain = static_cast<uint8_t>(domain_id);
+    Locator_t locator;
+    locator.port = 7900;
+    locator.kind = LOCATOR_KIND_UDPv4;
+    IPLocator::setIPv4(locator,
+        ("239.255." + std::to_string(domain / 250) + "." + std::to_string(1 + (domain % 250))).c_str());
+    return locator;
+}
+}
+
 DSRPublisher::DSRPublisher() : mp_participant(nullptr), mp_publisher(nullptr), mp_writer(nullptr)
 {}
 
@@ -23,7 +36,7 @@ DSRPublisher::~DSRPublisher()
 }
 
 std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*>
-        DSRPublisher::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic, bool isStreamData )
+        DSRPublisher::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic, int8_t domain_id, bool isStreamData )
 {
     mp_participant = mp_participant_;
 
@@ -46,12 +59,7 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
 
 
     if (not local) {
-        Locator_t locator;
-        locator.port = 7900;
-        locator.kind = LOCATOR_KIND_UDPv4;
-        IPLocator::setIPv4(locator, "239.255.1.33");
-        dataWriterQos.endpoint().multicast_locator_list.push_back(locator);
-
+        dataWriterQos.endpoint().multicast_locator_list.push_back(domain_multicast_locator(domain_id));
     }
 
     //ThroughputControllerDescriptor PublisherThroughputController{30000000, 1000};

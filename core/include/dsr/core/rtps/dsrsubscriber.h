@@ -16,6 +16,7 @@ public:
     [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
 	          init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
                    eprosima::fastdds::dds::Topic *topic,
+                   int8_t domain_id,
 				   const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
 				   std::mutex& mtx,
 				   bool isStreamData = false);
