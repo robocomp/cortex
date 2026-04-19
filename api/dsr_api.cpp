@@ -454,8 +454,8 @@ bool DSRGraph::delete_node(const std::string &name)
     {
         id = get_id_from_name(name);
         if (id.has_value()) {
-            node_signal = get_(*id);
             std::unique_lock<std::shared_mutex> lock(_mutex);
+            node_signal = get_(*id);
             std::tie(result, deleted_edges, deleted_node, delta_vec) = delete_node_(id.value());
         } else {
             return false;
