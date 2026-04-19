@@ -5,6 +5,8 @@ project(dsr
         LANGUAGES CXX)
 
 include(GNUInstallDirs)
+include(FetchContent)
+find_package(Threads REQUIRED)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -20,6 +22,8 @@ if (TSAN)
     add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
     add_link_options(-fsanitize=thread)
 endif()
+
+include(cmake/profiling.cmake)
 
 add_definitions(-I/usr/include/x86_64-linux-gnu/qt6/QtOpenGLWidgets/)
 

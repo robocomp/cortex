@@ -51,6 +51,7 @@ target_link_libraries(tests PRIVATE
                             Catch2::Catch2WithMain
                             Robocomp::dsr_api
                             Robocomp::dsr_core
+                            cortex_profiling
                             Qt6::Core
                             Eigen3::Eigen
                             fastdds

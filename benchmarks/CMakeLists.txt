@@ -102,6 +102,7 @@ target_link_libraries(dsr_benchmarks PRIVATE
     nanobench
     dsr_api
     dsr_core
+    cortex_profiling
     Qt6::Core
     Eigen3::Eigen
     fastdds

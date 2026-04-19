@@ -42,12 +42,15 @@ target_sources(dsr_core
 
         include/dsr/core/traits.h
         include/dsr/core/utils.h
+        include/dsr/core/profiling.h
+        profiling.cpp
         )
 
 
 target_link_libraries(dsr_core
         PRIVATE
-        Qt6::Core fastcdr fastdds Eigen3::Eigen)
+        Qt6::Core fastcdr fastdds osgDB OpenThreads Eigen3::Eigen
+        cortex_profiling)
 
 
 target_include_directories(dsr_core
