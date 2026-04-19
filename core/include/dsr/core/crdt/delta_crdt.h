@@ -12,6 +12,7 @@ Reimplementation from https://github.com/CBaquero/delta-enabled-crdts
 #include <set>
 
 #include "dsr/core/serialization/serializable.h"
+#include "dsr/core/profiling.h"
 
 using key_type = uint64_t;
 
@@ -58,6 +59,7 @@ public:
 
     //TODO: debug this
     void compact() {
+        CORTEX_PROFILE_ZONE_N("dot_context::compact");
         // Compact DC to CC if possible
         //typename map<K,int>::iterator mit;
         //typename set<pair<K,int> >::iterator sit;
@@ -117,6 +119,7 @@ public:
     }
 
     void join(const dot_context &o) {
+        CORTEX_PROFILE_ZONE_N("dot_context::join");
         if (this == &o) return; // Join is idempotent, but just dont do it.
         // CC
         auto mit = cc.begin();
@@ -293,6 +296,7 @@ public:
     }
 
     void join_replace_conflict(dot_kernel<T> &&o) {
+        CORTEX_PROFILE_ZONE_N("dot_kernel::join_replace_conflict");
 
         if (this == &o) return; // Join is idempotent, but just dont do it.
 
@@ -496,6 +500,7 @@ public:
     }
 
     mvreg<V> write(const V &val) {
+        CORTEX_PROFILE_ZONE_N("mvreg::write(copy)");
         mvreg<V> r, a;
         r.dk = dk.rmv();
         a.dk = dk.add(id, val);
@@ -505,6 +510,7 @@ public:
     }
 
     mvreg<V> write(V &&val) {
+        CORTEX_PROFILE_ZONE_N("mvreg::write(move)");
         mvreg<V> r, a;
         r.dk = dk.rmv();
         a.dk = dk.add(id, std::move(val));
@@ -543,6 +549,7 @@ public:
     }
 
     void join(mvreg<V> &&o) {
+        CORTEX_PROFILE_ZONE_N("mvreg::join");
         dk.join_replace_conflict(std::move(o.dk));
         assert(dk.ds.size() <= 1);
     }

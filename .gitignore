@@ -11,3 +11,4 @@ experiment/
 .artifacts/
 .vscode/*
 .claude/*
+build-*

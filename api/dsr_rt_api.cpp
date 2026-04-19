@@ -2,6 +2,7 @@
 #include <cmath>
 #include <dsr/api/dsr_rt_api.h>
 #include <dsr/api/dsr_api.h>
+#include <dsr/core/profiling.h>
 
 using namespace DSR;
 
@@ -144,6 +145,7 @@ std::optional<Edge> RT_API::get_edge_RT(const Node &n, uint64_t to, const std::s
 
 std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n, const std::string &edge_type)
 {
+    CORTEX_PROFILE_ZONE_N("RT_API::get_RT_pose_from_parent");
     if( not DSR::DSRGraph::is_valid_edge_type(edge_type)) 
         return {};
     auto p = G->get_parent_node(n);
@@ -170,6 +172,7 @@ std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n, const s
 
 std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query)
 {
+    CORTEX_PROFILE_ZONE_N("RT_API::get_edge_RT_as_rtmat");
     auto r_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge);
     auto t_o =  G->get_attrib_by_name<rt_translation_att>(edge);
     auto head_o = G->get_attrib_by_name<rt_head_index_att>(edge);
@@ -281,6 +284,7 @@ std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_edge_RT_covariance(const 
 
 std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
 {
+    CORTEX_PROFILE_ZONE_N("RT_API::get_translation(node,to)");
     if( auto edge = get_edge_RT(n, to); edge.has_value())
     {
         auto t_o = G->get_attrib_by_name<rt_translation_att>(edge.value());
@@ -361,11 +365,13 @@ std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(uint64_
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler, std::optional<uint64_t> timestamp)
 {
+    CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT(copy)");
     insert_or_assign_edge_RT_impl(n, to, trans, rot_euler, std::nullopt, timestamp);
 }
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler, std::optional<uint64_t> timestamp)
 {
+    CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT(move)");
     insert_or_assign_edge_RT_impl(n, to, std::move(trans), std::move(rot_euler), std::nullopt, timestamp);
 }
 

@@ -55,6 +55,8 @@ target_link_libraries(dsr_api
         Eigen3::Eigen
         )
 
+target_link_libraries(dsr_api PRIVATE cortex_profiling)
+
 target_include_directories(dsr_api
         PUBLIC
         # Headers of DSR Core
