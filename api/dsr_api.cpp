@@ -191,8 +191,7 @@ std::optional<DSR::Node> DSRGraph::get_node(const std::string &name)
     std::optional<uint64_t> id = get_id_from_name(name);
     if (id.has_value())
     {
-        std::optional<CRDTNode> n = get_(id.value());
-        if (n.has_value()) return Node(std::move(n.value()));
+        if (const auto* n = get_node_ptr_(id.value()); n != nullptr) return Node(*n);
     }
     return {};
 }
@@ -200,8 +199,7 @@ std::optional<DSR::Node> DSRGraph::get_node(const std::string &name)
 std::optional<DSR::Node> DSRGraph::get_node(uint64_t id)
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    std::optional<CRDTNode> n = get_(id);
-    if (n.has_value()) return Node(std::move(n.value()));
+    if (const auto* n = get_node_ptr_(id); n != nullptr) return Node(*n);
     return {};
 }
 
@@ -398,16 +396,13 @@ template bool DSRGraph::update_node<DSR::Node>(DSR::Node&&);
 
 
 std::tuple<bool, std::vector<Edge>, std::optional<DSR::MvregNodeMsg>, std::vector<DSR::MvregEdgeMsg>>
-DSRGraph::delete_node_(uint64_t id) {
+DSRGraph::delete_node_(uint64_t id, const CRDTNode &node) {
 
     std::vector<Edge> deleted_edges;
     std::vector<DSR::MvregEdgeMsg> delta_vec;
 
-    //Get and remove node.
-    auto node = get_(id);
-    if (!node.has_value()) return make_tuple(false, deleted_edges, std::nullopt, delta_vec);
     // Delete all edges from this node.
-    for (const auto &v : node.value().fano()) {
+    for (const auto &v : node.fano()) {
         deleted_edges.emplace_back(v.second.read_reg());
     }
     // Get remove delta.
@@ -432,7 +427,7 @@ DSRGraph::delete_node_(uint64_t id) {
             update_maps_edge_delete(from, id, type);
         }
     }
-    update_maps_node_delete(id, node.value());
+    update_maps_node_delete(id, node);
 
     return make_tuple(true, std::move(deleted_edges), std::move(delta_remove), std::move(delta_vec));
 
@@ -450,13 +445,16 @@ bool DSRGraph::delete_node(const std::string &name)
     std::optional<DSR::MvregNodeMsg> deleted_node;
     std::vector<DSR::MvregEdgeMsg> delta_vec;
     std::optional<Node> node_signal;
+    std::optional<CRDTNode> node_snapshot;
     std::optional<uint64_t> id = {};
     {
         id = get_id_from_name(name);
         if (id.has_value()) {
             std::unique_lock<std::shared_mutex> lock(_mutex);
-            node_signal = get_(*id);
-            std::tie(result, deleted_edges, deleted_node, delta_vec) = delete_node_(id.value());
+            node_snapshot = get_(*id);
+            if (!node_snapshot.has_value()) return false;
+            node_signal = Node(*node_snapshot);
+            std::tie(result, deleted_edges, deleted_node, delta_vec) = delete_node_(id.value(), *node_snapshot);
         } else {
             return false;
         }
@@ -489,11 +487,14 @@ bool DSRGraph::delete_node(uint64_t id)
     std::vector<Edge> deleted_edges;
     std::optional<DSR::MvregNodeMsg> deleted_node;
     std::optional<Node> node_signal;
+    std::optional<CRDTNode> node_snapshot;
     std::vector<DSR::MvregEdgeMsg> delta_vec;
     {
-        node_signal = get_(id);
         std::unique_lock<std::shared_mutex> lock(_mutex);
-        std::tie(result, deleted_edges, deleted_node, delta_vec) = delete_node_(id);
+        node_snapshot = get_(id);
+        if (!node_snapshot.has_value()) return false;
+        node_signal = Node(*node_snapshot);
+        std::tie(result, deleted_edges, deleted_node, delta_vec) = delete_node_(id, *node_snapshot);
     }
 
     if (result) {
@@ -531,7 +532,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
         {
             std::optional<CRDTNode> n = get_(id);
             if (n.has_value())
-                nodes_.emplace_back(std::move(n.value()));
+                nodes_.emplace_back(std::move(*n));
         }
     }
     return nodes_;
@@ -573,7 +574,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
             {
                 std::optional<CRDTNode> n = get_(id);
                 if (n.has_value())
-                    nodes_.emplace_back(std::move(n.value()));
+                    nodes_.emplace_back(std::move(*n));
             }
         }
     }
@@ -895,12 +896,17 @@ std::map<uint64_t, DSR::Node> DSRGraph::getCopy() const
 
 std::optional<CRDTNode> DSRGraph::get_(uint64_t id)
 {
+    if (const auto* node = get_node_ptr_(id); node != nullptr)
+        return std::make_optional(*node);
+    return {};
+}
+
+const CRDTNode* DSRGraph::get_node_ptr_(uint64_t id) const
+{
     auto it = nodes.find(id);
     if (it != nodes.end() and !it->second.empty())
-    {
-        return std::make_optional(it->second.read_reg());
-    }
-    return {};
+        return &it->second.read_reg();
+    return nullptr;
 }
 
 std::optional<std::int32_t> DSRGraph::get_node_level(const Node &n)
@@ -919,8 +925,7 @@ std::optional<DSR::Node> DSRGraph::get_parent_node(const Node &n)
     if (p.has_value())
     {
         std::shared_lock<std::shared_mutex> lock(_mutex);
-        auto tmp = get_(p.value());
-        if (tmp.has_value()) return Node(tmp.value());
+        if (const auto* tmp = get_node_ptr_(p.value()); tmp != nullptr) return Node(*tmp);
     }
     return {};
 }
