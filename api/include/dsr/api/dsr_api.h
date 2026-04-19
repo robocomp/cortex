@@ -558,7 +558,8 @@ namespace DSR
         std::vector<std::string> get_connected_agents()
         {
             std::unique_lock<std::mutex> lck(participant_set_mutex);
-            std::vector<std::string> ret_vec(participant_set.size());
+            std::vector<std::string> ret_vec;
+            ret_vec.reserve(participant_set.size());
             for (auto &[k, _]: participant_set)
             {
                 ret_vec.emplace_back(k);
