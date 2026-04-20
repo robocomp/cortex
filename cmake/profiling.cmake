@@ -133,7 +133,11 @@ if (CORTEX_PROFILING_BACKEND_MODE STREQUAL "TRACY" AND CORTEX_TRACY_ENABLED)
 # ── Perfetto ──────────────────────────────────────────────────────────────────
 
 elseif (CORTEX_PROFILING_BACKEND_MODE STREQUAL "PERFETTO")
-    message(STATUS "Perfetto support enabled")
+
+    set(CORTEX_PERFETTO_MODE "DEFAULT" CACHE STRING
+        "Perfetto callstack mode. Accepted values: DEFAULT, STACKFRAME, LINUX_PERF")
+    set_property(CACHE CORTEX_PERFETTO_MODE PROPERTY STRINGS DEFAULT STACKFRAME LINUX_PERF)
+    string(TOUPPER "${CORTEX_PERFETTO_MODE}" _pf_mode)
 
     FetchContent_Declare(
         perfetto_sdk_src
@@ -152,6 +156,24 @@ elseif (CORTEX_PROFILING_BACKEND_MODE STREQUAL "PERFETTO")
     target_compile_definitions(cortex_profiling INTERFACE
         CORTEX_PROFILING_BACKEND_PERFETTO
         CORTEX_CALLSTACK_DEPTH=${CORTEX_CALLSTACK_DEPTH})
+
+    if (_pf_mode STREQUAL "STACKFRAME")
+        target_compile_definitions(cortex_profiling INTERFACE CORTEX_PERFETTO_CALLSTACK_STACKFRAME)
+        target_compile_options(cortex_profiling INTERFACE -fno-omit-frame-pointer)
+        target_link_options(cortex_profiling INTERFACE -rdynamic)
+    elseif (_pf_mode STREQUAL "LINUX_PERF")
+        target_compile_definitions(cortex_profiling INTERFACE CORTEX_PERFETTO_CALLSTACK_LINUX_PERF)
+        target_compile_options(cortex_profiling INTERFACE -fno-omit-frame-pointer)
+    elseif (NOT _pf_mode STREQUAL "DEFAULT")
+        message(FATAL_ERROR
+            "Invalid value for CORTEX_PERFETTO_MODE='${CORTEX_PERFETTO_MODE}'. "
+            "Use one of: DEFAULT, STACKFRAME, LINUX_PERF")
+    endif()
+
+    message(STATUS "Perfetto support enabled  (mode: ${_pf_mode})")
+    if (_pf_mode STREQUAL "LINUX_PERF")
+        message(STATUS "  NOTE: LINUX_PERF requires traced + traced_probes and CAP_PERFMON (or perf_event_paranoid <= 1)")
+    endif()
 
 elseif (NOT CORTEX_PROFILING_BACKEND_MODE STREQUAL "NONE")
     message(FATAL_ERROR

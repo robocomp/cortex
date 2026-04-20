@@ -57,15 +57,85 @@ What you need:
 - a generated `.pftrace` file
 - either the web UI at `https://ui.perfetto.dev/` or another Perfetto-compatible viewer
 
-Typical usage:
+#### Callstack mode (`CORTEX_PERFETTO_MODE`)
+
+Three modes are available, selected at configure time:
+
+| Mode | CMake flag | What you get |
+|------|-----------|--------------|
+| `DEFAULT` | _(omit)_ | Zone events only, no callstacks |
+| `STACKFRAME` | `-DCORTEX_PERFETTO_MODE=STACKFRAME` | Callstacks attached to `CORTEX_PROFILE_ZONE_CS` zones via `callstack_iid` + `InternedData` (native flamechart in the UI) |
+| `LINUX_PERF` | `-DCORTEX_PERFETTO_MODE=LINUX_PERF` | Kernel-driven CPU sampling correlated to zone events by timestamp |
+
+**STACKFRAME** captures a callstack at every `CORTEX_PROFILE_ZONE_CS` call site using `backtrace()`, resolves symbols with `dladdr` + demangling, and emits them as proper `Callstack` / `Frame` / `InternedString` proto entries. The Perfetto UI renders these as an expandable flamechart on the event. `-fno-omit-frame-pointer` is added automatically.
+
+**LINUX_PERF** adds a `linux.perf` data source alongside track events. The kernel interrupts the process at 1 kHz and records the CPU stack independently of instrumentation — useful for finding hotspots in uninstrumented code. `-fno-omit-frame-pointer` is added automatically.
+
+Requirements for `LINUX_PERF`:
+
+- `traced`, `traced_probes`, and `traced_perf` must be running (all three)
+- `perf_event_paranoid <= 0`:
+  ```bash
+  sudo sysctl -w kernel.perf_event_paranoid=0
+  ```
+- The `tracebox` binary (not its symlink) needs `CAP_SYS_PTRACE` for DWARF stack unwinding. `readlink -f` may not resolve the real path — locate it manually if needed:
+  ```bash
+  # find the actual binary (example path — yours may differ)
+  ls -la $(which tracebox)          # shows where symlink points
+  sudo setcap cap_perfmon,cap_sys_ptrace+ep /home/jc/.local/share/perfetto/prebuilts/tracebox
+  ```
+- Run `traced_perf` as root if `setcap` is not an option (root can open `/proc/<pid>/mem` and connect to user-owned sockets):
+  ```bash
+  tracebox traced --background        # as your user
+  tracebox traced_probes --background # as your user
+  sudo tracebox traced_perf           # as root
+  ```
+
+**Important — LINUX_PERF vs DEFAULT/STACKFRAME modes:**
+
+LINUX_PERF mode registers the process as a system-backend producer only. It does **not** write a `.pftrace` file itself — the trace is owned by `traced` and read back at process exit via the consumer API. Zone events and CPU samples land in the same file and are visible as separate track groups in the UI ("Process callstacks cpu-clock" for samples, thread rows for zones). To correlate them, expand both groups and select an area that spans both.
+
+#### Typical usage
+
+DEFAULT (zone events only, no daemons needed):
 
 ```bash
 cmake -S . -B build-perfetto \
   -DWITH_TESTS=ON \
   -DCORTEX_PROFILING_BACKEND=PERFETTO
 cmake --build build-perfetto --target tests
-export CORTEX_PERFETTO_TRACE_FILE=.artifacts/output.pftrace
 ./build-perfetto/tests/tests "[SYNCHRONIZATION][GRAPH]"
+```
+
+STACKFRAME (callstacks on `_CS` zones, no daemons needed):
+
+```bash
+cmake -S . -B build-perfetto \
+  -DWITH_TESTS=ON \
+  -DCORTEX_PROFILING_BACKEND=PERFETTO \
+  -DCORTEX_PERFETTO_MODE=STACKFRAME
+cmake --build build-perfetto --target tests
+./build-perfetto/tests/tests "[SYNCHRONIZATION][GRAPH]"
+```
+
+LINUX_PERF (kernel CPU sampling correlated with zone events):
+
+```bash
+# One-time setup:
+sudo sysctl -w kernel.perf_event_paranoid=0
+sudo setcap cap_perfmon,cap_sys_ptrace+ep /path/to/real/tracebox
+
+# Start daemons (traced_perf as root OR with setcap applied):
+tracebox traced --background
+tracebox traced_probes --background
+tracebox traced_perf --background   # or: sudo tracebox traced_perf
+
+cmake -S . -B build-pf-lp \
+  -DWITH_TESTS=ON \
+  -DCORTEX_PROFILING_BACKEND=PERFETTO \
+  -DCORTEX_PERFETTO_MODE=LINUX_PERF
+cmake --build build-pf-lp -j$(nproc)
+./build-pf-lp/bin/your_component
 ```
 
 The trace file path can be overridden with:
