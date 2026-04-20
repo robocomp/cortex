@@ -22,19 +22,24 @@ void shutdown();
 
 #include <perfetto.h>
 #include <pthread.h>
+
 PERFETTO_DEFINE_CATEGORIES_IN_NAMESPACE(
     DSR::profiling,
     perfetto::Category("cortex").SetDescription("Cortex runtime events"));
 PERFETTO_USE_CATEGORIES_FROM_NAMESPACE(DSR::profiling);
 
 namespace DSR::profiling {
+
+#if defined(CORTEX_PERFETTO_CALLSTACK_STACKFRAME)
 struct CallstackFrames {
     static constexpr int kMax = 64;
     void* frames[kMax];
     int count;
 };
 CallstackFrames capture_callstack(int depth) noexcept;
-void emit_callstack(perfetto::EventContext& ctx, const CallstackFrames& cs) noexcept;
+void emit_callstack_stackframe(perfetto::EventContext& ctx, const CallstackFrames& cs) noexcept;
+#endif
+
 } // namespace DSR::profiling
 
 #define CORTEX_PROFILE_ZONE() \
@@ -45,12 +50,20 @@ void emit_callstack(perfetto::EventContext& ctx, const CallstackFrames& cs) noex
     ::DSR::profiling::ensure_started(); \
     TRACE_EVENT("cortex", name_literal)
 
+#if defined(CORTEX_PERFETTO_CALLSTACK_STACKFRAME)
 #define CORTEX_PROFILE_ZONE_CS(name_literal) \
     ::DSR::profiling::ensure_started(); \
     auto _cortex_cs = ::DSR::profiling::capture_callstack(CORTEX_CALLSTACK_DEPTH); \
     TRACE_EVENT("cortex", name_literal, [&_cortex_cs](perfetto::EventContext ctx) { \
-        ::DSR::profiling::emit_callstack(ctx, _cortex_cs); \
+        ::DSR::profiling::emit_callstack_stackframe(ctx, _cortex_cs); \
     })
+#else
+/* DEFAULT / LINUX_PERF: no per-zone callstack capture needed;
+   linux.perf samples the whole process at the configured frequency. */
+#define CORTEX_PROFILE_ZONE_CS(name_literal) \
+    ::DSR::profiling::ensure_started(); \
+    TRACE_EVENT("cortex", name_literal)
+#endif
 
 #define CORTEX_PROFILE_FRAME() ((void)0)
 #define CORTEX_PROFILE_TEXT(text_ptr, text_size) ((void)0)

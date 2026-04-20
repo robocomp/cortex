@@ -47,7 +47,7 @@ CXX_EXTENSIONS ON)
 target_compile_options(tests PUBLIC -g -std=c++23)
 
 
-target_link_libraries(tests PRIVATE 
+target_link_libraries(tests PRIVATE
                             Catch2::Catch2WithMain
                             Robocomp::dsr_api
                             Robocomp::dsr_core
@@ -56,4 +56,26 @@ target_link_libraries(tests PRIVATE
                             Eigen3::Eigen
                             fastdds
                             fastcdr)
+
+# ── Perfetto integration tests ────────────────────────────────────────────────
+# Built only when the Perfetto backend is active (any mode).
+if (TARGET cortex_profiling)
+    get_target_property(_pf_defs cortex_profiling INTERFACE_COMPILE_DEFINITIONS)
+    if (_pf_defs AND _pf_defs MATCHES "CORTEX_PROFILING_BACKEND_PERFETTO")
+        add_executable(perfetto_tests
+            profiling/perfetto_test.cpp)
+
+        set_target_properties(perfetto_tests PROPERTIES
+            CXX_STANDARD 23
+            CXX_STANDARD_REQUIRED ON)
+
+        target_compile_options(perfetto_tests PRIVATE -g -std=c++23)
+
+        target_link_libraries(perfetto_tests PRIVATE
+            Catch2::Catch2
+            Robocomp::dsr_api
+            Robocomp::dsr_core
+            cortex_profiling)
+    endif()
+endif()
 
