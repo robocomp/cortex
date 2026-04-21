@@ -35,6 +35,7 @@ add_executable(tests test.cpp
                      crdt/crdt_operations.cpp
                      synchronization/graph_synchronization.cpp
                      synchronization/type_translation.cpp
+                     synchronization/lww_sync_engine.cpp
                      synchronization/graph_signals.cpp
                      utils.h)
 
@@ -78,4 +79,3 @@ if (TARGET cortex_profiling)
             cortex_profiling)
     endif()
 endif()
-

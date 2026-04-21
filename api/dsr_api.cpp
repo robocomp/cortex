@@ -4,6 +4,7 @@
 
 #include "dsr/api/dsr_graph_settings.h"
 #include "dsr/api/dsr_crdt_sync_engine.h"
+#include "dsr/api/dsr_lww_sync_engine.h"
 #include "dsr/core/types/internal_types.h"
 #include "dsr/core/types/translator.h"
 #include "dsr/core/profiling.h"
@@ -32,6 +33,14 @@ using namespace DSR;
 using namespace std::literals;
 
 namespace {
+DSR::SyncEnginePtr make_sync_engine(DSR::DSRGraph& graph, DSR::SyncMode mode)
+{
+    if (mode == DSR::SyncMode::LWW) {
+        return std::make_unique<DSR::LWWSyncEngine>(graph);
+    }
+    return std::make_unique<DSR::CRDTSyncEngine>(graph);
+}
+
 bool protocol_version_matches(
     DSR::GraphSettings::LOGLEVEL log_level,
     const char* channel,
@@ -100,14 +109,11 @@ DSRGraph::DSRGraph(GraphSettings settings) :
         same_host(settings.same_host),
         generator(settings.agent_id),
         log_level(settings.log_level),
-        engine_(std::make_unique<CRDTSyncEngine>(*this))
+        engine_(make_sync_engine(*this, settings.sync_mode))
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::DSRGraph");
 
     qDebug() << "Agent name: " << QString::fromStdString(agent_name);
-    if (sync_mode != SyncMode::CRDT) {
-        qFatal("DSRGraph aborting: SyncMode::LWW is not implemented yet");
-    }
     {
         CORTEX_PROFILE_ZONE_N("DSRGraph::DSRGraph setup utils/signals");
         utils =  std::make_unique<Utilities>(this);
@@ -116,6 +122,25 @@ DSRGraph::DSRGraph(GraphSettings settings) :
         } else {
             set_queued_signals();
         }
+    }
+    if (sync_mode == SyncMode::LWW)
+    {
+        if (!settings.input_file.empty())
+        {
+            try
+            {
+                CORTEX_PROFILE_ZONE_N("DSRGraph::DSRGraph load local LWW graph");
+                read_from_json_file(settings.input_file);
+                qDebug() << __FUNCTION__ << "Warning, graph read from file " << QString::fromStdString(settings.input_file);
+            }
+            catch(const DSR::DSRException& e)
+            {
+                std::cout << e.what() << '\n';
+                qFatal("Aborting program. Cannot continue without intial file");
+            }
+        }
+        qDebug() << __FUNCTION__ << "Constructor finished OK";
+        return;
     }
     // RTPS Create participant
     auto participant_init_result = [&]() {
@@ -236,16 +261,20 @@ DSRGraph::DSRGraph(std::string name, uint32_t id, const std::string &dsr_input_f
 DSRGraph::~DSRGraph()
 {
     qDebug() << "Removing DSRGraph";
-    dsrparticipant.remove_participant_and_entities();
-    if (!copy) {
+    if (sync_mode == SyncMode::CRDT) {
+        dsrparticipant.remove_participant_and_entities();
+    }
+    if (!copy && sync_mode == SyncMode::CRDT) {
         qDebug() << "Removing rtps participant";
     }
 }
 
 void DSRGraph::reset()
 {
-    dsrparticipant.remove_participant_and_entities();
-    engine_ = std::make_unique<CRDTSyncEngine>(*this);
+    if (sync_mode == SyncMode::CRDT) {
+        dsrparticipant.remove_participant_and_entities();
+    }
+    engine_ = make_sync_engine(*this, sync_mode);
     deleted.clear();
     name_map.clear();
     id_map.clear();
@@ -277,6 +306,9 @@ std::optional<DSR::Node> DSRGraph::get_node(const std::string &name)
     std::optional<uint64_t> id = get_id_from_name(name);
     if (id.has_value())
     {
+        if (sync_mode == SyncMode::LWW) {
+            return engine_->get_node(id.value());
+        }
         if (const auto* n = get_node_ptr_(id.value()); n != nullptr) return Node(*n);
     }
     return {};
@@ -286,6 +318,9 @@ std::optional<DSR::Node> DSRGraph::get_node(uint64_t id)
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::get_node(id)");
     std::shared_lock<std::shared_mutex> lock(_mutex);
+    if (sync_mode == SyncMode::LWW) {
+        return engine_->get_node(id);
+    }
     if (const auto* n = get_node_ptr_(id); n != nullptr) return Node(*n);
     return {};
 }
@@ -299,6 +334,35 @@ template<typename No>
 std::optional<uint64_t> DSRGraph::insert_node(No &&node)
     requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
+    if (sync_mode == SyncMode::LWW)
+    {
+        {
+            CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node LWW");
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+            uint64_t new_node_id = generator.generate();
+            node.id(new_node_id);
+            if (node.name().empty() or name_map.contains(node.name()))
+                node.name(node.type() + "_" + id_generator::hex_string(new_node_id));
+            lck_cache.unlock();
+            auto node_copy = Node(node);
+            auto effect = engine_->insert_node_local(std::move(node_copy));
+            if (!effect.applied) {
+                return {};
+            }
+        }
+        if (!copy)
+        {
+            DSR_LOG_DEBUG("[INSERT_NODE] emitting update_node_signal", node.id(), node.type());
+            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+            for (const auto &[k, v]: node.fano())
+            {
+                emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+            }
+        }
+        return node.id();
+    }
+
     std::optional<DSR::MvregNodeMsg> delta;
     bool inserted = false;
     {
@@ -340,6 +404,36 @@ template<typename No>
 std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
     requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
+    if (sync_mode == SyncMode::LWW)
+    {
+        {
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+            if (id_map.contains(node.id())) {
+                DSR_LOG_WARNING("[INSERT_NODE_WITH_ID] Node id already exists", node.id(), node.type());
+                return {};
+            }
+            if (node.name().empty() or name_map.contains(node.name()))
+                node.name(node.type() + "_" + id_generator::hex_string(node.id()));
+            lck_cache.unlock();
+            auto node_copy = Node(node);
+            auto effect = engine_->insert_node_local(std::move(node_copy));
+            if (!effect.applied) {
+                return {};
+            }
+        }
+        if (!copy)
+        {
+            DSR_LOG_DEBUG("[INSERT_NODE_WITH_ID] emitting update_node_signal", node.id(), node.type());
+            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+            for (const auto &[k, v]: node.fano())
+            {
+                emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+            }
+        }
+        return node.id();
+    }
+
     std::optional<DSR::MvregNodeMsg> delta;
     bool inserted = false;
     {
@@ -387,6 +481,43 @@ bool DSRGraph::update_node(No &&node)
 requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
 {
     CORTEX_PROFILE_ZONE_CS("DSRGraph::update_node");
+
+    if (sync_mode == SyncMode::LWW)
+    {
+        std::vector<std::string> changed_attributes;
+        {
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+            if (deleted.contains(node.id()))
+                throw std::runtime_error(
+                        (std::string("Cannot update node in G, " + std::to_string(node.id()) + " is deleted") + __FILE__ +
+                         " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+            else if (( id_map.contains(node.id()) and id_map.at(node.id()) != node.name()) or
+                     ( name_map.contains(node.name()) and name_map.at(node.name()) != node.id()))
+                throw std::runtime_error(
+                        (std::string("Cannot update node in G, id and name must be unique") + __FILE__ + " " +
+                         __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+            else if (id_map.contains(node.id())) {
+                lck_cache.unlock();
+                auto node_copy = Node(node);
+                auto effect = engine_->update_node_local(std::move(node_copy));
+                if (!effect.applied) {
+                    return false;
+                }
+                changed_attributes = std::move(effect.changed_attributes);
+            } else {
+                return false;
+            }
+        }
+        if (!copy) {
+            DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", node.id(), node.type());
+            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+            if (!changed_attributes.empty()) {
+                emitter.update_node_attr_signal(node.id(), changed_attributes, SignalInfo{agent_id});
+            }
+        }
+        return true;
+    }
 
     bool updated = false;
     std::optional<DSR::MvregNodeAttrVec> vec_node_attr;
@@ -448,6 +579,15 @@ bool DSRGraph::delete_node(const std::string &name)
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::delete_node(name)");
 
+    if (sync_mode == SyncMode::LWW)
+    {
+        auto id = get_id_from_name(name);
+        if (!id.has_value()) {
+            return false;
+        }
+        return delete_node(*id);
+    }
+
     bool result = false;
     std::vector<Edge> deleted_edges;
     std::optional<DSR::MvregNodeMsg> deleted_node;
@@ -491,6 +631,32 @@ bool DSRGraph::delete_node(const std::string &name)
 bool DSRGraph::delete_node(uint64_t id)
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::delete_node(id)");
+
+    if (sync_mode == SyncMode::LWW)
+    {
+        NodeMutationEffect effect;
+        {
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            effect = engine_->delete_node_local(id);
+        }
+
+        if (!effect.applied) {
+            return false;
+        }
+
+        if (!copy) {
+            DSR_LOG_DEBUG("[DELETE_NODE] emitting del_node_signal", id);
+            emitter.del_node_signal(id, SignalInfo{ agent_id });
+            if (effect.deleted_node) {
+                emitter.deleted_node_signal(*effect.deleted_node, SignalInfo{agent_id});
+            }
+            for (auto &edge : effect.deleted_edges) {
+                emitter.del_edge_signal(edge.from(), edge.to(), edge.type(), SignalInfo{ agent_id });
+                emitter.deleted_edge_signal(edge, SignalInfo{ agent_id });
+            }
+        }
+        return true;
+    }
 
     bool result = false;
     std::vector<Edge> deleted_edges;
@@ -539,9 +705,15 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
         nodes_.reserve(nodeType.at(type).size());
         for (auto &id: nodeType.at(type))
         {
-            std::optional<CRDTNode> n = get_(id);
-            if (n.has_value())
-                nodes_.emplace_back(std::move(*n));
+            if (sync_mode == SyncMode::LWW) {
+                if (auto node = engine_->get_node(id); node.has_value()) {
+                    nodes_.emplace_back(std::move(*node));
+                }
+            } else {
+                std::optional<CRDTNode> n = get_(id);
+                if (n.has_value())
+                    nodes_.emplace_back(std::move(*n));
+            }
         }
     }
     return nodes_;
@@ -550,7 +722,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
 std::vector<Node> DSRGraph::get_nodes()
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    auto snapshot = crdt_engine().snapshot();
+    auto snapshot = engine_->snapshot();
     std::vector<Node> nodes_;
     nodes_.reserve(snapshot.size());
     for (auto& [id, node] : snapshot)
@@ -579,9 +751,15 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
         {
             for (auto &id: nodeType.at(type))
             {
-                std::optional<CRDTNode> n = get_(id);
-                if (n.has_value())
-                    nodes_.emplace_back(std::move(*n));
+                if (sync_mode == SyncMode::LWW) {
+                    if (auto node = engine_->get_node(id); node.has_value()) {
+                        nodes_.emplace_back(std::move(*node));
+                    }
+                } else {
+                    std::optional<CRDTNode> n = get_(id);
+                    if (n.has_value())
+                        nodes_.emplace_back(std::move(*n));
+                }
             }
         }
     }
@@ -603,6 +781,9 @@ std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::
     std::optional<uint64_t> id_to = get_id_from_name(to);
     if (id_from.has_value() and id_to.has_value())
     {
+        if (sync_mode == SyncMode::LWW) {
+            return engine_->get_edge(id_from.value(), id_to.value(), key);
+        }
         auto edge_opt = get_edge_(id_from.value(), id_to.value(), key);
         if (edge_opt.has_value()) return Edge(edge_opt.value());
     }
@@ -612,6 +793,9 @@ std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::
 std::optional<DSR::Edge> DSRGraph::get_edge(uint64_t from, uint64_t to, const std::string &key)
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);
+    if (sync_mode == SyncMode::LWW) {
+        return engine_->get_edge(from, to, key);
+    }
     auto edge_opt = get_edge_(from, to, key);
     if (edge_opt.has_value()) return Edge(std::move(edge_opt.value()));
     return {};
@@ -647,6 +831,31 @@ bool DSRGraph::insert_or_assign_edge(Ed &&attrs)
 requires (std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
 {
     CORTEX_PROFILE_ZONE_CS("DSRGraph::insert_or_assign_edge");
+
+    if (sync_mode == SyncMode::LWW)
+    {
+        std::vector<std::string> changed_attributes;
+        {
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            auto edge_copy = Edge(attrs);
+            auto effect = engine_->insert_or_assign_edge_local(std::move(edge_copy));
+            if (!effect.applied) {
+                std::cout << __FUNCTION__ << ":" << __LINE__ << " Error. ID:" << attrs.from() << " or " << attrs.to()
+                          << " not found. Cant update. " << std::endl;
+                return false;
+            }
+            changed_attributes = std::move(effect.changed_attributes);
+        }
+        if (!copy) {
+            DSR_LOG_DEBUG("[INSERT_OR_ASSIGN_EDGE] emitting update_edge_signal", attrs.from(), attrs.to(), attrs.type());
+            emitter.update_edge_signal(attrs.from(), attrs.to(), attrs.type(), SignalInfo{ agent_id });
+            if (!changed_attributes.empty()) {
+                emitter.update_edge_attr_signal(attrs.from(), attrs.to(), attrs.type(), changed_attributes, SignalInfo{ agent_id });
+            }
+        }
+        return true;
+    }
+
     bool result = false;
     std::optional<DSR::MvregEdgeMsg> delta_edge;
     std::optional<DSR::MvregEdgeAttrVec> delta_attrs;
@@ -701,6 +910,26 @@ std::optional<DSR::MvregEdgeMsg> DSRGraph::delete_edge_(uint64_t from, uint64_t 
 
 bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
 {
+    if (sync_mode == SyncMode::LWW)
+    {
+        EdgeMutationEffect effect;
+        {
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            effect = engine_->delete_edge_local(from, to, key);
+        }
+        if (!effect.applied)
+        {
+            return false;
+        }
+        if (!copy) {
+            DSR_LOG_DEBUG("[DELETE_EDGE] emitting del_edge_signal", from, to, key);
+            emitter.del_edge_signal(from, to, key, SignalInfo{ agent_id });
+            if (effect.deleted_edge.has_value()) {
+                emitter.deleted_edge_signal(*effect.deleted_edge, SignalInfo{ agent_id });
+            }
+        }
+        return true;
+    }
 
     std::optional<DSR::MvregEdgeMsg> delta;
     std::optional<Edge> deleted_edge;
@@ -726,6 +955,15 @@ bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
 
 bool DSRGraph::delete_edge(const std::string &from, const std::string &to, const std::string &key)
 {
+    if (sync_mode == SyncMode::LWW)
+    {
+        auto id_from = get_id_from_name(from);
+        auto id_to = get_id_from_name(to);
+        if (!id_from.has_value() || !id_to.has_value()) {
+            return false;
+        }
+        return delete_edge(*id_from, *id_to, key);
+    }
 
     std::optional<uint64_t> id_from = {};
     std::optional<uint64_t> id_to = {};
@@ -821,7 +1059,7 @@ std::optional<std::map<std::pair<uint64_t, std::string>, DSR::Edge>> DSRGraph::g
 std::map<uint64_t, DSR::Node> DSRGraph::getCopy() const
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    return crdt_engine().snapshot();
+    return engine_->snapshot();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -916,6 +1154,56 @@ void DSRGraph::update_maps_node_insert(uint64_t id, const CRDTNode &n)
     }
 }
 
+void DSRGraph::update_maps_node_delete(uint64_t id, const std::optional<Node>& n)
+{
+    std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
+    if (id_map.contains(id))
+    {
+        name_map.erase(id_map.at(id));
+        id_map.erase(id);
+    }
+    deleted.insert(id);
+    to_edges.erase(id);
+
+    if (n.has_value())
+    {
+        if (nodeType.contains(n->type())) {
+            nodeType.at(n->type()).erase(id);
+            if (nodeType.at(n->type()).empty()) nodeType.erase(n->type());
+        }
+        for (const auto &[k, v] : n->fano()) {
+            if (const auto tuple = std::pair{id, v.to()}; edges.contains(tuple)) {
+                edges.at(tuple).erase(k.second);
+                if (edges.at(tuple).empty()) edges.erase(tuple);
+            }
+            if (edgeType.contains(k.second)) {
+                edgeType.at(k.second).erase({id, k.first});
+                if (edgeType.at(k.second).empty()) edgeType.erase(k.second);
+            }
+            if (to_edges.contains(k.first)) {
+                to_edges.at(k.first).erase({id, k.second});
+                if (to_edges.at(k.first).empty()) to_edges.erase(k.first);
+            }
+        }
+    }
+}
+
+void DSRGraph::update_maps_node_insert(const Node& n)
+{
+    std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
+
+    deleted.erase(n.id());
+    name_map[n.name()] = n.id();
+    id_map[n.id()] = n.name();
+    nodeType[n.type()].emplace(n.id());
+    for (const auto& [k, v] : n.fano())
+    {
+        edges[{n.id(), k.first}].insert(k.second);
+        edgeType[k.second].insert({n.id(), k.first});
+        to_edges[k.first].insert({n.id(), k.second});
+    }
+}
+
 
 void DSRGraph::update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key)
 {
@@ -966,7 +1254,7 @@ std::optional<std::string> DSRGraph::get_name_from_id(uint64_t id)
 
 size_t DSRGraph::size() const {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    return crdt_engine().size();
+    return engine_->size();
 }
 
 
@@ -1559,7 +1847,7 @@ DSRGraph::DSRGraph(const DSRGraph &G)
       same_host(G.same_host),
       generator(G.agent_id),
       log_level(G.log_level),
-      engine_(std::make_unique<CRDTSyncEngine>(*this, G.crdt_engine())),
+      engine_(make_sync_engine(*this, G.sync_mode)),
       tp(1, "join-copy"),
       tp_delta_attr(1, "attr-copy")
 {
@@ -1573,6 +1861,18 @@ DSRGraph::DSRGraph(const DSRGraph &G)
     edgeType = G.edgeType;
     nodeType = G.nodeType;
     to_edges = G.to_edges;
+    if (sync_mode == SyncMode::CRDT) {
+        engine_ = std::make_unique<CRDTSyncEngine>(*this, G.crdt_engine());
+    } else {
+        for (auto& [id, node] : G.engine_->snapshot()) {
+            engine_->insert_node_local(Node(node));
+        }
+        for (auto& [id, node] : G.engine_->snapshot()) {
+            for (const auto& [key, edge] : node.fano()) {
+                engine_->insert_or_assign_edge_local(Edge(edge));
+            }
+        }
+    }
 }
 
 std::unique_ptr<DSRGraph> DSRGraph::G_copy()
