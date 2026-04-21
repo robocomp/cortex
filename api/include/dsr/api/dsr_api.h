@@ -53,15 +53,17 @@ namespace DSR
     static constexpr uint64_t CLEAR_DELETED_SIGNAL = std::numeric_limits<uint64_t>::max();
 
     class CRDTSyncEngine;
+    class LWWSyncEngine;
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
     /////////////////////////////////////////////////////////////////
-    class DSRGraph : public QObject
+    class DSRGraph : public QObject, public SyncEngineHost
     {
         friend RT_API;
         friend class DSRGraphTestAccess;
         friend class CRDTSyncEngine;
+        friend class LWWSyncEngine;
 
         public:
         size_t size() const;
@@ -515,22 +517,8 @@ namespace DSR
         {
             utils->read_from_json_file(file, [&] (const Node& node) -> std::optional<uint64_t>
             {
-                bool r = false;
-                {
-                    std::unique_lock<std::shared_mutex> lock(_mutex);
-                    if (auto t1 = !id_map.contains(node.id()), t2 = !name_map.contains(node.name()); t1 and t2) {
-                        std::tie(r, std::ignore) = insert_node_(user_node_to_crdt(node));
-                    } else {
-                        if (!t1 and t2) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                        if (t1) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                        throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") and same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                    }
-
-                }
-                if (r) {
-                    return node.id();
-                }
-                return {};
+                auto copy = node;
+                return insert_node_with_id(copy);
             });
         };
 
@@ -640,8 +628,14 @@ namespace DSR
 
         void update_maps_node_delete(uint64_t id, const std::optional<CRDTNode>& n);
         void update_maps_node_insert(uint64_t id, const CRDTNode &n);
-        void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "");
-        void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key);
+        void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "") override;
+        void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key) override;
+
+        uint32_t local_agent_id() const override { return agent_id; }
+        SyncMode local_sync_mode() const override { return sync_mode; }
+        bool is_copy_graph() const override { return copy; }
+        void update_maps_node_insert(const Node& node) override;
+        void update_maps_node_delete(uint64_t id, const std::optional<Node>& node) override;
 
         CRDTSyncEngine& crdt_engine();
         const CRDTSyncEngine& crdt_engine() const;
