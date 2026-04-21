@@ -182,6 +182,66 @@ bool DSRPublisher::write(DSR::MvregNodeAttrVec *object) {
     return false;
 }
 
+bool DSRPublisher::write(DSR::LWWNodeMsg *object)
+{
+    ReturnCode_t rt;
+    int retry = 0;
+    while (retry < 5) {
+        if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
+        retry++;
+    }
+    qInfo() << "Error writing LWW NODE " << object->id << " after 5 attempts. error code: " << rt;
+    return false;
+}
+
+bool DSRPublisher::write(DSR::LWWEdgeMsg *object)
+{
+    ReturnCode_t rt;
+    int retry = 0;
+    while (retry < 5) {
+        if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
+        retry++;
+    }
+    qInfo() << "Error writing LWW EDGE " << object->from << " " << object->to << " " << object->type.data() << " after 5 attempts. error code: " << rt;
+    return false;
+}
+
+bool DSRPublisher::write(DSR::LWWNodeAttrVec *object)
+{
+    ReturnCode_t rt;
+    int retry = 0;
+    while (retry < 5) {
+        if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
+        retry++;
+    }
+    qInfo() << "Error writing LWW NODE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
+    return false;
+}
+
+bool DSRPublisher::write(DSR::LWWEdgeAttrVec *object)
+{
+    ReturnCode_t rt;
+    int retry = 0;
+    while (retry < 5) {
+        if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
+        retry++;
+    }
+    qInfo() << "Error writing LWW EDGE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
+    return false;
+}
+
+bool DSRPublisher::write(DSR::LWWGraphSnapshot *object)
+{
+    ReturnCode_t rt;
+    int retry = 0;
+    while (retry < 5) {
+        if (rt = mp_writer->write(object); rt == RETCODE_OK) return true;
+        retry++;
+    }
+    qInfo() << "Error writing LWW GRAPH " << object->nodes.size() << " nodes after 5 attempts. error code: " << rt;
+    return false;
+}
+
 
 void DSRPublisher::PubListener::on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
                                                        const eprosima::fastdds::dds::PublicationMatchedStatus& info)

@@ -123,24 +123,9 @@ DSRGraph::DSRGraph(GraphSettings settings) :
             set_queued_signals();
         }
     }
-    if (sync_mode == SyncMode::LWW)
+    if (sync_mode == SyncMode::LWW && !same_host)
     {
-        if (!settings.input_file.empty())
-        {
-            try
-            {
-                CORTEX_PROFILE_ZONE_N("DSRGraph::DSRGraph load local LWW graph");
-                read_from_json_file(settings.input_file);
-                qDebug() << __FUNCTION__ << "Warning, graph read from file " << QString::fromStdString(settings.input_file);
-            }
-            catch(const DSR::DSRException& e)
-            {
-                std::cout << e.what() << '\n';
-                qFatal("Aborting program. Cannot continue without intial file");
-            }
-        }
-        qDebug() << __FUNCTION__ << "Constructor finished OK";
-        return;
+        qFatal("DSRGraph aborting: SyncMode::LWW currently supports same_host only");
     }
     // RTPS Create participant
     auto participant_init_result = [&]() {
@@ -185,7 +170,7 @@ DSRGraph::DSRGraph(GraphSettings settings) :
                                                    if (!deleted)
                                                        graph->delete_node(pname);
                                                }
-                                           }), settings.domain_id);
+                                           }), settings.domain_id, sync_mode == SyncMode::LWW);
     }();
     auto[suc, participant_handle] = std::move(participant_init_result);
 
@@ -294,6 +279,16 @@ const CRDTSyncEngine& DSRGraph::crdt_engine() const
     return static_cast<const CRDTSyncEngine&>(*engine_);
 }
 
+LWWSyncEngine& DSRGraph::lww_engine()
+{
+    return static_cast<LWWSyncEngine&>(*engine_);
+}
+
+const LWWSyncEngine& DSRGraph::lww_engine() const
+{
+    return static_cast<const LWWSyncEngine&>(*engine_);
+}
+
 //////////////////////////////////////
 /// NODE METHODS
 /////////////////////////////////////
@@ -353,11 +348,14 @@ std::optional<uint64_t> DSRGraph::insert_node(No &&node)
         }
         if (!copy)
         {
-            DSR_LOG_DEBUG("[INSERT_NODE] emitting update_node_signal", node.id(), node.type());
-            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
-            for (const auto &[k, v]: node.fano())
-            {
-                emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+            if (auto delta = lww_engine().export_node_delta(node.id()); delta.has_value()) {
+                dsrpub_node.write(&delta.value());
+                DSR_LOG_DEBUG("[INSERT_NODE] emitting update_node_signal", node.id(), node.type());
+                emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+                for (const auto &[k, v]: node.fano())
+                {
+                    emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+                }
             }
         }
         return node.id();
@@ -424,11 +422,14 @@ std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
         }
         if (!copy)
         {
-            DSR_LOG_DEBUG("[INSERT_NODE_WITH_ID] emitting update_node_signal", node.id(), node.type());
-            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
-            for (const auto &[k, v]: node.fano())
-            {
-                emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+            if (auto delta = lww_engine().export_node_delta(node.id()); delta.has_value()) {
+                dsrpub_node.write(&delta.value());
+                DSR_LOG_DEBUG("[INSERT_NODE_WITH_ID] emitting update_node_signal", node.id(), node.type());
+                emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+                for (const auto &[k, v]: node.fano())
+                {
+                    emitter.update_edge_signal(node.id(), k.first, k.second,  SignalInfo{agent_id});
+                }
             }
         }
         return node.id();
@@ -510,10 +511,13 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
             }
         }
         if (!copy) {
-            DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", node.id(), node.type());
-            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
-            if (!changed_attributes.empty()) {
-                emitter.update_node_attr_signal(node.id(), changed_attributes, SignalInfo{agent_id});
+            if (auto delta = lww_engine().export_node_delta(node.id()); delta.has_value()) {
+                dsrpub_node.write(&delta.value());
+                DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", node.id(), node.type());
+                emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+                if (!changed_attributes.empty()) {
+                    emitter.update_node_attr_signal(node.id(), changed_attributes, SignalInfo{agent_id});
+                }
             }
         }
         return true;
@@ -650,6 +654,14 @@ bool DSRGraph::delete_node(uint64_t id)
             if (effect.deleted_node) {
                 emitter.deleted_node_signal(*effect.deleted_node, SignalInfo{agent_id});
             }
+            if (auto delta = lww_engine().export_node_delta(id); delta.has_value()) {
+                dsrpub_node.write(&delta.value());
+            }
+            for (auto &edge : effect.deleted_edges) {
+                if (auto delta = lww_engine().export_edge_delta(edge.from(), edge.to(), edge.type()); delta.has_value()) {
+                    dsrpub_edge.write(&delta.value());
+                }
+            }
             for (auto &edge : effect.deleted_edges) {
                 emitter.del_edge_signal(edge.from(), edge.to(), edge.type(), SignalInfo{ agent_id });
                 emitter.deleted_edge_signal(edge, SignalInfo{ agent_id });
@@ -705,14 +717,8 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
         nodes_.reserve(nodeType.at(type).size());
         for (auto &id: nodeType.at(type))
         {
-            if (sync_mode == SyncMode::LWW) {
-                if (auto node = engine_->get_node(id); node.has_value()) {
-                    nodes_.emplace_back(std::move(*node));
-                }
-            } else {
-                std::optional<CRDTNode> n = get_(id);
-                if (n.has_value())
-                    nodes_.emplace_back(std::move(*n));
+            if (auto node = engine_->get_node(id); node.has_value()) {
+                nodes_.emplace_back(std::move(*node));
             }
         }
     }
@@ -751,14 +757,8 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
         {
             for (auto &id: nodeType.at(type))
             {
-                if (sync_mode == SyncMode::LWW) {
-                    if (auto node = engine_->get_node(id); node.has_value()) {
-                        nodes_.emplace_back(std::move(*node));
-                    }
-                } else {
-                    std::optional<CRDTNode> n = get_(id);
-                    if (n.has_value())
-                        nodes_.emplace_back(std::move(*n));
+                if (auto node = engine_->get_node(id); node.has_value()) {
+                    nodes_.emplace_back(std::move(*node));
                 }
             }
         }
@@ -781,11 +781,7 @@ std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::
     std::optional<uint64_t> id_to = get_id_from_name(to);
     if (id_from.has_value() and id_to.has_value())
     {
-        if (sync_mode == SyncMode::LWW) {
-            return engine_->get_edge(id_from.value(), id_to.value(), key);
-        }
-        auto edge_opt = get_edge_(id_from.value(), id_to.value(), key);
-        if (edge_opt.has_value()) return Edge(edge_opt.value());
+        return engine_->get_edge(id_from.value(), id_to.value(), key);
     }
     return {};
 }
@@ -793,12 +789,7 @@ std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::
 std::optional<DSR::Edge> DSRGraph::get_edge(uint64_t from, uint64_t to, const std::string &key)
 {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    if (sync_mode == SyncMode::LWW) {
-        return engine_->get_edge(from, to, key);
-    }
-    auto edge_opt = get_edge_(from, to, key);
-    if (edge_opt.has_value()) return Edge(std::move(edge_opt.value()));
-    return {};
+    return engine_->get_edge(from, to, key);
 }
 
 std::optional<Edge> DSRGraph::get_edge(const Node &n, const std::string &to, const std::string &key)
@@ -847,10 +838,13 @@ requires (std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
             changed_attributes = std::move(effect.changed_attributes);
         }
         if (!copy) {
-            DSR_LOG_DEBUG("[INSERT_OR_ASSIGN_EDGE] emitting update_edge_signal", attrs.from(), attrs.to(), attrs.type());
-            emitter.update_edge_signal(attrs.from(), attrs.to(), attrs.type(), SignalInfo{ agent_id });
-            if (!changed_attributes.empty()) {
-                emitter.update_edge_attr_signal(attrs.from(), attrs.to(), attrs.type(), changed_attributes, SignalInfo{ agent_id });
+            if (auto delta = lww_engine().export_edge_delta(attrs.from(), attrs.to(), attrs.type()); delta.has_value()) {
+                dsrpub_edge.write(&delta.value());
+                DSR_LOG_DEBUG("[INSERT_OR_ASSIGN_EDGE] emitting update_edge_signal", attrs.from(), attrs.to(), attrs.type());
+                emitter.update_edge_signal(attrs.from(), attrs.to(), attrs.type(), SignalInfo{ agent_id });
+                if (!changed_attributes.empty()) {
+                    emitter.update_edge_attr_signal(attrs.from(), attrs.to(), attrs.type(), changed_attributes, SignalInfo{ agent_id });
+                }
             }
         }
         return true;
@@ -926,6 +920,9 @@ bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
             emitter.del_edge_signal(from, to, key, SignalInfo{ agent_id });
             if (effect.deleted_edge.has_value()) {
                 emitter.deleted_edge_signal(*effect.deleted_edge, SignalInfo{ agent_id });
+            }
+            if (auto delta = lww_engine().export_edge_delta(from, to, key); delta.has_value()) {
+                dsrpub_edge.write(&delta.value());
             }
         }
         return true;
@@ -1010,11 +1007,15 @@ std::vector<DSR::Edge> DSRGraph::get_edges_by_type(const std::string &type)
     std::vector<Edge> edges_;
     if (edgeType.contains(type)) {
         edges_.reserve(edgeType.at(type).size());
-        for (auto &[from, to] : edgeType.at(type)) {
-            auto edge = get_edge_(from, to, type);
-            if (edge.has_value()) {
-                edges_.emplace_back(std::move(edge.value()));
-            }
+        engine_->for_each_edge_of_type(type, [&](uint64_t, uint64_t, const Edge& edge) {
+            edges_.emplace_back(edge);
+        });
+    } else {
+        engine_->for_each_edge_of_type(type, [&](uint64_t, uint64_t, const Edge& edge) {
+            edges_.emplace_back(edge);
+        });
+        if (!edges_.empty()) {
+            edges_.shrink_to_fit();
         }
     }
     return edges_;
@@ -1027,28 +1028,23 @@ std::vector<DSR::Edge> DSRGraph::get_edges_to_id(uint64_t id)
     std::vector<Edge> edges_;
     if (to_edges.contains(id)) {
         edges_.reserve(to_edges.at(id).size());
-        for (const auto &[k, v] : to_edges.at(id)) {
-            auto n = get_edge_(k, id, v);
-            if (n.has_value())
-                edges_.emplace_back(std::move(n.value()));
-        }
     }
+    engine_->for_each_edge_to(id, [&](uint64_t, const std::string&, const Edge& edge) {
+        edges_.emplace_back(edge);
+    });
 
     return edges_;
 }
 
 std::optional<std::map<std::pair<uint64_t, std::string>, DSR::Edge>> DSRGraph::get_edges(uint64_t id) {
     std::shared_lock<std::shared_mutex> lock(_mutex);
-    const auto* node = get_node_ptr_(id);
-    if (node == nullptr) {
-        return std::nullopt;
-    }
-
     std::map<std::pair<uint64_t, std::string>, DSR::Edge> edges_;
-    for (const auto &[key, edge_reg] : node->fano()) {
-        edges_.emplace(key, DSR::Edge(edge_reg.read_reg()));
+    if (engine_->for_each_edge_from(id, [&](uint64_t to, const std::string& type, const Edge& edge) {
+        edges_.emplace(std::pair{to, type}, edge);
+    })) {
+        return edges_;
     }
-    return edges_;
+    return std::nullopt;
 }
 
 
@@ -1092,7 +1088,7 @@ std::optional<DSR::Node> DSRGraph::get_parent_node(const Node &n)
     if (p.has_value())
     {
         std::shared_lock<std::shared_mutex> lock(_mutex);
-        if (const auto* tmp = get_node_ptr_(p.value()); tmp != nullptr) return Node(*tmp);
+        return engine_->get_node(p.value());
     }
     return {};
 }
@@ -1511,6 +1507,22 @@ void DSRGraph::node_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
+                if (sync_mode == SyncMode::LWW) {
+                    DSR::LWWNodeMsg sample;
+                    if (reader->take_next_sample(&sample, &m_info) != 0) {
+                        break;
+                    }
+                    if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
+                    if (m_info.valid_data && sample.agent_id != agent_id) {
+                        if (!network_compatibility_or_fatal("LWW_NODE", sample.protocol_version, sample.sync_mode, sync_mode)) {
+                            continue;
+                        }
+                        tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                            engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
+                        });
+                    }
+                    continue;
+                }
                 DSR::MvregNodeMsg sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
                     if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
@@ -1559,6 +1571,22 @@ void DSRGraph::edge_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
+                if (sync_mode == SyncMode::LWW) {
+                    DSR::LWWEdgeMsg sample;
+                    if (reader->take_next_sample(&sample, &m_info) != 0) {
+                        break;
+                    }
+                    if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
+                    if (m_info.valid_data && sample.agent_id != agent_id) {
+                        if (!network_compatibility_or_fatal("LWW_EDGE", sample.protocol_version, sample.sync_mode, sync_mode)) {
+                            continue;
+                        }
+                        tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                            engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
+                        });
+                    }
+                    continue;
+                }
                 DSR::MvregEdgeMsg sample;
                 if (reader->take_next_sample(&sample, &m_info) == 0) {
                     if (showReceived  == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
@@ -1602,6 +1630,22 @@ void DSRGraph::edge_attrs_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
+                if (sync_mode == SyncMode::LWW) {
+                    DSR::LWWEdgeAttrVec samples;
+                    if (reader->take_next_sample(&samples, &m_info) != 0) {
+                        break;
+                    }
+                    if (m_info.valid_data && !samples.vec.empty() && samples.vec.at(0).agent_id != agent_id) {
+                        const auto& first = samples.vec.front();
+                        if (!network_compatibility_or_fatal("LWW_EDGE_ATTS", first.protocol_version, first.sync_mode, sync_mode)) {
+                            continue;
+                        }
+                        tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                            engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
+                        });
+                    }
+                    continue;
+                }
                 DSR::MvregEdgeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
                     if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
@@ -1651,6 +1695,22 @@ void DSRGraph::node_attrs_subscription_thread()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
+                if (sync_mode == SyncMode::LWW) {
+                    DSR::LWWNodeAttrVec samples;
+                    if (reader->take_next_sample(&samples, &m_info) != 0) {
+                        break;
+                    }
+                    if (m_info.valid_data && !samples.vec.empty() && samples.vec.at(0).agent_id != agent_id) {
+                        const auto& first = samples.vec.front();
+                        if (!network_compatibility_or_fatal("LWW_NODE_ATTS", first.protocol_version, first.sync_mode, sync_mode)) {
+                            continue;
+                        }
+                        tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                            engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
+                        });
+                    }
+                    continue;
+                }
                 DSR::MvregNodeAttrVec samples;
                 if (reader->take_next_sample(&samples, &m_info) == 0) {
                     if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
@@ -1709,12 +1769,21 @@ void DSRGraph::fullgraph_server_thread()
                         {
                             if (it->second) {
                                 lck.unlock();
-                                DSR::OrMap mp;
-                                mp.id = -1;
-                                mp.to_id = static_cast<uint32_t>(sample.id);
-                                mp.protocol_version = DSR::DSR_PROTOCOL_VERSION;
-                                mp.sync_mode = sync_mode_wire_value(sync_mode);
-                                dsrpub_request_answer.write(&mp);
+                                if (sync_mode == SyncMode::LWW) {
+                                    DSR::LWWGraphSnapshot mp;
+                                    mp.id = -1;
+                                    mp.to_id = static_cast<uint32_t>(sample.id);
+                                    mp.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+                                    mp.sync_mode = sync_mode_wire_value(sync_mode);
+                                    dsrpub_request_answer.write(&mp);
+                                } else {
+                                    DSR::OrMap mp;
+                                    mp.id = -1;
+                                    mp.to_id = static_cast<uint32_t>(sample.id);
+                                    mp.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+                                    mp.sync_mode = sync_mode_wire_value(sync_mode);
+                                    dsrpub_request_answer.write(&mp);
+                                }
                                 continue;
                             } else {}
                         } else {
@@ -1727,9 +1796,15 @@ void DSRGraph::fullgraph_server_thread()
                         qDebug() << " Received Full Graph request: from "
                                 << m_info.sample_identity.writer_guid().entityId.value;
                         auto full_graph_message = graph->engine_->export_full_graph();
-                        auto mp = std::get<OrMap>(std::move(full_graph_message));
-                        mp.id = static_cast<int32_t>(graph->get_agent_id());
-                        dsrpub_request_answer.write(&mp);
+                        if (sync_mode == SyncMode::LWW) {
+                            auto mp = std::get<LWWGraphSnapshot>(std::move(full_graph_message));
+                            mp.id = static_cast<int32_t>(graph->get_agent_id());
+                            dsrpub_request_answer.write(&mp);
+                        } else {
+                            auto mp = std::get<OrMap>(std::move(full_graph_message));
+                            mp.id = static_cast<int32_t>(graph->get_agent_id());
+                            dsrpub_request_answer.write(&mp);
+                        }
 
                         qDebug() << "Full graph written";
 
@@ -1759,6 +1834,32 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
         while (true)
         {
             eprosima::fastdds::dds::SampleInfo m_info;
+            if (sync_mode == SyncMode::LWW) {
+                DSR::LWWGraphSnapshot sample;
+                if (reader->take_next_sample(&sample, &m_info) != 0) {
+                    break;
+                }
+                if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);
+                if (m_info.valid_data) {
+                    if (!network_compatibility_or_fatal("LWW_GRAPH_ANSWER", sample.protocol_version, sample.sync_mode, sync_mode)) {
+                        continue;
+                    }
+                    if (static_cast<uint32_t>(sample.id) != graph->get_agent_id()) {
+                        if (sample.id != -1) {
+                            tp.spawn_task([this, s = std::move(sample)]() mutable {
+                                engine_->import_full_graph(FullGraphMessage{std::move(s)});
+                            });
+                            sync = true;
+                            break;
+                        }
+                        else if (!sync && sample.to_id == agent_id)
+                        {
+                            repeated = true;
+                        }
+                    }
+                }
+                continue;
+            }
             DSR::OrMap sample;
             if (reader->take_next_sample(&sample, &m_info) == 0) {
                 if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);

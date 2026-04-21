@@ -1,5 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <thread>
+
+#include "../utils.h"
 #include "dsr/api/dsr_api.h"
 #include "dsr/api/dsr_lww_sync_engine.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
@@ -7,6 +10,7 @@
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 
 using namespace DSR;
+using namespace std::chrono_literals;
 
 namespace {
 
@@ -165,45 +169,48 @@ TEST_CASE("LWW edge tombstones allow newer recreation", "[LWW][ENGINE]")
     REQUIRE(stored->attrs().at("weight").dec() == 4);
 }
 
-TEST_CASE("DSRGraph LWW mode supports local core mutations without DDS", "[LWW][GRAPH]")
+TEST_CASE("Same-process LWW agents synchronize over DDS", "[LWW][DDS]")
 {
-    GraphSettings settings;
-    settings.agent_id = 31;
-    settings.graph_name = "lww_local_graph";
-    settings.sync_mode = SyncMode::LWW;
-    settings.same_host = true;
+    auto ctx = make_edge_config_file();
 
-    DSRGraph graph(settings);
+    GraphSettings loader_settings;
+    loader_settings.agent_id = static_cast<uint32_t>(rand() % 1000 + 2500);
+    loader_settings.graph_name = random_string(10);
+    loader_settings.input_file = ctx;
+    loader_settings.same_host = true;
+    loader_settings.sync_mode = SyncMode::LWW;
 
-    auto parent = make_robot(100, "parent", 1);
-    auto child = make_robot(101, "child", 2);
+    GraphSettings follower_settings = loader_settings;
+    follower_settings.agent_id += 1;
+    follower_settings.graph_name = random_string(11);
+    follower_settings.input_file.clear();
 
-    REQUIRE(graph.insert_node_with_id(parent).has_value());
-    REQUIRE(graph.insert_node_with_id(child).has_value());
-    REQUIRE(graph.size() == 2);
+    DSRGraph loader(loader_settings);
+    DSRGraph follower(follower_settings);
 
-    auto edge = Edge::create<RT_edge_type>(100, 101);
-    edge.attrs()["weight"] = Attribute(3, 1, settings.agent_id);
-    REQUIRE(graph.insert_or_assign_edge(edge));
+    auto wait_until = [](auto&& predicate, std::chrono::milliseconds timeout = 3000ms)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            if (predicate())
+                return true;
+            std::this_thread::sleep_for(50ms);
+        }
+        return predicate();
+    };
 
-    auto stored_parent = graph.get_node(100);
-    REQUIRE(stored_parent.has_value());
-    REQUIRE(stored_parent->name() == "parent");
+    REQUIRE(wait_until([&] { return follower.size() == loader.size(); }));
 
-    auto stored_edge = graph.get_edge(100, 101, std::string(RT_edge_type::attr_name));
-    REQUIRE(stored_edge.has_value());
-    REQUIRE(stored_edge->attrs().at("weight").dec() == 3);
+    auto root_loader = loader.get_node("root");
+    REQUIRE(root_loader.has_value());
+    root_loader->attrs()["lww_loader_sync"] =
+        Attribute(std::string("loader"), get_unix_timestamp(), loader.get_agent_id());
+    REQUIRE(loader.update_node(root_loader.value()));
 
-    auto replacement = make_robot(100, "parent", 7);
-    REQUIRE(graph.update_node(replacement));
-    stored_parent = graph.get_node(100);
-    REQUIRE(stored_parent.has_value());
-    REQUIRE(stored_parent->attrs().at("level").dec() == 7);
-
-    REQUIRE(graph.delete_edge(100, 101, std::string(RT_edge_type::attr_name)));
-    REQUIRE_FALSE(graph.get_edge(100, 101, std::string(RT_edge_type::attr_name)).has_value());
-
-    REQUIRE(graph.delete_node(100));
-    REQUIRE_FALSE(graph.get_node(100).has_value());
-    REQUIRE(graph.size() == 1);
+    REQUIRE(wait_until([&] {
+        auto root_follower = follower.get_node("root");
+        return root_follower.has_value() &&
+               root_follower->attrs().contains("lww_loader_sync");
+    }));
 }
