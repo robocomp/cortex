@@ -16,6 +16,7 @@
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/rtps/CRDTPubSubTypes.h"
+#include "dsr/api/dsr_sync_engine.h"
 
 #include <fastcdr/Cdr.h>
 #include <fastcdr/FastBuffer.h>
@@ -158,6 +159,127 @@ TEST_CASE("NODE: from DSR representation to CRDT and back via serialization", "[
     }
 
 
+}
+
+TEST_CASE("Wire metadata round-trip preserves sync mode", "[TRANSLATION][SYNC_MODE]")
+{
+    SECTION("GraphRequest preserves non-default sync mode")
+    {
+        GraphRequest request;
+        request.from = "agent";
+        request.id = 42;
+        request.protocol_version = DSR_PROTOCOL_VERSION;
+        request.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+
+        auto rt = roundtrip(request);
+        REQUIRE(rt.from == request.from);
+        REQUIRE(rt.id == request.id);
+        REQUIRE(rt.protocol_version == request.protocol_version);
+        REQUIRE(rt.sync_mode == request.sync_mode);
+    }
+
+    SECTION("Node delta preserves sync mode")
+    {
+        auto node = Node::create<robot_node_type>("sync_mode_node");
+        node.id(7);
+        node.agent_id(3);
+
+        mvreg<CRDTNode> reg;
+        auto delta = reg.write(user_node_to_crdt(node));
+        auto msg = CRDTNode_to_Msg(node.agent_id(), node.id(), std::move(delta));
+        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+
+        auto rt = roundtrip(msg);
+        REQUIRE(rt.id == msg.id);
+        REQUIRE(rt.agent_id == msg.agent_id);
+        REQUIRE(rt.protocol_version == msg.protocol_version);
+        REQUIRE(rt.sync_mode == msg.sync_mode);
+    }
+
+    SECTION("Full graph snapshot preserves sync mode")
+    {
+        OrMap graph;
+        graph.id = 1;
+        graph.to_id = 2;
+        graph.protocol_version = DSR_PROTOCOL_VERSION;
+        graph.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+
+        auto rt = roundtrip(graph);
+        REQUIRE(rt.id == graph.id);
+        REQUIRE(rt.to_id == graph.to_id);
+        REQUIRE(rt.protocol_version == graph.protocol_version);
+        REQUIRE(rt.sync_mode == graph.sync_mode);
+    }
+
+    SECTION("LWW node delta preserves delete metadata")
+    {
+        LWWNodeMsg msg;
+        msg.id = 42;
+        msg.type = "robot";
+        msg.name = "lww_node";
+        msg.deleted = true;
+        msg.agent_id = 9;
+        msg.timestamp = 123456;
+        msg.protocol_version = DSR_PROTOCOL_VERSION;
+        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+        msg.attrs.emplace("level", Attribute(7, msg.timestamp, msg.agent_id));
+
+        auto rt = roundtrip(msg);
+        REQUIRE(rt.id == msg.id);
+        REQUIRE(rt.type == msg.type);
+        REQUIRE(rt.name == msg.name);
+        REQUIRE(rt.deleted == msg.deleted);
+        REQUIRE(rt.timestamp == msg.timestamp);
+        REQUIRE(rt.sync_mode == msg.sync_mode);
+        REQUIRE(rt.attrs.contains("level"));
+    }
+
+    SECTION("LWW full graph snapshot preserves tombstone window")
+    {
+        LWWGraphSnapshot graph;
+        graph.id = 5;
+        graph.to_id = 6;
+        graph.tombstone_window_ms = 300000;
+        graph.protocol_version = DSR_PROTOCOL_VERSION;
+        graph.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+        graph.nodes.push_back(LWWNodeMsg{.id = 1, .type = "root", .name = "root", .attrs = {}, .agent_id = 2, .timestamp = 77, .deleted = false, .protocol_version = DSR_PROTOCOL_VERSION, .sync_mode = sync_mode_wire_value(SyncMode::LWW)});
+
+        auto rt = roundtrip(graph);
+        REQUIRE(rt.id == graph.id);
+        REQUIRE(rt.to_id == graph.to_id);
+        REQUIRE(rt.tombstone_window_ms == graph.tombstone_window_ms);
+        REQUIRE(rt.sync_mode == graph.sync_mode);
+        REQUIRE(rt.nodes.size() == graph.nodes.size());
+    }
+}
+
+TEST_CASE("Sync engine interface message aliases compile", "[SYNC_ENGINE][COMPILE]")
+{
+    NodeDeltaMessage node_delta = MvregNodeMsg{};
+    EdgeDeltaMessage edge_delta = MvregEdgeMsg{};
+    NodeAttrDeltaBatchMessage node_attr_batch = MvregNodeAttrVec{};
+    EdgeAttrDeltaBatchMessage edge_attr_batch = MvregEdgeAttrVec{};
+    FullGraphMessage full_graph = OrMap{};
+    NodeDeltaMessage lww_node_delta = LWWNodeMsg{};
+    EdgeDeltaMessage lww_edge_delta = LWWEdgeMsg{};
+    NodeAttrDeltaBatchMessage lww_node_attr_batch = LWWNodeAttrVec{};
+    EdgeAttrDeltaBatchMessage lww_edge_attr_batch = LWWEdgeAttrVec{};
+    FullGraphMessage lww_full_graph = LWWGraphSnapshot{};
+
+    REQUIRE(std::holds_alternative<MvregNodeMsg>(node_delta));
+    REQUIRE(std::holds_alternative<MvregEdgeMsg>(edge_delta));
+    REQUIRE(std::holds_alternative<MvregNodeAttrVec>(node_attr_batch));
+    REQUIRE(std::holds_alternative<MvregEdgeAttrVec>(edge_attr_batch));
+    REQUIRE(std::holds_alternative<OrMap>(full_graph));
+    REQUIRE(std::holds_alternative<LWWNodeMsg>(lww_node_delta));
+    REQUIRE(std::holds_alternative<LWWEdgeMsg>(lww_edge_delta));
+    REQUIRE(std::holds_alternative<LWWNodeAttrVec>(lww_node_attr_batch));
+    REQUIRE(std::holds_alternative<LWWEdgeAttrVec>(lww_edge_attr_batch));
+    REQUIRE(std::holds_alternative<LWWGraphSnapshot>(lww_full_graph));
+
+    SyncBackendInfo info;
+    REQUIRE(info.mode == SyncMode::CRDT);
+    REQUIRE(info.protocol_version == DSR_PROTOCOL_VERSION);
 }
 
 

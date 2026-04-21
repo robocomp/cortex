@@ -31,6 +31,7 @@
 #include "dsr/api/dsr_rt_api.h"
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
+#include "dsr/api/dsr_sync_engine.h"
 #include "dsr/api/dsr_graph_settings.h"
 #include "dsr/api/dsr_logging.h"
 #include "dsr/api/dsr_signal_emitter.h"
@@ -48,9 +49,10 @@
 
 namespace DSR
 {
-    using Nodes = std::unordered_map<uint64_t , mvreg<CRDTNode>>;
     using IDType = uint64_t;
     static constexpr uint64_t CLEAR_DELETED_SIGNAL = std::numeric_limits<uint64_t>::max();
+
+    class CRDTSyncEngine;
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
@@ -59,6 +61,7 @@ namespace DSR
     {
         friend RT_API;
         friend class DSRGraphTestAccess;
+        friend class CRDTSyncEngine;
 
         public:
         size_t size() const;
@@ -464,20 +467,7 @@ namespace DSR
         inline uint64_t get_agent_id() const { return agent_id; };
         inline std::string get_agent_name() const { return agent_name; };
 
-        void reset()
-        {
-            dsrparticipant.remove_participant_and_entities();
-
-            nodes.clear();
-            deleted.clear();
-            name_map.clear();
-            id_map.clear();
-            edges.clear();
-            edgeType.clear();
-            nodeType.clear();
-            to_edges.clear();
-
-        }
+        void reset();
 
         void clear_deleted()
         {
@@ -492,6 +482,7 @@ namespace DSR
                 signal.id = CLEAR_DELETED_SIGNAL;
                 signal.agent_id = agent_id;
                 signal.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+                signal.sync_mode = sync_mode_wire_value(sync_mode);
                 dsrpub_node.write(&signal);
             }
         }
@@ -585,7 +576,6 @@ namespace DSR
 
         DSRGraph(const DSRGraph& G); //Private constructor for DSRCopy
 
-        Nodes nodes;
         mutable std::shared_mutex _mutex;
         mutable std::shared_mutex _mutex_cache_maps;
         mutable std::mutex mtx_entity_creation;
@@ -593,12 +583,14 @@ namespace DSR
         const uint32_t agent_id;
         const std::string agent_name;
         const bool copy;
+        const SyncMode sync_mode;
         std::unique_ptr<Utilities> utils;
         std::unordered_set<std::string_view> ignored_attributes;
         bool same_host;
         id_generator generator;
         GraphSettings::LOGLEVEL log_level;
         signals_fns emitter;
+        SyncEnginePtr engine_;
 
         //////////////////////////////////////////////////////////////////////////
         // Signal method
@@ -651,6 +643,9 @@ namespace DSR
         void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "");
         void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key);
 
+        CRDTSyncEngine& crdt_engine();
+        const CRDTSyncEngine& crdt_engine() const;
+
 
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
@@ -677,16 +672,6 @@ namespace DSR
         std::optional<std::string> join_delta_node_attr(DSR::MvregNodeAttrMsg &&mvreg);
         std::optional<std::string> join_delta_edge_attr(DSR::MvregEdgeAttrMsg &&mvreg);
         void join_full_graph(DSR::OrMap &&full_graph);
-
-        bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta);
-        void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute> && attr);
-        void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute> && attr);
-
-        //Maps for temporary deltas
-        std::unordered_multimap<uint64_t, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t> > unprocessed_delta_node_att;
-        std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_from;
-        std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_to;
-        std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att;
 
         // ThreadPools are declared after all data they access so that their
         // destructors (which join worker threads) run before the data members
