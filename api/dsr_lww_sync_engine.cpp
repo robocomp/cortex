@@ -156,6 +156,43 @@ std::optional<Edge> LWWSyncEngine::get_edge(uint64_t from, uint64_t to, const st
     return {};
 }
 
+bool LWWSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const
+{
+    if (!nodes_.contains(from)) {
+        return false;
+    }
+    for (const auto& [key, edge] : edges_) {
+        if (edge.from == from) {
+            Edge out = to_edge(edge);
+            visitor(edge.to, edge.type, out);
+        }
+    }
+    return true;
+}
+
+bool LWWSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const
+{
+    bool found = false;
+    for (const auto& [key, edge] : edges_) {
+        if (edge.to == to) {
+            Edge out = to_edge(edge);
+            visitor(edge.from, edge.type, out);
+            found = true;
+        }
+    }
+    return found;
+}
+
+void LWWSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
+{
+    for (const auto& [key, edge] : edges_) {
+        if (edge.type == type) {
+            Edge out = to_edge(edge);
+            visitor(edge.from, edge.to, out);
+        }
+    }
+}
+
 size_t LWWSyncEngine::size() const
 {
     return nodes_.size();
@@ -533,6 +570,69 @@ std::optional<LWWSyncEngine::Tombstone> LWWSyncEngine::edge_tombstone(uint64_t f
 {
     if (auto it = edge_tombstones_.find(edge_key(from, to, type)); it != edge_tombstones_.end()) {
         return it->second;
+    }
+    return {};
+}
+
+std::optional<LWWNodeMsg> LWWSyncEngine::export_node_delta(uint64_t id) const
+{
+    if (auto it = nodes_.find(id); it != nodes_.end()) {
+        LWWNodeMsg msg;
+        msg.id = it->second.id;
+        msg.type = it->second.type;
+        msg.name = it->second.name;
+        msg.agent_id = it->second.agent_id;
+        msg.timestamp = it->second.version.timestamp;
+        msg.deleted = false;
+        msg.protocol_version = DSR_PROTOCOL_VERSION;
+        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+        for (const auto& [name, attr] : it->second.attrs) {
+            msg.attrs.emplace(name, attr.value);
+        }
+        return msg;
+    }
+    if (auto it = node_tombstones_.find(id); it != node_tombstones_.end()) {
+        LWWNodeMsg msg;
+        msg.id = id;
+        msg.agent_id = it->second.version.agent_id;
+        msg.timestamp = it->second.version.timestamp;
+        msg.deleted = true;
+        msg.protocol_version = DSR_PROTOCOL_VERSION;
+        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+        return msg;
+    }
+    return {};
+}
+
+std::optional<LWWEdgeMsg> LWWSyncEngine::export_edge_delta(uint64_t from, uint64_t to, const std::string& type) const
+{
+    auto key = edge_key(from, to, type);
+    if (auto it = edges_.find(key); it != edges_.end()) {
+        LWWEdgeMsg msg;
+        msg.from = it->second.from;
+        msg.to = it->second.to;
+        msg.type = it->second.type;
+        msg.agent_id = it->second.agent_id;
+        msg.timestamp = it->second.version.timestamp;
+        msg.deleted = false;
+        msg.protocol_version = DSR_PROTOCOL_VERSION;
+        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+        for (const auto& [name, attr] : it->second.attrs) {
+            msg.attrs.emplace(name, attr.value);
+        }
+        return msg;
+    }
+    if (auto it = edge_tombstones_.find(key); it != edge_tombstones_.end()) {
+        LWWEdgeMsg msg;
+        msg.from = from;
+        msg.to = to;
+        msg.type = type;
+        msg.agent_id = it->second.version.agent_id;
+        msg.timestamp = it->second.version.timestamp;
+        msg.deleted = true;
+        msg.protocol_version = DSR_PROTOCOL_VERSION;
+        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+        return msg;
     }
     return {};
 }

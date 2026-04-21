@@ -65,6 +65,46 @@ std::optional<Edge> CRDTSyncEngine::get_edge(uint64_t from, uint64_t to, const s
     return {};
 }
 
+bool CRDTSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const
+{
+    if (const auto* node = get_node_ptr(from); node != nullptr) {
+        for (const auto& [key, edge_reg] : node->fano()) {
+            if (!edge_reg.empty()) {
+                Edge edge(edge_reg.read_reg());
+                visitor(key.first, key.second, edge);
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const
+{
+    if (auto it = host_.to_edges.find(to); it != host_.to_edges.end()) {
+        for (const auto& [from, type] : it->second) {
+            if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
+                Edge out(std::move(*edge));
+                visitor(from, type, out);
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+void CRDTSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
+{
+    if (auto it = host_.edgeType.find(type); it != host_.edgeType.end()) {
+        for (const auto& [from, to] : it->second) {
+            if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
+                Edge out(std::move(*edge));
+                visitor(from, to, out);
+            }
+        }
+    }
+}
+
 size_t CRDTSyncEngine::size() const
 {
     return nodes_.size();

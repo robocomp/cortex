@@ -42,16 +42,18 @@ DSRParticipant::DSRParticipant() : mp_participant(nullptr),
 
 DSRParticipant::~DSRParticipant()
 {
-
-    remove_participant_and_entities();
+    if (cleanup_enabled_) {
+        remove_participant_and_entities();
+    }
 
     qDebug()  << "Removing DSRParticipant" ;
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id)
+std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id, bool lww)
 {
     domain_id_ = domain_id;
+    cleanup_enabled_ = !lww;
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
     PParam.name(("Participant_" + std::to_string(agent_id)+ " ( " + agent_name + " )").data() );
@@ -111,6 +113,15 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     }
 
 
+    if (lww) {
+        dsrgraphType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeMsg>("LWWNodeMsg"));
+        graphrequestType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest"));
+        graphRequestAnswerType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWGraphSnapshot>("LWWGraphSnapshot"));
+        dsrEdgeType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeMsg>("LWWEdgeMsg"));
+        dsrNodeAttrType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeAttrVec>("LWWNodeAttrVec"));
+        dsrEdgeAttrType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeAttrVec>("LWWEdgeAttrVec"));
+    }
+
     //Register types
     dsrgraphType.register_type(mp_participant);
     dsrgraphType.register_type(mp_participant);
@@ -121,12 +132,12 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     dsrEdgeAttrType.register_type(mp_participant);
 
     //Create topics
-    topic_node = mp_participant->create_topic("DSR_NODE", dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_edge = mp_participant->create_topic("DSR_EDGE", dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_node_att = mp_participant->create_topic("DSR_NODE_ATTS", dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_edge_att = mp_participant->create_topic("DSR_EDGE_ATTS", dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_graph_request = mp_participant->create_topic("GRAPH_REQUEST", graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_graph = mp_participant->create_topic("GRAPH_ANSWER", graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_node = mp_participant->create_topic(lww ? "LWW_NODE" : "DSR_NODE", dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_edge = mp_participant->create_topic(lww ? "LWW_EDGE" : "DSR_EDGE", dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_node_att = mp_participant->create_topic(lww ? "LWW_NODE_ATTS" : "DSR_NODE_ATTS", dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_edge_att = mp_participant->create_topic(lww ? "LWW_EDGE_ATTS" : "DSR_EDGE_ATTS", dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_graph_request = mp_participant->create_topic(lww ? "LWW_GRAPH_REQUEST" : "GRAPH_REQUEST", graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_graph = mp_participant->create_topic(lww ? "LWW_GRAPH_ANSWER" : "GRAPH_ANSWER", graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
 
     return std::make_tuple(true, mp_participant);
 }

@@ -5,6 +5,7 @@
 #include "dsr/core/types/user_types.h"
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -68,12 +69,19 @@ public:
 class SyncEngine
 {
 public:
+    using OutgoingEdgeVisitor = std::function<void(uint64_t to, const std::string& type, const Edge& edge)>;
+    using IncomingEdgeVisitor = std::function<void(uint64_t from, const std::string& type, const Edge& edge)>;
+    using TypedEdgeVisitor = std::function<void(uint64_t from, uint64_t to, const Edge& edge)>;
+
     virtual ~SyncEngine() = default;
 
     virtual SyncBackendInfo backend_info() const = 0;
 
     virtual std::optional<Node> get_node(uint64_t id) const = 0;
     virtual std::optional<Edge> get_edge(uint64_t from, uint64_t to, const std::string& type) const = 0;
+    virtual bool for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const = 0;
+    virtual bool for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const = 0;
+    virtual void for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const = 0;
     virtual size_t size() const = 0;
     virtual std::map<uint64_t, Node> snapshot() const = 0;
 

@@ -28,6 +28,11 @@ public:
     bool write(DSR::MvregEdgeMsg *object);
     bool write(DSR::MvregEdgeAttrVec *object);
     bool write(DSR::MvregNodeAttrVec *object);
+    bool write(DSR::LWWNodeMsg *object);
+    bool write(DSR::LWWEdgeMsg *object);
+    bool write(DSR::LWWNodeAttrVec *object);
+    bool write(DSR::LWWEdgeAttrVec *object);
+    bool write(DSR::LWWGraphSnapshot *object);
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;

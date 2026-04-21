@@ -639,6 +639,8 @@ namespace DSR
 
         CRDTSyncEngine& crdt_engine();
         const CRDTSyncEngine& crdt_engine() const;
+        LWWSyncEngine& lww_engine();
+        const LWWSyncEngine& lww_engine() const;
 
 
         //////////////////////////////////////////////////////////////////////////
