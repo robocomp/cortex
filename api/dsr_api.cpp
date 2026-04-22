@@ -375,6 +375,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_node_subscription_functor()
                                  << m_info.sample_identity.writer_guid().entityId.value;
                     }
                     tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
                         engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
                     });
                 }
@@ -405,6 +406,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_lww_node_subscription_functor()
                         continue;
                     }
                     tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
                         engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
                     });
                 }
@@ -440,6 +442,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_edge_subscription_functor()
                                  << m_info.sample_identity.writer_guid().entityId.value;
                     }
                     tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
                         engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
                     });
                 }
@@ -470,6 +473,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_lww_edge_subscription_functor()
                         continue;
                     }
                     tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
                         engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
                     });
                 }
@@ -509,6 +513,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_edge_attrs_subscription_functor(
                         }
                         tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
                             CORTEX_PROFILE_ZONE_N("DSRGraph::edge_attrs_subscription_thread apply batch");
+                            std::unique_lock<std::shared_mutex> lock(_mutex);
                             engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
                         });
                     }
@@ -540,6 +545,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_lww_edge_attrs_subscription_functor()
                         continue;
                     }
                     tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
                         engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
                     });
                 }
@@ -578,6 +584,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_node_attrs_subscription_functor(
                         }
                         tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
                             CORTEX_PROFILE_ZONE_N("DSRGraph::node_attrs_subscription_thread apply batch");
+                            std::unique_lock<std::shared_mutex> lock(_mutex);
                             engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
                         });
                     }
@@ -609,6 +616,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_lww_node_attrs_subscription_functor()
                         continue;
                     }
                     tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
                         engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
                     });
                 }
@@ -643,6 +651,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_fullgraph_request_functor(std::a
                                  << sample.m.size() << " elements";
                         tp.spawn_task([this, s = std::move(sample)]() mutable {
                             CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread apply full graph");
+                            std::unique_lock<std::shared_mutex> lock(_mutex);
                             engine_->import_full_graph(FullGraphMessage{std::move(s)});
                         });
                         qDebug() << "Synchronized.";
@@ -678,6 +687,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_lww_fullgraph_request_functor(std::at
                 if (static_cast<uint32_t>(sample.id) != graph->get_agent_id()) {
                     if (sample.id != -1) {
                         tp.spawn_task([this, s = std::move(sample)]() mutable {
+                            std::unique_lock<std::shared_mutex> lock(_mutex);
                             engine_->import_full_graph(FullGraphMessage{std::move(s)});
                         });
                         sync = true;
@@ -1084,17 +1094,10 @@ std::vector<DSR::Edge> DSRGraph::get_edges_by_type(const std::string &type)
     std::vector<Edge> edges_;
     if (edgeType.contains(type)) {
         edges_.reserve(edgeType.at(type).size());
-        engine_->for_each_edge_of_type(type, [&](uint64_t, uint64_t, const Edge& edge) {
-            edges_.emplace_back(edge);
-        });
-    } else {
-        engine_->for_each_edge_of_type(type, [&](uint64_t, uint64_t, const Edge& edge) {
-            edges_.emplace_back(edge);
-        });
-        if (!edges_.empty()) {
-            edges_.shrink_to_fit();
-        }
     }
+    engine_->for_each_edge_of_type(type, [&](uint64_t, uint64_t, const Edge& edge) {
+        edges_.emplace_back(edge);
+    });
     return edges_;
 }
 
@@ -1300,7 +1303,79 @@ void DSRGraph::update_maps_edge_insert(uint64_t from, uint64_t to, const std::st
     edges[{from, to}].insert(key);
     to_edges[to].insert({from, key});
     edgeType[key].insert({from, to});
+}
 
+bool DSRGraph::is_attribute_ignored(const std::string& name) const
+{
+    return ignored_attributes.contains(name);
+}
+
+bool DSRGraph::is_node_deleted(uint64_t id) const
+{
+    std::shared_lock<std::shared_mutex> lck(_mutex_cache_maps);
+    return deleted.contains(id);
+}
+
+void DSRGraph::for_each_incoming_edge(uint64_t to_id, std::function<void(uint64_t, const std::string&)> visitor) const
+{
+    std::shared_lock<std::shared_mutex> lck(_mutex_cache_maps);
+    if (auto it = to_edges.find(to_id); it != to_edges.end()) {
+        for (const auto& [from, type] : it->second) {
+            visitor(from, type);
+        }
+    }
+}
+
+void DSRGraph::for_each_edge_of_type_cache(const std::string& type, std::function<void(uint64_t, uint64_t)> visitor) const
+{
+    std::shared_lock<std::shared_mutex> lck(_mutex_cache_maps);
+    if (auto it = edgeType.find(type); it != edgeType.end()) {
+        for (const auto& [from, to] : it->second) {
+            visitor(from, to);
+        }
+    }
+}
+
+void DSRGraph::on_remote_node_updated(uint64_t id, const std::string& type, uint32_t agent_id)
+{
+    emitter.update_node_signal(id, type, SignalInfo{agent_id});
+}
+
+void DSRGraph::on_remote_node_deleted(uint64_t id, const std::optional<Node>& node, const std::vector<Edge>& removed_edges, uint32_t agent_id)
+{
+    emitter.del_node_signal(id, SignalInfo{agent_id});
+    if (node.has_value()) {
+        emitter.deleted_node_signal(*node, SignalInfo{agent_id});
+    }
+    for (const auto& edge : removed_edges) {
+        emitter.del_edge_signal(edge.from(), edge.to(), edge.type(), SignalInfo{agent_id});
+        emitter.deleted_edge_signal(edge, SignalInfo{agent_id});
+    }
+}
+
+void DSRGraph::on_remote_edge_updated(uint64_t from, uint64_t to, const std::string& type, uint32_t agent_id)
+{
+    emitter.update_edge_signal(from, to, type, SignalInfo{agent_id});
+}
+
+void DSRGraph::on_remote_edge_deleted(uint64_t from, uint64_t to, const std::string& type, const std::optional<Edge>& edge, uint32_t agent_id)
+{
+    emitter.del_edge_signal(from, to, type, SignalInfo{agent_id});
+    if (edge.has_value()) {
+        emitter.deleted_edge_signal(*edge, SignalInfo{agent_id});
+    }
+}
+
+void DSRGraph::on_remote_node_attrs_updated(uint64_t id, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id)
+{
+    emitter.update_node_attr_signal(id, attrs, SignalInfo{agent_id});
+    emitter.update_node_signal(id, type, SignalInfo{agent_id});
+}
+
+void DSRGraph::on_remote_edge_attrs_updated(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id)
+{
+    emitter.update_edge_attr_signal(from, to, type, attrs, SignalInfo{agent_id});
+    emitter.update_edge_signal(from, to, type, SignalInfo{agent_id});
 }
 
 

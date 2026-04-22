@@ -68,9 +68,6 @@ private:
 
     std::map<uint64_t, MvregNodeMsg> export_mvreg_map() const;
 
-    class DSRGraph& graph();
-    const class DSRGraph& graph() const;
-
     bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge>&& delta);
     void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute>&& attr);
     void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute>&& attr);

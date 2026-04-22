@@ -9,20 +9,6 @@ using DSR::LWW::edge_key;
 using DSR::LWW::is_newer;
 using DSR::LWW::version_of;
 
-namespace {
-template <typename Map, typename Predicate>
-void erase_if_compat(Map& map, Predicate&& predicate)
-{
-    for (auto it = map.begin(); it != map.end(); ) {
-        if (predicate(*it)) {
-            it = map.erase(it);
-        } else {
-            ++it;
-        }
-    }
-}
-}
-
 LWWSyncEngine::LWWSyncEngine(SyncEngineHost& host, uint64_t tombstone_window_ms)
     : host_(host),
       tombstone_window_ms_(tombstone_window_ms)
@@ -38,6 +24,9 @@ LWWSyncEngine::LWWSyncEngine(SyncEngineHost& host, const LWWSyncEngine& other)
       node_tombstones_(other.node_tombstones_),
       edge_tombstones_(other.edge_tombstones_)
 {
+    for (const auto& [key, _] : edges_) {
+        idx_insert(key);
+    }
 }
 
 SyncBackendInfo LWWSyncEngine::backend_info() const
@@ -48,6 +37,29 @@ SyncBackendInfo LWWSyncEngine::backend_info() const
 std::unique_ptr<SyncEngine> LWWSyncEngine::clone(SyncEngineHost& host) const
 {
     return std::make_unique<LWWSyncEngine>(host, *this);
+}
+
+void LWWSyncEngine::idx_insert(const EdgeKey& key)
+{
+    from_idx_[std::get<0>(key)].insert(key);
+    to_idx_[std::get<1>(key)].insert(key);
+    type_idx_[std::get<2>(key)].insert(key);
+}
+
+void LWWSyncEngine::idx_erase(const EdgeKey& key)
+{
+    if (auto it = from_idx_.find(std::get<0>(key)); it != from_idx_.end()) {
+        it->second.erase(key);
+        if (it->second.empty()) from_idx_.erase(it);
+    }
+    if (auto it = to_idx_.find(std::get<1>(key)); it != to_idx_.end()) {
+        it->second.erase(key);
+        if (it->second.empty()) to_idx_.erase(it);
+    }
+    if (auto it = type_idx_.find(std::get<2>(key)); it != type_idx_.end()) {
+        it->second.erase(key);
+        if (it->second.empty()) type_idx_.erase(it);
+    }
 }
 
 uint64_t LWWSyncEngine::current_time_ms() const
@@ -65,8 +77,8 @@ uint64_t LWWSyncEngine::next_timestamp()
 
 void LWWSyncEngine::prune_tombstones(uint64_t now)
 {
-    erase_if_compat(node_tombstones_, [now](const auto& item) { return item.second.expires_at_ms <= now; });
-    erase_if_compat(edge_tombstones_, [now](const auto& item) { return item.second.expires_at_ms <= now; });
+    std::erase_if(node_tombstones_, [now](const auto& item) { return item.second.expires_at_ms <= now; });
+    std::erase_if(edge_tombstones_, [now](const auto& item) { return item.second.expires_at_ms <= now; });
 }
 
 void LWWSyncEngine::store_node_tombstone(uint64_t id, Version version, uint64_t now)
@@ -81,26 +93,46 @@ void LWWSyncEngine::store_edge_tombstone(uint64_t from, uint64_t to, const std::
 
 void LWWSyncEngine::erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges)
 {
-    for (auto it = edges_.begin(); it != edges_.end(); ) {
-        if (it->second.from == node_id || it->second.to == node_id) {
-            host_.update_maps_edge_delete(it->second.from, it->second.to, it->second.type);
-            store_edge_tombstone(it->second.from, it->second.to, it->second.type, version, now);
-            if (removed_edges != nullptr) {
-                removed_edges->emplace_back(LWW::to_user_edge(it->second));
-            }
-            it = edges_.erase(it);
-        } else {
-            ++it;
+    std::unordered_set<EdgeKey, hash_tuple> to_erase;
+    if (auto it = from_idx_.find(node_id); it != from_idx_.end()) {
+        to_erase.insert(it->second.begin(), it->second.end());
+    }
+    if (auto it = to_idx_.find(node_id); it != to_idx_.end()) {
+        to_erase.insert(it->second.begin(), it->second.end());
+    }
+    for (const auto& key : to_erase) {
+        auto eit = edges_.find(key);
+        if (eit == edges_.end()) continue;
+        host_.update_maps_edge_delete(eit->second.from, eit->second.to, eit->second.type);
+        store_edge_tombstone(eit->second.from, eit->second.to, eit->second.type, version, now);
+        if (removed_edges != nullptr) {
+            removed_edges->emplace_back(LWW::to_user_edge(eit->second));
         }
+        idx_erase(key);
+        edges_.erase(eit);
     }
 }
 
 std::optional<Node> LWWSyncEngine::get_node(uint64_t id) const
 {
-    if (auto it = nodes_.find(id); it != nodes_.end()) {
-        return LWW::to_user_node(it->second, edges_);
+    auto it = nodes_.find(id);
+    if (it == nodes_.end()) return {};
+
+    const auto& state = it->second;
+    Node out(state.agent_id, state.type);
+    out.id(state.id);
+    out.name(state.name);
+    for (const auto& [name, attr] : state.attrs) {
+        out.attrs().emplace(name, attr.value);
     }
-    return {};
+    if (auto fidx = from_idx_.find(id); fidx != from_idx_.end()) {
+        for (const auto& key : fidx->second) {
+            if (auto eit = edges_.find(key); eit != edges_.end()) {
+                out.fano().emplace(std::pair{eit->second.to, eit->second.type}, LWW::to_user_edge(eit->second));
+            }
+        }
+    }
+    return out;
 }
 
 std::optional<Edge> LWWSyncEngine::get_edge(uint64_t from, uint64_t to, const std::string& type) const
@@ -116,10 +148,10 @@ bool LWWSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor&
     if (!nodes_.contains(from)) {
         return false;
     }
-    for (const auto& [key, edge] : edges_) {
-        if (edge.from == from) {
-            Edge out = LWW::to_user_edge(edge);
-            visitor(edge.to, edge.type, out);
+    if (auto it = from_idx_.find(from); it != from_idx_.end()) {
+        for (const auto& key : it->second) {
+            const auto& edge = edges_.at(key);
+            visitor(edge.to, edge.type, LWW::to_user_edge(edge));
         }
     }
     return true;
@@ -127,24 +159,24 @@ bool LWWSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor&
 
 bool LWWSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const
 {
-    bool found = false;
-    for (const auto& [key, edge] : edges_) {
-        if (edge.to == to) {
-            Edge out = LWW::to_user_edge(edge);
-            visitor(edge.from, edge.type, out);
-            found = true;
-        }
+    auto it = to_idx_.find(to);
+    if (it == to_idx_.end()) {
+        return false;
     }
-    return found;
+    for (const auto& key : it->second) {
+        const auto& edge = edges_.at(key);
+        visitor(edge.from, edge.type, LWW::to_user_edge(edge));
+    }
+    return true;
 }
 
 void LWWSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
 {
-    for (const auto& [key, edge] : edges_) {
-        if (edge.type == type) {
-            Edge out = LWW::to_user_edge(edge);
-            visitor(edge.from, edge.to, out);
-        }
+    auto it = type_idx_.find(type);
+    if (it == type_idx_.end()) return;
+    for (const auto& key : it->second) {
+        const auto& edge = edges_.at(key);
+        visitor(edge.from, edge.to, LWW::to_user_edge(edge));
     }
 }
 
@@ -156,8 +188,8 @@ size_t LWWSyncEngine::size() const
 std::map<uint64_t, Node> LWWSyncEngine::snapshot() const
 {
     std::map<uint64_t, Node> out;
-    for (const auto& [id, node] : nodes_) {
-        out.emplace(id, LWW::to_user_node(node, edges_));
+    for (const auto& [id, _] : nodes_) {
+        out.emplace(id, *get_node(id));
     }
     return out;
 }
@@ -203,7 +235,7 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
         return effect;
     }
 
-    auto old_node = LWW::to_user_node(it->second, edges_);
+    auto old_node = get_node(node.id());
     auto version = version_of(now, host_.local_agent_id());
     it->second.type = node.type();
     it->second.name = node.name();
@@ -241,7 +273,7 @@ NodeMutationEffect LWWSyncEngine::delete_node_local(uint64_t id)
     }
 
     auto version = version_of(now, host_.local_agent_id());
-    auto deleted_node = LWW::to_user_node(it->second, edges_);
+    auto deleted_node = get_node(id);
     effect.deleted_node = deleted_node;
     effect.deleted_edges.clear();
     erase_related_edges(id, version, now, &effect.deleted_edges);
@@ -278,8 +310,8 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     }
 
     auto key = edge_key(edge.from(), edge.to(), edge.type());
-    auto& state = edges_[key];
-    state = LWW::to_edge_state(edge, version, host_.local_agent_id());
+    edges_[key] = LWW::to_edge_state(edge, version, host_.local_agent_id());
+    idx_insert(key);  // idempotent for updates
     for (const auto& [name, _] : edge.attrs()) {
         effect.changed_attributes.emplace_back(name);
     }
@@ -310,6 +342,7 @@ EdgeMutationEffect LWWSyncEngine::delete_edge_local(uint64_t from, uint64_t to, 
     effect.deleted_edge = LWW::to_user_edge(it->second);
     host_.update_maps_edge_delete(from, to, type);
     store_edge_tombstone(from, to, type, version, now);
+    idx_erase(key);
     edges_.erase(it);
     effect.applied = true;
     if (auto delta = export_edge_delta(from, to, type); delta.has_value()) {
@@ -335,13 +368,16 @@ void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
     }
 
     if (payload->deleted) {
+        std::optional<Node> deleted_node;
+        std::vector<Edge> deleted_edges;
         if (auto it = nodes_.find(payload->id); it != nodes_.end()) {
-            auto deleted_node = LWW::to_user_node(it->second, edges_);
-            erase_related_edges(payload->id, version, now);
+            deleted_node = get_node(payload->id);
+            erase_related_edges(payload->id, version, now, &deleted_edges);
             host_.update_maps_node_delete(payload->id, deleted_node);
             nodes_.erase(it);
         }
         store_node_tombstone(payload->id, version, now);
+        host_.on_remote_node_deleted(payload->id, deleted_node, deleted_edges, payload->agent_id);
         return;
     }
 
@@ -354,6 +390,7 @@ void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
     nodes_[payload->id] = std::move(state);
     node_tombstones_.erase(payload->id);
     host_.update_maps_node_insert(*get_node(payload->id));
+    host_.on_remote_node_updated(payload->id, payload->type, payload->agent_id);
 }
 
 void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
@@ -377,19 +414,24 @@ void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
 
     auto key = edge_key(payload->from, payload->to, payload->type);
     if (payload->deleted) {
-        if (edges_.contains(key)) {
+        std::optional<Edge> deleted_edge;
+        if (auto it = edges_.find(key); it != edges_.end()) {
+            deleted_edge = LWW::to_user_edge(it->second);
             host_.update_maps_edge_delete(payload->from, payload->to, payload->type);
-            edges_.erase(key);
+            idx_erase(key);
+            edges_.erase(it);
         }
         store_edge_tombstone(payload->from, payload->to, payload->type, version, now);
+        host_.on_remote_edge_deleted(payload->from, payload->to, payload->type, deleted_edge, payload->agent_id);
         return;
     }
 
     EdgeState state = LWW::to_edge_state(*payload);
-
     edges_[key] = std::move(state);
+    idx_insert(key);
     edge_tombstones_.erase(key);
     host_.update_maps_edge_insert(payload->from, payload->to, payload->type);
+    host_.on_remote_edge_updated(payload->from, payload->to, payload->type, payload->agent_id);
 }
 
 void LWWSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& batch)
@@ -399,6 +441,13 @@ void LWWSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& bat
         return;
     }
 
+    struct NodeAttrBatchChange
+    {
+        std::string type;
+        std::vector<std::string> attrs;
+        uint32_t agent_id{0};
+    };
+    std::unordered_map<uint64_t, NodeAttrBatchChange> changes;
     for (const auto& item : payload->vec) {
         auto it = nodes_.find(item.node_id);
         if (it == nodes_.end()) {
@@ -414,6 +463,16 @@ void LWWSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& bat
         } else {
             it->second.attrs[item.attr_name] = AttrState{item.value, version};
         }
+        auto& change = changes[item.node_id];
+        if (change.type.empty()) {
+            change.type = it->second.type;
+        }
+        change.agent_id = item.agent_id;
+        change.attrs.push_back(item.attr_name);
+    }
+
+    for (const auto& [id, change] : changes) {
+        host_.on_remote_node_attrs_updated(id, change.type, change.attrs, change.agent_id);
     }
 }
 
@@ -424,6 +483,12 @@ void LWWSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& bat
         return;
     }
 
+    struct EdgeAttrBatchChange
+    {
+        std::vector<std::string> attrs;
+        uint32_t agent_id{0};
+    };
+    std::map<EdgeKey, EdgeAttrBatchChange> changes;
     for (const auto& item : payload->vec) {
         auto it = edges_.find(edge_key(item.from, item.to, item.type));
         if (it == edges_.end()) {
@@ -439,6 +504,13 @@ void LWWSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& bat
         } else {
             it->second.attrs[item.attr_name] = AttrState{item.value, version};
         }
+        auto& change = changes[edge_key(item.from, item.to, item.type)];
+        change.agent_id = item.agent_id;
+        change.attrs.push_back(item.attr_name);
+    }
+
+    for (const auto& [key, change] : changes) {
+        host_.on_remote_edge_attrs_updated(std::get<0>(key), std::get<1>(key), std::get<2>(key), change.attrs, change.agent_id);
     }
 }
 
