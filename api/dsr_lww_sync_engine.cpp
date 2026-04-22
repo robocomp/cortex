@@ -3,6 +3,9 @@
 #include <algorithm>
 
 using namespace DSR;
+using DSR::LWW::edge_key;
+using DSR::LWW::is_newer;
+using DSR::LWW::version_of;
 
 namespace {
 template <typename Map, typename Predicate>
@@ -43,21 +46,6 @@ SyncBackendInfo LWWSyncEngine::backend_info() const
 std::unique_ptr<SyncEngine> LWWSyncEngine::clone(SyncEngineHost& host) const
 {
     return std::make_unique<LWWSyncEngine>(host, *this);
-}
-
-bool LWWSyncEngine::is_newer(const Version& lhs, const Version& rhs)
-{
-    return lhs.tie() > rhs.tie();
-}
-
-LWWSyncEngine::Version LWWSyncEngine::version_of(uint64_t timestamp, uint32_t agent_id)
-{
-    return Version{timestamp, agent_id};
-}
-
-LWWSyncEngine::EdgeKey LWWSyncEngine::edge_key(uint64_t from, uint64_t to, const std::string& type)
-{
-    return EdgeKey{from, to, type};
 }
 
 uint64_t LWWSyncEngine::current_time_ms() const

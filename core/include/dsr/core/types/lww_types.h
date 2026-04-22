@@ -52,4 +52,19 @@ struct EdgeState
 
 using EdgeKey = std::tuple<uint64_t, uint64_t, std::string>;
 
+inline bool is_newer(const Version& lhs, const Version& rhs)
+{
+    return lhs.tie() > rhs.tie();
+}
+
+inline Version version_of(uint64_t timestamp, uint32_t agent_id)
+{
+    return Version{timestamp, agent_id};
+}
+
+inline EdgeKey edge_key(uint64_t from, uint64_t to, const std::string& type)
+{
+    return EdgeKey{from, to, type};
+}
+
 } // namespace DSR::LWW
