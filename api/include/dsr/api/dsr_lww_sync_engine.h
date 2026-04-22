@@ -60,10 +60,6 @@ private:
     using EdgeState = LWW::EdgeState;
     using EdgeKey = LWW::EdgeKey;
 
-    static bool is_newer(const Version& lhs, const Version& rhs);
-    static Version version_of(uint64_t timestamp, uint32_t agent_id);
-    static EdgeKey edge_key(uint64_t from, uint64_t to, const std::string& type);
-
     uint64_t current_time_ms() const;
     uint64_t next_timestamp();
     void prune_tombstones(uint64_t now);
