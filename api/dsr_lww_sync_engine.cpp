@@ -41,25 +41,12 @@ std::unique_ptr<SyncEngine> LWWSyncEngine::clone(SyncEngineHost& host) const
 
 void LWWSyncEngine::idx_insert(const EdgeKey& key)
 {
-    from_idx_[std::get<0>(key)].insert(key);
-    to_idx_[std::get<1>(key)].insert(key);
-    type_idx_[std::get<2>(key)].insert(key);
+    LWW::edge_index_insert(from_idx_, to_idx_, type_idx_, key);
 }
 
 void LWWSyncEngine::idx_erase(const EdgeKey& key)
 {
-    if (auto it = from_idx_.find(std::get<0>(key)); it != from_idx_.end()) {
-        it->second.erase(key);
-        if (it->second.empty()) from_idx_.erase(it);
-    }
-    if (auto it = to_idx_.find(std::get<1>(key)); it != to_idx_.end()) {
-        it->second.erase(key);
-        if (it->second.empty()) to_idx_.erase(it);
-    }
-    if (auto it = type_idx_.find(std::get<2>(key)); it != type_idx_.end()) {
-        it->second.erase(key);
-        if (it->second.empty()) type_idx_.erase(it);
-    }
+    LWW::edge_index_erase(from_idx_, to_idx_, type_idx_, key);
 }
 
 uint64_t LWWSyncEngine::current_time_ms() const
@@ -117,22 +104,7 @@ std::optional<Node> LWWSyncEngine::get_node(uint64_t id) const
 {
     auto it = nodes_.find(id);
     if (it == nodes_.end()) return {};
-
-    const auto& state = it->second;
-    Node out(state.agent_id, state.type);
-    out.id(state.id);
-    out.name(state.name);
-    for (const auto& [name, attr] : state.attrs) {
-        out.attrs().emplace(name, attr.value);
-    }
-    if (auto fidx = from_idx_.find(id); fidx != from_idx_.end()) {
-        for (const auto& key : fidx->second) {
-            if (auto eit = edges_.find(key); eit != edges_.end()) {
-                out.fano().emplace(std::pair{eit->second.to, eit->second.type}, LWW::to_user_edge(eit->second));
-            }
-        }
-    }
-    return out;
+    return LWW::to_user_node(it->second, edges_, from_idx_);
 }
 
 std::optional<Edge> LWWSyncEngine::get_edge(uint64_t from, uint64_t to, const std::string& type) const
@@ -148,36 +120,17 @@ bool LWWSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor&
     if (!nodes_.contains(from)) {
         return false;
     }
-    if (auto it = from_idx_.find(from); it != from_idx_.end()) {
-        for (const auto& key : it->second) {
-            const auto& edge = edges_.at(key);
-            visitor(edge.to, edge.type, LWW::to_user_edge(edge));
-        }
-    }
-    return true;
+    return LWW::for_each_edge_from(edges_, from_idx_, from, visitor);
 }
 
 bool LWWSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const
 {
-    auto it = to_idx_.find(to);
-    if (it == to_idx_.end()) {
-        return false;
-    }
-    for (const auto& key : it->second) {
-        const auto& edge = edges_.at(key);
-        visitor(edge.from, edge.type, LWW::to_user_edge(edge));
-    }
-    return true;
+    return LWW::for_each_edge_to(edges_, to_idx_, to, visitor);
 }
 
 void LWWSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
 {
-    auto it = type_idx_.find(type);
-    if (it == type_idx_.end()) return;
-    for (const auto& key : it->second) {
-        const auto& edge = edges_.at(key);
-        visitor(edge.from, edge.to, LWW::to_user_edge(edge));
-    }
+    LWW::for_each_edge_of_type(edges_, type_idx_, type, visitor);
 }
 
 size_t LWWSyncEngine::size() const

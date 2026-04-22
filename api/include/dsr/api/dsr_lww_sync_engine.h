@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dsr/api/dsr_sync_engine.h"
+#include "dsr/core/types/lww_index.h"
 #include "dsr/core/types/lww_types.h"
 
 #include <chrono>
@@ -59,6 +60,9 @@ private:
     using NodeState = LWW::NodeState;
     using EdgeState = LWW::EdgeState;
     using EdgeKey = LWW::EdgeKey;
+    using FromIndex = LWW::FromIndex;
+    using ToIndex = LWW::ToIndex;
+    using TypeIndex = LWW::TypeIndex;
 
     uint64_t current_time_ms() const;
     uint64_t next_timestamp();
@@ -80,9 +84,9 @@ private:
     std::unordered_map<uint64_t, Tombstone> node_tombstones_;
     std::unordered_map<EdgeKey, Tombstone, hash_tuple> edge_tombstones_;
 
-    std::unordered_map<uint64_t, std::unordered_set<EdgeKey, hash_tuple>> from_idx_;
-    std::unordered_map<uint64_t, std::unordered_set<EdgeKey, hash_tuple>> to_idx_;
-    std::unordered_map<std::string, std::unordered_set<EdgeKey, hash_tuple>> type_idx_;
+    FromIndex from_idx_;
+    ToIndex to_idx_;
+    TypeIndex type_idx_;
 };
 
 } // namespace DSR
