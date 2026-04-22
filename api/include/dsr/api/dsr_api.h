@@ -636,6 +636,19 @@ namespace DSR
         void update_maps_node_insert(const Node& node) override;
         void update_maps_node_delete(uint64_t id, const std::optional<Node>& node) override;
 
+        GraphSettings::LOGLEVEL get_log_level() const override { return log_level; }
+        bool is_attribute_ignored(const std::string& name) const override;
+        bool is_node_deleted(uint64_t id) const override;
+        void for_each_incoming_edge(uint64_t to, std::function<void(uint64_t from, const std::string& type)> visitor) const override;
+        void for_each_edge_of_type_cache(const std::string& type, std::function<void(uint64_t from, uint64_t to)> visitor) const override;
+
+        void on_remote_node_updated(uint64_t id, const std::string& type, uint32_t agent_id) override;
+        void on_remote_node_deleted(uint64_t id, const std::optional<Node>& node, const std::vector<Edge>& edges, uint32_t agent_id) override;
+        void on_remote_edge_updated(uint64_t from, uint64_t to, const std::string& type, uint32_t agent_id) override;
+        void on_remote_edge_deleted(uint64_t from, uint64_t to, const std::string& type, const std::optional<Edge>& edge, uint32_t agent_id) override;
+        void on_remote_node_attrs_updated(uint64_t id, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id) override;
+        void on_remote_edge_attrs_updated(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id) override;
+
         CRDTSyncEngine& crdt_engine();
         const CRDTSyncEngine& crdt_engine() const;
         LWWSyncEngine& lww_engine();
@@ -646,7 +659,6 @@ namespace DSR
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
         const CRDTNode* get_node_ptr_(uint64_t id) const;
-
         void publish_node_message(const NodeDeltaMessage &message);
         void publish_node_attr_batch(const NodeAttrDeltaBatchMessage &message);
         void publish_edge_message(const EdgeDeltaMessage &message);

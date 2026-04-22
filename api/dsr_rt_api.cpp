@@ -2,6 +2,7 @@
 #include <cmath>
 #include <dsr/api/dsr_rt_api.h>
 #include <dsr/api/dsr_api.h>
+#include <dsr/api/dsr_crdt_sync_engine.h>
 #include <dsr/core/profiling.h>
 
 using namespace DSR;

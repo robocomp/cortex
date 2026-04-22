@@ -69,6 +69,24 @@ public:
     virtual void update_maps_node_delete(uint64_t id, const std::optional<Node>& node) = 0;
     virtual void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string& type) = 0;
     virtual void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string& type) = 0;
+
+    // Graph configuration queries — default impls safe for unit-test hosts.
+    virtual GraphSettings::LOGLEVEL get_log_level() const { return GraphSettings::LOGLEVEL::INFOL; }
+    virtual bool is_attribute_ignored(const std::string& /*name*/) const { return false; }
+    virtual bool is_node_deleted(uint64_t /*id*/) const { return false; }
+
+    // Secondary-index traversal — default no-ops; DSRGraph overrides with cache-map reads.
+    virtual void for_each_incoming_edge(uint64_t /*to*/, std::function<void(uint64_t from, const std::string& type)> /*visitor*/) const {}
+    virtual void for_each_edge_of_type_cache(const std::string& /*type*/, std::function<void(uint64_t from, uint64_t to)> /*visitor*/) const {}
+
+    // Signal hooks for remote apply — called by the engine after state is updated.
+    // Default no-ops; DSRGraph overrides to emit Qt signals.
+    virtual void on_remote_node_updated(uint64_t /*id*/, const std::string& /*type*/, uint32_t /*agent_id*/) {}
+    virtual void on_remote_node_deleted(uint64_t /*id*/, const std::optional<Node>& /*node*/, const std::vector<Edge>& /*edges*/, uint32_t /*agent_id*/) {}
+    virtual void on_remote_edge_updated(uint64_t /*from*/, uint64_t /*to*/, const std::string& /*type*/, uint32_t /*agent_id*/) {}
+    virtual void on_remote_edge_deleted(uint64_t /*from*/, uint64_t /*to*/, const std::string& /*type*/, const std::optional<Edge>& /*edge*/, uint32_t /*agent_id*/) {}
+    virtual void on_remote_node_attrs_updated(uint64_t /*id*/, const std::string& /*type*/, const std::vector<std::string>& /*attrs*/, uint32_t /*agent_id*/) {}
+    virtual void on_remote_edge_attrs_updated(uint64_t /*from*/, uint64_t /*to*/, const std::string& /*type*/, const std::vector<std::string>& /*attrs*/, uint32_t /*agent_id*/) {}
 };
 
 class SyncEngine

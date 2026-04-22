@@ -68,6 +68,10 @@ private:
     void store_edge_tombstone(uint64_t from, uint64_t to, const std::string& type, Version version, uint64_t now);
     void erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges = nullptr);
 
+    // Secondary indices — maintained in sync with edges_ for O(degree) lookup.
+    void idx_insert(const EdgeKey& key);
+    void idx_erase(const EdgeKey& key);
+
     SyncEngineHost& host_;
     uint64_t tombstone_window_ms_;
     uint64_t logical_clock_ms_{0};
@@ -75,6 +79,10 @@ private:
     std::unordered_map<EdgeKey, EdgeState, hash_tuple> edges_;
     std::unordered_map<uint64_t, Tombstone> node_tombstones_;
     std::unordered_map<EdgeKey, Tombstone, hash_tuple> edge_tombstones_;
+
+    std::unordered_map<uint64_t, std::unordered_set<EdgeKey, hash_tuple>> from_idx_;
+    std::unordered_map<uint64_t, std::unordered_set<EdgeKey, hash_tuple>> to_idx_;
+    std::unordered_map<std::string, std::unordered_set<EdgeKey, hash_tuple>> type_idx_;
 };
 
 } // namespace DSR
