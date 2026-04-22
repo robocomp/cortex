@@ -16,6 +16,7 @@ class CRDTSyncEngine final : public SyncEngine
 public:
     using Nodes = std::unordered_map<uint64_t, mvreg<CRDTNode>>;
     friend class DSRGraph;
+    friend class RT_API;
 
     explicit CRDTSyncEngine(SyncEngineHost& host);
     CRDTSyncEngine(SyncEngineHost& host, const CRDTSyncEngine& other);
