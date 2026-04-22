@@ -23,6 +23,7 @@ public:
     ~CRDTSyncEngine() override = default;
 
     SyncBackendInfo backend_info() const override;
+    std::unique_ptr<SyncEngine> clone(SyncEngineHost& host) const override;
 
     std::optional<Node> get_node(uint64_t id) const override;
     std::optional<Edge> get_edge(uint64_t from, uint64_t to, const std::string& type) const override;
