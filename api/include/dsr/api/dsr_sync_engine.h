@@ -39,6 +39,9 @@ struct NodeMutationEffect
     std::vector<std::pair<uint64_t, std::string>> related_edge_keys;
     std::vector<Edge> deleted_edges;
     std::optional<Node> deleted_node;
+    std::optional<NodeDeltaMessage> node_delta;
+    std::optional<NodeAttrDeltaBatchMessage> node_attr_batch;
+    std::vector<EdgeDeltaMessage> edge_deltas;
 };
 
 struct EdgeMutationEffect
@@ -49,6 +52,8 @@ struct EdgeMutationEffect
     std::string type;
     std::vector<std::string> changed_attributes;
     std::optional<Edge> deleted_edge;
+    std::optional<EdgeDeltaMessage> edge_delta;
+    std::optional<EdgeAttrDeltaBatchMessage> edge_attr_batch;
 };
 
 class SyncEngineHost
@@ -76,6 +81,7 @@ public:
     virtual ~SyncEngine() = default;
 
     virtual SyncBackendInfo backend_info() const = 0;
+    virtual std::unique_ptr<SyncEngine> clone(SyncEngineHost& host) const = 0;
 
     virtual std::optional<Node> get_node(uint64_t id) const = 0;
     virtual std::optional<Edge> get_edge(uint64_t from, uint64_t to, const std::string& type) const = 0;

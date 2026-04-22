@@ -24,9 +24,25 @@ LWWSyncEngine::LWWSyncEngine(SyncEngineHost& host, uint64_t tombstone_window_ms)
 {
 }
 
+LWWSyncEngine::LWWSyncEngine(SyncEngineHost& host, const LWWSyncEngine& other)
+    : host_(host),
+      tombstone_window_ms_(other.tombstone_window_ms_),
+      logical_clock_ms_(other.logical_clock_ms_),
+      nodes_(other.nodes_),
+      edges_(other.edges_),
+      node_tombstones_(other.node_tombstones_),
+      edge_tombstones_(other.edge_tombstones_)
+{
+}
+
 SyncBackendInfo LWWSyncEngine::backend_info() const
 {
     return SyncBackendInfo{SyncMode::LWW, DSR_PROTOCOL_VERSION};
+}
+
+std::unique_ptr<SyncEngine> LWWSyncEngine::clone(SyncEngineHost& host) const
+{
+    return std::make_unique<LWWSyncEngine>(host, *this);
 }
 
 bool LWWSyncEngine::is_newer(const Version& lhs, const Version& rhs)
@@ -236,6 +252,7 @@ NodeMutationEffect LWWSyncEngine::insert_node_local(Node&& node)
     node_tombstones_.erase(node.id());
     host_.update_maps_node_insert(node);
     effect.applied = true;
+    effect.node_delta = NodeDeltaMessage{*export_node_delta(effect.id)};
     return effect;
 }
 
@@ -275,6 +292,7 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
     host_.update_maps_node_delete(node.id(), old_node);
     host_.update_maps_node_insert(node);
     effect.applied = true;
+    effect.node_delta = NodeDeltaMessage{*export_node_delta(effect.id)};
     return effect;
 }
 
@@ -299,6 +317,15 @@ NodeMutationEffect LWWSyncEngine::delete_node_local(uint64_t id)
     store_node_tombstone(id, version, now);
     nodes_.erase(it);
     effect.applied = true;
+    if (auto delta = export_node_delta(id); delta.has_value()) {
+        effect.node_delta = NodeDeltaMessage{*delta};
+    }
+    effect.edge_deltas.reserve(effect.deleted_edges.size());
+    for (const auto& edge : effect.deleted_edges) {
+        if (auto delta = export_edge_delta(edge.from(), edge.to(), edge.type()); delta.has_value()) {
+            effect.edge_deltas.emplace_back(EdgeDeltaMessage{*delta});
+        }
+    }
     return effect;
 }
 
@@ -333,6 +360,7 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     edge_tombstones_.erase(key);
     host_.update_maps_edge_insert(edge.from(), edge.to(), edge.type());
     effect.applied = true;
+    effect.edge_delta = EdgeDeltaMessage{*export_edge_delta(effect.from, effect.to, effect.type)};
     return effect;
 }
 
@@ -358,6 +386,9 @@ EdgeMutationEffect LWWSyncEngine::delete_edge_local(uint64_t from, uint64_t to, 
     store_edge_tombstone(from, to, type, version, now);
     edges_.erase(it);
     effect.applied = true;
+    if (auto delta = export_edge_delta(from, to, type); delta.has_value()) {
+        effect.edge_delta = EdgeDeltaMessage{*delta};
+    }
     return effect;
 }
 

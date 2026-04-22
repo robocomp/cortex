@@ -49,6 +49,11 @@ SyncBackendInfo CRDTSyncEngine::backend_info() const
     return {};
 }
 
+std::unique_ptr<SyncEngine> CRDTSyncEngine::clone(SyncEngineHost& host) const
+{
+    return std::make_unique<CRDTSyncEngine>(static_cast<DSRGraph&>(host), *this);
+}
+
 std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
 {
     if (const auto* node = get_node_ptr(id); node != nullptr) {
@@ -126,6 +131,7 @@ NodeMutationEffect CRDTSyncEngine::insert_node_local(Node&& node)
     effect.applied = applied;
     if (applied && delta.has_value()) {
         effect.id = delta->id;
+        effect.node_delta = NodeDeltaMessage{*delta};
         if (const auto* inserted = get_node_ptr(delta->id); inserted != nullptr) {
             effect.type = inserted->type();
         }
@@ -139,6 +145,7 @@ NodeMutationEffect CRDTSyncEngine::update_node_local(Node&& node)
     auto [applied, deltas] = update_node_raw(user_node_to_crdt(std::move(node)));
     effect.applied = applied;
     if (applied && deltas.has_value()) {
+        effect.node_attr_batch = NodeAttrDeltaBatchMessage{*deltas};
         effect.changed_attributes.reserve(deltas->vec.size());
         for (const auto& item : deltas->vec) {
             effect.changed_attributes.emplace_back(item.attr_name);
@@ -151,12 +158,19 @@ NodeMutationEffect CRDTSyncEngine::delete_node_local(uint64_t id)
 {
     NodeMutationEffect effect;
     if (auto node = get_crdt_node(id); node.has_value()) {
-        auto [applied, deleted_edges, _delta_node, _delta_edges] = delete_node_raw(id, *node);
+        auto [applied, deleted_edges, delta_node, delta_edges] = delete_node_raw(id, *node);
         effect.applied = applied;
         effect.id = id;
         effect.deleted_edges = std::move(deleted_edges);
         if (node.has_value()) {
             effect.deleted_node = Node(*node);
+        }
+        if (delta_node.has_value()) {
+            effect.node_delta = NodeDeltaMessage{*delta_node};
+        }
+        effect.edge_deltas.reserve(delta_edges.size());
+        for (const auto& delta : delta_edges) {
+            effect.edge_deltas.emplace_back(EdgeDeltaMessage{delta});
         }
     }
     return effect;
@@ -173,7 +187,11 @@ EdgeMutationEffect CRDTSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     effect.from = from;
     effect.to = to;
     effect.type = std::move(type);
+    if (_edge_delta.has_value()) {
+        effect.edge_delta = EdgeDeltaMessage{*_edge_delta};
+    }
     if (attr_deltas.has_value()) {
+        effect.edge_attr_batch = EdgeAttrDeltaBatchMessage{*attr_deltas};
         effect.changed_attributes.reserve(attr_deltas->vec.size());
         for (const auto& item : attr_deltas->vec) {
             effect.changed_attributes.emplace_back(item.attr_name);
@@ -186,7 +204,10 @@ EdgeMutationEffect CRDTSyncEngine::delete_edge_local(uint64_t from, uint64_t to,
 {
     EdgeMutationEffect effect;
     effect.deleted_edge = get_edge(from, to, type);
-    effect.applied = delete_edge_raw(from, to, type).has_value();
+    if (auto delta = delete_edge_raw(from, to, type); delta.has_value()) {
+        effect.edge_delta = EdgeDeltaMessage{*delta};
+        effect.applied = true;
+    }
     effect.from = from;
     effect.to = to;
     effect.type = type;

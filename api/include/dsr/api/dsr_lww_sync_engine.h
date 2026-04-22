@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dsr/api/dsr_sync_engine.h"
+#include "dsr/core/types/lww_types.h"
 
 #include <chrono>
 #include <map>
@@ -14,26 +15,17 @@ namespace DSR {
 class LWWSyncEngine final : public SyncEngine
 {
 public:
-    struct Version
-    {
-        uint64_t timestamp{};
-        uint32_t agent_id{};
-
-        auto tie() const { return std::tie(timestamp, agent_id); }
-    };
-
-    struct Tombstone
-    {
-        Version version;
-        uint64_t expires_at_ms{};
-    };
+    using Version = LWW::Version;
+    using Tombstone = LWW::Tombstone;
 
     explicit LWWSyncEngine(
         SyncEngineHost& host,
         uint64_t tombstone_window_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::minutes(5)).count());
+    LWWSyncEngine(SyncEngineHost& host, const LWWSyncEngine& other);
     ~LWWSyncEngine() override = default;
 
     SyncBackendInfo backend_info() const override;
+    std::unique_ptr<SyncEngine> clone(SyncEngineHost& host) const override;
 
     std::optional<Node> get_node(uint64_t id) const override;
     std::optional<Edge> get_edge(uint64_t from, uint64_t to, const std::string& type) const override;
@@ -63,33 +55,10 @@ public:
     std::optional<LWWEdgeMsg> export_edge_delta(uint64_t from, uint64_t to, const std::string& type) const;
 
 private:
-    struct AttrState
-    {
-        Attribute value;
-        Version version;
-    };
-
-    struct NodeState
-    {
-        uint64_t id{};
-        std::string type;
-        std::string name;
-        uint32_t agent_id{};
-        Version version;
-        std::map<std::string, AttrState> attrs;
-    };
-
-    struct EdgeState
-    {
-        uint64_t from{};
-        uint64_t to{};
-        std::string type;
-        uint32_t agent_id{};
-        Version version;
-        std::map<std::string, AttrState> attrs;
-    };
-
-    using EdgeKey = std::tuple<uint64_t, uint64_t, std::string>;
+    using AttrState = LWW::AttrState;
+    using NodeState = LWW::NodeState;
+    using EdgeState = LWW::EdgeState;
+    using EdgeKey = LWW::EdgeKey;
 
     static bool is_newer(const Version& lhs, const Version& rhs);
     static Version version_of(uint64_t timestamp, uint32_t agent_id);

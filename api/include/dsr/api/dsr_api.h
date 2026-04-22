@@ -668,6 +668,11 @@ namespace DSR
         std::optional<std::string> join_delta_node_attr(DSR::MvregNodeAttrMsg &&mvreg);
         std::optional<std::string> join_delta_edge_attr(DSR::MvregEdgeAttrMsg &&mvreg);
         void join_full_graph(DSR::OrMap &&full_graph);
+        void publish_node_message(const NodeDeltaMessage &message);
+        void publish_node_attr_batch(const NodeAttrDeltaBatchMessage &message);
+        void publish_edge_message(const EdgeDeltaMessage &message);
+        void publish_edge_attr_batch(const EdgeAttrDeltaBatchMessage &message);
+        void publish_full_graph_message(FullGraphMessage &&message, int32_t sender_id);
 
         // ThreadPools are declared after all data they access so that their
         // destructors (which join worker threads) run before the data members
@@ -688,6 +693,26 @@ namespace DSR
 
             void operator()(eprosima::fastdds::dds::DataReader* reader) const { f(reader, graph); };
         };
+
+        struct TransportProfile {
+            NewMessageFunctor (DSRGraph::*make_node_functor)();
+            NewMessageFunctor (DSRGraph::*make_edge_functor)();
+            NewMessageFunctor (DSRGraph::*make_edge_attrs_functor)();
+            NewMessageFunctor (DSRGraph::*make_node_attrs_functor)();
+            NewMessageFunctor (DSRGraph::*make_fullgraph_request_functor)(std::atomic<bool>&, std::atomic<bool>&);
+        };
+
+        const TransportProfile& transport_profile() const;
+        NewMessageFunctor make_crdt_node_subscription_functor();
+        NewMessageFunctor make_lww_node_subscription_functor();
+        NewMessageFunctor make_crdt_edge_subscription_functor();
+        NewMessageFunctor make_lww_edge_subscription_functor();
+        NewMessageFunctor make_crdt_edge_attrs_subscription_functor();
+        NewMessageFunctor make_lww_edge_attrs_subscription_functor();
+        NewMessageFunctor make_crdt_node_attrs_subscription_functor();
+        NewMessageFunctor make_lww_node_attrs_subscription_functor();
+        NewMessageFunctor make_crdt_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        NewMessageFunctor make_lww_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
 
         //Custom function for each rtps topic
         class ParticipantChangeFunctor {
