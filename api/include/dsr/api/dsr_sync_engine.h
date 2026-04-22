@@ -92,9 +92,28 @@ public:
 class SyncEngine
 {
 public:
+    class NodeAttrsView
+    {
+    public:
+        virtual ~NodeAttrsView() = default;
+        virtual const Attribute* find(const std::string& name) const = 0;
+    };
+
+    class NodeView
+    {
+    public:
+        virtual ~NodeView() = default;
+        virtual uint64_t id() const = 0;
+        virtual const std::string& type() const = 0;
+        virtual const std::string& name() const = 0;
+        virtual const NodeAttrsView& attrs() const = 0;
+    };
+
     using OutgoingEdgeVisitor = std::function<void(uint64_t to, const std::string& type, const Edge& edge)>;
     using IncomingEdgeVisitor = std::function<void(uint64_t from, const std::string& type, const Edge& edge)>;
     using TypedEdgeVisitor = std::function<void(uint64_t from, uint64_t to, const Edge& edge)>;
+    using NodeAttrsVisitor = std::function<void(const NodeAttrsView&)>;
+    using NodeViewVisitor = std::function<void(const NodeView&)>;
 
     virtual ~SyncEngine() = default;
 
@@ -103,6 +122,8 @@ public:
 
     virtual std::optional<Node> get_node(uint64_t id) const = 0;
     virtual std::optional<Edge> get_edge(uint64_t from, uint64_t to, const std::string& type) const = 0;
+    virtual bool with_node_attrs(uint64_t id, const NodeAttrsVisitor& visitor) const = 0;
+    virtual bool with_node_view(uint64_t id, const NodeViewVisitor& visitor) const = 0;
     virtual bool for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const = 0;
     virtual bool for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const = 0;
     virtual void for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const = 0;

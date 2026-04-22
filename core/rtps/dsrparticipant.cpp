@@ -206,9 +206,9 @@ eprosima::fastdds::dds::DomainParticipant *DSRParticipant::getParticipant()
 
 void DSRParticipant::remove_participant_and_entities()
 {
-    if (!cleanup_enabled_) {
-        return;
-    }
+    //if (!cleanup_enabled_) {
+    //    return;
+    //}
     if (mp_participant != nullptr)
     {
 

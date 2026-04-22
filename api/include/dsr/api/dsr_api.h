@@ -173,6 +173,7 @@ namespace DSR
 
             const auto &av = [&]() -> const DSR::Attribute& {
                 if constexpr (node_or_edge<Type>) return value->second;
+                else if constexpr (lww_node_or_edge<Type>) return value->value;
                 else return value->second.read_reg();
             }();
 
@@ -209,6 +210,44 @@ namespace DSR
             }
         }
 
+        template <typename name>
+        inline std::optional<decltype(name::type)> get_attrib_by_name(const Attribute &av)
+            requires(is_attr_name<name>) {
+            using name_type = std::remove_cv_t<unwrap_reference_wrapper_t<std::remove_reference_t<std::remove_cv_t<decltype(name::type)>>>>;
+
+            if constexpr (std::is_same_v< name_type, float>)
+                return av.fl();
+            else if constexpr (std::is_same_v< name_type, double>)
+                return av.dob();
+            else if constexpr (std::is_same_v< name_type, std::string>)
+                return std::cref(av.str());
+            else if constexpr (std::is_same_v< name_type, std::int32_t>)
+                return av.dec();
+            else if constexpr (std::is_same_v< name_type, std::uint32_t>)
+                return av.uint();
+            else if constexpr (std::is_same_v< name_type, std::uint64_t>)
+                return av.uint64();
+            else if constexpr (std::is_same_v< name_type, bool>)
+                return av.bl();
+            else if constexpr (std::is_same_v< name_type, std::vector<float>>)
+                return std::cref(av.float_vec());
+            else if constexpr (std::is_same_v< name_type, std::vector<uint8_t>>)
+                return std::cref(av.byte_vec());
+            else if constexpr (std::is_same_v< name_type, std::vector<uint64_t>>)
+                return std::cref(av.u64_vec());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 2>>)
+                return std::cref(av.vec2());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 3>>)
+                return std::cref(av.vec3());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 4>>)
+                return std::cref(av.vec4());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 6>>)
+                return std::cref(av.vec6());
+            else {
+                []<bool flag = false>() { static_assert(flag, "Unreachable"); }();
+            }
+        }
+
 
         template <typename name>
         inline std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>> get_attrib_by_name(uint64_t id)
@@ -216,17 +255,20 @@ namespace DSR
         {
             using ret_type = std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>;
             std::shared_lock<std::shared_mutex> lock(_mutex);
-            if (const auto* n = get_node_ptr_(id); n != nullptr) {
-                auto tmp = get_attrib_by_name<name>(*n);
-                if (tmp.has_value())
-                {
-                    if constexpr(is_reference_wrapper<decltype(name::type)>::value) {
-                        return ret_type{tmp.value().get()};
-                    } else {
-                        return tmp;
+            std::optional<ret_type> out;
+            with_node_attrs_(id, [&](const SyncEngine::NodeAttrsView& attrs) {
+                if (const auto* attr = attrs.find(name::attr_name.data()); attr != nullptr) {
+                    auto tmp = get_attrib_by_name<name>(*attr);
+                    if (tmp.has_value()) {
+                        if constexpr(is_reference_wrapper<decltype(name::type)>::value) {
+                            out = tmp.value().get();
+                        } else {
+                            out = tmp;
+                        }
                     }
                 }
-            }
+            });
+            if (out.has_value()) return out;
             return {};
         }
 
@@ -259,23 +301,27 @@ namespace DSR
         {
             using ret_type = std::tuple<std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>> ...>;
             std::shared_lock<std::shared_mutex> lock(_mutex);
-            if (const auto* node = get_node_ptr_(id); node != nullptr)
-            {
+            std::optional<ret_type> out;
+            with_node_view_(id, [&](const SyncEngine::NodeView& node_view) {
+                const auto& attrs_view = node_view.attrs();
                 auto get_by_name = [&]<typename n>(n* dummy) -> std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(n::type)>>>
                 {
-                    auto tmp = get_attrib_by_name<n>(*node);
-                    if (tmp.has_value())
-                    {
-                        if constexpr(is_reference_wrapper<decltype(n::type)>::value) {
-                            return tmp.value().get();
-                        } else {
-                            return tmp;
+                    if (const auto* attr = attrs_view.find(n::attr_name.data()); attr != nullptr) {
+                        auto tmp = get_attrib_by_name<n>(*attr);
+                        if (tmp.has_value())
+                        {
+                            if constexpr(is_reference_wrapper<decltype(n::type)>::value) {
+                                return tmp.value().get();
+                            } else {
+                                return tmp;
+                            }
                         }
-                    } else  return {};
+                    }
+                    return {};
                 };
-
-                return ret_type(std::move(get_by_name(static_cast<name*>(nullptr))) ...);
-            }
+                out = ret_type(std::move(get_by_name(static_cast<name*>(nullptr))) ...);
+            });
+            if (out.has_value()) return *out;
             constexpr auto return_nullopt = []<typename n>(n* dummy) { return std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(n::type)>>>{}; };
             return ret_type( return_nullopt(static_cast<name*>(nullptr)) ...);
         }
@@ -658,7 +704,8 @@ namespace DSR
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
-        const CRDTNode* get_node_ptr_(uint64_t id) const;
+        bool with_node_attrs_(uint64_t id, const SyncEngine::NodeAttrsVisitor& visitor) const;
+        bool with_node_view_(uint64_t id, const SyncEngine::NodeViewVisitor& visitor) const;
         void publish_node_message(const NodeDeltaMessage &message);
         void publish_node_attr_batch(const NodeAttrDeltaBatchMessage &message);
         void publish_edge_message(const EdgeDeltaMessage &message);

@@ -9,6 +9,63 @@ using DSR::LWW::edge_key;
 using DSR::LWW::is_newer;
 using DSR::LWW::version_of;
 
+namespace {
+template <typename AttrMap>
+std::vector<std::string> collect_changed_attr_names(const AttrMap& before, const AttrMap& after)
+{
+    std::vector<std::string> changed;
+    changed.reserve(std::max(before.size(), after.size()));
+
+    for (const auto& [name, after_attr] : after) {
+        const auto before_it = before.find(name);
+        if (before_it == before.end() || !(before_it->second.value == after_attr.value)) {
+            changed.emplace_back(name);
+        }
+    }
+    for (const auto& [name, _] : before) {
+        if (!after.contains(name)) {
+            changed.emplace_back(name);
+        }
+    }
+
+    return changed;
+}
+
+class LWWNodeAttrsView final : public SyncEngine::NodeAttrsView
+{
+public:
+    explicit LWWNodeAttrsView(const std::map<std::string, LWW::AttrState>& attrs)
+        : attrs_(attrs) {}
+
+    const Attribute* find(const std::string& name) const override
+    {
+        if (auto it = attrs_.find(name); it != attrs_.end()) {
+            return &it->second.value;
+        }
+        return nullptr;
+    }
+
+private:
+    const std::map<std::string, LWW::AttrState>& attrs_;
+};
+
+class LWWNodeView final : public SyncEngine::NodeView
+{
+public:
+    explicit LWWNodeView(const LWW::NodeState& node)
+        : node_(node), attrs_(node.attrs) {}
+
+    uint64_t id() const override { return node_.id; }
+    const std::string& type() const override { return node_.type; }
+    const std::string& name() const override { return node_.name; }
+    const SyncEngine::NodeAttrsView& attrs() const override { return attrs_; }
+
+private:
+    const LWW::NodeState& node_;
+    LWWNodeAttrsView attrs_;
+};
+}
+
 LWWSyncEngine::LWWSyncEngine(SyncEngineHost& host, uint64_t tombstone_window_ms)
     : host_(host),
       tombstone_window_ms_(tombstone_window_ms)
@@ -115,10 +172,33 @@ std::optional<Edge> LWWSyncEngine::get_edge(uint64_t from, uint64_t to, const st
     return {};
 }
 
+bool LWWSyncEngine::with_node_attrs(uint64_t id, const NodeAttrsVisitor& visitor) const
+{
+    if (const auto* node = get_node_ptr(id); node != nullptr) {
+        LWWNodeAttrsView attrs(node->attrs);
+        visitor(attrs);
+        return true;
+    }
+    return false;
+}
+
+bool LWWSyncEngine::with_node_view(uint64_t id, const NodeViewVisitor& visitor) const
+{
+    if (const auto* node = get_node_ptr(id); node != nullptr) {
+        LWWNodeView view(*node);
+        visitor(view);
+        return true;
+    }
+    return false;
+}
+
 bool LWWSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const
 {
     if (!nodes_.contains(from)) {
         return false;
+    }
+    if (auto it = from_idx_.find(from); it == from_idx_.end()) {
+        return true;
     }
     return LWW::for_each_edge_from(edges_, from_idx_, from, visitor);
 }
@@ -196,14 +276,7 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
     it->second.agent_id = host_.local_agent_id();
 
     std::map<std::string, AttrState> next_attrs = LWW::to_attr_state_map(node.attrs(), version);
-    for (const auto& [name, _] : node.attrs()) {
-        effect.changed_attributes.emplace_back(name);
-    }
-    for (const auto& [name, _] : it->second.attrs) {
-        if (!next_attrs.contains(name)) {
-            effect.changed_attributes.emplace_back(name);
-        }
-    }
+    effect.changed_attributes = collect_changed_attr_names(it->second.attrs, next_attrs);
     it->second.attrs = std::move(next_attrs);
 
     host_.update_maps_node_delete(node.id(), old_node);
@@ -263,11 +336,17 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     }
 
     auto key = edge_key(edge.from(), edge.to(), edge.type());
-    edges_[key] = LWW::to_edge_state(edge, version, host_.local_agent_id());
-    idx_insert(key);  // idempotent for updates
-    for (const auto& [name, _] : edge.attrs()) {
-        effect.changed_attributes.emplace_back(name);
+    auto next_state = LWW::to_edge_state(edge, version, host_.local_agent_id());
+    if (const auto old_it = edges_.find(key); old_it != edges_.end()) {
+        effect.changed_attributes = collect_changed_attr_names(old_it->second.attrs, next_state.attrs);
+    } else {
+        effect.changed_attributes.reserve(next_state.attrs.size());
+        for (const auto& [name, _] : next_state.attrs) {
+            effect.changed_attributes.emplace_back(name);
+        }
     }
+    edges_[key] = std::move(next_state);
+    idx_insert(key);  // idempotent for updates
     edge_tombstones_.erase(key);
     host_.update_maps_edge_insert(edge.from(), edge.to(), edge.type());
     effect.applied = true;
@@ -539,4 +618,13 @@ std::optional<LWWEdgeMsg> LWWSyncEngine::export_edge_delta(uint64_t from, uint64
         return LWW::to_edge_tombstone_msg(from, to, type, it->second);
     }
     return {};
+}
+
+const LWW::NodeState* LWWSyncEngine::get_node_ptr(uint64_t id) const
+{
+    auto it = nodes_.find(id);
+    if (it != nodes_.end()) {
+        return &it->second;
+    }
+    return nullptr;
 }
