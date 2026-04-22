@@ -3,7 +3,7 @@
 #include "dsr/api/dsr_api.h"
 #include "dsr/api/dsr_logging.h"
 #include "dsr/core/profiling.h"
-#include "dsr/core/types/translator.h"
+#include "dsr/core/types/crdt_io.h"
 
 #include <algorithm>
 #include <iostream>
@@ -29,12 +29,12 @@ bool protocol_version_matches(
 }
 }
 
-CRDTSyncEngine::CRDTSyncEngine(DSRGraph& host)
+CRDTSyncEngine::CRDTSyncEngine(SyncEngineHost& host)
     : host_(host)
 {
 }
 
-CRDTSyncEngine::CRDTSyncEngine(DSRGraph& host, const CRDTSyncEngine& other)
+CRDTSyncEngine::CRDTSyncEngine(SyncEngineHost& host, const CRDTSyncEngine& other)
     : host_(host),
       nodes_(other.nodes_),
       unprocessed_delta_node_att_(other.unprocessed_delta_node_att_),
@@ -51,7 +51,17 @@ SyncBackendInfo CRDTSyncEngine::backend_info() const
 
 std::unique_ptr<SyncEngine> CRDTSyncEngine::clone(SyncEngineHost& host) const
 {
-    return std::make_unique<CRDTSyncEngine>(static_cast<DSRGraph&>(host), *this);
+    return std::make_unique<CRDTSyncEngine>(host, *this);
+}
+
+DSRGraph& CRDTSyncEngine::graph()
+{
+    return static_cast<DSRGraph&>(host_);
+}
+
+const DSRGraph& CRDTSyncEngine::graph() const
+{
+    return static_cast<const DSRGraph&>(host_);
 }
 
 std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
@@ -86,10 +96,11 @@ bool CRDTSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor
 
 bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const
 {
-    if (auto it = host_.to_edges.find(to); it != host_.to_edges.end()) {
+    if (auto it = graph().to_edges.find(to); it != graph().to_edges.end()) {
         for (const auto& [from, type] : it->second) {
             if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
                 Edge out(std::move(*edge));
+                //TODO: move here?
                 visitor(from, type, out);
             }
         }
@@ -100,7 +111,7 @@ bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& vi
 
 void CRDTSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
 {
-    if (auto it = host_.edgeType.find(type); it != host_.edgeType.end()) {
+    if (auto it = graph().edgeType.find(type); it != graph().edgeType.end()) {
         for (const auto& [from, to] : it->second) {
             if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
                 Edge out(std::move(*edge));
@@ -239,7 +250,7 @@ void CRDTSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& ba
     const auto sample_agent_id = payload->vec.front().agent_id;
     std::vector<std::string> changed_attributes;
     for (auto&& item : payload->vec) {
-        if (host_.ignored_attributes.contains(item.attr_name)) {
+        if (graph().ignored_attributes.contains(item.attr_name)) {
             continue;
         }
         if (auto changed = join_delta_node_attr(std::move(item)); changed.has_value()) {
@@ -250,13 +261,13 @@ void CRDTSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& ba
     if (!changed_attributes.empty()) {
         std::string type;
         {
-            std::shared_lock<std::shared_mutex> lock(host_._mutex);
+            std::shared_lock<std::shared_mutex> lock(graph()._mutex);
             if (const auto* node = get_node_ptr(id); node != nullptr) {
                 type = node->type();
             }
         }
-        host_.emitter.update_node_attr_signal(id, changed_attributes, SignalInfo{sample_agent_id});
-        host_.emitter.update_node_signal(id, type, SignalInfo{sample_agent_id});
+        graph().emitter.update_node_attr_signal(id, changed_attributes, SignalInfo{sample_agent_id});
+        graph().emitter.update_node_signal(id, type, SignalInfo{sample_agent_id});
     }
 }
 
@@ -273,7 +284,7 @@ void CRDTSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& ba
     const auto sample_agent_id = payload->vec.front().agent_id;
     std::vector<std::string> changed_attributes;
     for (auto&& item : payload->vec) {
-        if (host_.ignored_attributes.contains(item.attr_name)) {
+        if (graph().ignored_attributes.contains(item.attr_name)) {
             continue;
         }
         if (auto changed = join_delta_edge_attr(std::move(item)); changed.has_value()) {
@@ -282,8 +293,8 @@ void CRDTSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& ba
     }
 
     if (!changed_attributes.empty()) {
-        host_.emitter.update_edge_attr_signal(from, to, type, changed_attributes, SignalInfo{sample_agent_id});
-        host_.emitter.update_edge_signal(from, to, type, SignalInfo{sample_agent_id});
+        graph().emitter.update_edge_attr_signal(from, to, type, changed_attributes, SignalInfo{sample_agent_id});
+        graph().emitter.update_edge_signal(from, to, type, SignalInfo{sample_agent_id});
     }
 }
 
@@ -296,11 +307,11 @@ void CRDTSyncEngine::import_full_graph(FullGraphMessage&& full_graph)
 
 FullGraphMessage CRDTSyncEngine::export_full_graph() const
 {
-    std::shared_lock<std::shared_mutex> lock(host_._mutex);
+    std::shared_lock<std::shared_mutex> lock(graph()._mutex);
     OrMap map;
-    map.id = static_cast<int32_t>(host_.agent_id);
+    map.id = static_cast<int32_t>(graph().agent_id);
     map.protocol_version = DSR_PROTOCOL_VERSION;
-    map.sync_mode = sync_mode_wire_value(host_.sync_mode);
+    map.sync_mode = sync_mode_wire_value(graph().sync_mode);
     map.m = export_mvreg_map();
     return map;
 }
@@ -341,7 +352,7 @@ std::optional<CRDTEdge> CRDTSyncEngine::get_crdt_edge(uint64_t from, uint64_t to
 std::tuple<bool, std::optional<MvregNodeMsg>> CRDTSyncEngine::insert_node_raw(CRDTNode&& node)
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::insert_node_raw");
-    if (!host_.deleted.contains(node.id()))
+    if (!graph().deleted.contains(node.id()))
     {
         if (auto it = nodes_.find(node.id()); it != nodes_.end() and not it->second.empty() and it->second.read_reg() == node)
         {
@@ -349,9 +360,9 @@ std::tuple<bool, std::optional<MvregNodeMsg>> CRDTSyncEngine::insert_node_raw(CR
         }
 
         uint64_t id = node.id();
-        host_.update_maps_node_insert(id, node);
+        graph().update_maps_node_insert(id, node);
         auto delta = nodes_[id].write(std::move(node));
-        return {true, CRDTNode_to_Msg(host_.agent_id, id, std::move(delta))};
+        return {true, crdt_node_to_msg(graph().agent_id, id, std::move(delta))};
     }
     return {false, {}};
 }
@@ -359,7 +370,7 @@ std::tuple<bool, std::optional<MvregNodeMsg>> CRDTSyncEngine::insert_node_raw(CR
 std::tuple<bool, std::optional<MvregNodeAttrVec>> CRDTSyncEngine::update_node_raw(CRDTNode&& node)
 {
     CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::update_node_raw");
-    if (!host_.deleted.contains(node.id()))
+    if (!graph().deleted.contains(node.id()))
     {
         auto nit = nodes_.find(node.id());
         if (nit != nodes_.end() && !nit->second.empty())
@@ -371,18 +382,18 @@ std::tuple<bool, std::optional<MvregNodeAttrVec>> CRDTSyncEngine::update_node_ra
                 if (attr_reg.empty() || att.read_reg() != attr_reg.read_reg()) {
                     auto delta = attr_reg.write(std::move(att.read_reg()));
                     atts_deltas.vec.emplace_back(
-                        CRDTNodeAttr_to_Msg(host_.agent_id, node.id(), node.id(), k, std::move(delta)));
+                        crdt_node_attr_to_msg(graph().agent_id, node.id(), node.id(), k, std::move(delta)));
                 }
             }
             auto it_a = iter.begin();
             while (it_a != iter.end()) {
                 const std::string& k = it_a->first;
-                if (host_.ignored_attributes.contains(k)) {
+                if (graph().ignored_attributes.contains(k)) {
                     it_a = iter.erase(it_a);
                 } else if (!node.attrs().contains(k)) {
                     auto delta = it_a->second.reset();
                     atts_deltas.vec.emplace_back(
-                        CRDTNodeAttr_to_Msg(node.agent_id(), node.id(), node.id(), k, std::move(delta)));
+                        crdt_node_attr_to_msg(node.agent_id(), node.id(), node.id(), k, std::move(delta)));
                     it_a = iter.erase(it_a);
                 } else {
                     ++it_a;
@@ -408,13 +419,13 @@ CRDTSyncEngine::delete_node_raw(uint64_t id, const CRDTNode& node)
         deleted_edges.emplace_back(v.second.read_reg());
     }
     auto delta = nodes_[id].reset();
-    MvregNodeMsg delta_remove = CRDTNode_to_Msg(host_.agent_id, id, std::move(delta));
+    MvregNodeMsg delta_remove = crdt_node_to_msg(graph().agent_id, id, std::move(delta));
     {
-        decltype(host_.to_edges)::mapped_type incoming;
+        decltype(graph().to_edges)::mapped_type incoming;
         {
-            std::shared_lock<std::shared_mutex> lck_cache(host_._mutex_cache_maps);
-            if (host_.to_edges.contains(id))
-                incoming = host_.to_edges.at(id);
+            std::shared_lock<std::shared_mutex> lck_cache(graph()._mutex_cache_maps);
+            if (graph().to_edges.contains(id))
+                incoming = graph().to_edges.at(id);
         }
         for (const auto& [from, type] : incoming)
         {
@@ -422,13 +433,13 @@ CRDTSyncEngine::delete_node_raw(uint64_t id, const CRDTNode& node)
             auto& visited_node = nodes_.at(from).read_reg();
             deleted_edges.emplace_back(visited_node.fano().at({id, type}).read_reg());
             auto delta_fano = visited_node.fano().at({id, type}).reset();
-            delta_vec.emplace_back(CRDTEdge_to_Msg(host_.agent_id, from, id, type, std::move(delta_fano)));
+            delta_vec.emplace_back(crdt_edge_to_msg(graph().agent_id, from, id, type, std::move(delta_fano)));
             visited_node.fano().erase({id, type});
-            host_.update_maps_edge_delete(from, id, type);
+            graph().update_maps_edge_delete(from, id, type);
         }
     }
 
-    host_.update_maps_node_delete(id, node);
+    graph().update_maps_node_delete(id, node);
 
     return {true, std::move(deleted_edges), std::move(delta_remove), std::move(delta_vec)};
 }
@@ -440,8 +451,8 @@ std::optional<MvregEdgeMsg> CRDTSyncEngine::delete_edge_raw(uint64_t from, uint6
         if (node.fano().contains({to, key})) {
             auto delta = node.fano().at({to, key}).reset();
             node.fano().erase({to, key});
-            host_.update_maps_edge_delete(from, to, key);
-            return CRDTEdge_to_Msg(host_.agent_id, from, to, key, std::move(delta));
+            graph().update_maps_edge_delete(from, to, key);
+            return crdt_edge_to_msg(graph().agent_id, from, to, key, std::move(delta));
         }
     }
     return {};
@@ -467,7 +478,7 @@ CRDTSyncEngine::insert_or_assign_edge_raw(CRDTEdge&& attrs, uint64_t from, uint6
                 if (attr_reg.empty() || att.read_reg() != attr_reg.read_reg()) {
                     auto delta = attr_reg.write(std::move(att.read_reg()));
                     atts_deltas.vec.emplace_back(
-                        CRDTEdgeAttr_to_Msg(host_.agent_id, from, from, to, attrs.type(), k, std::move(delta)));
+                        crdt_edge_attr_to_msg(graph().agent_id, from, from, to, attrs.type(), k, std::move(delta)));
                 }
             }
             auto it = iter_edge.begin();
@@ -477,7 +488,7 @@ CRDTSyncEngine::insert_or_assign_edge_raw(CRDTEdge&& attrs, uint64_t from, uint6
                     auto delta = it->second.reset();
                     it = iter_edge.erase(it);
                     atts_deltas.vec.emplace_back(
-                        CRDTEdgeAttr_to_Msg(host_.agent_id, from, from, to, attrs.type(), std::move(att), std::move(delta)));
+                        crdt_edge_attr_to_msg(graph().agent_id, from, from, to, attrs.type(), std::move(att), std::move(delta)));
                 } else {
                     ++it;
                 }
@@ -487,8 +498,8 @@ CRDTSyncEngine::insert_or_assign_edge_raw(CRDTEdge&& attrs, uint64_t from, uint6
         {
             std::string att_type = attrs.type();
             auto delta = node.fano()[{to, attrs.type()}].write(std::move(attrs));
-            host_.update_maps_edge_insert(from, to, att_type);
-            return {true, CRDTEdge_to_Msg(host_.agent_id, from, to, std::move(att_type), std::move(delta)), {}};
+            graph().update_maps_edge_insert(from, to, att_type);
+            return {true, crdt_edge_to_msg(graph().agent_id, from, to, std::move(att_type), std::move(delta)), {}};
         }
     }
     return {false, {}, {}};
@@ -509,10 +520,10 @@ bool CRDTSyncEngine::process_delta_edge(uint64_t from, uint64_t to, const std::s
     edge_reg.join(std::move(delta));
     if (edge_reg.empty() || d_empty) {
         fanout.erase({to, type});
-        host_.update_maps_edge_delete(from, to, type);
+        graph().update_maps_edge_delete(from, to, type);
         signal = false;
     } else {
-        host_.update_maps_edge_insert(from, to, type);
+        graph().update_maps_edge_insert(from, to, type);
         signal = !prev.has_value() || prev.value() != edge_reg.read_reg();
     }
     return signal;
@@ -547,11 +558,11 @@ void CRDTSyncEngine::process_delta_edge_attr(uint64_t from, uint64_t to, const s
 void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::join_delta_node");
-    const auto log_level = host_.log_level;
+    const auto log_level = graph().log_level;
 
     std::optional<CRDTNode> maybe_deleted_node = {};
     try {
-        if (!protocol_version_matches(host_.log_level, "DSR_NODE", mvreg.protocol_version)) {
+        if (!protocol_version_matches(graph().log_level, "DSR_NODE", mvreg.protocol_version)) {
             return;
         }
         bool signal = false, joined = false;
@@ -639,22 +650,22 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
 
         {
             CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node crdt merge");
-            std::unique_lock<std::shared_mutex> lock(host_._mutex);
-            if (!host_.deleted.contains(id)) {
+            std::unique_lock<std::shared_mutex> lock(graph()._mutex);
+            if (!graph().deleted.contains(id)) {
                 if (auto it = nodes_.find(id); it != nodes_.end() && !it->second.empty()) {
                     maybe_deleted_node = it->second.read_reg();
                 }
                 nodes_[id].join(std::move(crdt_delta));
                 if (nodes_.at(id).empty() || d_empty) {
                     if (maybe_deleted_node.has_value()) {
-                        cache_map_to_edges = host_.to_edges[id];
+                        cache_map_to_edges = graph().to_edges[id];
                     }
-                    host_.update_maps_node_delete(id, maybe_deleted_node);
+                    graph().update_maps_node_delete(id, maybe_deleted_node);
                     delete_unprocessed_deltas();
                 } else {
                     const auto& reg = nodes_.at(id).read_reg();
                     current_type = reg.type();
-                    host_.update_maps_node_insert(id, reg);
+                    graph().update_maps_node_insert(id, reg);
                     consume_unprocessed_deltas();
                 }
                 signal = !d_empty;
@@ -665,33 +676,33 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         if (joined) {
             CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node signal emit");
             if (signal) {
-                host_.emitter.update_node_signal(id, current_type, SignalInfo{ mvreg.agent_id });
+                graph().emitter.update_node_signal(id, current_type, SignalInfo{ mvreg.agent_id });
                 if (const auto* current = get_node_ptr(id); current != nullptr) {
                     for (const auto &[k, v] : current->fano()) {
-                        host_.emitter.update_edge_signal(id, k.first, k.second, SignalInfo{ mvreg.agent_id });
+                        graph().emitter.update_edge_signal(id, k.first, k.second, SignalInfo{ mvreg.agent_id });
                     }
                 }
 
                 for (const auto &[k, v]: map_new_to_edges)
                 {
-                    host_.emitter.update_edge_signal(k, id, v, SignalInfo{ mvreg.agent_id });
+                    graph().emitter.update_edge_signal(k, id, v, SignalInfo{ mvreg.agent_id });
                 }
             } else {
-                host_.emitter.del_node_signal(id, SignalInfo{ mvreg.agent_id });
+                graph().emitter.del_node_signal(id, SignalInfo{ mvreg.agent_id });
                 if (maybe_deleted_node.has_value()) {
                     Node tmp_node(*maybe_deleted_node);
-                    host_.emitter.deleted_node_signal(tmp_node, SignalInfo{ mvreg.agent_id });
+                    graph().emitter.deleted_node_signal(tmp_node, SignalInfo{ mvreg.agent_id });
                     for (const auto &node: maybe_deleted_node->fano()) {
-                        host_.emitter.del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
+                        graph().emitter.del_edge_signal(node.second.read_reg().from(), node.second.read_reg().to(),
                                              node.second.read_reg().type(), SignalInfo{ mvreg.agent_id });
                         Edge tmp_edge(node.second.read_reg());
-                        host_.emitter.deleted_edge_signal(tmp_edge, SignalInfo{ mvreg.agent_id });
+                        graph().emitter.deleted_edge_signal(tmp_edge, SignalInfo{ mvreg.agent_id });
                     }
                 }
 
                 if (cache_map_to_edges.has_value()) {
                     for (const auto &[from, type] : cache_map_to_edges.value()) {
-                        host_.emitter.del_edge_signal(from, id, type, SignalInfo{ mvreg.agent_id });
+                        graph().emitter.del_edge_signal(from, id, type, SignalInfo{ mvreg.agent_id });
                     }
                 }
             }
@@ -702,9 +713,9 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
 void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::join_delta_edge");
-    const auto log_level = host_.log_level;
+    const auto log_level = graph().log_level;
     try {
-        if (!protocol_version_matches(host_.log_level, "DSR_EDGE", mvreg.protocol_version)) {
+        if (!protocol_version_matches(graph().log_level, "DSR_EDGE", mvreg.protocol_version)) {
             return;
         }
         bool signal = false, joined = false;
@@ -744,10 +755,10 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
 
         {
             CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge crdt merge");
-            std::unique_lock<std::shared_mutex> lock(host_._mutex);
+            std::unique_lock<std::shared_mutex> lock(graph()._mutex);
             deleted_edge = get_edge(from, to, type);
             bool cfrom{nodes_.contains(from)}, cto{nodes_.contains(to)};
-            bool dfrom{host_.deleted.contains(from)}, dto{host_.deleted.contains(to)};
+            bool dfrom{graph().deleted.contains(from)}, dto{graph().deleted.contains(to)};
 
             if (cfrom && cto) {
                 signal = process_delta_edge(from, to, type, std::move(crdt_delta));
@@ -789,11 +800,11 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         if (joined) {
             CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge signal emit");
             if (signal) {
-                host_.emitter.update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id });
+                graph().emitter.update_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id });
             } else {
-                host_.emitter.del_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id });
+                graph().emitter.del_edge_signal(from, to, type, SignalInfo{ mvreg.agent_id });
                 if (deleted_edge.has_value()) {
-                    host_.emitter.deleted_edge_signal(*deleted_edge, SignalInfo{ mvreg.agent_id });
+                    graph().emitter.deleted_edge_signal(*deleted_edge, SignalInfo{ mvreg.agent_id });
                 }
             }
         }
@@ -804,7 +815,7 @@ std::optional<std::string> CRDTSyncEngine::join_delta_node_attr(MvregNodeAttrMsg
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::join_delta_node_attr");
     try {
-        if (!protocol_version_matches(host_.log_level, "DSR_NODE_ATTS", mvreg.protocol_version)) {
+        if (!protocol_version_matches(graph().log_level, "DSR_NODE_ATTS", mvreg.protocol_version)) {
             return {};
         }
         auto id = mvreg.node;
@@ -814,13 +825,13 @@ std::optional<std::string> CRDTSyncEngine::join_delta_node_attr(MvregNodeAttrMsg
         auto d_empty = crdt_delta.empty();
         {
             CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node_attr crdt merge");
-            std::unique_lock<std::shared_mutex> lock(host_._mutex);
+            std::unique_lock<std::shared_mutex> lock(graph()._mutex);
             if (nodes_.contains(id)) {
                 process_delta_node_attr(id, att_name, std::move(crdt_delta));
                 std::erase_if(unprocessed_delta_node_att_,
                               [id = id, att_name = att_name](auto &it){ return it.first == id && std::get<0>(it.second) == att_name;});
                 return att_name;
-            } else if (!host_.deleted.contains(id)) {
+            } else if (!graph().deleted.contains(id)) {
                 bool find = false;
                 for (auto [begin, end] = unprocessed_delta_node_att_.equal_range(id); begin != end; ++begin) {
                     if (std::get<0>(begin->second) == att_name){
@@ -848,7 +859,7 @@ std::optional<std::string> CRDTSyncEngine::join_delta_edge_attr(MvregEdgeAttrMsg
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::join_delta_edge_attr");
     try {
-        if (!protocol_version_matches(host_.log_level, "DSR_EDGE_ATTS", mvreg.protocol_version)) {
+        if (!protocol_version_matches(graph().log_level, "DSR_EDGE_ATTS", mvreg.protocol_version)) {
             return {};
         }
         auto from = mvreg.from_node;
@@ -860,14 +871,14 @@ std::optional<std::string> CRDTSyncEngine::join_delta_edge_attr(MvregEdgeAttrMsg
         auto d_empty = crdt_delta.empty();
         {
             CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge_attr crdt merge");
-            std::unique_lock<std::shared_mutex> lock(host_._mutex);
+            std::unique_lock<std::shared_mutex> lock(graph()._mutex);
             if (nodes_.contains(from)  and nodes_.at(from).read_reg().fano().contains({to, type}))
             {
                 process_delta_edge_attr(from, to, type, att_name, std::move(crdt_delta));
                 std::erase_if(unprocessed_delta_edge_att_,
                               [from = from, to = to, type = type, att_name = att_name](auto &it){ return it.first == std::tuple{from, to, type} && std::get<0>(it.second) == att_name;});
                 return att_name;
-            } else if (!host_.deleted.contains(from) && !host_.deleted.contains(to)) {
+            } else if (!graph().deleted.contains(from) && !graph().deleted.contains(to)) {
                 bool find = false;
                 for (auto [begin, end] = unprocessed_delta_edge_att_.equal_range(std::tuple{from, to, type}); begin != end; ++begin) {
                     if (std::get<0>(begin->second) == att_name){
@@ -894,8 +905,8 @@ std::optional<std::string> CRDTSyncEngine::join_delta_edge_attr(MvregEdgeAttrMsg
 void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::join_full_graph");
-    const auto log_level = host_.log_level;
-    if (!protocol_version_matches(host_.log_level, "GRAPH_ANSWER", full_graph.protocol_version)) {
+    const auto log_level = graph().log_level;
+    if (!protocol_version_matches(graph().log_level, "GRAPH_ANSWER", full_graph.protocol_version)) {
         return;
     }
 
@@ -975,7 +986,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     };
 
     {
-        std::unique_lock<std::shared_mutex> lock(host_._mutex);
+        std::unique_lock<std::shared_mutex> lock(graph()._mutex);
 
         for (auto &[k, val] : full_graph.m) {
             auto mv = std::move(val.dk);
@@ -985,18 +996,18 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
             std::optional<CRDTNode> nd =
                     (it != nodes_.end() and !it->second.empty()) ? std::make_optional(it->second.read_reg()) : std::nullopt;
             id = k;
-            if (!host_.deleted.contains(k)) {
+            if (!graph().deleted.contains(k)) {
                 if (it == nodes_.end()) {
                     it = nodes_.emplace(k, mvreg<CRDTNode>{}).first;
                 }
                 it->second.join(std::move(mv));
                 if (mv_empty or it->second.empty()) {
-                    host_.update_maps_node_delete(k, nd);
+                    graph().update_maps_node_delete(k, nd);
                     updates.emplace_back(false, k, "", std::nullopt, std::nullopt);
                     delete_unprocessed_deltas();
                 } else {
                     const auto& reg = it->second.read_reg();
-                    host_.update_maps_node_insert(k, reg);
+                    graph().update_maps_node_insert(k, reg);
                     updates.emplace_back(true, k, reg.type(), nd, reg);
                     consume_unprocessed_deltas();
                 }
@@ -1008,28 +1019,28 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
         for (auto &[signal, node_id, type, nd, current_nd] : updates) {
             if (signal) {
                 if (!nd.has_value() || nd->attrs() != current_nd->attrs()) {
-                    host_.emitter.update_node_signal(node_id, type, SignalInfo{ agent_id_ch });
+                    graph().emitter.update_node_signal(node_id, type, SignalInfo{ agent_id_ch });
                 } else if (nd.value() != *current_nd) {
                     const auto& iter = current_nd->fano();
                     for (const auto &[k, v] : nd->fano()) {
                         if (!iter.contains(k)) {
-                            host_.emitter.del_edge_signal(node_id, k.first, k.second, SignalInfo{ agent_id_ch });
+                            graph().emitter.del_edge_signal(node_id, k.first, k.second, SignalInfo{ agent_id_ch });
                             if (v.dk.ds.size() > 0) {
                                 Edge tmp_edge(v.read_reg());
-                                host_.emitter.deleted_edge_signal(tmp_edge, SignalInfo{ host_.agent_id });
+                                graph().emitter.deleted_edge_signal(tmp_edge, SignalInfo{ graph().agent_id });
                             }
                         }
                     }
                     for (const auto &[k, v] : iter) {
                         if (auto it = nd->fano().find(k); it == nd->fano().end() or it->second != v)
-                            host_.emitter.update_edge_signal(node_id, k.first, k.second, SignalInfo{ agent_id_ch });
+                            graph().emitter.update_edge_signal(node_id, k.first, k.second, SignalInfo{ agent_id_ch });
                     }
                 }
             } else {
-                host_.emitter.del_node_signal(node_id, SignalInfo{ agent_id_ch });
+                graph().emitter.del_node_signal(node_id, SignalInfo{ agent_id_ch });
                 if (nd.has_value()) {
                     Node tmp_node(*nd);
-                    host_.emitter.deleted_node_signal(tmp_node, SignalInfo{ agent_id_ch });
+                    graph().emitter.deleted_node_signal(tmp_node, SignalInfo{ agent_id_ch });
                 }
             }
         }
@@ -1044,10 +1055,10 @@ std::map<uint64_t, MvregNodeMsg> CRDTSyncEngine::export_mvreg_map() const
         MvregNodeMsg msg;
         msg.dk = kv.second;
         msg.id = kv.first;
-        msg.agent_id = host_.agent_id;
+        msg.agent_id = graph().agent_id;
         msg.timestamp = get_unix_timestamp();
         msg.protocol_version = DSR_PROTOCOL_VERSION;
-        msg.sync_mode = sync_mode_wire_value(host_.sync_mode);
+        msg.sync_mode = sync_mode_wire_value(graph().sync_mode);
         m.emplace(kv.first, std::move(msg));
     }
     return m;

@@ -608,11 +608,11 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
 
         if (node1_insert.has_value())
         {
-            G->dsrpub_edge.write(&node1_insert.value());
+            G->dsrpub_edge.write(node1_insert.value());
         }
-        if (node1_update.has_value()) G->dsrpub_edge_attrs.write(&node1_update.value());
+        if (node1_update.has_value()) G->dsrpub_edge_attrs.write(node1_update.value());
 
-        if (!no_send and node2.has_value()) G->dsrpub_node_attrs.write(&node2.value());
+        if (!no_send and node2.has_value()) G->dsrpub_node_attrs.write(node2.value());
 
         G->emitter.update_edge_attr_signal(n.id(), to, "RT", updated_attributes, SignalInfo{ G->agent_id });
         G->emitter.update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
