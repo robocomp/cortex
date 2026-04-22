@@ -32,6 +32,60 @@ bool is_lww_mode(uint8_t sync_mode_wire)
 {
     return sync_mode_wire == 1;
 }
+
+struct TransportFamily
+{
+    const char* node_topic_name;
+    const char* edge_topic_name;
+    const char* node_attr_topic_name;
+    const char* edge_attr_topic_name;
+    const char* graph_request_topic_name;
+    const char* graph_answer_topic_name;
+    eprosima::fastdds::dds::TypeSupport node_type;
+    eprosima::fastdds::dds::TypeSupport graph_request_type;
+    eprosima::fastdds::dds::TypeSupport graph_answer_type;
+    eprosima::fastdds::dds::TypeSupport edge_type;
+    eprosima::fastdds::dds::TypeSupport node_attr_type;
+    eprosima::fastdds::dds::TypeSupport edge_attr_type;
+    bool cleanup_enabled{true};
+};
+
+TransportFamily make_transport_family(uint8_t sync_mode_wire)
+{
+    if (is_lww_mode(sync_mode_wire)) {
+        return TransportFamily{
+            "LWW_NODE",
+            "LWW_EDGE",
+            "LWW_NODE_ATTS",
+            "LWW_EDGE_ATTS",
+            "LWW_GRAPH_REQUEST",
+            "LWW_GRAPH_ANSWER",
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeMsg>("LWWNodeMsg")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWGraphSnapshot>("LWWGraphSnapshot")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeMsg>("LWWEdgeMsg")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeAttrVec>("LWWNodeAttrVec")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeAttrVec>("LWWEdgeAttrVec")),
+            false
+        };
+    }
+
+    return TransportFamily{
+        "DSR_NODE",
+        "DSR_EDGE",
+        "DSR_NODE_ATTS",
+        "DSR_EDGE_ATTS",
+        "GRAPH_REQUEST",
+        "GRAPH_ANSWER",
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregNodeMsg>("MvregNodeMsg")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::OrMap>("OrMap")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregEdgeMsg>("MvregEdgeMsg")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregNodeAttrVec>("MvregNodeAttrVec")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregEdgeAttrVec>("MvregEdgeAttrVec")),
+        true
+    };
+}
 }
 
 DSRParticipant::DSRParticipant() : mp_participant(nullptr),
@@ -59,7 +113,8 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
 {
     domain_id_ = domain_id;
     sync_mode_wire_ = sync_mode_wire;
-    cleanup_enabled_ = !is_lww_mode(sync_mode_wire);
+    auto family = make_transport_family(sync_mode_wire);
+    cleanup_enabled_ = family.cleanup_enabled;
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
     PParam.name(("Participant_" + std::to_string(agent_id)+ " ( " + agent_name + " )").data() );
@@ -117,16 +172,12 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     {
         qFatal("Could not create particpant after 5 attemps");
     }
-
-
-    if (is_lww_mode(sync_mode_wire)) {
-        dsrgraphType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeMsg>("LWWNodeMsg"));
-        graphrequestType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest"));
-        graphRequestAnswerType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWGraphSnapshot>("LWWGraphSnapshot"));
-        dsrEdgeType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeMsg>("LWWEdgeMsg"));
-        dsrNodeAttrType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeAttrVec>("LWWNodeAttrVec"));
-        dsrEdgeAttrType = eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeAttrVec>("LWWEdgeAttrVec"));
-    }
+    dsrgraphType = std::move(family.node_type);
+    graphrequestType = std::move(family.graph_request_type);
+    graphRequestAnswerType = std::move(family.graph_answer_type);
+    dsrEdgeType = std::move(family.edge_type);
+    dsrNodeAttrType = std::move(family.node_attr_type);
+    dsrEdgeAttrType = std::move(family.edge_attr_type);
 
     //Register types
     dsrgraphType.register_type(mp_participant);
@@ -138,12 +189,12 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     dsrEdgeAttrType.register_type(mp_participant);
 
     //Create topics
-    topic_node = mp_participant->create_topic(is_lww_mode(sync_mode_wire) ? "LWW_NODE" : "DSR_NODE", dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_edge = mp_participant->create_topic(is_lww_mode(sync_mode_wire) ? "LWW_EDGE" : "DSR_EDGE", dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_node_att = mp_participant->create_topic(is_lww_mode(sync_mode_wire) ? "LWW_NODE_ATTS" : "DSR_NODE_ATTS", dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_edge_att = mp_participant->create_topic(is_lww_mode(sync_mode_wire) ? "LWW_EDGE_ATTS" : "DSR_EDGE_ATTS", dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_graph_request = mp_participant->create_topic(is_lww_mode(sync_mode_wire) ? "LWW_GRAPH_REQUEST" : "GRAPH_REQUEST", graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_graph = mp_participant->create_topic(is_lww_mode(sync_mode_wire) ? "LWW_GRAPH_ANSWER" : "GRAPH_ANSWER", graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_node = mp_participant->create_topic(family.node_topic_name, dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_edge = mp_participant->create_topic(family.edge_topic_name, dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_node_att = mp_participant->create_topic(family.node_attr_topic_name, dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_edge_att = mp_participant->create_topic(family.edge_attr_topic_name, dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_graph_request = mp_participant->create_topic(family.graph_request_topic_name, graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_graph = mp_participant->create_topic(family.graph_answer_topic_name, graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
 
     return std::make_tuple(true, mp_participant);
 }
