@@ -152,6 +152,11 @@ PYBIND11_MAKE_OPAQUE(std::map<std::string, Attribute>)
 
 
 PYBIND11_MODULE(pydsr, m) {
+    py::enum_<SyncMode>(m, "SyncMode")
+        .value("CRDT", SyncMode::CRDT)
+        .value("LWW", SyncMode::LWW)
+        .export_values();
+
     py::bind_map<std::map<std::pair<uint64_t, std::string>, Edge>>(m, "MapStringEdge");
     py::bind_dsr_map<std::map<std::string, Attribute>>(m, "MapStringAttribute");
 
@@ -575,12 +580,21 @@ PYBIND11_MODULE(pydsr, m) {
     py::class_<DSRGraph>(m, "DSRGraph")
             .def(py::init([&](int root, const std::string &name, int id,
                               const std::string &dsr_input_file = "",
-                              bool all_same_host = true, int8_t domain_id = 0) -> std::unique_ptr<DSRGraph> {
+                              bool all_same_host = true, int8_t domain_id = 0,
+                              SyncMode sync_mode = SyncMode::CRDT) -> std::unique_ptr<DSRGraph> {
                      local_agent_id = id;
-                     auto g = std::make_unique<DSRGraph>(root, name, id, dsr_input_file, all_same_host, domain_id, SignalMode::Queue);
+                     GraphSettings settings;
+                     settings.agent_id = id;
+                     settings.graph_name = name;
+                     settings.input_file = dsr_input_file;
+                     settings.same_host = all_same_host;
+                     settings.domain_id = domain_id;
+                     settings.signal_mode = SignalMode::Queue;
+                     settings.sync_mode = sync_mode;
+                     auto g = std::make_unique<DSRGraph>(settings);
                      return g;
                  }), "root"_a, "name"_a, "id"_a, "dsr_input_file"_a = "",
-                 "all_same_host"_a = true, "domain_id"_a=0, py::call_guard<py::gil_scoped_release>())
+                 "all_same_host"_a = true, "domain_id"_a=0, "sync_mode"_a = SyncMode::CRDT, py::call_guard<py::gil_scoped_release>())
             .def("get_agent_id", &DSRGraph::get_agent_id, "get agent_id")
             .def("get_agent_name", &DSRGraph::get_agent_name, "get agent_id")
             .def("get_node", [](DSRGraph &self, uint64_t id) -> std::optional<Node> {

@@ -1029,9 +1029,14 @@ std::map<uint64_t, DSR::Node> DSRGraph::getCopy() const
 /////  CORE
 //////////////////////////////////////////////////////////////////////////////
 
-const CRDTNode* DSRGraph::get_node_ptr_(uint64_t id) const
+bool DSRGraph::with_node_attrs_(uint64_t id, const SyncEngine::NodeAttrsVisitor& visitor) const
 {
-    return crdt_engine().get_node_ptr(id);
+    return engine_->with_node_attrs(id, visitor);
+}
+
+bool DSRGraph::with_node_view_(uint64_t id, const SyncEngine::NodeViewVisitor& visitor) const
+{
+    return engine_->with_node_view(id, visitor);
 }
 
 std::optional<std::int32_t> DSRGraph::get_node_level(const Node &n)

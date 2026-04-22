@@ -30,6 +30,8 @@ public:
 
     std::optional<Node> get_node(uint64_t id) const override;
     std::optional<Edge> get_edge(uint64_t from, uint64_t to, const std::string& type) const override;
+    bool with_node_attrs(uint64_t id, const NodeAttrsVisitor& visitor) const override;
+    bool with_node_view(uint64_t id, const NodeViewVisitor& visitor) const override;
     bool for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const override;
     bool for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const override;
     void for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const override;
@@ -63,6 +65,8 @@ private:
     using FromIndex = LWW::FromIndex;
     using ToIndex = LWW::ToIndex;
     using TypeIndex = LWW::TypeIndex;
+
+    const LWW::NodeState* get_node_ptr(uint64_t id) const;
 
     uint64_t current_time_ms() const;
     uint64_t next_timestamp();
