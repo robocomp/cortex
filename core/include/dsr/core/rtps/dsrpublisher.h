@@ -22,17 +22,17 @@ public:
         int8_t domain_id,
         bool isStreamData = false);
     [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID() const;
-    bool write(DSR::GraphRequest *object);
-    bool write(DSR::MvregNodeMsg *object);
-    bool write(DSR::OrMap *object);
-    bool write(DSR::MvregEdgeMsg *object);
-    bool write(DSR::MvregEdgeAttrVec *object);
-    bool write(DSR::MvregNodeAttrVec *object);
-    bool write(DSR::LWWNodeMsg *object);
-    bool write(DSR::LWWEdgeMsg *object);
-    bool write(DSR::LWWNodeAttrVec *object);
-    bool write(DSR::LWWEdgeAttrVec *object);
-    bool write(DSR::LWWGraphSnapshot *object);
+    bool write(const DSR::GraphRequest &object);
+    bool write(const DSR::MvregNodeMsg &object);
+    bool write(const DSR::OrMap &object);
+    bool write(const DSR::MvregEdgeMsg &object);
+    bool write(const DSR::MvregEdgeAttrVec &object);
+    bool write(const DSR::MvregNodeAttrVec &object);
+    bool write(const DSR::LWWNodeMsg &object);
+    bool write(const DSR::LWWEdgeMsg &object);
+    bool write(const DSR::LWWNodeAttrVec &object);
+    bool write(const DSR::LWWEdgeAttrVec &object);
+    bool write(const DSR::LWWGraphSnapshot &object);
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;

@@ -290,42 +290,36 @@ const LWWSyncEngine& DSRGraph::lww_engine() const
 void DSRGraph::publish_node_message(const NodeDeltaMessage& message)
 {
     std::visit([this](const auto& payload) {
-        auto copy = payload;
-        dsrpub_node.write(&copy);
+        dsrpub_node.write(payload);
     }, message);
 }
 
 void DSRGraph::publish_node_attr_batch(const NodeAttrDeltaBatchMessage& message)
 {
     std::visit([this](const auto& payload) {
-        auto copy = payload;
-        dsrpub_node_attrs.write(&copy);
+        dsrpub_node_attrs.write(payload);
     }, message);
 }
 
 void DSRGraph::publish_edge_message(const EdgeDeltaMessage& message)
 {
     std::visit([this](const auto& payload) {
-        auto copy = payload;
-        dsrpub_edge.write(&copy);
+        dsrpub_edge.write(payload);
     }, message);
 }
 
 void DSRGraph::publish_edge_attr_batch(const EdgeAttrDeltaBatchMessage& message)
 {
     std::visit([this](const auto& payload) {
-        auto copy = payload;
-        dsrpub_edge_attrs.write(&copy);
+        dsrpub_edge_attrs.write(payload);
     }, message);
 }
 
 void DSRGraph::publish_full_graph_message(FullGraphMessage&& message, int32_t sender_id)
 {
     std::visit([this, sender_id](auto&& payload) {
-        using T = std::decay_t<decltype(payload)>;
-        T copy = std::forward<decltype(payload)>(payload);
-        copy.id = sender_id;
-        dsrpub_request_answer.write(&copy);
+        payload.id = sender_id;
+        dsrpub_request_answer.write(payload);
     }, std::move(message));
 }
 
@@ -1678,7 +1672,7 @@ void DSRGraph::fullgraph_server_thread()
                                     empty.to_id = static_cast<uint32_t>(sample.id);
                                     empty.protocol_version = DSR::DSR_PROTOCOL_VERSION;
                                     empty.sync_mode = sync_mode_wire_value(sync_mode);
-                                    dsrpub_request_answer.write(&empty);
+                                    dsrpub_request_answer.write(empty);
                                 }, std::move(repeated_graph));
                                 continue;
                             } else {}
@@ -1734,7 +1728,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
     gr.sync_mode = sync_mode_wire_value(sync_mode);
     {
         CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread send request");
-        dsrpub_graph_request.write(&gr);
+        dsrpub_graph_request.write(gr);
     }
 
 
@@ -1748,7 +1742,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
         qInfo() << " Waiting for the graph ... seconds to timeout ["
                 << std::ceil(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() / 10) / 100.0
                 << "/" << TIMEOUT / 1000 * 3 << "] ";
-        dsrpub_graph_request.write(&gr);
+        dsrpub_graph_request.write(gr);
     }
 
     dsrparticipant.delete_publisher(dsrparticipant.getGraphRequestTopic()->get_name());

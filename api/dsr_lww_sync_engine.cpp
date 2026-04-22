@@ -1,4 +1,6 @@
 #include "dsr/api/dsr_lww_sync_engine.h"
+#include "dsr/core/types/lww_io.h"
+#include "dsr/core/types/lww_merge.h"
 
 #include <algorithm>
 
@@ -67,43 +69,14 @@ void LWWSyncEngine::prune_tombstones(uint64_t now)
     erase_if_compat(edge_tombstones_, [now](const auto& item) { return item.second.expires_at_ms <= now; });
 }
 
-Node LWWSyncEngine::to_node(const NodeState& state) const
-{
-    Node out(state.agent_id, state.type);
-    out.id(state.id);
-    out.name(state.name);
-    auto& attrs = out.attrs();
-    for (const auto& [name, attr] : state.attrs) {
-        attrs.emplace(name, attr.value);
-    }
-    auto& fano = out.fano();
-    for (const auto& [key, edge] : edges_) {
-        if (edge.from != state.id) {
-            continue;
-        }
-        fano.emplace(std::pair{edge.to, edge.type}, to_edge(edge));
-    }
-    return out;
-}
-
-Edge LWWSyncEngine::to_edge(const EdgeState& state) const
-{
-    Edge out(state.to, state.from, state.type, {}, state.agent_id);
-    auto& attrs = out.attrs();
-    for (const auto& [name, attr] : state.attrs) {
-        attrs.emplace(name, attr.value);
-    }
-    return out;
-}
-
 void LWWSyncEngine::store_node_tombstone(uint64_t id, Version version, uint64_t now)
 {
-    node_tombstones_[id] = Tombstone{version, now + tombstone_window_ms_};
+    node_tombstones_[id] = LWW::make_tombstone(version, now, tombstone_window_ms_);
 }
 
 void LWWSyncEngine::store_edge_tombstone(uint64_t from, uint64_t to, const std::string& type, Version version, uint64_t now)
 {
-    edge_tombstones_[edge_key(from, to, type)] = Tombstone{version, now + tombstone_window_ms_};
+    edge_tombstones_[edge_key(from, to, type)] = LWW::make_tombstone(version, now, tombstone_window_ms_);
 }
 
 void LWWSyncEngine::erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges)
@@ -113,7 +86,7 @@ void LWWSyncEngine::erase_related_edges(uint64_t node_id, Version version, uint6
             host_.update_maps_edge_delete(it->second.from, it->second.to, it->second.type);
             store_edge_tombstone(it->second.from, it->second.to, it->second.type, version, now);
             if (removed_edges != nullptr) {
-                removed_edges->emplace_back(to_edge(it->second));
+                removed_edges->emplace_back(LWW::to_user_edge(it->second));
             }
             it = edges_.erase(it);
         } else {
@@ -122,32 +95,10 @@ void LWWSyncEngine::erase_related_edges(uint64_t node_id, Version version, uint6
     }
 }
 
-bool LWWSyncEngine::node_delta_is_stale(uint64_t id, const Version& version) const
-{
-    if (auto it = node_tombstones_.find(id); it != node_tombstones_.end() && !is_newer(version, it->second.version)) {
-        return true;
-    }
-    if (auto it = nodes_.find(id); it != nodes_.end() && !is_newer(version, it->second.version)) {
-        return true;
-    }
-    return false;
-}
-
-bool LWWSyncEngine::edge_delta_is_stale(uint64_t from, uint64_t to, const std::string& type, const Version& version) const
-{
-    if (auto it = edge_tombstones_.find(edge_key(from, to, type)); it != edge_tombstones_.end() && !is_newer(version, it->second.version)) {
-        return true;
-    }
-    if (auto it = edges_.find(edge_key(from, to, type)); it != edges_.end() && !is_newer(version, it->second.version)) {
-        return true;
-    }
-    return false;
-}
-
 std::optional<Node> LWWSyncEngine::get_node(uint64_t id) const
 {
     if (auto it = nodes_.find(id); it != nodes_.end()) {
-        return to_node(it->second);
+        return LWW::to_user_node(it->second, edges_);
     }
     return {};
 }
@@ -155,7 +106,7 @@ std::optional<Node> LWWSyncEngine::get_node(uint64_t id) const
 std::optional<Edge> LWWSyncEngine::get_edge(uint64_t from, uint64_t to, const std::string& type) const
 {
     if (auto it = edges_.find(edge_key(from, to, type)); it != edges_.end()) {
-        return to_edge(it->second);
+        return LWW::to_user_edge(it->second);
     }
     return {};
 }
@@ -167,7 +118,7 @@ bool LWWSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor&
     }
     for (const auto& [key, edge] : edges_) {
         if (edge.from == from) {
-            Edge out = to_edge(edge);
+            Edge out = LWW::to_user_edge(edge);
             visitor(edge.to, edge.type, out);
         }
     }
@@ -179,7 +130,7 @@ bool LWWSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& vis
     bool found = false;
     for (const auto& [key, edge] : edges_) {
         if (edge.to == to) {
-            Edge out = to_edge(edge);
+            Edge out = LWW::to_user_edge(edge);
             visitor(edge.from, edge.type, out);
             found = true;
         }
@@ -191,7 +142,7 @@ void LWWSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEd
 {
     for (const auto& [key, edge] : edges_) {
         if (edge.type == type) {
-            Edge out = to_edge(edge);
+            Edge out = LWW::to_user_edge(edge);
             visitor(edge.from, edge.to, out);
         }
     }
@@ -206,7 +157,7 @@ std::map<uint64_t, Node> LWWSyncEngine::snapshot() const
 {
     std::map<uint64_t, Node> out;
     for (const auto& [id, node] : nodes_) {
-        out.emplace(id, to_node(node));
+        out.emplace(id, LWW::to_user_node(node, edges_));
     }
     return out;
 }
@@ -221,18 +172,12 @@ NodeMutationEffect LWWSyncEngine::insert_node_local(Node&& node)
     effect.type = node.type();
 
     auto version = version_of(now, host_.local_agent_id());
-    if (node_delta_is_stale(node.id(), version)) {
+    if (LWW::delta_is_stale(node_tombstones_, nodes_, node.id(), version)) {
         return effect;
     }
 
-    NodeState state;
-    state.id = node.id();
-    state.type = node.type();
-    state.name = node.name();
-    state.agent_id = host_.local_agent_id();
-    state.version = version;
-    for (const auto& [name, attr] : node.attrs()) {
-        state.attrs.emplace(name, AttrState{attr, version});
+    NodeState state = LWW::to_node_state(node, version, host_.local_agent_id());
+    for (const auto& [name, _] : node.attrs()) {
         effect.changed_attributes.emplace_back(name);
     }
 
@@ -258,16 +203,15 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
         return effect;
     }
 
-    auto old_node = to_node(it->second);
+    auto old_node = LWW::to_user_node(it->second, edges_);
     auto version = version_of(now, host_.local_agent_id());
     it->second.type = node.type();
     it->second.name = node.name();
     it->second.version = version;
     it->second.agent_id = host_.local_agent_id();
 
-    std::map<std::string, AttrState> next_attrs;
-    for (const auto& [name, attr] : node.attrs()) {
-        next_attrs.emplace(name, AttrState{attr, version});
+    std::map<std::string, AttrState> next_attrs = LWW::to_attr_state_map(node.attrs(), version);
+    for (const auto& [name, _] : node.attrs()) {
         effect.changed_attributes.emplace_back(name);
     }
     for (const auto& [name, _] : it->second.attrs) {
@@ -297,7 +241,7 @@ NodeMutationEffect LWWSyncEngine::delete_node_local(uint64_t id)
     }
 
     auto version = version_of(now, host_.local_agent_id());
-    auto deleted_node = to_node(it->second);
+    auto deleted_node = LWW::to_user_node(it->second, edges_);
     effect.deleted_node = deleted_node;
     effect.deleted_edges.clear();
     erase_related_edges(id, version, now, &effect.deleted_edges);
@@ -329,20 +273,14 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
 
     auto version = version_of(now, host_.local_agent_id());
     if (!nodes_.contains(edge.from()) || !nodes_.contains(edge.to()) ||
-        edge_delta_is_stale(edge.from(), edge.to(), edge.type(), version)) {
+        LWW::delta_is_stale(edge_tombstones_, edges_, edge_key(edge.from(), edge.to(), edge.type()), version)) {
         return effect;
     }
 
     auto key = edge_key(edge.from(), edge.to(), edge.type());
     auto& state = edges_[key];
-    state.from = edge.from();
-    state.to = edge.to();
-    state.type = edge.type();
-    state.version = version;
-    state.agent_id = host_.local_agent_id();
-    state.attrs.clear();
-    for (const auto& [name, attr] : edge.attrs()) {
-        state.attrs.emplace(name, AttrState{attr, version});
+    state = LWW::to_edge_state(edge, version, host_.local_agent_id());
+    for (const auto& [name, _] : edge.attrs()) {
         effect.changed_attributes.emplace_back(name);
     }
     edge_tombstones_.erase(key);
@@ -369,7 +307,7 @@ EdgeMutationEffect LWWSyncEngine::delete_edge_local(uint64_t from, uint64_t to, 
     }
 
     auto version = version_of(now, host_.local_agent_id());
-    effect.deleted_edge = to_edge(it->second);
+    effect.deleted_edge = LWW::to_user_edge(it->second);
     host_.update_maps_edge_delete(from, to, type);
     store_edge_tombstone(from, to, type, version, now);
     edges_.erase(it);
@@ -392,13 +330,13 @@ void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
     prune_tombstones(now);
 
     auto version = version_of(payload->timestamp, payload->agent_id);
-    if (node_delta_is_stale(payload->id, version)) {
+    if (LWW::delta_is_stale(node_tombstones_, nodes_, payload->id, version)) {
         return;
     }
 
     if (payload->deleted) {
         if (auto it = nodes_.find(payload->id); it != nodes_.end()) {
-            auto deleted_node = to_node(it->second);
+            auto deleted_node = LWW::to_user_node(it->second, edges_);
             erase_related_edges(payload->id, version, now);
             host_.update_maps_node_delete(payload->id, deleted_node);
             nodes_.erase(it);
@@ -407,15 +345,7 @@ void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
         return;
     }
 
-    NodeState state;
-    state.id = payload->id;
-    state.type = payload->type;
-    state.name = payload->name;
-    state.agent_id = payload->agent_id;
-    state.version = version;
-    for (const auto& [name, attr] : payload->attrs) {
-        state.attrs.emplace(name, AttrState{attr, version});
-    }
+    NodeState state = LWW::to_node_state(*payload);
 
     auto maybe_old = get_node(payload->id);
     if (maybe_old.has_value()) {
@@ -438,7 +368,7 @@ void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
     prune_tombstones(now);
 
     auto version = version_of(payload->timestamp, payload->agent_id);
-    if (edge_delta_is_stale(payload->from, payload->to, payload->type, version)) {
+    if (LWW::delta_is_stale(edge_tombstones_, edges_, edge_key(payload->from, payload->to, payload->type), version)) {
         return;
     }
     if (!nodes_.contains(payload->from) || !nodes_.contains(payload->to)) {
@@ -455,15 +385,7 @@ void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
         return;
     }
 
-    EdgeState state;
-    state.from = payload->from;
-    state.to = payload->to;
-    state.type = payload->type;
-    state.agent_id = payload->agent_id;
-    state.version = version;
-    for (const auto& [name, attr] : payload->attrs) {
-        state.attrs.emplace(name, AttrState{attr, version});
-    }
+    EdgeState state = LWW::to_edge_state(*payload);
 
     edges_[key] = std::move(state);
     edge_tombstones_.erase(key);
@@ -545,33 +467,11 @@ FullGraphMessage LWWSyncEngine::export_full_graph() const
     snapshot.tombstone_window_ms = tombstone_window_ms_;
 
     for (const auto& [id, node] : nodes_) {
-        LWWNodeMsg item;
-        item.id = id;
-        item.type = node.type;
-        item.name = node.name;
-        item.agent_id = node.agent_id;
-        item.timestamp = node.version.timestamp;
-        item.protocol_version = DSR_PROTOCOL_VERSION;
-        item.sync_mode = sync_mode_wire_value(SyncMode::LWW);
-        for (const auto& [name, attr] : node.attrs) {
-            item.attrs.emplace(name, attr.value);
-        }
-        snapshot.nodes.emplace_back(std::move(item));
+        snapshot.nodes.emplace_back(LWW::to_node_msg(node));
     }
 
     for (const auto& [key, edge] : edges_) {
-        LWWEdgeMsg item;
-        item.from = edge.from;
-        item.to = edge.to;
-        item.type = edge.type;
-        item.agent_id = edge.agent_id;
-        item.timestamp = edge.version.timestamp;
-        item.protocol_version = DSR_PROTOCOL_VERSION;
-        item.sync_mode = sync_mode_wire_value(SyncMode::LWW);
-        for (const auto& [name, attr] : edge.attrs) {
-            item.attrs.emplace(name, attr.value);
-        }
-        snapshot.edges.emplace_back(std::move(item));
+        snapshot.edges.emplace_back(LWW::to_edge_msg(edge));
     }
 
     return snapshot;
@@ -596,29 +496,10 @@ std::optional<LWWSyncEngine::Tombstone> LWWSyncEngine::edge_tombstone(uint64_t f
 std::optional<LWWNodeMsg> LWWSyncEngine::export_node_delta(uint64_t id) const
 {
     if (auto it = nodes_.find(id); it != nodes_.end()) {
-        LWWNodeMsg msg;
-        msg.id = it->second.id;
-        msg.type = it->second.type;
-        msg.name = it->second.name;
-        msg.agent_id = it->second.agent_id;
-        msg.timestamp = it->second.version.timestamp;
-        msg.deleted = false;
-        msg.protocol_version = DSR_PROTOCOL_VERSION;
-        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
-        for (const auto& [name, attr] : it->second.attrs) {
-            msg.attrs.emplace(name, attr.value);
-        }
-        return msg;
+        return LWW::to_node_msg(it->second);
     }
     if (auto it = node_tombstones_.find(id); it != node_tombstones_.end()) {
-        LWWNodeMsg msg;
-        msg.id = id;
-        msg.agent_id = it->second.version.agent_id;
-        msg.timestamp = it->second.version.timestamp;
-        msg.deleted = true;
-        msg.protocol_version = DSR_PROTOCOL_VERSION;
-        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
-        return msg;
+        return LWW::to_node_tombstone_msg(id, it->second);
     }
     return {};
 }
@@ -627,31 +508,10 @@ std::optional<LWWEdgeMsg> LWWSyncEngine::export_edge_delta(uint64_t from, uint64
 {
     auto key = edge_key(from, to, type);
     if (auto it = edges_.find(key); it != edges_.end()) {
-        LWWEdgeMsg msg;
-        msg.from = it->second.from;
-        msg.to = it->second.to;
-        msg.type = it->second.type;
-        msg.agent_id = it->second.agent_id;
-        msg.timestamp = it->second.version.timestamp;
-        msg.deleted = false;
-        msg.protocol_version = DSR_PROTOCOL_VERSION;
-        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
-        for (const auto& [name, attr] : it->second.attrs) {
-            msg.attrs.emplace(name, attr.value);
-        }
-        return msg;
+        return LWW::to_edge_msg(it->second);
     }
     if (auto it = edge_tombstones_.find(key); it != edge_tombstones_.end()) {
-        LWWEdgeMsg msg;
-        msg.from = from;
-        msg.to = to;
-        msg.type = type;
-        msg.agent_id = it->second.version.agent_id;
-        msg.timestamp = it->second.version.timestamp;
-        msg.deleted = true;
-        msg.protocol_version = DSR_PROTOCOL_VERSION;
-        msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
-        return msg;
+        return LWW::to_edge_tombstone_msg(from, to, type, it->second);
     }
     return {};
 }

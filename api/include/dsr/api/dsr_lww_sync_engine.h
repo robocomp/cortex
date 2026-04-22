@@ -64,15 +64,9 @@ private:
     uint64_t next_timestamp();
     void prune_tombstones(uint64_t now);
 
-    Node to_node(const NodeState& state) const;
-    Edge to_edge(const EdgeState& state) const;
-
     void store_node_tombstone(uint64_t id, Version version, uint64_t now);
     void store_edge_tombstone(uint64_t from, uint64_t to, const std::string& type, Version version, uint64_t now);
     void erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges = nullptr);
-
-    bool node_delta_is_stale(uint64_t id, const Version& version) const;
-    bool edge_delta_is_stale(uint64_t from, uint64_t to, const std::string& type, const Version& version) const;
 
     SyncEngineHost& host_;
     uint64_t tombstone_window_ms_;

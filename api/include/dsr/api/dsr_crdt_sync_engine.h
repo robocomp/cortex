@@ -11,15 +11,14 @@
 
 namespace DSR {
 
-class DSRGraph;
-
 class CRDTSyncEngine final : public SyncEngine
 {
 public:
     using Nodes = std::unordered_map<uint64_t, mvreg<CRDTNode>>;
+    friend class DSRGraph;
 
-    explicit CRDTSyncEngine(DSRGraph& host);
-    CRDTSyncEngine(DSRGraph& host, const CRDTSyncEngine& other);
+    explicit CRDTSyncEngine(SyncEngineHost& host);
+    CRDTSyncEngine(SyncEngineHost& host, const CRDTSyncEngine& other);
     ~CRDTSyncEngine() override = default;
 
     SyncBackendInfo backend_info() const override;
@@ -47,6 +46,7 @@ public:
     void import_full_graph(FullGraphMessage&& full_graph) override;
     FullGraphMessage export_full_graph() const override;
 
+private:
     const CRDTNode* get_node_ptr(uint64_t id) const;
     std::optional<CRDTNode> get_crdt_node(uint64_t id) const;
     std::optional<CRDTEdge> get_crdt_edge(uint64_t from, uint64_t to, const std::string& key) const;
@@ -67,12 +67,14 @@ public:
 
     std::map<uint64_t, MvregNodeMsg> export_mvreg_map() const;
 
-private:
+    class DSRGraph& graph();
+    const class DSRGraph& graph() const;
+
     bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge>&& delta);
     void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute>&& attr);
     void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute>&& attr);
 
-    DSRGraph& host_;
+    SyncEngineHost& host_;
     Nodes nodes_;
     std::unordered_multimap<uint64_t, std::tuple<std::string, mvreg<CRDTAttribute>, uint64_t>> unprocessed_delta_node_att_;
     std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDTEdge>, uint64_t>> unprocessed_delta_edge_from_;

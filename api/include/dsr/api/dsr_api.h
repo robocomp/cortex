@@ -485,7 +485,7 @@ namespace DSR
                 signal.agent_id = agent_id;
                 signal.protocol_version = DSR::DSR_PROTOCOL_VERSION;
                 signal.sync_mode = sync_mode_wire_value(sync_mode);
-                dsrpub_node.write(&signal);
+                dsrpub_node.write(signal);
             }
         }
 

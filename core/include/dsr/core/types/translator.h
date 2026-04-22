@@ -1,163 +1,38 @@
 //
-// Created by juancarlos on 1/7/20.
+// Legacy compatibility shim. Prefer including `crdt_io.h` directly in new code.
 //
 
 #ifndef CONVERTER_H
 #define CONVERTER_H
 
-#include "user_types.h"
-#include "crdt_types.h"
-#include "internal_types.h"
-#include <cassert>
+#include "dsr/core/types/crdt_io.h"
 
 namespace DSR {
 
-    // ---- CRDT → DSR message type helpers ------------------------------------
-
-    inline static DSR::MvregNodeMsg CRDTNode_to_Msg(uint32_t agent_id, uint64_t id, mvreg<DSR::CRDTNode>&& data)
-    {
-        DSR::MvregNodeMsg msg;
-        msg.dk        = std::move(data);
-        msg.id        = id;
-        msg.agent_id  = agent_id;
-        msg.timestamp = get_unix_timestamp();
-        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
-        return msg;
-    }
-
-    template<typename S>
-    inline static DSR::MvregEdgeMsg CRDTEdge_to_Msg(uint32_t agent_id, uint64_t from, uint64_t to,
-                                                     S&& type, mvreg<DSR::CRDTEdge>&& data)
-    {
-        DSR::MvregEdgeMsg msg;
-        msg.dk        = std::move(data);
-        msg.id        = from;
-        msg.to        = to;
-        msg.from      = from;
-        msg.type      = std::forward<S>(type);
-        msg.agent_id  = agent_id;
-        msg.timestamp = get_unix_timestamp();
-        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
-        return msg;
-    }
-
-    template<typename S>
-    inline static DSR::MvregNodeAttrMsg CRDTNodeAttr_to_Msg(uint32_t agent_id, uint64_t id, uint64_t node,
-                                                             S&& attr, mvreg<DSR::CRDTAttribute>&& data)
-    {
-        DSR::MvregNodeAttrMsg msg;
-        msg.dk        = std::move(data);
-        msg.id        = id;
-        msg.node      = node;
-        msg.attr_name = std::forward<S>(attr);
-        msg.agent_id  = agent_id;
-        msg.timestamp = get_unix_timestamp();
-        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
-        return msg;
-    }
-
-    template<typename TS, typename AS>
-    inline static DSR::MvregEdgeAttrMsg CRDTEdgeAttr_to_Msg(uint32_t agent_id, uint64_t id,
-                                                             uint64_t from, uint64_t to,
-                                                             TS&& type, AS&& attr,
-                                                             mvreg<DSR::CRDTAttribute>&& data)
-    {
-        DSR::MvregEdgeAttrMsg msg;
-        msg.dk        = std::move(data);
-        msg.id        = id;
-        msg.from_node = from;
-        msg.to_node   = to;
-        msg.type      = std::forward<TS>(type);
-        msg.attr_name = std::forward<AS>(attr);
-        msg.agent_id  = agent_id;
-        msg.timestamp = get_unix_timestamp();
-        msg.protocol_version = DSR::DSR_PROTOCOL_VERSION;
-        return msg;
-    }
-
-    // ---- User ↔ CRDT helpers (kept unchanged) --------------------------------
-
-    inline static CRDTEdge user_edge_to_crdt(Edge&& edge)
-    {
-        CRDTEdge crdt_edge;
-
-        crdt_edge.agent_id(edge.agent_id());
-        crdt_edge.from(edge.from());
-        crdt_edge.to(edge.to());
-        crdt_edge.type(std::move(edge.type()));
-        for (auto &&[k,v] : edge.attrs()) {
-            mvreg<CRDTAttribute> mv;
-            mv.write(std::move(v));
-            crdt_edge.attrs().emplace(k, std::move(mv));
-        }
-
-        return crdt_edge;
-    }
-
-    inline static CRDTEdge user_edge_to_crdt(const Edge& edge)
-    {
-        CRDTEdge crdt_edge;
-
-        crdt_edge.agent_id(edge.agent_id());
-        crdt_edge.from(edge.from());
-        crdt_edge.to(edge.to());
-        crdt_edge.type(edge.type());
-        for (auto &[k,v] : edge.attrs()) {
-            mvreg<CRDTAttribute> mv;
-            mv.write(v);
-            crdt_edge.attrs().emplace(k, std::move(mv));
-        }
-
-        return crdt_edge;
-    }
-
-    inline static CRDTNode user_node_to_crdt(Node&& node)
-    {
-        CRDTNode crdt_node;
-
-        crdt_node.agent_id(node.agent_id());
-        crdt_node.id(node.id());
-        crdt_node.type(std::move(node.type()));
-        crdt_node.name(std::move(node.name()));
-
-
-        for (auto &&[k, val] : node.attrs()) {
-            mvreg<CRDTAttribute> mv;
-            mv.write(std::move(val));
-            crdt_node.attrs().emplace(k, std::move(mv));
-        }
-
-        for (auto &[k,v] : node.fano()) {
-            mvreg<CRDTEdge> mv;
-            mv.write(user_edge_to_crdt(std::move(v)));
-            crdt_node.fano().emplace(k, std::move(mv));
-        }
-
-        return crdt_node;
-    }
-
-    inline static CRDTNode user_node_to_crdt(const Node& node)
-    {
-        CRDTNode crdt_node;
-
-        crdt_node.agent_id(node.agent_id());
-        crdt_node.id(node.id());
-        crdt_node.type(node.type());
-        crdt_node.name(node.name());
-        for (auto &[k,v] : node.attrs()) {
-            mvreg<CRDTAttribute> mv;
-            mv.write(v);
-            crdt_node.attrs().emplace(k, std::move(mv));
-        }
-
-        for (auto &[k,v] : node.fano()) {
-            mvreg<CRDTEdge> mv;
-            mv.write(user_edge_to_crdt(v));
-            crdt_node.fano().emplace(k, std::move(mv));
-        }
-
-        return crdt_node;
-    }
+inline MvregNodeMsg CRDTNode_to_Msg(uint32_t agent_id, uint64_t id, mvreg<CRDTNode>&& data)
+{
+    return crdt_node_to_msg(agent_id, id, std::move(data));
 }
 
-#endif //CONVERTER_H
+template<typename S>
+inline MvregEdgeMsg CRDTEdge_to_Msg(uint32_t agent_id, uint64_t from, uint64_t to, S&& type, mvreg<CRDTEdge>&& data)
+{
+    return crdt_edge_to_msg(agent_id, from, to, std::forward<S>(type), std::move(data));
+}
+
+template<typename S>
+inline MvregNodeAttrMsg CRDTNodeAttr_to_Msg(uint32_t agent_id, uint64_t id, uint64_t node, S&& attr, mvreg<CRDTAttribute>&& data)
+{
+    return crdt_node_attr_to_msg(agent_id, id, node, std::forward<S>(attr), std::move(data));
+}
+
+template<typename TS, typename AS>
+inline MvregEdgeAttrMsg CRDTEdgeAttr_to_Msg(uint32_t agent_id, uint64_t id, uint64_t from, uint64_t to,
+                                            TS&& type, AS&& attr, mvreg<CRDTAttribute>&& data)
+{
+    return crdt_edge_attr_to_msg(agent_id, id, from, to, std::forward<TS>(type), std::forward<AS>(attr), std::move(data));
+}
+
+} // namespace DSR
+
+#endif // CONVERTER_H

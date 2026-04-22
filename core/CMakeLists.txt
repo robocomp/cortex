@@ -19,6 +19,7 @@ target_sources(dsr_core
         include/dsr/core/types/crdt_types.h
         include/dsr/core/types/user_types.h
         include/dsr/core/types/common_types.h
+        include/dsr/core/types/crdt_io.h
         include/dsr/core/types/translator.h
         include/dsr/core/types/type_checking/dsr_attr_name.h
         include/dsr/core/types/type_checking/dsr_edge_type.h
