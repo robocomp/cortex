@@ -22,7 +22,6 @@
 #include "dsr/core/rtps/dsrsubscriber.h"
 #include "dsr/core/types/crdt_types.h"
 #include "dsr/core/types/user_types.h"
-#include "dsr/core/types/translator.h"
 #include "dsr/core/traits.h"
 #include "dsr/api/dsr_agent_info_api.h"
 #include "dsr/api/dsr_inner_eigen_api.h"
@@ -647,27 +646,7 @@ namespace DSR
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
         const CRDTNode* get_node_ptr_(uint64_t id) const;
-        std::optional<CRDTNode> get_(uint64_t id);
-        std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
-        std::tuple<bool, std::optional<DSR::MvregNodeMsg>> insert_node_(CRDTNode &&node);
-        std::tuple<bool, std::optional<DSR::MvregNodeAttrVec>> update_node_(CRDTNode &&node);
-        std::tuple<bool, std::vector<Edge>, std::optional<DSR::MvregNodeMsg>, std::vector<DSR::MvregEdgeMsg>> delete_node_(uint64_t id, const CRDTNode &node);
-        std::optional<DSR::MvregEdgeMsg> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
-        std::tuple<bool, std::optional<DSR::MvregEdgeMsg>, std::optional<DSR::MvregEdgeAttrVec>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
 
-        //////////////////////////////////////////////////////////////////////////
-        // Other methods
-        //////////////////////////////////////////////////////////////////////////
-        std::map<uint64_t, DSR::MvregNodeMsg> Map();
-
-        //////////////////////////////////////////////////////////////////////////
-        // CRDT join operations
-        ///////////////////////////////////////////////////////////////////////////
-        void join_delta_node(DSR::MvregNodeMsg &&mvreg);
-        void join_delta_edge(DSR::MvregEdgeMsg &&mvreg);
-        std::optional<std::string> join_delta_node_attr(DSR::MvregNodeAttrMsg &&mvreg);
-        std::optional<std::string> join_delta_edge_attr(DSR::MvregEdgeAttrMsg &&mvreg);
-        void join_full_graph(DSR::OrMap &&full_graph);
         void publish_node_message(const NodeDeltaMessage &message);
         void publish_node_attr_batch(const NodeAttrDeltaBatchMessage &message);
         void publish_edge_message(const EdgeDeltaMessage &message);
