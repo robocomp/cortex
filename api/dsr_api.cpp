@@ -92,6 +92,35 @@ bool network_compatibility_or_fatal(
 
     return true;
 }
+
+template <typename Sample>
+uint32_t remote_agent_id_of(const Sample& sample)
+{
+    return sample.agent_id;
+}
+
+template <typename Batch>
+bool batch_is_from_remote(const Batch& batch, uint32_t local_agent_id)
+{
+    return !batch.vec.empty() && remote_agent_id_of(batch.vec.front()) != local_agent_id;
+}
+
+template <typename Batch>
+bool batch_is_compatible(const char* channel, const Batch& batch, DSR::SyncMode local_sync_mode)
+{
+    return !batch.vec.empty() &&
+           network_compatibility_or_fatal(channel, batch.vec.front().protocol_version, batch.vec.front().sync_mode, local_sync_mode);
+}
+
+inline size_t full_graph_payload_size(const DSR::OrMap& sample)
+{
+    return sample.m.size();
+}
+
+inline size_t full_graph_payload_size(const DSR::LWWGraphSnapshot& sample)
+{
+    return sample.nodes.size() + sample.edges.size();
+}
 }
 
 void print_sample_info(DSR::GraphSettings::LOGLEVEL log_level, const eprosima::fastdds::dds::SampleInfo& info);
@@ -322,31 +351,11 @@ void DSRGraph::publish_full_graph_message(FullGraphMessage&& message, int32_t se
     }, std::move(message));
 }
 
-const DSRGraph::TransportProfile& DSRGraph::transport_profile() const
-{
-    static const TransportProfile profiles[] = {
-        {
-            &DSRGraph::make_crdt_node_subscription_functor,
-            &DSRGraph::make_crdt_edge_subscription_functor,
-            &DSRGraph::make_crdt_edge_attrs_subscription_functor,
-            &DSRGraph::make_crdt_node_attrs_subscription_functor,
-            &DSRGraph::make_crdt_fullgraph_request_functor,
-        },
-        {
-            &DSRGraph::make_lww_node_subscription_functor,
-            &DSRGraph::make_lww_edge_subscription_functor,
-            &DSRGraph::make_lww_edge_attrs_subscription_functor,
-            &DSRGraph::make_lww_node_attrs_subscription_functor,
-            &DSRGraph::make_lww_fullgraph_request_functor,
-        },
-    };
-    return profiles[sync_mode_wire_value(sync_mode)];
-}
-
-DSRGraph::NewMessageFunctor DSRGraph::make_crdt_node_subscription_functor()
+template <typename Sample>
+DSRGraph::NewMessageFunctor DSRGraph::make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal)
 {
     auto name = "node_subscription_thread";
-    return NewMessageFunctor(this, [this, name, showReceived = log_level]
+    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level, clear_deleted_signal]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("node_sub"); return true; }();
@@ -355,71 +364,42 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_node_subscription_functor()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::MvregNodeMsg sample;
+                Sample sample;
                 if (reader->take_next_sample(&sample, &m_info) != 0) {
                     break;
                 }
                 if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
-                if (m_info.valid_data && sample.agent_id != agent_id) {
-                    if (!network_compatibility_or_fatal("DSR_NODE", sample.protocol_version, sample.sync_mode, sync_mode)) {
-                        continue;
-                    }
-                    if (sample.id == CLEAR_DELETED_SIGNAL) {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        std::unique_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
-                        deleted.clear();
-                        continue;
-                    }
-                    if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
-                        qDebug() << name << " Received:" << std::to_string(sample.id).c_str() << " node from: "
-                                 << m_info.sample_identity.writer_guid().entityId.value;
-                    }
-                    tp.spawn_task([this, sample = std::move(sample)]() mutable {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
-                    });
+                if (!m_info.valid_data || remote_agent_id_of(sample) == agent_id) {
+                    continue;
                 }
+                if (!network_compatibility_or_fatal(channel, sample.protocol_version, sample.sync_mode, sync_mode)) {
+                    continue;
+                }
+                if (clear_deleted_signal && sample.id == CLEAR_DELETED_SIGNAL) {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    std::unique_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+                    deleted.clear();
+                    continue;
+                }
+                if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
+                    qDebug() << name << " Received:" << std::to_string(sample.id).c_str() << " node from: "
+                             << m_info.sample_identity.writer_guid().entityId.value;
+                }
+                tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
+                });
             }
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     });
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_lww_node_subscription_functor()
-{
-    return NewMessageFunctor(this, [this, showReceived = log_level]
-    (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
-    {
-        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("node_sub"); return true; }();
-        CORTEX_PROFILE_ZONE_N("DSRGraph::node_subscription_thread callback");
-        try {
-            while (true)
-            {
-                eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::LWWNodeMsg sample;
-                if (reader->take_next_sample(&sample, &m_info) != 0) {
-                    break;
-                }
-                if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
-                if (m_info.valid_data && sample.agent_id != agent_id) {
-                    if (!network_compatibility_or_fatal("LWW_NODE", sample.protocol_version, sample.sync_mode, sync_mode)) {
-                        continue;
-                    }
-                    tp.spawn_task([this, sample = std::move(sample)]() mutable {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
-                    });
-                }
-            }
-        }
-        catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
-    });
-}
-
-DSRGraph::NewMessageFunctor DSRGraph::make_crdt_edge_subscription_functor()
+template <typename Sample>
+DSRGraph::NewMessageFunctor DSRGraph::make_edge_subscription_functor_impl(const char* channel)
 {
     auto name = "edge_subscription_thread";
-    return NewMessageFunctor(this, [this, name, showReceived = log_level]
+    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("edge_sub"); return true; }();
@@ -428,65 +408,32 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_edge_subscription_functor()
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::MvregEdgeMsg sample;
+                Sample sample;
                 if (reader->take_next_sample(&sample, &m_info) != 0) {
                     break;
                 }
                 if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
-                if (m_info.valid_data && sample.agent_id != agent_id) {
-                    if (!network_compatibility_or_fatal("DSR_EDGE", sample.protocol_version, sample.sync_mode, sync_mode)) {
-                        continue;
-                    }
-                    if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
-                        qDebug() << name << " Received:" << std::to_string(sample.id).c_str() << " node from: "
-                                 << m_info.sample_identity.writer_guid().entityId.value;
-                    }
-                    tp.spawn_task([this, sample = std::move(sample)]() mutable {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
-                    });
+                if (!m_info.valid_data || remote_agent_id_of(sample) == agent_id) {
+                    continue;
                 }
+                if (!network_compatibility_or_fatal(channel, sample.protocol_version, sample.sync_mode, sync_mode)) {
+                    continue;
+                }
+                tp.spawn_task([this, sample = std::move(sample)]() mutable {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
+                });
             }
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     });
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_lww_edge_subscription_functor()
-{
-    return NewMessageFunctor(this, [this, showReceived = log_level]
-    (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
-    {
-        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("edge_sub"); return true; }();
-        CORTEX_PROFILE_ZONE_N("DSRGraph::edge_subscription_thread callback");
-        try {
-            while (true)
-            {
-                eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::LWWEdgeMsg sample;
-                if (reader->take_next_sample(&sample, &m_info) != 0) {
-                    break;
-                }
-                if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
-                if (m_info.valid_data && sample.agent_id != agent_id) {
-                    if (!network_compatibility_or_fatal("LWW_EDGE", sample.protocol_version, sample.sync_mode, sync_mode)) {
-                        continue;
-                    }
-                    tp.spawn_task([this, sample = std::move(sample)]() mutable {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
-                    });
-                }
-            }
-        }
-        catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
-    });
-}
-
-DSRGraph::NewMessageFunctor DSRGraph::make_crdt_edge_attrs_subscription_functor()
+template <typename Batch>
+DSRGraph::NewMessageFunctor DSRGraph::make_edge_attrs_subscription_functor_impl(const char* channel)
 {
     auto name = "edge_attrs_subscription_thread";
-    return NewMessageFunctor(this, [this, name, showReceived = log_level]
+    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("edge_attr_sub"); return true; }();
@@ -495,70 +442,37 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_edge_attrs_subscription_functor(
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::MvregEdgeAttrVec samples;
+                Batch samples;
                 if (reader->take_next_sample(&samples, &m_info) != 0) {
                     break;
                 }
                 if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
-                if (m_info.valid_data) {
-                    if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
-                        qDebug() << name << " Received:" << samples.vec.size() << " edge attr from: "
-                                 << m_info.sample_identity.writer_guid().entityId.value;
-                    }
-                    if (!samples.vec.empty() and samples.vec.at(0).agent_id != agent_id)
-                    {
-                        const auto& first = samples.vec.front();
-                        if (!network_compatibility_or_fatal("DSR_EDGE_ATTS", first.protocol_version, first.sync_mode, sync_mode)) {
-                            continue;
-                        }
-                        tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
-                            CORTEX_PROFILE_ZONE_N("DSRGraph::edge_attrs_subscription_thread apply batch");
-                            std::unique_lock<std::shared_mutex> lock(_mutex);
-                            engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
-                        });
-                    }
+                if (!m_info.valid_data || !batch_is_from_remote(samples, agent_id)) {
+                    continue;
                 }
+                if (!batch_is_compatible(channel, samples, sync_mode)) {
+                    continue;
+                }
+                if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
+                    qDebug() << name << " Received:" << samples.vec.size() << " edge attr from: "
+                             << m_info.sample_identity.writer_guid().entityId.value;
+                }
+                tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                    CORTEX_PROFILE_ZONE_N("DSRGraph::edge_attrs_subscription_thread apply batch");
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
+                });
             }
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     });
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_lww_edge_attrs_subscription_functor()
-{
-    return NewMessageFunctor(this, [this]
-    (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
-    {
-        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("edge_attr_sub"); return true; }();
-        CORTEX_PROFILE_ZONE_N("DSRGraph::edge_attrs_subscription_thread callback");
-        try {
-            while (true)
-            {
-                eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::LWWEdgeAttrVec samples;
-                if (reader->take_next_sample(&samples, &m_info) != 0) {
-                    break;
-                }
-                if (m_info.valid_data && !samples.vec.empty() && samples.vec.at(0).agent_id != agent_id) {
-                    const auto& first = samples.vec.front();
-                    if (!network_compatibility_or_fatal("LWW_EDGE_ATTS", first.protocol_version, first.sync_mode, sync_mode)) {
-                        continue;
-                    }
-                    tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
-                    });
-                }
-            }
-        }
-        catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
-    });
-}
-
-DSRGraph::NewMessageFunctor DSRGraph::make_crdt_node_attrs_subscription_functor()
+template <typename Batch>
+DSRGraph::NewMessageFunctor DSRGraph::make_node_attrs_subscription_functor_impl(const char* channel)
 {
     auto name = "node_attrs_subscription_thread";
-    return NewMessageFunctor(this, [this, name, showReceived = log_level]
+    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("node_attr_sub"); return true; }();
@@ -567,138 +481,111 @@ DSRGraph::NewMessageFunctor DSRGraph::make_crdt_node_attrs_subscription_functor(
             while (true)
             {
                 eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::MvregNodeAttrVec samples;
+                Batch samples;
                 if (reader->take_next_sample(&samples, &m_info) != 0) {
                     break;
                 }
                 if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(showReceived, m_info);
-                if (m_info.valid_data) {
-                    if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
-                        qDebug() << name << " Received:" << samples.vec.size() << " node attrs from: "
-                                 << m_info.sample_identity.writer_guid().entityId.value;
-                    }
-                    if (!samples.vec.empty() and samples.vec.at(0).agent_id != agent_id) {
-                        const auto& first = samples.vec.front();
-                        if (!network_compatibility_or_fatal("DSR_NODE_ATTS", first.protocol_version, first.sync_mode, sync_mode)) {
-                            continue;
-                        }
-                        tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
-                            CORTEX_PROFILE_ZONE_N("DSRGraph::node_attrs_subscription_thread apply batch");
-                            std::unique_lock<std::shared_mutex> lock(_mutex);
-                            engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
-                        });
-                    }
+                if (!m_info.valid_data || !batch_is_from_remote(samples, agent_id)) {
+                    continue;
                 }
+                if (!batch_is_compatible(channel, samples, sync_mode)) {
+                    continue;
+                }
+                if (showReceived == GraphSettings::LOGLEVEL::DEBUGL) {
+                    qDebug() << name << " Received:" << samples.vec.size() << " node attrs from: "
+                             << m_info.sample_identity.writer_guid().entityId.value;
+                }
+                tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+                    CORTEX_PROFILE_ZONE_N("DSRGraph::node_attrs_subscription_thread apply batch");
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
+                });
             }
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     });
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_lww_node_attrs_subscription_functor()
+template <typename GraphSample>
+DSRGraph::NewMessageFunctor DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated)
 {
-    return NewMessageFunctor(this, [this]
-    (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
+    return NewMessageFunctor(this, [this, channel, &sync, &repeated](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
-        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("node_attr_sub"); return true; }();
-        CORTEX_PROFILE_ZONE_N("DSRGraph::node_attrs_subscription_thread callback");
-        try {
-            while (true)
-            {
-                eprosima::fastdds::dds::SampleInfo m_info;
-                DSR::LWWNodeAttrVec samples;
-                if (reader->take_next_sample(&samples, &m_info) != 0) {
-                    break;
-                }
-                if (m_info.valid_data && !samples.vec.empty() && samples.vec.at(0).agent_id != agent_id) {
-                    const auto& first = samples.vec.front();
-                    if (!network_compatibility_or_fatal("LWW_NODE_ATTS", first.protocol_version, first.sync_mode, sync_mode)) {
-                        continue;
-                    }
-                    tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("fg_request"); return true; }();
+        CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread callback");
+        while (true)
+        {
+            eprosima::fastdds::dds::SampleInfo m_info;
+            GraphSample sample;
+            if (reader->take_next_sample(&sample, &m_info) != 0) {
+                break;
+            }
+            if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);
+            if (!m_info.valid_data) {
+                continue;
+            }
+            if (!network_compatibility_or_fatal(channel, sample.protocol_version, sample.sync_mode, sync_mode)) {
+                continue;
+            }
+            if (static_cast<uint32_t>(sample.id) != graph->get_agent_id()) {
+                if (sample.id != -1) {
+                    qDebug() << " Received Full Graph from " << m_info.sample_identity.writer_guid().entityId.value
+                             << " whith " << full_graph_payload_size(sample) << " elements";
+                    tp.spawn_task([this, s = std::move(sample)]() mutable {
+                        CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread apply full graph");
                         std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
+                        engine_->import_full_graph(FullGraphMessage{std::move(s)});
                     });
-                }
-            }
-        }
-        catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
-    });
-}
-
-DSRGraph::NewMessageFunctor DSRGraph::make_crdt_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated)
-{
-    return NewMessageFunctor(this, [this, &sync, &repeated](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
-    {
-        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("fg_request"); return true; }();
-        CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread callback");
-        while (true)
-        {
-            eprosima::fastdds::dds::SampleInfo m_info;
-            DSR::OrMap sample;
-            if (reader->take_next_sample(&sample, &m_info) != 0) {
-                break;
-            }
-            if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);
-            if (m_info.valid_data) {
-                if (!network_compatibility_or_fatal("GRAPH_ANSWER", sample.protocol_version, sample.sync_mode, sync_mode)) {
-                    continue;
-                }
-                if (static_cast<uint32_t>(sample.id) != graph->get_agent_id()) {
-                    if (sample.id != -1) {
-                        qDebug() << " Received Full Graph from " << m_info.sample_identity.writer_guid().entityId.value
-                                 << " whith "
-                                 << sample.m.size() << " elements";
-                        tp.spawn_task([this, s = std::move(sample)]() mutable {
-                            CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread apply full graph");
-                            std::unique_lock<std::shared_mutex> lock(_mutex);
-                            engine_->import_full_graph(FullGraphMessage{std::move(s)});
-                        });
-                        qDebug() << "Synchronized.";
-                        sync = true;
-                        break;
-                    } else if (!sync && sample.to_id == agent_id) {
-                        repeated = true;
-                    }
+                    qDebug() << "Synchronized.";
+                    sync = true;
+                    break;
+                } else if (!sync && sample.to_id == agent_id) {
+                    repeated = true;
                 }
             }
         }
     });
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_lww_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated)
+DSRGraph::NewMessageFunctor DSRGraph::make_node_subscription_functor()
 {
-    return NewMessageFunctor(this, [this, &sync, &repeated](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
-    {
-        [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("fg_request"); return true; }();
-        CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread callback");
-        while (true)
-        {
-            eprosima::fastdds::dds::SampleInfo m_info;
-            DSR::LWWGraphSnapshot sample;
-            if (reader->take_next_sample(&sample, &m_info) != 0) {
-                break;
-            }
-            if (log_level == GraphSettings::LOGLEVEL::DEBUGL) print_sample_info(log_level, m_info);
-            if (m_info.valid_data) {
-                if (!network_compatibility_or_fatal("LWW_GRAPH_ANSWER", sample.protocol_version, sample.sync_mode, sync_mode)) {
-                    continue;
-                }
-                if (static_cast<uint32_t>(sample.id) != graph->get_agent_id()) {
-                    if (sample.id != -1) {
-                        tp.spawn_task([this, s = std::move(sample)]() mutable {
-                            std::unique_lock<std::shared_mutex> lock(_mutex);
-                            engine_->import_full_graph(FullGraphMessage{std::move(s)});
-                        });
-                        sync = true;
-                        break;
-                    } else if (!sync && sample.to_id == agent_id) {
-                        repeated = true;
-                    }
-                }
-            }
-        }
-    });
+    if (sync_mode == SyncMode::LWW) {
+        return make_node_subscription_functor_impl<LWWNodeMsg>("LWW_NODE");
+    }
+    return make_node_subscription_functor_impl<MvregNodeMsg>("DSR_NODE", true);
+}
+
+DSRGraph::NewMessageFunctor DSRGraph::make_edge_subscription_functor()
+{
+    if (sync_mode == SyncMode::LWW) {
+        return make_edge_subscription_functor_impl<LWWEdgeMsg>("LWW_EDGE");
+    }
+    return make_edge_subscription_functor_impl<MvregEdgeMsg>("DSR_EDGE");
+}
+
+DSRGraph::NewMessageFunctor DSRGraph::make_edge_attrs_subscription_functor()
+{
+    if (sync_mode == SyncMode::LWW) {
+        return make_edge_attrs_subscription_functor_impl<LWWEdgeAttrVec>("LWW_EDGE_ATTS");
+    }
+    return make_edge_attrs_subscription_functor_impl<MvregEdgeAttrVec>("DSR_EDGE_ATTS");
+}
+
+DSRGraph::NewMessageFunctor DSRGraph::make_node_attrs_subscription_functor()
+{
+    if (sync_mode == SyncMode::LWW) {
+        return make_node_attrs_subscription_functor_impl<LWWNodeAttrVec>("LWW_NODE_ATTS");
+    }
+    return make_node_attrs_subscription_functor_impl<MvregNodeAttrVec>("DSR_NODE_ATTS");
+}
+
+DSRGraph::NewMessageFunctor DSRGraph::make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated)
+{
+    if (sync_mode == SyncMode::LWW) {
+        return make_fullgraph_request_functor_impl<LWWGraphSnapshot>("LWW_GRAPH_ANSWER", sync, repeated);
+    }
+    return make_fullgraph_request_functor_impl<OrMap>("GRAPH_ANSWER", sync, repeated);
 }
 
 //////////////////////////////////////
@@ -1461,7 +1348,7 @@ void print_sample_info(DSR::GraphSettings::LOGLEVEL log_level, const eprosima::f
 void DSRGraph::node_subscription_thread()
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::node_subscription_thread setup");
-    dsrpub_call_node = (this->*transport_profile().make_node_functor)();
+    dsrpub_call_node = make_node_subscription_functor();
     auto [res, sub, reader] = dsrsub_node.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_node, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), {sub, reader});
 }
@@ -1469,7 +1356,7 @@ void DSRGraph::node_subscription_thread()
 void DSRGraph::edge_subscription_thread()
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::edge_subscription_thread setup");
-    dsrpub_call_edge = (this->*transport_profile().make_edge_functor)();
+    dsrpub_call_edge = make_edge_subscription_functor();
     auto [res, sub, reader]  = dsrsub_edge.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_edge, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getEdgeTopic()->get_name(), {sub, reader});
 
@@ -1478,7 +1365,7 @@ void DSRGraph::edge_subscription_thread()
 void DSRGraph::edge_attrs_subscription_thread()
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::edge_attrs_subscription_thread setup");
-    dsrpub_call_edge_attrs = (this->*transport_profile().make_edge_attrs_functor)();
+    dsrpub_call_edge_attrs = make_edge_attrs_subscription_functor();
     auto [res, sub, reader] = dsrsub_edge_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_edge_attrs, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getAttEdgeTopic()->get_name(), {sub, reader});
@@ -1489,7 +1376,7 @@ void DSRGraph::edge_attrs_subscription_thread()
 void DSRGraph::node_attrs_subscription_thread()
 {
     CORTEX_PROFILE_ZONE_N("DSRGraph::node_attrs_subscription_thread setup");
-    dsrpub_call_node_attrs = (this->*transport_profile().make_node_attrs_functor)();
+    dsrpub_call_node_attrs = make_node_attrs_subscription_functor();
     auto [res, sub, reader] = dsrsub_node_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_node_attrs, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getAttNodeTopic()->get_name(), {sub, reader});
@@ -1565,7 +1452,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
     CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread");
     std::atomic<bool> sync{false};
     std::atomic<bool> repeated{false};
-    dsrpub_request_answer_call = (this->*transport_profile().make_fullgraph_request_functor)(sync, repeated);
+    dsrpub_request_answer_call = make_fullgraph_request_functor(sync, repeated);
     auto [res, sub, reader] = dsrsub_request_answer.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(), dsrparticipant.get_domain_id(),
                                dsrpub_request_answer_call, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getGraphTopic()->get_name(), {sub, reader});

@@ -685,25 +685,22 @@ namespace DSR
             void operator()(eprosima::fastdds::dds::DataReader* reader) const { f(reader, graph); };
         };
 
-        struct TransportProfile {
-            NewMessageFunctor (DSRGraph::*make_node_functor)();
-            NewMessageFunctor (DSRGraph::*make_edge_functor)();
-            NewMessageFunctor (DSRGraph::*make_edge_attrs_functor)();
-            NewMessageFunctor (DSRGraph::*make_node_attrs_functor)();
-            NewMessageFunctor (DSRGraph::*make_fullgraph_request_functor)(std::atomic<bool>&, std::atomic<bool>&);
-        };
+        NewMessageFunctor make_node_subscription_functor();
+        NewMessageFunctor make_edge_subscription_functor();
+        NewMessageFunctor make_edge_attrs_subscription_functor();
+        NewMessageFunctor make_node_attrs_subscription_functor();
+        NewMessageFunctor make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
 
-        const TransportProfile& transport_profile() const;
-        NewMessageFunctor make_crdt_node_subscription_functor();
-        NewMessageFunctor make_lww_node_subscription_functor();
-        NewMessageFunctor make_crdt_edge_subscription_functor();
-        NewMessageFunctor make_lww_edge_subscription_functor();
-        NewMessageFunctor make_crdt_edge_attrs_subscription_functor();
-        NewMessageFunctor make_lww_edge_attrs_subscription_functor();
-        NewMessageFunctor make_crdt_node_attrs_subscription_functor();
-        NewMessageFunctor make_lww_node_attrs_subscription_functor();
-        NewMessageFunctor make_crdt_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
-        NewMessageFunctor make_lww_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        template <typename Sample>
+        NewMessageFunctor make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal = false);
+        template <typename Sample>
+        NewMessageFunctor make_edge_subscription_functor_impl(const char* channel);
+        template <typename Batch>
+        NewMessageFunctor make_edge_attrs_subscription_functor_impl(const char* channel);
+        template <typename Batch>
+        NewMessageFunctor make_node_attrs_subscription_functor_impl(const char* channel);
+        template <typename GraphSample>
+        NewMessageFunctor make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
 
         //Custom function for each rtps topic
         class ParticipantChangeFunctor {
