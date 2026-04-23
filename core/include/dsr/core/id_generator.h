@@ -10,7 +10,7 @@
  * as it is not intended to be used on architectures that do not support
  * unsigned 64-bits numbers.
  *
- * Each timestamp represent a 10 milliseconds periods since 2021-01-01 00:00:00 GTM.
+ * Each timestamp represent a 10 milliseconds periods since 2026-04-23 00:00:00 GTM.
  * The counter is used to differentiate between ids generated in the same timestamp.
  * The id allows to generate unique ids in a distributed environment as long as the id
  * is unique.
@@ -57,7 +57,7 @@ public:
             throw std::logic_error("agent_id must be between 0 and 4095");
         }
 
-        start_time = 1609459200000000000; // epoch of 2021-01-01 00:00:00 GMT in nanoseconds
+        start_time = 1776902400000000000; // epoch of 2026-04-23 00:00:00 GMT in nanoseconds
         elapsed_time = 0;
         agent_id = agent_id_;
         counter  = 0;

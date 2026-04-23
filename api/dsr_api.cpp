@@ -161,7 +161,7 @@ DSRGraph::DSRGraph(GraphSettings settings) :
     auto participant_init_result = [&]() {
         CORTEX_PROFILE_ZONE_N("DSRGraph::DSRGraph init participant");
         return dsrparticipant.init(agent_id, agent_name, settings.same_host,
-                                   ParticipantChangeFunctor(this, [&](DSR::DSRGraph *graph,
+                                   ParticipantChangeFn(this, [&](DSR::DSRGraph *graph,
                                            eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
                                            const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info)
                                            {
@@ -295,26 +295,6 @@ void DSRGraph::reset()
     to_edges.clear();
 }
 
-CRDTSyncEngine& DSRGraph::crdt_engine()
-{
-    return static_cast<CRDTSyncEngine&>(*engine_);
-}
-
-const CRDTSyncEngine& DSRGraph::crdt_engine() const
-{
-    return static_cast<const CRDTSyncEngine&>(*engine_);
-}
-
-LWWSyncEngine& DSRGraph::lww_engine()
-{
-    return static_cast<LWWSyncEngine&>(*engine_);
-}
-
-const LWWSyncEngine& DSRGraph::lww_engine() const
-{
-    return static_cast<const LWWSyncEngine&>(*engine_);
-}
-
 void DSRGraph::publish_node_message(const NodeDeltaMessage& message)
 {
     std::visit([this](const auto& payload) {
@@ -352,10 +332,10 @@ void DSRGraph::publish_full_graph_message(FullGraphMessage&& message, int32_t se
 }
 
 template <typename Sample>
-DSRGraph::NewMessageFunctor DSRGraph::make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal)
+DSRGraph::NewMessageFn DSRGraph::make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal)
 {
     auto name = "node_subscription_thread";
-    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level, clear_deleted_signal]
+    return NewMessageFn(this, [this, channel, name, showReceived = log_level, clear_deleted_signal]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("node_sub"); return true; }();
@@ -396,10 +376,10 @@ DSRGraph::NewMessageFunctor DSRGraph::make_node_subscription_functor_impl(const 
 }
 
 template <typename Sample>
-DSRGraph::NewMessageFunctor DSRGraph::make_edge_subscription_functor_impl(const char* channel)
+DSRGraph::NewMessageFn DSRGraph::make_edge_subscription_functor_impl(const char* channel)
 {
     auto name = "edge_subscription_thread";
-    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level]
+    return NewMessageFn(this, [this, channel, name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("edge_sub"); return true; }();
@@ -430,10 +410,10 @@ DSRGraph::NewMessageFunctor DSRGraph::make_edge_subscription_functor_impl(const 
 }
 
 template <typename Batch>
-DSRGraph::NewMessageFunctor DSRGraph::make_edge_attrs_subscription_functor_impl(const char* channel)
+DSRGraph::NewMessageFn DSRGraph::make_edge_attrs_subscription_functor_impl(const char* channel)
 {
     auto name = "edge_attrs_subscription_thread";
-    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level]
+    return NewMessageFn(this, [this, channel, name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("edge_attr_sub"); return true; }();
@@ -469,10 +449,10 @@ DSRGraph::NewMessageFunctor DSRGraph::make_edge_attrs_subscription_functor_impl(
 }
 
 template <typename Batch>
-DSRGraph::NewMessageFunctor DSRGraph::make_node_attrs_subscription_functor_impl(const char* channel)
+DSRGraph::NewMessageFn DSRGraph::make_node_attrs_subscription_functor_impl(const char* channel)
 {
     auto name = "node_attrs_subscription_thread";
-    return NewMessageFunctor(this, [this, channel, name, showReceived = log_level]
+    return NewMessageFn(this, [this, channel, name, showReceived = log_level]
     (eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("node_attr_sub"); return true; }();
@@ -508,9 +488,9 @@ DSRGraph::NewMessageFunctor DSRGraph::make_node_attrs_subscription_functor_impl(
 }
 
 template <typename GraphSample>
-DSRGraph::NewMessageFunctor DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated)
+DSRGraph::NewMessageFn DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated)
 {
-    return NewMessageFunctor(this, [this, channel, &sync, &repeated](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
+    return NewMessageFn(this, [this, channel, &sync, &repeated](eprosima::fastdds::dds::DataReader *reader, DSR::DSRGraph *graph)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("fg_request"); return true; }();
         CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread callback");
@@ -548,7 +528,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_fullgraph_request_functor_impl(const 
     });
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_node_subscription_functor()
+DSRGraph::NewMessageFn DSRGraph::make_node_subscription_functor()
 {
     if (sync_mode == SyncMode::LWW) {
         return make_node_subscription_functor_impl<LWWNodeMsg>("LWW_NODE");
@@ -556,7 +536,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_node_subscription_functor()
     return make_node_subscription_functor_impl<MvregNodeMsg>("DSR_NODE", true);
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_edge_subscription_functor()
+DSRGraph::NewMessageFn DSRGraph::make_edge_subscription_functor()
 {
     if (sync_mode == SyncMode::LWW) {
         return make_edge_subscription_functor_impl<LWWEdgeMsg>("LWW_EDGE");
@@ -564,7 +544,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_edge_subscription_functor()
     return make_edge_subscription_functor_impl<MvregEdgeMsg>("DSR_EDGE");
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_edge_attrs_subscription_functor()
+DSRGraph::NewMessageFn DSRGraph::make_edge_attrs_subscription_functor()
 {
     if (sync_mode == SyncMode::LWW) {
         return make_edge_attrs_subscription_functor_impl<LWWEdgeAttrVec>("LWW_EDGE_ATTS");
@@ -572,7 +552,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_edge_attrs_subscription_functor()
     return make_edge_attrs_subscription_functor_impl<MvregEdgeAttrVec>("DSR_EDGE_ATTS");
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_node_attrs_subscription_functor()
+DSRGraph::NewMessageFn DSRGraph::make_node_attrs_subscription_functor()
 {
     if (sync_mode == SyncMode::LWW) {
         return make_node_attrs_subscription_functor_impl<LWWNodeAttrVec>("LWW_NODE_ATTS");
@@ -580,7 +560,7 @@ DSRGraph::NewMessageFunctor DSRGraph::make_node_attrs_subscription_functor()
     return make_node_attrs_subscription_functor_impl<MvregNodeAttrVec>("DSR_NODE_ATTS");
 }
 
-DSRGraph::NewMessageFunctor DSRGraph::make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated)
+DSRGraph::NewMessageFn DSRGraph::make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated)
 {
     if (sync_mode == SyncMode::LWW) {
         return make_fullgraph_request_functor_impl<LWWGraphSnapshot>("LWW_GRAPH_ANSWER", sync, repeated);
@@ -616,9 +596,9 @@ template<typename No>
 std::optional<uint64_t> DSRGraph::insert_node(No &&node)
     requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node");
     NodeMutationEffect effect;
     {
-        CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node local");
         std::unique_lock<std::shared_mutex> lock(_mutex);
         std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
         uint64_t new_node_id = generator.generate();
@@ -635,7 +615,9 @@ std::optional<uint64_t> DSRGraph::insert_node(No &&node)
     {
         if (effect.node_delta.has_value())
         {
+            CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node publish deltas");
             publish_node_message(*effect.node_delta);
+            CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node emit signals");
             DSR_LOG_DEBUG("[INSERT_NODE] emitting update_node_signal", node.id(), node.type());
             emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
             for (const auto &[k, v]: node.fano())
@@ -655,6 +637,7 @@ template<typename No>
 std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
     requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node_with_id");
     NodeMutationEffect effect;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -675,7 +658,9 @@ std::optional<uint64_t> DSRGraph::insert_node_with_id(No &&node)
     {
         if (effect.node_delta.has_value())
         {
+            CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node_with_id send deltas");
             publish_node_message(*effect.node_delta);
+            CORTEX_PROFILE_ZONE_N("DSRGraph::insert_node_with_id emit signals");
             DSR_LOG_DEBUG("[INSERT_NODE_WITH_ID] emitting update_node_signal", node.id(), node.type());
             emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
             for (const auto &[k, v]: node.fano())
@@ -720,12 +705,14 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
         }
     }
     if (!copy) {
+        CORTEX_PROFILE_ZONE_CS("DSRGraph::update_node send deltas");
         if (effect.node_delta.has_value()) {
             publish_node_message(*effect.node_delta);
         }
         if (effect.node_attr_batch.has_value()) {
             publish_node_attr_batch(*effect.node_attr_batch);
         }
+        CORTEX_PROFILE_ZONE_CS("DSRGraph::update_node emit signals");
         if (effect.node_delta.has_value() || effect.node_attr_batch.has_value()) {
             DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", node.id(), node.type());
             emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
@@ -772,17 +759,21 @@ bool DSRGraph::delete_node(uint64_t id)
     }
 
     if (!copy) {
-        DSR_LOG_DEBUG("[DELETE_NODE] emitting del_node_signal", id);
-        emitter.del_node_signal(id, SignalInfo{ agent_id });
-        if (effect.deleted_node) {
-            emitter.deleted_node_signal(*effect.deleted_node, SignalInfo{agent_id});
-        }
+        CORTEX_PROFILE_ZONE_CS("DSRGraph::delete_node(id) send deltas");
         if (effect.node_delta.has_value()) {
             publish_node_message(*effect.node_delta);
         }
         for (const auto &delta : effect.edge_deltas) {
             publish_edge_message(delta);
         }
+        CORTEX_PROFILE_ZONE_CS("DSRGraph::delete_node(id) emit signals");
+        DSR_LOG_DEBUG("[DELETE_NODE] emitting del_node_signal", id);
+        emitter.del_node_signal(id, SignalInfo{ agent_id });
+        
+        if (effect.deleted_node) {
+            emitter.deleted_node_signal(*effect.deleted_node, SignalInfo{agent_id});
+        }
+
         for (auto &edge : effect.deleted_edges) {
             emitter.del_edge_signal(edge.from(), edge.to(), edge.type(), SignalInfo{ agent_id });
             emitter.deleted_edge_signal(edge, SignalInfo{ agent_id });
@@ -810,15 +801,17 @@ requires (std::is_same_v<std::remove_cvref_t<Ed>, DSR::Edge>)
         }
     }
     if (!copy) {
-        DSR_LOG_DEBUG("[INSERT_OR_ASSIGN_EDGE] emitting update_edge_signal", attrs.from(), attrs.to(), attrs.type());
-        emitter.update_edge_signal(attrs.from(), attrs.to(), attrs.type(), SignalInfo{ agent_id });
-
+        CORTEX_PROFILE_ZONE_CS("DSRGraph::insert_or_assign_edge sned deltas");
         if (effect.edge_delta.has_value()) {
             publish_edge_message(*effect.edge_delta);
         }
         if (effect.edge_attr_batch.has_value()) {
             publish_edge_attr_batch(*effect.edge_attr_batch);
         }
+        CORTEX_PROFILE_ZONE_CS("DSRGraph::insert_or_assign_edge emit signals");
+        DSR_LOG_DEBUG("[INSERT_OR_ASSIGN_EDGE] emitting update_edge_signal", attrs.from(), attrs.to(), attrs.type());
+        emitter.update_edge_signal(attrs.from(), attrs.to(), attrs.type(), SignalInfo{ agent_id });
+
         if (!effect.changed_attributes.empty()) {
             emitter.update_edge_attr_signal(attrs.from(), attrs.to(), attrs.type(), effect.changed_attributes, SignalInfo{ agent_id });
         }
@@ -835,6 +828,7 @@ template bool DSRGraph::insert_or_assign_edge<const DSR::Edge&>(const DSR::Edge&
 
 bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::delete_edge(from, to, key)");
     EdgeMutationEffect effect;
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
@@ -845,13 +839,16 @@ bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
         return false;
     }
     if (!copy) {
+        CORTEX_PROFILE_ZONE_N("DSRGraph::delete_edge(from, to, key) send deltas");
+        if (effect.edge_delta.has_value()) {
+            publish_edge_message(*effect.edge_delta);
+        }
+
+        CORTEX_PROFILE_ZONE_N("DSRGraph::delete_edge(from, to, key) emit signals");
         DSR_LOG_DEBUG("[DELETE_EDGE] emitting del_edge_signal", from, to, key);
         emitter.del_edge_signal(from, to, key, SignalInfo{ agent_id });
         if (effect.deleted_edge.has_value()) {
             emitter.deleted_edge_signal(*effect.deleted_edge, SignalInfo{ agent_id });
-        }
-        if (effect.edge_delta.has_value()) {
-            publish_edge_message(*effect.edge_delta);
         }
     }
     return true;
@@ -859,6 +856,7 @@ bool DSRGraph::delete_edge(uint64_t from, uint64_t to, const std::string &key)
 
 bool DSRGraph::delete_edge(const std::string &from, const std::string &to, const std::string &key)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::delete_edge(from_str, to_str, key)");
     std::optional<uint64_t> id_from = get_id_from_name(from);
     std::optional<uint64_t> id_to = get_id_from_name(to);
     if (!id_from.has_value() || !id_to.has_value()) {
@@ -931,6 +929,7 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
 //////////////////////////////////////////////////////////////////////////////////
 std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::string &to, const std::string &key)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::get_edge(from_str, to_str, key)");
     std::shared_lock<std::shared_mutex> lock(_mutex);
     std::optional<uint64_t> id_from = get_id_from_name(from);
     std::optional<uint64_t> id_to = get_id_from_name(to);
@@ -943,12 +942,14 @@ std::optional<DSR::Edge> DSRGraph::get_edge(const std::string &from, const std::
 
 std::optional<DSR::Edge> DSRGraph::get_edge(uint64_t from, uint64_t to, const std::string &key)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::get_edge(from, to, key)");
     std::shared_lock<std::shared_mutex> lock(_mutex);
     return engine_->get_edge(from, to, key);
 }
 
 std::optional<Edge> DSRGraph::get_edge(const Node &n, const std::string &to, const std::string &key)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::get_edge(Node, to_str, key)");
     std::optional<uint64_t> id_to = get_id_from_name(to);
     if (id_to.has_value())
     {
@@ -960,6 +961,7 @@ std::optional<Edge> DSRGraph::get_edge(const Node &n, const std::string &to, con
 
 std::optional<Edge> DSRGraph::get_edge(const Node &n, uint64_t to, const std::string &key)
 {
+    CORTEX_PROFILE_ZONE_N("DSRGraph::get_edge(Node, to, key)");
     auto it = n.fano().find({to, key});
     if (it != n.fano().end()) return it->second;
     return {};
@@ -1445,7 +1447,7 @@ void DSRGraph::fullgraph_server_thread()
             }
         }
     };
-    dsrpub_graph_request_call = NewMessageFunctor(this, lambda_graph_request);
+    dsrpub_graph_request_call = NewMessageFn(this, lambda_graph_request);
     auto [res, sub, reader] = dsrsub_graph_request.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(), dsrparticipant.get_domain_id(),
                               dsrpub_graph_request_call, mtx_entity_creation);
     dsrparticipant.add_subscriber(dsrparticipant.getGraphRequestTopic()->get_name(), {sub, reader});

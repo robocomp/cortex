@@ -695,11 +695,6 @@ namespace DSR
         void on_remote_node_attrs_updated(uint64_t id, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id) override;
         void on_remote_edge_attrs_updated(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id) override;
 
-        CRDTSyncEngine& crdt_engine();
-        const CRDTSyncEngine& crdt_engine() const;
-        LWWSyncEngine& lww_engine();
-        const LWWSyncEngine& lww_engine() const;
-
 
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
@@ -718,49 +713,49 @@ namespace DSR
         ThreadPool tp, tp_delta_attr;
 
         //Custom function for each rtps topic
-        class NewMessageFunctor {
+        class NewMessageFn {
         public:
             DSRGraph *graph{};
             std::function<void(eprosima::fastdds::dds::DataReader* reader, DSR::DSRGraph *graph)> f;
 
-            NewMessageFunctor(DSRGraph *graph_,
+            NewMessageFn(DSRGraph *graph_,
                               std::function<void(eprosima::fastdds::dds::DataReader* reader,  DSR::DSRGraph *graph)> f_)
                     : graph(graph_), f(std::move(f_)) {}
 
-            NewMessageFunctor() = default;
+            NewMessageFn() = default;
 
             void operator()(eprosima::fastdds::dds::DataReader* reader) const { f(reader, graph); };
         };
 
-        NewMessageFunctor make_node_subscription_functor();
-        NewMessageFunctor make_edge_subscription_functor();
-        NewMessageFunctor make_edge_attrs_subscription_functor();
-        NewMessageFunctor make_node_attrs_subscription_functor();
-        NewMessageFunctor make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        NewMessageFn make_node_subscription_functor();
+        NewMessageFn make_edge_subscription_functor();
+        NewMessageFn make_edge_attrs_subscription_functor();
+        NewMessageFn make_node_attrs_subscription_functor();
+        NewMessageFn make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
 
         template <typename Sample>
-        NewMessageFunctor make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal = false);
+        NewMessageFn make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal = false);
         template <typename Sample>
-        NewMessageFunctor make_edge_subscription_functor_impl(const char* channel);
+        NewMessageFn make_edge_subscription_functor_impl(const char* channel);
         template <typename Batch>
-        NewMessageFunctor make_edge_attrs_subscription_functor_impl(const char* channel);
+        NewMessageFn make_edge_attrs_subscription_functor_impl(const char* channel);
         template <typename Batch>
-        NewMessageFunctor make_node_attrs_subscription_functor_impl(const char* channel);
+        NewMessageFn make_node_attrs_subscription_functor_impl(const char* channel);
         template <typename GraphSample>
-        NewMessageFunctor make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        NewMessageFn make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
 
         //Custom function for each rtps topic
-        class ParticipantChangeFunctor {
+        class ParticipantChangeFn {
         public:
             DSRGraph *graph{};
             std::function<void(DSRGraph *graph_,eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f;
 
-            ParticipantChangeFunctor(DSRGraph *graph_,
+            ParticipantChangeFn(DSRGraph *graph_,
                                      std::function<void(DSRGraph *graph_, eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
                                                         const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f_)
                     : graph(graph_), f(std::move(f_)) {}
 
-            ParticipantChangeFunctor() = default;
+            ParticipantChangeFn() = default;
 
             void operator()(eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
                             const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info) const
@@ -791,27 +786,27 @@ namespace DSR
 
         DSRPublisher dsrpub_node;
         DSRSubscriber dsrsub_node;
-        NewMessageFunctor dsrpub_call_node;
+        NewMessageFn dsrpub_call_node;
 
         DSRPublisher dsrpub_edge;
         DSRSubscriber dsrsub_edge;
-        NewMessageFunctor dsrpub_call_edge;
+        NewMessageFn dsrpub_call_edge;
 
         DSRPublisher dsrpub_node_attrs;
         DSRSubscriber dsrsub_node_attrs;
-        NewMessageFunctor dsrpub_call_node_attrs;
+        NewMessageFn dsrpub_call_node_attrs;
 
         DSRPublisher dsrpub_edge_attrs;
         DSRSubscriber dsrsub_edge_attrs;
-        NewMessageFunctor dsrpub_call_edge_attrs;
+        NewMessageFn dsrpub_call_edge_attrs;
 
         DSRSubscriber dsrsub_graph_request;
         DSRPublisher dsrpub_graph_request;
-        NewMessageFunctor dsrpub_graph_request_call;
+        NewMessageFn dsrpub_graph_request_call;
 
         DSRSubscriber dsrsub_request_answer;
         DSRPublisher dsrpub_request_answer;
-        NewMessageFunctor dsrpub_request_answer_call;
+        NewMessageFn dsrpub_request_answer_call;
 
     Q_OBJECT
     signals:

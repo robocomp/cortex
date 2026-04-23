@@ -619,6 +619,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         std::string current_type;
 
         auto delete_unprocessed_deltas = [&](){
+            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node delete unprocessed deltas");
             unprocessed_delta_node_att_.erase(id);
             decltype(unprocessed_delta_edge_from_)::node_type node_handle = unprocessed_delta_edge_from_.extract(id);
             while (!node_handle.empty())
@@ -633,6 +634,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         };
 
         auto consume_unprocessed_deltas = [&]() {
+            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node consume unprocessed deltas");
             decltype(unprocessed_delta_node_att_)::node_type node_handle_node_att = unprocessed_delta_node_att_.extract(id);
             while (!node_handle_node_att.empty())
             {
@@ -768,6 +770,7 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         std::optional<Edge> deleted_edge;
 
         auto delete_unprocessed_deltas = [&](){
+            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge delete unprocessed deltas");
             unprocessed_delta_edge_att_.erase(std::tuple{from, to, type});
             std::erase_if(unprocessed_delta_edge_to_,
                           [&](auto &it){ return std::get<0>(it.second) == from || std::get<0>(it.second) == to;});
@@ -776,6 +779,7 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         };
 
         auto consume_unprocessed_deltas = [&](){
+            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge consume unprocessed deltas");
             auto att_key = std::tuple{from, to, type};
             decltype(unprocessed_delta_edge_att_)::node_type node_handle_edge_att = unprocessed_delta_edge_att_.extract(att_key);
             while (!node_handle_edge_att.empty()) {
@@ -948,6 +952,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     uint64_t id{0}, timestamp{0};
     uint32_t agent_id_ch{0};
     auto delete_unprocessed_deltas = [&](){
+        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph delete unprocessed deltas");
         unprocessed_delta_node_att_.erase(id);
         decltype(unprocessed_delta_edge_from_)::node_type node_handle = unprocessed_delta_edge_from_.extract(id);
         while (!node_handle.empty())
@@ -960,6 +965,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     };
 
     auto consume_unprocessed_deltas = [&](){
+        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph consume unprocessed deltas");
         decltype(unprocessed_delta_node_att_)::node_type node_handle_node_att = unprocessed_delta_node_att_.extract(id);
         while (!node_handle_node_att.empty())
         {
@@ -1019,6 +1025,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     };
 
     {
+        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph crdt");
         for (auto &[k, val] : full_graph.m) {
             auto mv = std::move(val.dk);
             bool mv_empty = mv.empty();
