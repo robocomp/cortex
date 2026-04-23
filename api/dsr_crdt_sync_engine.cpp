@@ -91,7 +91,7 @@ std::unique_ptr<SyncEngine> CRDTSyncEngine::clone(SyncEngineHost& host) const
 std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
 {
     if (const auto* node = get_node_ptr(id); node != nullptr) {
-        return Node(*node);
+        return to_user_node(*node);
     }
     return {};
 }
@@ -99,7 +99,7 @@ std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
 std::optional<Edge> CRDTSyncEngine::get_edge(uint64_t from, uint64_t to, const std::string& type) const
 {
     if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
-        return Edge(std::move(edge.value()));
+        return to_user_edge(*edge);
     }
     return {};
 }
@@ -129,7 +129,7 @@ bool CRDTSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor
     if (const auto* node = get_node_ptr(from); node != nullptr) {
         for (const auto& [key, edge_reg] : node->fano()) {
             if (!edge_reg.empty()) {
-                Edge edge(edge_reg.read_reg());
+                Edge edge = to_user_edge(edge_reg.read_reg());
                 visitor(key.first, key.second, edge);
             }
         }
@@ -144,7 +144,7 @@ bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& vi
     host_.for_each_incoming_edge(to, [&](uint64_t from, const std::string& type) {
         found = true;
         if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
-            Edge out(std::move(*edge));
+            Edge out = to_user_edge(*edge);
             visitor(from, type, out);
         }
     });
@@ -155,7 +155,7 @@ void CRDTSyncEngine::for_each_edge_of_type(const std::string& type, const TypedE
 {
     host_.for_each_edge_of_type_cache(type, [&](uint64_t from, uint64_t to) {
         if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
-            Edge out(std::move(*edge));
+            Edge out = to_user_edge(*edge);
             visitor(from, to, out);
         }
     });
@@ -175,7 +175,7 @@ std::map<uint64_t, Node> CRDTSyncEngine::snapshot() const
             DSR_LOG_WARNING_L(log_level, "[CRDT] snapshot skipping empty node register", id);
             continue;
         }
-        out.emplace(id, Node(reg.read_reg()));
+        out.emplace(id, to_user_node(reg.read_reg()));
     }
     return out;
 }
@@ -219,7 +219,7 @@ NodeMutationEffect CRDTSyncEngine::delete_node_local(uint64_t id)
         effect.id = id;
         effect.deleted_edges = std::move(deleted_edges);
         if (node.has_value()) {
-            effect.deleted_node = Node(*node);
+            effect.deleted_node = to_user_node(*node);
         }
         if (delta_node.has_value()) {
             effect.node_delta = NodeDeltaMessage{*delta_node};
@@ -399,7 +399,7 @@ std::tuple<bool, std::optional<MvregNodeMsg>> CRDTSyncEngine::insert_node_raw(CR
         }
 
         uint64_t id = node.id();
-        host_.update_maps_node_insert(Node(node));
+        host_.update_maps_node_insert(to_user_node(node));
         auto delta = nodes_[id].write(std::move(node));
         nodes_[id].join(mvreg<CRDTNode>(delta));
         return {true, crdt_node_to_msg(host_.local_agent_id(), id, std::move(delta))};
@@ -457,7 +457,7 @@ CRDTSyncEngine::delete_node_raw(uint64_t id, const CRDTNode& node)
     std::vector<MvregEdgeMsg> delta_vec;
 
     for (const auto& v : node.fano()) {
-        deleted_edges.emplace_back(v.second.read_reg());
+        deleted_edges.emplace_back(to_user_edge(v.second.read_reg()));
     }
     auto delta = nodes_[id].reset();
     nodes_.erase(id);
@@ -471,7 +471,7 @@ CRDTSyncEngine::delete_node_raw(uint64_t id, const CRDTNode& node)
         {
             if (!nodes_.contains(from)) continue;
             auto& visited_node = nodes_.at(from).read_reg();
-            deleted_edges.emplace_back(visited_node.fano().at({id, type}).read_reg());
+            deleted_edges.emplace_back(to_user_edge(visited_node.fano().at({id, type}).read_reg()));
             auto delta_fano = visited_node.fano().at({id, type}).reset();
             delta_vec.emplace_back(crdt_edge_to_msg(host_.local_agent_id(), from, id, type, std::move(delta_fano)));
             visited_node.fano().erase({id, type});
@@ -479,7 +479,7 @@ CRDTSyncEngine::delete_node_raw(uint64_t id, const CRDTNode& node)
         }
     }
 
-    host_.update_maps_node_delete(id, std::make_optional(Node(node)));
+    host_.update_maps_node_delete(id, std::make_optional(to_user_node(node)));
 
     return {true, std::move(deleted_edges), std::move(delta_remove), std::move(delta_vec)};
 }
@@ -707,13 +707,13 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
                         });
                     }
                     std::optional<Node> deleted_node_user = maybe_deleted_node.has_value()
-                        ? std::make_optional(Node(*maybe_deleted_node)) : std::nullopt;
+                        ? std::make_optional(to_user_node(*maybe_deleted_node)) : std::nullopt;
                     host_.update_maps_node_delete(id, deleted_node_user);
                     delete_unprocessed_deltas();
                 } else {
                     const auto& reg = nodes_.at(id).read_reg();
                     current_type = reg.type();
-                    host_.update_maps_node_insert(Node(reg));
+                    host_.update_maps_node_insert(to_user_node(reg));
                     consume_unprocessed_deltas();
                 }
                 signal = !d_empty;
@@ -735,11 +735,11 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
                 }
             } else {
                 std::optional<Node> deleted_node_user = maybe_deleted_node.has_value()
-                    ? std::make_optional(Node(*maybe_deleted_node)) : std::nullopt;
+                    ? std::make_optional(to_user_node(*maybe_deleted_node)) : std::nullopt;
                 std::vector<Edge> deleted_edges_user;
                 if (maybe_deleted_node.has_value()) {
                     for (const auto& [key, mvreg_edge] : maybe_deleted_node->fano()) {
-                        deleted_edges_user.emplace_back(mvreg_edge.read_reg());
+                        deleted_edges_user.emplace_back(to_user_edge(mvreg_edge.read_reg()));
                     }
                 }
                 host_.on_remote_node_deleted(id, deleted_node_user, deleted_edges_user, mvreg.agent_id);
@@ -1044,13 +1044,13 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
             }
             it->second.join(std::move(mv));
             if (mv_empty or it->second.empty()) {
-                std::optional<Node> nd_user = nd.has_value() ? std::make_optional(Node(*nd)) : std::nullopt;
+                std::optional<Node> nd_user = nd.has_value() ? std::make_optional(to_user_node(*nd)) : std::nullopt;
                 host_.update_maps_node_delete(k, nd_user);
                 updates.emplace_back(false, k, "", std::nullopt, std::nullopt);
                 delete_unprocessed_deltas();
             } else {
                 const auto& reg = it->second.read_reg();
-                host_.update_maps_node_insert(Node(reg));
+                host_.update_maps_node_insert(to_user_node(reg));
                 updates.emplace_back(true, k, reg.type(), nd, reg);
                 consume_unprocessed_deltas();
             }
@@ -1067,7 +1067,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
                     for (const auto &[k, v] : nd->fano()) {
                         if (!iter.contains(k)) {
                             std::optional<Edge> del_edge = (v.dk.ds.size() > 0)
-                                ? std::make_optional(Edge(v.read_reg())) : std::nullopt;
+                                ? std::make_optional(to_user_edge(v.read_reg())) : std::nullopt;
                             host_.on_remote_edge_deleted(node_id, k.first, k.second, del_edge, agent_id_ch);
                         }
                     }
@@ -1077,7 +1077,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
                     }
                 }
             } else {
-                std::optional<Node> nd_user = nd.has_value() ? std::make_optional(Node(*nd)) : std::nullopt;
+                std::optional<Node> nd_user = nd.has_value() ? std::make_optional(to_user_node(*nd)) : std::nullopt;
                 host_.on_remote_node_deleted(node_id, nd_user, {}, agent_id_ch);
             }
         }

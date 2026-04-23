@@ -101,6 +101,41 @@ inline CRDTEdge user_edge_to_crdt(const Edge& edge)
     return crdt_edge;
 }
 
+inline Edge to_user_edge(const CRDTEdge& edge)
+{
+    Edge out(edge.to(), edge.from(), edge.type(), {}, edge.agent_id());
+    auto& attrs = out.attrs();
+    for (const auto& [name, attr] : edge.attrs()) {
+        if (!attr.empty()) {
+            attrs.emplace(name, attr.read_reg());
+        }
+    }
+    return out;
+}
+
+inline Node to_user_node(const CRDTNode& node)
+{
+    Node out(node.agent_id(), node.type());
+    out.id(node.id());
+    out.name(node.name());
+
+    auto& attrs = out.attrs();
+    for (const auto& [name, attr] : node.attrs()) {
+        if (!attr.empty()) {
+            attrs.emplace(name, attr.read_reg());
+        }
+    }
+
+    auto& fano = out.fano();
+    for (const auto& [key, edge] : node.fano()) {
+        if (!edge.empty()) {
+            fano.emplace(key, to_user_edge(edge.read_reg()));
+        }
+    }
+
+    return out;
+}
+
 inline CRDTNode user_node_to_crdt(Node&& node)
 {
     CRDTNode crdt_node;
