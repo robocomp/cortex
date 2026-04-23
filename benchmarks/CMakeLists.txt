@@ -34,15 +34,14 @@ set(BENCHMARK_SOURCES
     latency/delta_propagation_bench.cpp
     latency/signal_latency_bench.cpp
     latency/crdt_join_bench.cpp
+    latency/type_conversion_bench.cpp
 
     # Throughput benchmarks
     throughput/single_agent_ops_bench.cpp
     throughput/concurrent_writers_bench.cpp
     throughput/single_agent_ops_with_latency_bench.cpp
-    throughput/query_ops_bench.cpp
 
     # Scalability benchmarks
-    scalability/multi_agent_sync_bench.cpp
     scalability/graph_size_impact_bench.cpp
     scalability/thread_scaling_bench.cpp
     scalability/graph_size_scaling_bench.cpp

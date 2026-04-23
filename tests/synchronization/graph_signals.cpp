@@ -685,8 +685,8 @@ TEST_CASE("delete an edge", "[GRAPH][SIGNALS]") {
     G.insert_or_assign_edge(e);
 
     Edge e2 = new_edge_(0).second;
-    e.from(*r2);
-    e.to(*r);
+    e2.from(*r2);
+    e2.to(*r);
     G.insert_or_assign_edge(e2);
 
     bool update_node_signal_recv = false;

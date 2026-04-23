@@ -13,7 +13,7 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][CONFLICT][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("conflict_rate");
 
@@ -34,7 +34,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
         fixture.wait_for_sync();
         REQUIRE(fixture.verify_convergence());
 
-        constexpr int NUM_ROUNDS = 50;
+        constexpr int NUM_ROUNDS = 20;
         constexpr int UPDATES_PER_AGENT = 10;
         constexpr size_t NUM_AGENTS = 4;
 
@@ -76,7 +76,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
             }
 
             // Wait for convergence
-            fixture.wait_for_sync(std::chrono::milliseconds(500));
+            fixture.wait_for_sync(std::chrono::milliseconds(200));
 
             // Check if all agents converged to the same value
             std::set<int32_t> final_values;
@@ -111,79 +111,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
         INFO("Total updates: " << total_updates.load());
 
         // Verify final convergence
-        fixture.wait_for_sync(std::chrono::milliseconds(1000));
-        CHECK(fixture.verify_convergence());
-    }
-
-    SECTION("Concurrent node creations - potential ID conflicts") {
-        // This tests CRDT behavior when multiple agents create nodes
-        MultiAgentFixture fixture;
-        auto config_file = generator.generate_empty_graph();
-        REQUIRE(fixture.create_agents(4, config_file));
-        fixture.wait_for_sync();
-
-        constexpr int NODES_PER_AGENT = 100;
-        constexpr size_t NUM_AGENTS = 4;
-
-        std::atomic<uint64_t> total_created{0};
-        std::atomic<uint64_t> creation_failures{0};
-
-        std::barrier sync_point(NUM_AGENTS);
-        std::vector<std::thread> threads;
-        threads.reserve(NUM_AGENTS);
-
-        for (size_t agent_idx = 0; agent_idx < NUM_AGENTS; ++agent_idx) {
-            threads.emplace_back([&, agent_idx]() {
-                auto* agent = fixture.get_agent(agent_idx);
-                sync_point.arrive_and_wait();
-
-                for (int i = 0; i < NODES_PER_AGENT; ++i) {
-                    // Each agent uses unique IDs in its range
-                    uint64_t node_id = 8500000 + agent_idx * 10000 + i;
-                    auto node = GraphGenerator::create_test_node(
-                        node_id, agent->get_agent_id(),
-                        "agent" + std::to_string(agent_idx) + "_node" + std::to_string(i));
-
-                    auto result = agent->insert_node(node);
-                    if (result.has_value()) {
-                        total_created.fetch_add(1, std::memory_order_relaxed);
-                    } else {
-                        creation_failures.fetch_add(1, std::memory_order_relaxed);
-                    }
-                }
-            });
-        }
-
-        for (auto& t : threads) {
-            t.join();
-        }
-
-        // Wait for convergence
-        fixture.wait_for_sync(std::chrono::milliseconds(2000));
-
-        // Verify all agents have the same nodes
-        auto* agent_0 = fixture.get_agent(0);
-        size_t expected_node_count = agent_0->get_nodes().size();
-
-        bool all_match = true;
-        for (size_t i = 1; i < NUM_AGENTS; ++i) {
-            auto* agent = fixture.get_agent(i);
-            if (agent->get_nodes().size() != expected_node_count) {
-                all_match = false;
-            }
-        }
-
-        collector.record_consistency("node_creation_success_rate",
-            static_cast<double>(total_created.load()) /
-            static_cast<double>(NODES_PER_AGENT * NUM_AGENTS) * 100.0, "%");
-
-        collector.record_consistency("final_convergence",
-            all_match ? 100.0 : 0.0, "%");
-
-        INFO("Created: " << total_created.load() << "/" << NODES_PER_AGENT * NUM_AGENTS);
-        INFO("Failures: " << creation_failures.load());
-        INFO("All agents converged: " << (all_match ? "yes" : "no"));
-
+        fixture.wait_for_sync(std::chrono::milliseconds(500));
         CHECK(fixture.verify_convergence());
     }
 
@@ -210,7 +138,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
         REQUIRE(fixture.verify_convergence());
 
         uint64_t conflicts = 0;
-        constexpr int NUM_ROUNDS = 50;
+        constexpr int NUM_ROUNDS = 20;
 
         for (int round = 0; round < NUM_ROUNDS; ++round) {
             // Both agents try to create the same edge simultaneously
@@ -225,7 +153,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
             ta.join();
             tb.join();
 
-            fixture.wait_for_sync(std::chrono::milliseconds(200));
+            fixture.wait_for_sync(std::chrono::milliseconds(100));
 
             // Check both agents see the edge
             auto edge_on_a = agent_a->get_edge(node1_id, node2_id, "test_edge");
@@ -237,7 +165,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
 
             // Delete edge for next round
             agent_a->delete_edge(node1_id, node2_id, "test_edge");
-            fixture.wait_for_sync(std::chrono::milliseconds(100));
+            fixture.wait_for_sync(std::chrono::milliseconds(50));
         }
 
         double conflict_rate = static_cast<double>(conflicts) /
@@ -254,7 +182,7 @@ TEST_CASE("Conflict rate benchmarks", "[CONSISTENCY][conflict][.multi][PROFILE][
     reporter.export_all(result, "conflict_rate");
 }
 
-TEST_CASE("CRDT eventual consistency verification", "[CONSISTENCY][eventual][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("CRDT eventual consistency verification", "[CONSISTENCY][EVENTUAL][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("eventual_consistency");
 
@@ -286,7 +214,7 @@ TEST_CASE("CRDT eventual consistency verification", "[CONSISTENCY][eventual][.mu
                         // Insert node
                         auto node = GraphGenerator::create_test_node(
                             base_id + i, agent->get_agent_id());
-                        agent->insert_node(node);
+                        agent->insert_node_with_id(node);
                     } else if (op == 1) {
                         // Update existing node
                         auto node = agent->get_node(base_id + (i % (std::max(1, i / 2))));

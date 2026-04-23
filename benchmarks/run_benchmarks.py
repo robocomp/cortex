@@ -8,7 +8,7 @@ Usage:
     python run_benchmarks.py --cpp-only              # skip Python
     python run_benchmarks.py --python-only           # skip C++
     python run_benchmarks.py --build                 # cmake build before running
-    python run_benchmarks.py --all                   # include hidden tests ([.multi], [.extended])
+    python run_benchmarks.py --all                   # include hidden tests ([.extended])
     python run_benchmarks.py --cpp-filter "[LATENCY]"# pass filter to dsr_benchmarks
     python run_benchmarks.py --report                # open HTML report when done
     python run_benchmarks.py --compare <run-id>      # compare against a previous run
@@ -37,7 +37,7 @@ PYTHON_DIR = os.path.join(SCRIPT_DIR, "python")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 RESULTS_ROOT = os.path.join(SCRIPT_DIR, "results")
 RUNS_INDEX = os.path.join(RESULTS_ROOT, "runs.json")
-BASELINE_CPP_FILTER = "[BASELINE]~[.multi]"
+BASELINE_CPP_FILTER = "[BASELINE]"
 # Catch2 v3 has no single spec that matches both visible and hidden tests.
 # _run_cpp_once detects this sentinel and runs the binary twice:
 #   1. no filter   → all visible tests
@@ -878,7 +878,7 @@ def main():
     parser.add_argument("--cpp-only", action="store_true", help="Skip Python suite")
     parser.add_argument("--python-only", action="store_true", help="Skip C++ suite")
     parser.add_argument("--all", action="store_true",
-                        help="Run all C++ tests including hidden ones ([.multi], [.extended])")
+                        help="Run all C++ tests including hidden ones ([.extended])")
     parser.add_argument("--baseline", action="store_true",
                         help="Run only the curated low-noise baseline benchmark set")
     parser.add_argument("--verbose", "-v", action="store_true",

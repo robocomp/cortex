@@ -179,9 +179,9 @@ def infer_profile(bench: dict, metric: Optional[dict] = None) -> str:
     return "other"
 
 
-def flatten_metrics(bench_files: list) -> tuple[list, list]:
-    """Return (latency_metrics, throughput_metrics) as flat lists."""
-    latency, throughput = [], []
+def flatten_metrics(bench_files: list) -> tuple[list, list, list]:
+    """Return (latency_metrics, throughput_metrics, other_metrics) as flat lists."""
+    latency, throughput, other = [], [], []
     latency_keys: set = set()   # (bench_name, metric_name) pairs with real latency data
     for bench in bench_files:
         bench_name = bench.get("benchmark_name", bench["_source_file"])
@@ -250,7 +250,13 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
                     "has_percentiles": False,
                 })
                 latency.append(entry)
-    return latency, throughput
+            else:
+                entry.update({
+                    "category": category or "other",
+                    "tags": tags,
+                })
+                other.append(entry)
+    return latency, throughput, other
 
 
 # ── Scalability flattening ────────────────────────────────────────────────────
@@ -361,8 +367,10 @@ def generate_html(
     baseline_info: Optional[dict] = None,
     baseline_files: Optional[list] = None,
 ):
-    latency, throughput = flatten_metrics(bench_files)
-    b_latency, b_throughput = (flatten_metrics(baseline_files) if baseline_files else ([], []))
+    latency, throughput, other = flatten_metrics(bench_files)
+    b_latency, b_throughput, b_other = (
+        flatten_metrics(baseline_files) if baseline_files else ([], [], [])
+    )
 
     scl_rows = flatten_scalability(bench_files)
     eff_rows = compute_efficiency(scl_rows)
@@ -377,8 +385,10 @@ def generate_html(
 
     latency_json = json.dumps(latency)
     throughput_json = json.dumps(throughput)
+    other_json = json.dumps(other)
     b_latency_json = json.dumps(b_latency)
     b_throughput_json = json.dumps(b_throughput)
+    b_other_json = json.dumps(b_other)
     run_info_json = json.dumps(run_info)
     b_info_json = json.dumps(baseline_info or {})
     scl_json = json.dumps(scl_rows)
@@ -572,6 +582,7 @@ def generate_html(
   <button class="active" onclick="showTab('overview', this)">Overview</button>
   <button onclick="showTab('latency', this)">Latency</button>
   <button onclick="showTab('throughput', this)">Throughput</button>
+  <button onclick="showTab('metrics', this)">Metrics</button>
   <button onclick="showTab('scalability', this)">Scalability</button>
   {compare_tab}
   <button onclick="showTab('raw', this)">Raw Data</button>
@@ -667,6 +678,30 @@ def generate_html(
   </div>
 </div>
 
+<!-- METRICS -->
+<div id="tab-metrics" class="tab-panel">
+  <div class="section">
+    <div class="filter-bar">
+      <select id="oth-filter" onchange="renderOther()"><option value="">All benchmarks</option></select>
+      <select id="oth-profile-filter" onchange="renderOther()">
+        <option value="">All profiles</option>
+        <option value="baseline">Baseline</option>
+        <option value="extended">Extended</option>
+        <option value="other">Other</option>
+      </select>
+      <div class="lang-toggle">
+        <button class="active" onclick="setLangFilter('oth','',this)">All</button>
+        <button onclick="setLangFilter('oth','cpp',this)">C++</button>
+        <button onclick="setLangFilter('oth','python',this)">Python</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Non-Time Metrics</h3>
+      <div id="oth-detail-sections"></div>
+    </div>
+  </div>
+</div>
+
 <!-- SCALABILITY -->
 <div id="tab-scalability" class="tab-panel">
   <div class="section">
@@ -719,8 +754,10 @@ def generate_html(
 // ── Data ─────────────────────────────────────────────────────────────────────
 const LAT   = {latency_json};
 const THR   = {throughput_json};
+const OTH   = {other_json};
 const B_LAT = {b_latency_json};
 const B_THR = {b_throughput_json};
+const B_OTH = {b_other_json};
 const RUN_INFO = {run_info_json};
 const B_INFO   = {b_info_json};
 const SUMMARY  = {summary_json};
@@ -744,6 +781,11 @@ function fmtOps(v) {{
   if (v >= 1e6) return (v/1e6).toFixed(2) + ' M ops/s';
   if (v >= 1e3) return (v/1e3).toFixed(2) + ' K ops/s';
   return v.toFixed(1) + ' ops/s';
+}}
+function fmtValue(v, unit) {{
+  if (typeof v !== 'number') return String(v) + (unit ? ' ' + unit : '');
+  if (unit === '%') return v.toFixed(2).replace(/[.]?0+$/, '') + '%';
+  return v.toLocaleString(undefined, {{ maximumFractionDigits: 3 }}) + (unit ? ' ' + unit : '');
 }}
 function deltaClass(pct, higherIsBetter) {{
   if (Math.abs(pct) < 1) return 'delta-neutral';
@@ -812,11 +854,11 @@ function showTab(name, btn) {{
 // ── Overview ──────────────────────────────────────────────────────────────────
 function renderOverview() {{
   // Stat cards
-  const total = LAT.length + THR.length;
-  const benchNames = [...new Set([...LAT.map(m=>m.benchmark), ...THR.map(m=>m.benchmark)])];
+  const total = LAT.length + THR.length + OTH.length;
+  const benchNames = [...new Set([...LAT.map(m=>m.benchmark), ...THR.map(m=>m.benchmark), ...OTH.map(m=>m.benchmark)])];
   const avgMean = LAT.length ? LAT.reduce((s,m)=>s+m.mean_ns,0)/LAT.length : 0;
-  const baselineCount = new Set([...LAT.filter(m=>m.profile==='baseline').map(m=>m.benchmark), ...THR.filter(m=>m.profile==='baseline').map(m=>m.benchmark)]).size;
-  const extendedCount = new Set([...LAT.filter(m=>m.profile==='extended').map(m=>m.benchmark), ...THR.filter(m=>m.profile==='extended').map(m=>m.benchmark)]).size;
+  const baselineCount = new Set([...LAT.filter(m=>m.profile==='baseline').map(m=>m.benchmark), ...THR.filter(m=>m.profile==='baseline').map(m=>m.benchmark), ...OTH.filter(m=>m.profile==='baseline').map(m=>m.benchmark)]).size;
+  const extendedCount = new Set([...LAT.filter(m=>m.profile==='extended').map(m=>m.benchmark), ...THR.filter(m=>m.profile==='extended').map(m=>m.benchmark), ...OTH.filter(m=>m.profile==='extended').map(m=>m.benchmark)]).size;
   document.getElementById('stat-cards').innerHTML = `
     <div class="stat-card"><div class="val">${{benchNames.length}}</div><div class="lbl">Benchmark Suites</div></div>
     <div class="stat-card"><div class="val">${{total}}</div><div class="lbl">Total Metrics</div></div>
@@ -881,13 +923,14 @@ function populateFilter(selId, data) {{
 }}
 
 // ── Lang filter state ─────────────────────────────────────────────────────────
-const langFilter = {{ lat: '', thr: '' }};
+const langFilter = {{ lat: '', thr: '', oth: '' }};
 function setLangFilter(tab, lang, btn) {{
   langFilter[tab] = lang;
   btn.closest('.lang-toggle').querySelectorAll('button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   if (tab === 'lat') renderLatency();
-  else renderThroughput();
+  else if (tab === 'thr') renderThroughput();
+  else renderOther();
 }}
 function langBadge(lang) {{
   return `<span class="badge badge-${{lang}}">${{lang}}</span>`;
@@ -1054,6 +1097,50 @@ function renderThroughput() {{
       </table>`;
   }}).join('');
   document.getElementById('thr-detail-sections').innerHTML = grouped || '<p class="empty">No data</p>';
+}}
+
+function renderOther() {{
+  let data = OTH;
+  const benchF = document.getElementById('oth-filter').value;
+  const profileF = document.getElementById('oth-profile-filter').value;
+  if (benchF) data = data.filter(m => m.benchmark === benchF);
+  if (profileF) data = data.filter(m => m.profile === profileF);
+  if (langFilter.oth) data = data.filter(m => m.lang === langFilter.oth);
+  const bMap = COMPARING ? Object.fromEntries(B_OTH.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m])) : {{}};
+
+  const renderRows = rows => rows.map(m => {{
+    const b = bMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
+    const deltaCell = b && typeof m.value === 'number' && typeof b.value === 'number' && b.value !== 0
+      ? fmtDelta(((m.value - b.value) / b.value) * 100, true)
+      : '';
+    const tagText = m.tags && Object.keys(m.tags).length ? JSON.stringify(m.tags) : '';
+    return `<tr>
+      <td>${{langBadge(m.lang)}}</td>
+      <td><span class="badge badge-throughput">${{m.category}}</span></td>
+      <td>${{m.benchmark}} ${{profileBadge(m.profile)}}</td>
+      <td>${{m.metric}}</td>
+      <td style="color:var(--accent2)">${{fmtValue(m.value, m.unit)}}${{deltaCell ? ' ' + deltaCell : ''}}</td>
+      <td style="color:var(--muted)">${{b ? fmtValue(b.value, b.unit) : ''}}</td>
+      <td style="color:var(--muted)">${{tagText}}</td>
+    </tr>`;
+  }}).join('');
+
+  const grouped = ['baseline', 'extended', 'other'].map(profile => {{
+    const rows = data.filter(m => m.profile === profile);
+    if (!rows.length) return '';
+    return `
+      <div class="subsection-title">
+        <span>${{profileLabel(profile)}} ${{profileBadge(profile)}}</span>
+        <span style="color:var(--muted);font-size:0.78rem">${{rows.length}} metric(s)</span>
+      </div>
+      <table style="margin-bottom:18px;">
+        <thead><tr>
+          <th>Lang</th><th>Category</th><th>Benchmark</th><th>Metric</th><th>Value</th><th>Baseline</th><th>Tags</th>
+        </tr></thead>
+        <tbody>${{renderRows(rows) || '<tr><td colspan="7" class="empty">No data</td></tr>'}}</tbody>
+      </table>`;
+  }}).join('');
+  document.getElementById('oth-detail-sections').innerHTML = grouped || '<p class="empty">No non-time metrics</p>';
 }}
 
 // ── Scalability Tab ───────────────────────────────────────────────────────────
@@ -1348,10 +1435,11 @@ function buildCmpDeltaChart(lang, items) {{
   }}
 }}
 
-function buildLangSection(lang, lat, bLatMap, thr, bThrMap) {{
+function buildLangSection(lang, lat, bLatMap, thr, bThrMap, oth, bOthMap) {{
   const langLat = lat.filter(m => m.lang === lang);
   const langThr = thr.filter(m => m.lang === lang);
-  if (!langLat.length && !langThr.length) return {{ html: '', items: [] }};
+  const langOth = oth.filter(m => m.lang === lang);
+  if (!langLat.length && !langThr.length && !langOth.length) return {{ html: '', items: [] }};
 
   const badgeCls  = lang === 'cpp' ? 'badge-cpp' : 'badge-python';
   const langLabel = lang === 'cpp' ? 'C++' : 'Python';
@@ -1432,13 +1520,42 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap) {{
       </table>
     </div>` : '';
 
+  const othRows = langOth.map(m => {{
+    const b = bOthMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
+    const deltaCell = b && typeof m.value === 'number' && typeof b.value === 'number' && b.value !== 0
+      ? fmtDelta(((m.value - b.value) / b.value) * 100, true)
+      : '';
+    if (!b) return `<tr><td><span class="badge badge-throughput">${{m.category}}</span></td><td>${{m.benchmark}}</td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
+    return `<tr>
+      <td><span class="badge badge-throughput">${{m.category}}</span></td>
+      <td>${{m.benchmark}}</td>
+      <td>${{m.metric}}</td>
+      <td style="color:var(--muted)">${{fmtValue(b.value, b.unit)}}</td>
+      <td style="color:var(--accent2)">${{fmtValue(m.value, m.unit)}}</td>
+      <td>${{deltaCell}}</td>
+    </tr>`;
+  }}).join('');
+
+  const othSection = langOth.length ? `
+    <div class="card section">
+      <h3>Other Metrics Comparison</h3>
+      <table>
+        <thead><tr>
+          <th>Category</th><th>Benchmark</th><th>Metric</th>
+          <th>Baseline</th><th>Current</th><th>Δ</th>
+        </tr></thead>
+        <tbody>${{othRows}}</tbody>
+      </table>
+    </div>` : '';
+
   const html = `
     <div class="lang-section-title">
       <span class="badge ${{badgeCls}}" style="font-size:0.88rem;padding:4px 14px;">${{langLabel}}</span>
     </div>
     ${{chartSection}}
     ${{latSection}}
-    ${{thrSection}}`;
+    ${{thrSection}}
+    ${{othSection}}`;
 
   return {{ html, items: chartItems }};
 }}
@@ -1449,9 +1566,10 @@ function renderCompare() {{
 
   const bLatMap = Object.fromEntries(B_LAT.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
   const bThrMap = Object.fromEntries(B_THR.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
+  const bOthMap = Object.fromEntries(B_OTH.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
 
-  const pySection  = buildLangSection('python', LAT, bLatMap, THR, bThrMap);
-  const cppSection = buildLangSection('cpp',    LAT, bLatMap, THR, bThrMap);
+  const pySection  = buildLangSection('python', LAT, bLatMap, THR, bThrMap, OTH, bOthMap);
+  const cppSection = buildLangSection('cpp',    LAT, bLatMap, THR, bThrMap, OTH, bOthMap);
 
   el.innerHTML = `
     <div class="section">
@@ -1470,7 +1588,11 @@ function renderCompare() {{
 
 // ── Raw ───────────────────────────────────────────────────────────────────────
 function renderRaw() {{
-  const all = [...LAT.map(m=>({{'type':'latency',...m}})), ...THR.map(m=>({{'type':'throughput',...m}}))];
+  const all = [
+    ...LAT.map(m=>({{'type':'latency',...m}})),
+    ...THR.map(m=>({{'type':'throughput',...m}})),
+    ...OTH.map(m=>({{'type':m.category || 'other',...m}})),
+  ];
   const byProfile = ['baseline', 'extended', 'other'].sort((a,b)=>profileOrder(a)-profileOrder(b)).map(profile => {{
     const rows = all.filter(m => m.profile === profile);
     if (!rows.length) return '';
@@ -1492,10 +1614,12 @@ function renderRaw() {{
 // ── Init ──────────────────────────────────────────────────────────────────────
 populateFilter('lat-filter', LAT);
 populateFilter('thr-filter', THR);
+populateFilter('oth-filter', OTH);
 // scl-op is populated lazily on first tab activation (needs SCL data)
 renderOverview();
 renderLatency();
 renderThroughput();
+renderOther();
 renderRaw();
 </script>
 </body>

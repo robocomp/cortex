@@ -26,9 +26,18 @@ struct FakeSyncHost final : SyncEngineHost
     SyncMode local_sync_mode() const override { return mode; }
     bool is_copy_graph() const override { return copy; }
 
-    void update_maps_node_insert(const Node& node) override { nodes[node.id()] = node; }
+    void update_maps_node_insert(uint64_t id, std::string_view name, std::string_view type, const EdgeKeyList& outgoing_edges) override
+    {
+        Node node(agent, std::string{type});
+        node.id(id);
+        node.name(std::string{name});
+        for (const auto& [to, edge_type] : outgoing_edges) {
+            node.fano().emplace(std::pair{to, edge_type}, Edge(to, id, edge_type, {}, agent));
+        }
+        nodes[id] = std::move(node);
+    }
 
-    void update_maps_node_delete(uint64_t id, const std::optional<Node>&) override
+    void update_maps_node_delete(uint64_t id, std::optional<std::string_view>, const EdgeKeyList&) override
     {
         nodes.erase(id);
         for (auto it = edges.begin(); it != edges.end(); ) {
