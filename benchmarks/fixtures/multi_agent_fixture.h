@@ -87,10 +87,13 @@ public:
 
             try {
                 agent->graph = std::make_unique<DSRGraph>(
-                    agent->name,
-                    agent->id,
-                    config_file,
-                    true
+                    GraphSettings{
+                        .agent_id = agent->id,
+                        .graph_name = agent->name,
+                        .input_file = config_file,
+                        .same_host = true,
+                        .sync_mode = config_.sync_mode
+                    }
                 );
                 agents_.push_back(std::move(agent));
             } catch (const std::exception& e) {
@@ -111,10 +114,13 @@ public:
             try {
                 // No config file - agent receives graph from DDS
                 agent->graph = std::make_unique<DSRGraph>(
-                    agent->name,
-                    agent->id,
-                    std::string{},
-                    true
+                    GraphSettings{
+                        .agent_id = agent->id,
+                        .graph_name = agent->name,
+                        .input_file = std::string{},
+                        .same_host = true,
+                        .sync_mode = config_.sync_mode
+                    }
                 );
                 agents_.push_back(std::move(agent));
             } catch (const std::exception& e) {

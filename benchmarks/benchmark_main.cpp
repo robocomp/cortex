@@ -5,8 +5,12 @@
 #include <catch2/catch_session.hpp>
 #include <QCoreApplication>
 #include <QtGlobal>
+#include "core/benchmark_config.h"
+#include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
+#include <type_traits>
 
 // Custom Qt message handler to filter debug output during benchmarks
 static bool g_verbose = false;
@@ -29,6 +33,47 @@ bool shouldPrintBenchmarkPreamble(int argc, char* argv[]) {
         && !hasCliFlag(argc, argv, "--list-tags")
         && !hasCliFlag(argc, argv, "--list-reporters")
         && !hasCliFlag(argc, argv, "--list-listeners");
+}
+
+std::optional<std::string> getenv_string(const char* name) {
+    if (const char* value = std::getenv(name); value != nullptr && *value != '\0') {
+        return std::string(value);
+    }
+    return std::nullopt;
+}
+
+template <typename T>
+void load_env_value(const char* name, T& target) {
+    if (const auto value = getenv_string(name); value.has_value()) {
+        if constexpr (std::is_same_v<T, uint32_t>) {
+            target = static_cast<uint32_t>(std::stoul(*value));
+        } else if constexpr (std::is_same_v<T, std::chrono::milliseconds>) {
+            target = std::chrono::milliseconds(std::stoull(*value));
+        } else if constexpr (std::is_same_v<T, std::chrono::seconds>) {
+            target = std::chrono::seconds(std::stoull(*value));
+        } else {
+            target = *value;
+        }
+    }
+}
+
+void configureBenchmarkDefaultsFromEnv() {
+    using namespace DSR::Benchmark;
+
+    auto& config = default_config();
+
+    if (const auto sync_mode = getenv_string("BENCH_SYNC_MODE"); sync_mode.has_value()) {
+        config.sync_mode = parse_sync_mode(*sync_mode);
+    }
+
+    load_env_value("BENCH_WARMUP_ITERATIONS", config.warmup_iterations);
+    load_env_value("BENCH_MEASUREMENT_ITERATIONS", config.measurement_iterations);
+    load_env_value("BENCH_SYNC_WAIT_MS", config.sync_wait_time);
+    load_env_value("BENCH_MAX_CONVERGENCE_TIMEOUT_S", config.max_convergence_timeout);
+    load_env_value("BENCH_DEFAULT_AGENT_COUNT", config.default_agent_count);
+    load_env_value("BENCH_MAX_AGENT_COUNT", config.max_agent_count);
+    load_env_value("BENCH_CONCURRENT_WRITER_THREADS", config.concurrent_writer_threads);
+    load_env_value("BENCH_RESULTS_DIRECTORY", config.results_directory);
 }
 
 }  // namespace
@@ -82,6 +127,7 @@ int main(int argc, char* argv[]) {
 
     // Initialize Qt (required for signals/slots)
     QCoreApplication app(argc, argv);
+    configureBenchmarkDefaultsFromEnv();
     // Initialize Catch2
     Catch::Session session;
 
@@ -98,6 +144,14 @@ int main(int argc, char* argv[]) {
         std::cout << "=================================\n";
         std::cout << " DSR Benchmarking Suite\n";
         std::cout << "=================================\n\n";
+        std::cout << "Benchmark config:\n";
+        std::cout << "  sync_mode      = " << DSR::Benchmark::sync_mode_name(DSR::Benchmark::default_config().sync_mode) << "\n";
+        std::cout << "  warmup         = " << DSR::Benchmark::default_config().warmup_iterations << "\n";
+        std::cout << "  measurements   = " << DSR::Benchmark::default_config().measurement_iterations << "\n";
+        std::cout << "  sync_wait_ms   = " << DSR::Benchmark::default_config().sync_wait_time.count() << "\n";
+        std::cout << "  max_conv_s     = " << DSR::Benchmark::default_config().max_convergence_timeout.count() << "\n";
+        std::cout << "  agent_count    = " << DSR::Benchmark::default_config().default_agent_count << "\n";
+        std::cout << "  writer_threads = " << DSR::Benchmark::default_config().concurrent_writer_threads << "\n\n";
         std::cout << "Available benchmark categories:\n";
         std::cout << "  [BASELINE]     - Curated low-noise regression baseline\n";
         std::cout << "  [EXTENDED]     - Slower supplementary baseline coverage\n";

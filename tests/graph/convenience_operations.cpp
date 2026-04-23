@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 
 using namespace DSR;
@@ -12,9 +13,11 @@ using namespace DSR;
 
 
 TEST_CASE("Maps operations", "[CONVENIENCE METHODS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
 
     SECTION("Get id from a name and a name from an id") {
@@ -94,9 +97,11 @@ TEST_CASE("Maps operations", "[CONVENIENCE METHODS]") {
 
 
 TEST_CASE("Convenience methods", "[CONVENIENCE METHODS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
 
     SECTION("Get node level") {

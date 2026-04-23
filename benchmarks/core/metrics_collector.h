@@ -214,6 +214,7 @@ public:
         result.total_duration = duration;
         result.metrics = metrics_;
         result.metadata = metadata_;
+        result.metadata.try_emplace("sync_mode", sync_mode_name(default_config().sync_mode));
 
         return result;
     }

@@ -5,6 +5,7 @@
 #include <QtWidgets/QApplication>
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 #include "catch2/internal/catch_test_registry.hpp"
 
 using namespace DSR;
@@ -52,11 +53,13 @@ struct QTestApplication: public QCoreApplication {
 };
 
 TEST_CASE("Insert a node without attributes and edges", "[GRAPH][SIGNALS]"){
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
 
     bool update_node_signal_recv = false;
     QObject::connect(&G, &DSRGraph::update_node_signal, &app,
@@ -159,11 +162,13 @@ static const auto new_edge_ = [](uint64_t to, const std::map<std::string, Attrib
 };
 
 TEST_CASE("Insert a node with attributes and edges", "[GRAPH][SIGNALS]"){
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     std::optional<uint64_t> r  = G.insert_node(n);
@@ -250,11 +255,13 @@ TEST_CASE("Insert a node with attributes and edges", "[GRAPH][SIGNALS]"){
 
 
 TEST_CASE("Update a node, add and remove attributes", "[GRAPH][SIGNALS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     n.attrs({new_attribute_(), new_attribute_(), new_attribute_()});
@@ -343,11 +350,13 @@ TEST_CASE("Update a node, add and remove attributes", "[GRAPH][SIGNALS]") {
 }
 
 TEST_CASE("Insert and edge", "[GRAPH][SIGNALS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     const std::optional<uint64_t> r  = G.insert_node(n);
@@ -435,11 +444,13 @@ TEST_CASE("Insert and edge", "[GRAPH][SIGNALS]") {
 }
 
 TEST_CASE("Update an edge, add and remove attributes", "[GRAPH][SIGNALS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     const std::optional<uint64_t> r  = G.insert_node(n);
@@ -542,11 +553,13 @@ TEST_CASE("Update an edge, add and remove attributes", "[GRAPH][SIGNALS]") {
 }
 
 TEST_CASE("delete a node", "[GRAPH][SIGNALS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     const std::optional<uint64_t> r  = G.insert_node(n);
@@ -648,11 +661,13 @@ TEST_CASE("delete a node", "[GRAPH][SIGNALS]") {
 }
 
 TEST_CASE("delete an edge", "[GRAPH][SIGNALS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
     auto id1 = rand() % 1000;
     int argc = 0;
     QTestApplication app(argc, nullptr); // need this to trigger signals
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     const std::optional<uint64_t> r  = G.insert_node(n);
@@ -858,4 +873,6 @@ TEST_CASE("RT api signals", "[GRAPH][SIGNALS]") {
 
 
 TEST_CASE("Graph synchronization signals", "[GRAPH][SIGNALS]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 }

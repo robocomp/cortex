@@ -17,7 +17,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from bench_utils import LatencyTracker, MetricsCollector, make_temp_config_file, warmup
+from bench_utils import LatencyTracker, MetricsCollector, make_temp_config_file, warmup, sync_modes, create_graph
 
 try:
     import pydsr
@@ -246,34 +246,36 @@ def main():
     print("=" * 60)
     print()
 
-    collector = MetricsCollector("graph_operations")
-
-    # Create graph
-    config_file = make_temp_config_file()
-    graph = pydsr.DSRGraph(0, "bench_graph_ops", 42, config_file)
-    time.sleep(0.5)
-
-    print("--- Node Operations ---")
-    benchmark_node_operations(graph, collector)
-
-    print("\n--- Edge Operations ---")
-    benchmark_edge_operations(graph, collector)
-
-    print("\n--- Query Operations ---")
-    benchmark_query_operations(graph, collector)
-
-    # Cleanup
-    del graph
-    os.unlink(config_file)
-
     # Export
     results_dir = os.environ.get(
         "BENCH_RESULTS_DIR",
         os.path.join(os.path.dirname(__file__), "..", "results"),
     )
     os.makedirs(results_dir, exist_ok=True)
-    collector.export_json(os.path.join(results_dir, "python_graph_operations.json"))
-    collector.export_csv(os.path.join(results_dir, "python_graph_operations.csv"))
+
+    for sync_label, sync_mode in sync_modes(pydsr):
+        print(f"--- Backend: {sync_label} ---")
+        collector = MetricsCollector(f"graph_operations_{sync_label}")
+        collector.metadata["sync_mode"] = sync_label
+
+        config_file = make_temp_config_file()
+        graph = create_graph(pydsr, f"bench_graph_ops_{sync_label}", 42, config_file, sync_mode)
+        time.sleep(0.5)
+
+        print("--- Node Operations ---")
+        benchmark_node_operations(graph, collector)
+
+        print("\n--- Edge Operations ---")
+        benchmark_edge_operations(graph, collector)
+
+        print("\n--- Query Operations ---")
+        benchmark_query_operations(graph, collector)
+
+        del graph
+        os.unlink(config_file)
+
+        collector.export_json(os.path.join(results_dir, f"python_graph_operations_{sync_label}.json"))
+        collector.export_csv(os.path.join(results_dir, f"python_graph_operations_{sync_label}.csv"))
     print(f"\nResults exported to {results_dir}")
 
 

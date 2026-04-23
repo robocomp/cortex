@@ -282,3 +282,32 @@ inline auto make_edge_config_file() -> std::string {
 
     return filename;
 }
+
+inline auto sync_mode_label(DSR::SyncMode mode) -> const char*
+{
+    switch (mode) {
+        case DSR::SyncMode::CRDT: return "CRDT";
+        case DSR::SyncMode::LWW: return "LWW";
+    }
+    return "UNKNOWN";
+}
+
+inline auto make_test_graph_settings(
+    std::string graph_name,
+    uint32_t agent_id,
+    const std::string& input_file = std::string(),
+    bool same_host = true,
+    int8_t domain_id = 0,
+    DSR::SignalMode signal_mode = DSR::SignalMode::QT,
+    DSR::SyncMode sync_mode = DSR::SyncMode::CRDT) -> DSR::GraphSettings
+{
+    DSR::GraphSettings settings;
+    settings.agent_id = agent_id;
+    settings.graph_name = std::move(graph_name);
+    settings.input_file = input_file;
+    settings.same_host = same_host;
+    settings.domain_id = domain_id;
+    settings.signal_mode = signal_mode;
+    settings.sync_mode = sync_mode;
+    return settings;
+}

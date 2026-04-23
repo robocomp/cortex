@@ -13,7 +13,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from bench_utils import LatencyTracker, MetricsCollector, make_temp_config_file
+from bench_utils import LatencyTracker, MetricsCollector, make_temp_config_file, sync_modes, create_graph
 
 try:
     import pydsr
@@ -106,25 +106,28 @@ def main():
     print("=" * 60)
     print()
 
-    collector = MetricsCollector("python_baseline_graph")
-    collector.metadata["profile"] = "baseline"
-
-    config_file = make_temp_config_file()
-    graph = pydsr.DSRGraph(0, "python_baseline_graph", 84, config_file)
-    time.sleep(0.3)
-
-    benchmark_fixed_graph(graph, collector)
-
-    del graph
-    os.unlink(config_file)
-
     results_dir = os.environ.get(
         "BENCH_RESULTS_DIR",
         os.path.join(os.path.dirname(__file__), "..", "results"),
     )
     os.makedirs(results_dir, exist_ok=True)
-    collector.export_json(os.path.join(results_dir, "python_baseline_graph.json"))
-    collector.export_csv(os.path.join(results_dir, "python_baseline_graph.csv"))
+
+    for sync_label, sync_mode in sync_modes(pydsr):
+        collector = MetricsCollector(f"python_baseline_graph_{sync_label}")
+        collector.metadata["profile"] = "baseline"
+        collector.metadata["sync_mode"] = sync_label
+
+        config_file = make_temp_config_file()
+        graph = create_graph(pydsr, f"python_baseline_graph_{sync_label}", 84, config_file, sync_mode)
+        time.sleep(0.3)
+
+        benchmark_fixed_graph(graph, collector)
+
+        del graph
+        os.unlink(config_file)
+
+        collector.export_json(os.path.join(results_dir, f"python_baseline_graph_{sync_label}.json"))
+        collector.export_csv(os.path.join(results_dir, f"python_baseline_graph_{sync_label}.csv"))
     print(f"\nResults exported to {results_dir}")
 
 

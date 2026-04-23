@@ -6,6 +6,28 @@ from pydsr import *
 
 
 ETC_DIR = "../etc/"
+NativeDSRGraph = DSRGraph
+CURRENT_SYNC_MODE = SyncMode.CRDT
+
+
+def DSRGraph(*args, **kwargs):
+    kwargs.setdefault("sync_mode", CURRENT_SYNC_MODE)
+    return NativeDSRGraph(*args, **kwargs)
+
+
+SYNC_MODES = [("crdt", SyncMode.CRDT), ("lww", SyncMode.LWW)]
+
+
+def make_graph(sync_mode):
+    return DSRGraph(
+        int(0),
+        "Prueba",
+        int(12),
+        os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"),
+        True,
+        0,
+        sync_mode,
+    )
 
 
 class TestAttribute(unittest.TestCase):
@@ -147,30 +169,27 @@ class TestNode(unittest.TestCase):
 
 
 class TestDSRGraph(unittest.TestCase):
+    SYNC_MODE = SyncMode.CRDT
 
     @classmethod
     def tearDownClass(cls):
         # time.sleep(0.5)
         pass
 
+    def setUp(self):
+        global CURRENT_SYNC_MODE
+        CURRENT_SYNC_MODE = self.SYNC_MODE
+
+    def tearDown(self):
+        global CURRENT_SYNC_MODE
+        CURRENT_SYNC_MODE = SyncMode.CRDT
+
     def test_create_graph(self):
-        a = DSRGraph(
-            int(0),
-            "Prueba",
-            int(12),
-            os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"),
-            True,
-        )
+        a = make_graph(self.SYNC_MODE)
         self.assertIsNotNone(a)
 
     def test_get_node(self):
-        g = DSRGraph(
-            int(0),
-            "Prueba",
-            int(12),
-            os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"),
-            True,
-        )
+        g = make_graph(self.SYNC_MODE)
         node = g.get_node(1)
         self.assertIsNotNone(node)
         node = g.get_node("root")
@@ -181,13 +200,7 @@ class TestDSRGraph(unittest.TestCase):
         self.assertIsNone(node)
 
     def test_delete_node(self):
-        g = DSRGraph(
-            int(0),
-            "Prueba",
-            int(12),
-            os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"),
-            True,
-        )
+        g = make_graph(self.SYNC_MODE)
         node = g.get_node(1)
         self.assertIsNotNone(node)
         res = g.delete_node(1)
@@ -196,13 +209,7 @@ class TestDSRGraph(unittest.TestCase):
         self.assertIsNone(node)
 
     def test_update_node(self):
-        g = DSRGraph(
-            int(0),
-            "Prueba",
-            int(12),
-            os.path.join(ETC_DIR, "autonomyLab_objects.simscene.json"),
-            True,
-        )
+        g = make_graph(self.SYNC_MODE)
         world = g.get_node("root")
         world.attrs["color"].value = "red"
         result = g.update_node(world)
@@ -553,6 +560,10 @@ class TestInnerAPI(unittest.TestCase):
         inner = inner_api(g)
         angles = inner.get_euler_xyz_angles("root", "laser", 0)
         self.assertIsNotNone(angles)
+
+
+class TestDSRGraphLWW(TestDSRGraph):
+    SYNC_MODE = SyncMode.LWW
 
 
 class Singleton(type):

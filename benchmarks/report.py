@@ -5,6 +5,7 @@ Generate a visual HTML report from benchmark results.
 Single run:
     python report.py                            # latest run
     python report.py --run 20260314T153000
+    python report.py --run 20260314T153000 --report-name lww_vs_crdt
 
 Compare two runs:
     python report.py --run 20260314T153000 --baseline 20260313T090000
@@ -95,11 +96,61 @@ def resolve_run_dir(run_id: str, results_root: str) -> str:
     raise FileNotFoundError(f"Run directory not found for id '{run_id}'")
 
 
+def sanitize_report_name(name: str) -> str:
+    """Return a filesystem-safe report basename without an html extension."""
+    cleaned = []
+    for ch in name.strip():
+        if ch.isalnum() or ch in ("-", "_", "."):
+            cleaned.append(ch)
+        elif ch.isspace():
+            cleaned.append("_")
+    basename = "".join(cleaned).strip("._")
+    if basename.lower().endswith(".html"):
+        basename = basename[:-5]
+    if not basename:
+        raise ValueError("--report-name must contain at least one letter, number, dash, underscore, or dot")
+    return basename
+
+
+def resolve_output_path(run_dir: str, output: Optional[str], report_name: Optional[str]) -> str:
+    if output and report_name:
+        raise ValueError("--output and --report-name are mutually exclusive")
+    if output:
+        return output
+    if report_name:
+        return os.path.join(run_dir, f"{sanitize_report_name(report_name)}.html")
+    return os.path.join(run_dir, "report.html")
+
+
 _UNIT_TO_NS = {"ns": 1, "us": 1_000, "µs": 1_000, "ms": 1_000_000, "s": 1_000_000_000}
+
+
+SYNC_MODE_SUFFIXES = ("_crdt", "_lww")
 
 
 def _to_ns(value: float, unit: str) -> float:
     return value * _UNIT_TO_NS.get(unit.strip(), 1)
+
+
+def comparison_benchmark_name(bench: dict) -> str:
+    """Return a stable benchmark identity for cross-sync-mode comparisons."""
+    name = bench.get("benchmark_name", bench.get("_source_file", ""))
+    metadata = bench.get("metadata", {}) or {}
+    sync_mode = str(metadata.get("sync_mode", "")).strip().lower()
+    suffixes = [f"_{sync_mode}"] if sync_mode else []
+    suffixes.extend(s for s in SYNC_MODE_SUFFIXES if s not in suffixes)
+    for suffix in suffixes:
+        if suffix and name.endswith(suffix):
+            return name[:-len(suffix)]
+    return name
+
+
+def metric_tag_suffix(tags: dict) -> str:
+    """Build a deterministic suffix for tags that identify repeated metrics."""
+    preferred = ("graph_size", "num_threads", "threads", "agents", "scale_factor", "num_handlers")
+    keys = [k for k in preferred if k in tags]
+    keys.extend(sorted(k for k in tags if k not in preferred and k != "scale_dim"))
+    return "_".join(f"{k}={tags[k]}" for k in keys)
 
 
 def infer_profile(bench: dict, metric: Optional[dict] = None) -> str:
@@ -134,6 +185,7 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
     latency_keys: set = set()   # (bench_name, metric_name) pairs with real latency data
     for bench in bench_files:
         bench_name = bench.get("benchmark_name", bench["_source_file"])
+        bench_key = comparison_benchmark_name(bench)
         lang = bench.get("_lang", "python")
         for m in bench.get("metrics", []):
             add = m.get("additional", {})
@@ -146,13 +198,13 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
             # differentiates them (e.g. graph_size) so each row is unique.
             metric_name = m["name"]
             if tags:
-                tag_suffix = "_".join(f"{k}={v}" for k, v in tags.items()
-                                      if k in ("graph_size", "num_threads", "threads", "scale_factor"))
+                tag_suffix = metric_tag_suffix(tags)
                 if tag_suffix:
                     metric_name = f"{metric_name}@{tag_suffix}"
 
             entry = {
                 "benchmark": bench_name,
+                "benchmark_key": bench_key,
                 "metric": metric_name,
                 "lang": lang,
                 "profile": profile,
@@ -173,7 +225,7 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
                     "has_percentiles": True,
                 })
                 latency.append(entry)
-                latency_keys.add((bench_name, metric_name))
+                latency_keys.add((bench_key, metric_name))
             elif category == "throughput":
                 entry.update({
                     "ops_per_sec": m["value"],
@@ -184,7 +236,7 @@ def flatten_metrics(bench_files: list) -> tuple[list, list]:
             elif category == "scalability" and unit in _UNIT_TO_NS:
                 # Only promote scalability entries that have no proper latency
                 # counterpart — avoids duplicates and preserves percentile data.
-                if (bench_name, metric_name) in latency_keys:
+                if (bench_key, metric_name) in latency_keys:
                     continue
                 mean_ns = _to_ns(m["value"], unit)
                 entry.update({
@@ -1307,7 +1359,7 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap) {{
   // Deduplicate for chart (first-seen per key)
   const seenChart = new Set(), chartItems = [];
   for (const m of langLat) {{
-    const key = m.benchmark + '/' + m.metric;
+    const key = (m.benchmark_key || m.benchmark) + '/' + m.metric;
     const b = bLatMap[key];
     if (b && !seenChart.has(key)) {{
       seenChart.add(key);
@@ -1329,7 +1381,7 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap) {{
     </div>` : '';
 
   const latRows = langLat.map(m => {{
-    const b = bLatMap[m.benchmark+'/'+m.metric];
+    const b = bLatMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
     if (!b) return `<tr><td><span class="badge badge-latency">${{m.benchmark}}</span></td><td>${{m.metric}}</td><td colspan="4" style="color:var(--muted)">no baseline</td></tr>`;
     const pct    = ((m.mean_ns - b.mean_ns) / b.mean_ns) * 100;
     const p99pct = (m.has_percentiles && b.has_percentiles && b.p99_ns) ? ((m.p99_ns - b.p99_ns) / b.p99_ns) * 100 : null;
@@ -1344,7 +1396,7 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap) {{
   }}).join('');
 
   const thrRows = langThr.map(m => {{
-    const b = bThrMap[m.benchmark+'/'+m.metric];
+    const b = bThrMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
     if (!b) return `<tr><td><span class="badge badge-throughput">${{m.benchmark}}</span></td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
     const pct = ((m.ops_per_sec - b.ops_per_sec) / b.ops_per_sec) * 100;
     return `<tr>
@@ -1395,8 +1447,8 @@ function renderCompare() {{
   const el = document.getElementById('tab-compare');
   if (!el || !COMPARING) return;
 
-  const bLatMap = Object.fromEntries(B_LAT.map(m => [m.benchmark+'/'+m.metric, m]));
-  const bThrMap = Object.fromEntries(B_THR.map(m => [m.benchmark+'/'+m.metric, m]));
+  const bLatMap = Object.fromEntries(B_LAT.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
+  const bThrMap = Object.fromEntries(B_THR.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
 
   const pySection  = buildLangSection('python', LAT, bLatMap, THR, bThrMap);
   const cppSection = buildLangSection('cpp',    LAT, bLatMap, THR, bThrMap);
@@ -1463,6 +1515,7 @@ def main():
     parser.add_argument("--baseline", "-b", help="Run ID to compare against")
     parser.add_argument("--results-root", default=DEFAULT_RESULTS_ROOT)
     parser.add_argument("--output", "-o", help="Output HTML file (default: <run_dir>/report.html)")
+    parser.add_argument("--report-name", help="Named HTML report in the run directory, e.g. lww_vs_crdt -> lww_vs_crdt.html")
     parser.add_argument("--list", action="store_true", help="List available runs")
     args = parser.parse_args()
 
@@ -1506,7 +1559,10 @@ def main():
         baseline_files = load_run_metrics(b_dir)
         print(f"Baseline: {len(baseline_files)} file(s) from run '{baseline_info.get('id', b_dir)}'")
 
-    output_path = args.output or os.path.join(run_dir, "report.html")
+    try:
+        output_path = resolve_output_path(run_dir, args.output, args.report_name)
+    except ValueError as e:
+        parser.error(str(e))
     generate_html(run_info, bench_files, output_path, baseline_info, baseline_files)
 
 
