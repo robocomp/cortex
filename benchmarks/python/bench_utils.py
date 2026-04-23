@@ -239,6 +239,23 @@ def make_temp_config_file() -> str:
     return path
 
 
+def sync_modes(pydsr_module):
+    requested = os.environ.get("BENCH_SYNC_MODE", "both").lower()
+    modes = {
+        "crdt": [("crdt", pydsr_module.SyncMode.CRDT)],
+        "lww": [("lww", pydsr_module.SyncMode.LWW)],
+        "both": [
+            ("crdt", pydsr_module.SyncMode.CRDT),
+            ("lww", pydsr_module.SyncMode.LWW),
+        ],
+    }
+    return modes.get(requested, modes["both"])
+
+
+def create_graph(pydsr_module, name: str, agent_id: int, config_file: str, sync_mode):
+    return pydsr_module.DSRGraph(0, name, agent_id, config_file, True, 0, sync_mode)
+
+
 def warmup(func: Callable, iterations: int = 10):
     """Run warmup iterations."""
     for _ in range(iterations):

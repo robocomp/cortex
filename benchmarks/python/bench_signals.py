@@ -17,7 +17,7 @@ import threading
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from bench_utils import LatencyTracker, MetricsCollector, make_temp_config_file
+from bench_utils import LatencyTracker, MetricsCollector, make_temp_config_file, sync_modes, create_graph
 
 try:
     import pydsr
@@ -158,32 +158,36 @@ def main():
     print("=" * 60)
     print()
 
-    collector = MetricsCollector("signals")
-
-    config_file = make_temp_config_file()
-    graph = pydsr.DSRGraph(0, "bench_signals", 42, config_file)
-    time.sleep(0.5)
-
-    print("--- Signal Callback Latency ---")
-    benchmark_signal_callback_latency(graph, collector)
-
-    print("\n--- Signal Throughput ---")
-    benchmark_signal_throughput(graph, collector)
-
-    print("\n--- Multiple Handlers Impact ---")
-    benchmark_multiple_handlers(graph, collector)
-
-    del graph
-    os.unlink(config_file)
-
     # Export
     results_dir = os.environ.get(
         "BENCH_RESULTS_DIR",
         os.path.join(os.path.dirname(__file__), "..", "results"),
     )
     os.makedirs(results_dir, exist_ok=True)
-    collector.export_json(os.path.join(results_dir, "python_signals.json"))
-    collector.export_csv(os.path.join(results_dir, "python_signals.csv"))
+
+    for sync_label, sync_mode in sync_modes(pydsr):
+        print(f"--- Backend: {sync_label} ---")
+        collector = MetricsCollector(f"signals_{sync_label}")
+        collector.metadata["sync_mode"] = sync_label
+
+        config_file = make_temp_config_file()
+        graph = create_graph(pydsr, f"bench_signals_{sync_label}", 42, config_file, sync_mode)
+        time.sleep(0.5)
+
+        print("--- Signal Callback Latency ---")
+        benchmark_signal_callback_latency(graph, collector)
+
+        print("\n--- Signal Throughput ---")
+        benchmark_signal_throughput(graph, collector)
+
+        print("\n--- Multiple Handlers Impact ---")
+        benchmark_multiple_handlers(graph, collector)
+
+        del graph
+        os.unlink(config_file)
+
+        collector.export_json(os.path.join(results_dir, f"python_signals_{sync_label}.json"))
+        collector.export_csv(os.path.join(results_dir, f"python_signals_{sync_label}.csv"))
     print(f"\nResults exported to {results_dir}")
 
 

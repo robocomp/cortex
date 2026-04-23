@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <chrono>
+#include <dsr/api/dsr_graph_settings.h>
 
 namespace DSR::Benchmark {
 
@@ -32,7 +33,27 @@ struct BenchmarkConfig {
     bool export_json = true;
     bool export_csv = true;
     bool verbose = false;
+    DSR::SyncMode sync_mode = DSR::SyncMode::CRDT;
 };
+
+inline const char* sync_mode_name(DSR::SyncMode mode) {
+    switch (mode) {
+        case DSR::SyncMode::CRDT: return "crdt";
+        case DSR::SyncMode::LWW: return "lww";
+    }
+    return "unknown";
+}
+
+inline DSR::SyncMode parse_sync_mode(const std::string& value) {
+    if (value == "lww" || value == "LWW") {
+        return DSR::SyncMode::LWW;
+    }
+    return DSR::SyncMode::CRDT;
+}
+
+inline std::string sync_mode_suffix(DSR::SyncMode mode) {
+    return std::string("_") + sync_mode_name(mode);
+}
 
 // Default configuration singleton
 inline BenchmarkConfig& default_config() {

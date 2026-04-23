@@ -39,14 +39,15 @@ public:
 }
 
 TEST_CASE("Connect and receive the graph from other agent", "[SYNCHRONIZATION][GRAPH]"){
-
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = GENERATE(make_edge_config_file, make_empty_config_file);
     auto ctx = filename();
     auto id1 = rand() % 1000;
     auto id2 = id1 + 1;
-    DSRGraph G(random_string(10), id1, ctx);
-    DSRGraph G2(random_string(11), id2);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
+    DSRGraph G2(make_test_graph_settings(random_string(11), id2, std::string{}, true, 0, SignalMode::QT, sync_mode));
     std::this_thread::sleep_for(200ms);
     REQUIRE(G2.size() == G.size());
     
@@ -54,13 +55,15 @@ TEST_CASE("Connect and receive the graph from other agent", "[SYNCHRONIZATION][G
 
 TEST_CASE("Same-process agents discover each other and exchange updates", "[SYNCHRONIZATION][GRAPH][REGRESSION][DDS]")
 {
-    const auto same_host = GENERATE(true, false);
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    const auto same_host = (sync_mode == SyncMode::LWW) ? true : GENERATE(true, false);
+    CAPTURE(sync_mode_label(sync_mode), same_host);
     auto ctx = make_edge_config_file();
     auto id1 = static_cast<uint32_t>(rand() % 1000 + 1000);
     auto id2 = id1 + 1;
 
-    DSRGraph loader(random_string(10), id1, ctx, same_host);
-    DSRGraph follower(random_string(11), id2, std::string{}, same_host);
+    DSRGraph loader(make_test_graph_settings(random_string(10), id1, ctx, same_host, 0, SignalMode::QT, sync_mode));
+    DSRGraph follower(make_test_graph_settings(random_string(11), id2, std::string{}, same_host, 0, SignalMode::QT, sync_mode));
 
     auto wait_until = [](auto&& predicate, std::chrono::milliseconds timeout = 2000ms)
     {

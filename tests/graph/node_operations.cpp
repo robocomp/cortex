@@ -4,6 +4,7 @@
 
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
@@ -17,10 +18,11 @@ using namespace DSR;
 
 
 TEST_CASE("Graph node operations", "[NODE]") {
-
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_empty_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Try to get a node that does not exists by a id") {
         std::optional<Node> n_id = G.get_node(random_number());
@@ -157,9 +159,11 @@ TEST_CASE("Graph node operations", "[NODE]") {
 
 
 TEST_CASE("Insert node with specific id", "[NODE]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_empty_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Insert a node with a specific id") {
         auto node_name = random_string();
