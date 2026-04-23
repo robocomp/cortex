@@ -62,6 +62,8 @@ private:
     using NodeState = LWW::NodeState;
     using EdgeState = LWW::EdgeState;
     using EdgeKey = LWW::EdgeKey;
+    using EdgeKeyHash = LWW::EdgeKeyHash;
+    using EdgeKeyEqual = LWW::EdgeKeyEqual;
     using FromIndex = LWW::FromIndex;
     using ToIndex = LWW::ToIndex;
     using TypeIndex = LWW::TypeIndex;
@@ -71,22 +73,20 @@ private:
     uint64_t current_time_ms() const;
     uint64_t next_timestamp();
     void prune_tombstones(uint64_t now);
+    void maybe_prune_tombstones(uint64_t now);
 
     void store_node_tombstone(uint64_t id, Version version, uint64_t now);
     void store_edge_tombstone(uint64_t from, uint64_t to, const std::string& type, Version version, uint64_t now);
     void erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges = nullptr);
 
-    // Secondary indices — maintained in sync with edges_ for O(degree) lookup.
-    void idx_insert(const EdgeKey& key);
-    void idx_erase(const EdgeKey& key);
-
     SyncEngineHost& host_;
     uint64_t tombstone_window_ms_;
     uint64_t logical_clock_ms_{0};
+    uint64_t last_prune_ms_{0};
     std::unordered_map<uint64_t, NodeState> nodes_;
-    std::unordered_map<EdgeKey, EdgeState, hash_tuple> edges_;
+    std::unordered_map<EdgeKey, EdgeState, EdgeKeyHash, EdgeKeyEqual> edges_;
     std::unordered_map<uint64_t, Tombstone> node_tombstones_;
-    std::unordered_map<EdgeKey, Tombstone, hash_tuple> edge_tombstones_;
+    std::unordered_map<EdgeKey, Tombstone, EdgeKeyHash, EdgeKeyEqual> edge_tombstones_;
 
     FromIndex from_idx_;
     ToIndex to_idx_;

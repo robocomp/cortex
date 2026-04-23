@@ -671,16 +671,63 @@ namespace DSR
         std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>> edgeType;  // collection with all edge types.
         std::unordered_map<std::string, std::unordered_set<uint64_t>> nodeType;  // collection with all node types.
 
-        void update_maps_node_delete(uint64_t id, const std::optional<CRDTNode>& n);
-        void update_maps_node_insert(uint64_t id, const CRDTNode &n);
+        template<typename T>
+        void update_maps_node_delete_impl(uint64_t id, std::optional<std::string_view> type, const T& outgoing_edges) {
+            std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
+            if (id_map.contains(id))
+            {
+                name_map.erase(id_map.at(id));
+                id_map.erase(id);
+            }
+            deleted.insert(id);
+            to_edges.erase(id);
+
+            if (type.has_value())
+            {
+                if (nodeType.contains(std::string{*type})) {
+                    nodeType.at(std::string{*type}).erase(id);
+                    if (nodeType.at(std::string{*type}).empty()) nodeType.erase(std::string{*type});
+                }
+                for (const auto& [to, edge_type] : outgoing_edges) {
+                    if (const auto tuple = std::pair{id, to}; edges.contains(tuple)) {
+                        edges.at(tuple).erase(edge_type);
+                        if (edges.at(tuple).empty()) edges.erase(tuple);
+                    }
+                    if (edgeType.contains(edge_type)) {
+                        edgeType.at(edge_type).erase({id, to});
+                        if (edgeType.at(edge_type).empty()) edgeType.erase(edge_type);
+                    }
+                    if (to_edges.contains(to)) {
+                        to_edges.at(to).erase({id, edge_type});
+                        if (to_edges.at(to).empty()) to_edges.erase(to);
+                    }
+                }
+            }
+        }
+
+        template<typename T>
+        void update_maps_node_insert_impl(uint64_t id, std::string name, const std::string& type, const T& outgoing_edges) {
+            std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
+
+            name_map[name] = id;
+            id_map[id] = std::move(name);
+            nodeType[type].emplace(id);
+            for (const auto& [to, edge_type] : outgoing_edges)
+            {
+                edges[{id, to}].insert(edge_type);
+                edgeType[edge_type].insert({id, to});
+                to_edges[to].insert({id, edge_type});
+            }
+        }
         void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "") override;
         void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key) override;
 
         uint32_t local_agent_id() const override { return agent_id; }
         SyncMode local_sync_mode() const override { return sync_mode; }
         bool is_copy_graph() const override { return copy; }
-        void update_maps_node_insert(const Node& node) override;
-        void update_maps_node_delete(uint64_t id, const std::optional<Node>& node) override;
+        void update_maps_node_insert(uint64_t id, std::string_view name, std::string_view type, const EdgeKeyList& outgoing_edges) override;
+        void update_maps_node_delete(uint64_t id, std::optional<std::string_view> type, const EdgeKeyList& outgoing_edges) override;
+        
 
         GraphSettings::LOGLEVEL get_log_level() const override { return log_level; }
         bool is_attribute_ignored(const std::string& name) const override;

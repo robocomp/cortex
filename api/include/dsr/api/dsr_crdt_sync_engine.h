@@ -52,6 +52,7 @@ public:
 private:
     const CRDTNode* get_node_ptr(uint64_t id) const;
     std::optional<CRDTNode> get_crdt_node(uint64_t id) const;
+    const CRDTEdge* get_crdt_edge_ptr(uint64_t from, uint64_t to, const std::string& key) const;
     std::optional<CRDTEdge> get_crdt_edge(uint64_t from, uint64_t to, const std::string& key) const;
 
     std::tuple<bool, std::optional<MvregNodeMsg>> insert_node_raw(CRDTNode&& node);

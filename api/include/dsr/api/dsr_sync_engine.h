@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -59,14 +60,16 @@ struct EdgeMutationEffect
 class SyncEngineHost
 {
 public:
+    using EdgeKeyList = std::vector<std::pair<uint64_t, std::string>>;
+
     virtual ~SyncEngineHost() = default;
 
     virtual uint32_t local_agent_id() const = 0;
     virtual SyncMode local_sync_mode() const = 0;
     virtual bool is_copy_graph() const = 0;
 
-    virtual void update_maps_node_insert(const Node& node) = 0;
-    virtual void update_maps_node_delete(uint64_t id, const std::optional<Node>& node) = 0;
+    virtual void update_maps_node_insert(uint64_t id, std::string_view name, std::string_view type, const EdgeKeyList& outgoing_edges) = 0;
+    virtual void update_maps_node_delete(uint64_t id, std::optional<std::string_view> type, const EdgeKeyList& outgoing_edges) = 0;
     virtual void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string& type) = 0;
     virtual void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string& type) = 0;
 

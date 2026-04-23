@@ -32,7 +32,6 @@ namespace DSR {
         Edge() = default;
         ~Edge() = default;
 
-        [[deprecated("Use Edge::create<example_edge_type>(...)")]]
         Edge(uint64_t to, uint64_t from, std::string type, uint32_t agent_id)
             : m_to(to),
             m_from(from),
@@ -45,7 +44,6 @@ namespace DSR {
             }
         }
 
-        [[deprecated("Use Edge::create<example_edge_type>(...)")]]
         Edge(uint64_t to, uint64_t from, std::string type,
                    std::map<std::string, Attribute> attrs,
                    uint32_t agent_id)
@@ -171,7 +169,6 @@ namespace DSR {
         Node() = default;
         ~Node() = default;
 
-        [[deprecated("Use Node::create<example_node_type>(...)")]]
         Node(uint64_t agent_id, std::string type)
             : m_id(0),
             m_type(std::move(type)),
@@ -184,7 +181,6 @@ namespace DSR {
             }
         }
 
-        [[deprecated("Use Node::create<example_node_type>(...)")]]
         Node(std::string type, uint32_t agent_id,
                    std::map<std::string, Attribute> attrs,
                    std::map<std::pair<uint64_t, std::string>, Edge > fano)
