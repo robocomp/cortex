@@ -11,6 +11,17 @@
 using namespace DSR;
 
 namespace {
+template <typename Fano>
+SyncEngineHost::EdgeKeyList collect_outgoing_edge_keys(const Fano& fano)
+{
+    SyncEngineHost::EdgeKeyList outgoing_edges;
+    outgoing_edges.reserve(fano.size());
+    for (const auto& [key, _] : fano) {
+        outgoing_edges.emplace_back(key.first, key.second);
+    }
+    return outgoing_edges;
+}
+
 bool protocol_version_matches(
     DSR::GraphSettings::LOGLEVEL log_level,
     const char* channel,
@@ -98,7 +109,7 @@ std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
 
 std::optional<Edge> CRDTSyncEngine::get_edge(uint64_t from, uint64_t to, const std::string& type) const
 {
-    if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
+    if (const auto* edge = get_crdt_edge_ptr(from, to, type); edge != nullptr) {
         return to_user_edge(*edge);
     }
     return {};
@@ -143,7 +154,7 @@ bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& vi
     bool found = false;
     host_.for_each_incoming_edge(to, [&](uint64_t from, const std::string& type) {
         found = true;
-        if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
+        if (const auto* edge = get_crdt_edge_ptr(from, to, type); edge != nullptr) {
             Edge out = to_user_edge(*edge);
             visitor(from, type, out);
         }
@@ -154,7 +165,7 @@ bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& vi
 void CRDTSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
 {
     host_.for_each_edge_of_type_cache(type, [&](uint64_t from, uint64_t to) {
-        if (auto edge = get_crdt_edge(from, to, type); edge.has_value()) {
+        if (const auto* edge = get_crdt_edge_ptr(from, to, type); edge != nullptr) {
             Edge out = to_user_edge(*edge);
             visitor(from, to, out);
         }
@@ -372,19 +383,27 @@ std::optional<CRDTNode> CRDTSyncEngine::get_crdt_node(uint64_t id) const
     return {};
 }
 
-std::optional<CRDTEdge> CRDTSyncEngine::get_crdt_edge(uint64_t from, uint64_t to, const std::string& key) const
+const CRDTEdge* CRDTSyncEngine::get_crdt_edge_ptr(uint64_t from, uint64_t to, const std::string& key) const
 {
     auto from_it = nodes_.find(from);
     if (from_it == nodes_.end() || from_it->second.empty() || !nodes_.contains(to)) {
-        return {};
+        return nullptr;
     }
 
     auto& fano = from_it->second.read_reg().fano();
     auto edge = fano.find({to, key});
     if (edge != fano.end() && !edge->second.empty()) {
-        return edge->second.read_reg();
+        return &edge->second.read_reg();
     }
 
+    return nullptr;
+}
+
+std::optional<CRDTEdge> CRDTSyncEngine::get_crdt_edge(uint64_t from, uint64_t to, const std::string& key) const
+{
+    if (const auto* edge = get_crdt_edge_ptr(from, to, key); edge != nullptr) {
+        return *edge;
+    }
     return {};
 }
 
@@ -399,7 +418,7 @@ std::tuple<bool, std::optional<MvregNodeMsg>> CRDTSyncEngine::insert_node_raw(CR
         }
 
         uint64_t id = node.id();
-        host_.update_maps_node_insert(to_user_node(node));
+        host_.update_maps_node_insert(id, node.name(), node.type(), collect_outgoing_edge_keys(node.fano()));
         auto delta = nodes_[id].write(std::move(node));
         nodes_[id].join(mvreg<CRDTNode>(delta));
         return {true, crdt_node_to_msg(host_.local_agent_id(), id, std::move(delta))};
@@ -479,7 +498,7 @@ CRDTSyncEngine::delete_node_raw(uint64_t id, const CRDTNode& node)
         }
     }
 
-    host_.update_maps_node_delete(id, std::make_optional(to_user_node(node)));
+    host_.update_maps_node_delete(id, node.type(), collect_outgoing_edge_keys(node.fano()));
 
     return {true, std::move(deleted_edges), std::move(delta_remove), std::move(delta_vec)};
 }
@@ -706,14 +725,15 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
                             incoming_edge_cache.emplace_back(from, type);
                         });
                     }
-                    std::optional<Node> deleted_node_user = maybe_deleted_node.has_value()
-                        ? std::make_optional(to_user_node(*maybe_deleted_node)) : std::nullopt;
-                    host_.update_maps_node_delete(id, deleted_node_user);
+                    host_.update_maps_node_delete(
+                        id,
+                        maybe_deleted_node.has_value() ? std::optional<std::string_view>{maybe_deleted_node->type()} : std::nullopt,
+                        maybe_deleted_node.has_value() ? collect_outgoing_edge_keys(maybe_deleted_node->fano()) : SyncEngineHost::EdgeKeyList{});
                     delete_unprocessed_deltas();
                 } else {
                     const auto& reg = nodes_.at(id).read_reg();
                     current_type = reg.type();
-                    host_.update_maps_node_insert(to_user_node(reg));
+                    host_.update_maps_node_insert(reg.id(), reg.name(), reg.type(), collect_outgoing_edge_keys(reg.fano()));
                     consume_unprocessed_deltas();
                 }
                 signal = !d_empty;
@@ -1044,13 +1064,15 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
             }
             it->second.join(std::move(mv));
             if (mv_empty or it->second.empty()) {
-                std::optional<Node> nd_user = nd.has_value() ? std::make_optional(to_user_node(*nd)) : std::nullopt;
-                host_.update_maps_node_delete(k, nd_user);
+                host_.update_maps_node_delete(
+                    k,
+                    nd.has_value() ? std::optional<std::string_view>{nd->type()} : std::nullopt,
+                    nd.has_value() ? collect_outgoing_edge_keys(nd->fano()) : SyncEngineHost::EdgeKeyList{});
                 updates.emplace_back(false, k, "", std::nullopt, std::nullopt);
                 delete_unprocessed_deltas();
             } else {
                 const auto& reg = it->second.read_reg();
-                host_.update_maps_node_insert(to_user_node(reg));
+                host_.update_maps_node_insert(reg.id(), reg.name(), reg.type(), collect_outgoing_edge_keys(reg.fano()));
                 updates.emplace_back(true, k, reg.type(), nd, reg);
                 consume_unprocessed_deltas();
             }

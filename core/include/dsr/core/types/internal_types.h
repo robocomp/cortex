@@ -8,6 +8,16 @@
 
 namespace DSR {
 
+    enum struct SyncMode : uint8_t {
+        CRDT = 0,
+        LWW = 1,
+    };
+
+    constexpr uint8_t sync_mode_wire_value(SyncMode mode) noexcept
+    {
+        return static_cast<uint8_t>(mode);
+    }
+
     inline constexpr uint32_t DSR_PROTOCOL_VERSION = 1;
 
     // ---- GraphRequest --------------------------------------------------------

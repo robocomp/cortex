@@ -7,42 +7,41 @@
 
 namespace DSR::LWW {
 
-using EdgeSet = std::unordered_set<EdgeKey, hash_tuple>;
-using FromIndex = std::unordered_map<uint64_t, EdgeSet>;
-using ToIndex = std::unordered_map<uint64_t, EdgeSet>;
-using TypeIndex = std::unordered_map<std::string, EdgeSet>;
+using EdgePtrSet = std::unordered_set<const EdgeState*>;
+using FromIndex = std::unordered_map<uint64_t, EdgePtrSet>;
+using ToIndex = std::unordered_map<uint64_t, EdgePtrSet>;
+using TypeIndex = std::unordered_map<std::string, EdgePtrSet>;
 
-inline void edge_index_insert(FromIndex& from_idx, ToIndex& to_idx, TypeIndex& type_idx, const EdgeKey& key)
+inline void edge_index_insert(FromIndex& from_idx, ToIndex& to_idx, TypeIndex& type_idx, const EdgeState& edge)
 {
-    from_idx[std::get<0>(key)].insert(key);
-    to_idx[std::get<1>(key)].insert(key);
-    type_idx[std::get<2>(key)].insert(key);
+    from_idx[edge.from].insert(&edge);
+    to_idx[edge.to].insert(&edge);
+    type_idx[edge.type].insert(&edge);
 }
 
-inline void edge_index_erase(FromIndex& from_idx, ToIndex& to_idx, TypeIndex& type_idx, const EdgeKey& key)
+inline void edge_index_erase(FromIndex& from_idx, ToIndex& to_idx, TypeIndex& type_idx, const EdgeState& edge)
 {
-    if (auto it = from_idx.find(std::get<0>(key)); it != from_idx.end()) {
-        it->second.erase(key);
+    if (auto it = from_idx.find(edge.from); it != from_idx.end()) {
+        it->second.erase(&edge);
         if (it->second.empty()) {
             from_idx.erase(it);
         }
     }
-    if (auto it = to_idx.find(std::get<1>(key)); it != to_idx.end()) {
-        it->second.erase(key);
+    if (auto it = to_idx.find(edge.to); it != to_idx.end()) {
+        it->second.erase(&edge);
         if (it->second.empty()) {
             to_idx.erase(it);
         }
     }
-    if (auto it = type_idx.find(std::get<2>(key)); it != type_idx.end()) {
-        it->second.erase(key);
+    if (auto it = type_idx.find(edge.type); it != type_idx.end()) {
+        it->second.erase(&edge);
         if (it->second.empty()) {
             type_idx.erase(it);
         }
     }
 }
 
-template <typename EdgeMap>
-Node to_user_node(const NodeState& state, const EdgeMap& edges, const FromIndex& from_idx)
+inline Node to_user_node(const NodeState& state, const FromIndex& from_idx)
 {
     Node out(state.agent_id, state.type);
     out.id(state.id);
@@ -56,52 +55,47 @@ Node to_user_node(const NodeState& state, const EdgeMap& edges, const FromIndex&
         return out;
     }
     auto& fano = out.fano();
-    for (const auto& key : fit->second) {
-        if (auto eit = edges.find(key); eit != edges.end()) {
-            fano.emplace(std::pair{eit->second.to, eit->second.type}, to_user_edge(eit->second));
-        }
+    for (const auto* edge : fit->second) {
+        fano.emplace(std::pair{edge->to, edge->type}, to_user_edge(*edge));
     }
     return out;
 }
 
-template <typename EdgeMap, typename Visitor>
-bool for_each_edge_from(const EdgeMap& edges, const FromIndex& from_idx, uint64_t from, Visitor&& visitor)
+template <typename Visitor>
+bool for_each_edge_from(const FromIndex& from_idx, uint64_t from, Visitor&& visitor)
 {
     auto it = from_idx.find(from);
     if (it == from_idx.end()) {
         return false;
     }
-    for (const auto& key : it->second) {
-        const auto& edge = edges.at(key);
-        visitor(edge.to, edge.type, to_user_edge(edge));
+    for (const auto* edge : it->second) {
+        visitor(edge->to, edge->type, to_user_edge(*edge));
     }
     return true;
 }
 
-template <typename EdgeMap, typename Visitor>
-bool for_each_edge_to(const EdgeMap& edges, const ToIndex& to_idx, uint64_t to, Visitor&& visitor)
+template <typename Visitor>
+bool for_each_edge_to(const ToIndex& to_idx, uint64_t to, Visitor&& visitor)
 {
     auto it = to_idx.find(to);
     if (it == to_idx.end()) {
         return false;
     }
-    for (const auto& key : it->second) {
-        const auto& edge = edges.at(key);
-        visitor(edge.from, edge.type, to_user_edge(edge));
+    for (const auto* edge : it->second) {
+        visitor(edge->from, edge->type, to_user_edge(*edge));
     }
     return true;
 }
 
-template <typename EdgeMap, typename Visitor>
-void for_each_edge_of_type(const EdgeMap& edges, const TypeIndex& type_idx, const std::string& type, Visitor&& visitor)
+template <typename Visitor>
+void for_each_edge_of_type(const TypeIndex& type_idx, const std::string& type, Visitor&& visitor)
 {
     auto it = type_idx.find(type);
     if (it == type_idx.end()) {
         return;
     }
-    for (const auto& key : it->second) {
-        const auto& edge = edges.at(key);
-        visitor(edge.from, edge.to, to_user_edge(edge));
+    for (const auto* edge : it->second) {
+        visitor(edge->from, edge->to, to_user_edge(*edge));
     }
 }
 

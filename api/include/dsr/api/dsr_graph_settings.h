@@ -1,20 +1,11 @@
 #pragma once
 
+#include "dsr/core/types/internal_types.h"
 #include <cstdint>
 #include <string>
 #include <dsr/api/dsr_signal_emitter.h>
 
 namespace DSR {
-
-enum struct SyncMode : uint8_t {
-    CRDT = 0,
-    LWW = 1,
-};
-
-constexpr uint8_t sync_mode_wire_value(SyncMode mode) noexcept
-{
-    return static_cast<uint8_t>(mode);
-}
 
 struct GraphSettings {
     uint32_t agent_id {0};

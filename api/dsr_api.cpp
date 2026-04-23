@@ -1070,105 +1070,15 @@ std::string DSRGraph::get_node_type(Node &n)
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-void DSRGraph::update_maps_node_delete(uint64_t id, const std::optional<CRDTNode> &n)
+void DSRGraph::update_maps_node_insert(uint64_t id, std::string_view name, std::string_view type, const EdgeKeyList& outgoing_edges)
 {
-    std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-    if (id_map.contains(id))
-    {
-        name_map.erase(id_map.at(id));
-        id_map.erase(id);
-    }
-    deleted.insert(id);
-    to_edges.erase(id);
-
-    if (n.has_value())
-    {
-        if (nodeType.contains(n->type())) {
-            nodeType.at(n->type()).erase(id);
-            if (nodeType.at(n->type()).empty()) nodeType.erase(n->type());
-        }
-        for (const auto &[k, v] : n->fano()) {
-            if (auto tuple = std::pair{id, v.read_reg().to()}; edges.contains(tuple)) {
-                edges.at(tuple).erase(k.second);
-                if (edges.at(tuple).empty()) edges.erase(tuple);
-            }
-            if (auto tuple = std::pair{id, k.first}; edgeType.contains(k.second)) {
-                edgeType.at(k.second).erase(tuple);
-                if (edgeType.at(k.second).empty())edgeType.erase(k.second);
-            }
-            if (auto tuple = std::pair{id, k.second}; to_edges.contains(k.first)) {
-                to_edges.at(k.first).erase(tuple);
-                if (to_edges.at(k.first).empty()) to_edges.erase(k.first);
-            }
-        }
-    }
+    update_maps_node_insert_impl(id, std::string{name}, std::string{type}, outgoing_edges);
 }
 
-void DSRGraph::update_maps_node_insert(uint64_t id, const CRDTNode &n)
+void DSRGraph::update_maps_node_delete(uint64_t id, std::optional<std::string_view> type, const EdgeKeyList& outgoing_edges)
 {
-    std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-
-    name_map[n.name()] = id;
-    id_map[id] = n.name();
-    nodeType[n.type()].emplace(id);
-    for (const auto &[k, v] : n.fano())
-    {
-        edges[{id, k.first}].insert(k.second);
-        edgeType[k.second].insert({id, k.first});
-        to_edges[k.first].insert({id, k.second});
-    }
+    update_maps_node_delete_impl(id, type, outgoing_edges);
 }
-
-void DSRGraph::update_maps_node_delete(uint64_t id, const std::optional<Node>& n)
-{
-    std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-    if (id_map.contains(id))
-    {
-        name_map.erase(id_map.at(id));
-        id_map.erase(id);
-    }
-    deleted.insert(id);
-    to_edges.erase(id);
-
-    if (n.has_value())
-    {
-        if (nodeType.contains(n->type())) {
-            nodeType.at(n->type()).erase(id);
-            if (nodeType.at(n->type()).empty()) nodeType.erase(n->type());
-        }
-        for (const auto &[k, v] : n->fano()) {
-            if (const auto tuple = std::pair{id, v.to()}; edges.contains(tuple)) {
-                edges.at(tuple).erase(k.second);
-                if (edges.at(tuple).empty()) edges.erase(tuple);
-            }
-            if (edgeType.contains(k.second)) {
-                edgeType.at(k.second).erase({id, k.first});
-                if (edgeType.at(k.second).empty()) edgeType.erase(k.second);
-            }
-            if (to_edges.contains(k.first)) {
-                to_edges.at(k.first).erase({id, k.second});
-                if (to_edges.at(k.first).empty()) to_edges.erase(k.first);
-            }
-        }
-    }
-}
-
-void DSRGraph::update_maps_node_insert(const Node& n)
-{
-    std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-
-    deleted.erase(n.id());
-    name_map[n.name()] = n.id();
-    id_map[n.id()] = n.name();
-    nodeType[n.type()].emplace(n.id());
-    for (const auto& [k, v] : n.fano())
-    {
-        edges[{n.id(), k.first}].insert(k.second);
-        edgeType[k.second].insert({n.id(), k.first});
-        to_edges[k.first].insert({n.id(), k.second});
-    }
-}
-
 
 void DSRGraph::update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key)
 {
