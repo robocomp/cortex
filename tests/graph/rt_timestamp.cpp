@@ -3,6 +3,7 @@
 #include "../utils.h"
 
 #include "catch2/catch_test_macros.hpp"
+#include <catch2/generators/catch_generators.hpp>
 
 #include <cmath>
 #include <QtCore/QCoreApplication>
@@ -13,10 +14,11 @@ using namespace DSR;
 
 //TODO: add REQUIRES, I'm checking manually
 TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    INFO("sync_mode=" << sync_mode_label(sync_mode));
     auto ctx = make_edge_config_file();
     auto id1 = rand() % 1000;
-    int argc = 0;
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     G.add_attrib_local<level_att>(n, 0);
