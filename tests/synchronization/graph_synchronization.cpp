@@ -4,6 +4,9 @@
 #include "dsr/api/dsr_api.h"
 #include "../utils.h"
 #include <thread>
+#include <barrier>
+#include <memory>
+#include <vector>
 
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/generators/catch_generators.hpp"
@@ -181,3 +184,4 @@ TEST_CASE("Node delta join rejects incompatible protocol versions", "[SYNCHRONIZ
 
     REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
 }
+

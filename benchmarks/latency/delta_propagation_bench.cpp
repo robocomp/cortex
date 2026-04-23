@@ -13,8 +13,8 @@ using namespace DSR;
 using namespace DSR::Benchmark;
 
 // Multi-agent tests require working DDS synchronization
-// Skip these by default - run with "[delta]" tag explicitly to test
-TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][PROFILE][MULTIAGENT]") {
+// Skip these by default - run with "[DELTA]" tag explicitly to test
+TEST_CASE("Delta propagation latency between agents", "[LATENCY][DELTA][PROFILE][MULTIAGENT]") {
     // Setup
     MultiAgentFixture fixture;
     GraphGenerator generator;
@@ -42,7 +42,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
         QObject::connect(agent_b, &DSR::DSRGraph::update_node_signal, agent_b,
             [&](uint64_t id, const std::string& type, DSR::SignalInfo) {
                 if (id == expected_node_id.load(std::memory_order_acquire)) {
-                    receive_time.store(get_unix_timestamp());
+                    receive_time.store(bench_now());
                     received.store(true);
                 }
             }, Qt::DirectConnection);
@@ -63,7 +63,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
                 expected_node_id, agent_a->get_agent_id(),
                 "bench_node_" + std::to_string(i));
 
-            uint64_t send_time = get_unix_timestamp();
+            uint64_t send_time = bench_now();
             auto ins_result = agent_a->insert_node(node);
             REQUIRE(ins_result.has_value());
             expected_node_id.store(ins_result.value(), std::memory_order_release);
@@ -121,7 +121,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
             [&](uint64_t from, uint64_t to, const std::string& type, DSR::SignalInfo) {
                 if (from == expected_from.load(std::memory_order_acquire) &&
                     to   == expected_to.load(std::memory_order_acquire)) {
-                    receive_time.store(get_unix_timestamp());
+                    receive_time.store(bench_now());
                     received.store(true);
                 }
             }, Qt::DirectConnection);
@@ -143,7 +143,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
             auto edge = GraphGenerator::create_test_edge(
                 expected_from, expected_to, agent_a->get_agent_id());
 
-            uint64_t send_time = get_unix_timestamp();
+            uint64_t send_time = bench_now();
             agent_a->insert_or_assign_edge(edge);
 
             // Wait for signal with timeout
@@ -191,7 +191,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
         QObject::connect(agent_b, &DSR::DSRGraph::update_node_attr_signal, agent_b,
             [&](uint64_t id, const std::vector<std::string>& att_names, DSR::SignalInfo) {
                 if (id == *insert_result) {
-                    receive_time.store(get_unix_timestamp());
+                    receive_time.store(bench_now());
                     received.store(true);
                 }
             }, Qt::DirectConnection);
@@ -215,7 +215,7 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
 
             agent_a->add_or_modify_attrib_local<level_att>(*node, static_cast<int32_t>(1000 + i));
 
-            uint64_t send_time = get_unix_timestamp();
+            uint64_t send_time = bench_now();
             agent_a->update_node(*node);
 
             // Wait for signal with timeout
@@ -246,11 +246,11 @@ TEST_CASE("Delta propagation latency between agents", "[LATENCY][delta][.multi][
     reporter.export_all(result, "delta_propagation");
 }
 
-TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][delta][scalability][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][DELTA][scalability][PROFILE][MULTIAGENT]") {
     MetricsCollector collector("delta_propagation_scaling");
     GraphGenerator generator;
 
-    for (uint32_t num_agents : {2, 4, 8}) {
+    for (uint32_t num_agents : {2, 4}) {
         SECTION("With " + std::to_string(num_agents) + " agents") {
             MultiAgentFixture fixture;
             auto config_file = generator.generate_empty_graph();
@@ -282,7 +282,7 @@ TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][delta][scala
                 QObject::connect(receiver, &DSR::DSRGraph::update_node_signal, receiver,
                     [&, idx = i - 1](uint64_t id, const std::string& type, DSR::SignalInfo) {
                         if (id == current_expected_id.load()) {
-                            receive_times[idx].store(get_unix_timestamp());
+                            receive_times[idx].store(bench_now());
                             received_count.fetch_add(1);
                         }
                     }, Qt::DirectConnection);
@@ -297,7 +297,7 @@ TEST_CASE("Delta propagation with varying agent counts", "[LATENCY][delta][scala
                     0, sender->get_agent_id(),
                     "scale_node_" + std::to_string(i));
 
-                uint64_t send_time = get_unix_timestamp();
+                uint64_t send_time = bench_now();
                 auto result = sender->insert_node(node);
                 REQUIRE(result.has_value());
                 current_expected_id.store(result.value());

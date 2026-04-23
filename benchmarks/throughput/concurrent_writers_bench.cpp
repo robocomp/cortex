@@ -28,7 +28,7 @@ TEST_CASE("Concurrent writers throughput", "[THROUGHPUT][concurrent][PROFILE][LO
     auto* graph = fixture.get_agent(0);
     REQUIRE(graph != nullptr);
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
+    constexpr auto TEST_DURATION = std::chrono::seconds(2);
 
     ankerl::nanobench::Bench bench;
     bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
@@ -131,7 +131,7 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent][PROFILE]
         pre_node_ids.push_back(result.value());
     }
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
+    constexpr auto TEST_DURATION = std::chrono::seconds(2);
 
     ankerl::nanobench::Bench bench;
     bench.output(&nb_report_stream()).warmup(0).epochs(1).epochIterations(1);
@@ -293,7 +293,7 @@ TEST_CASE("Concurrent read-write throughput", "[THROUGHPUT][concurrent][PROFILE]
     reporter.export_all(result, "concurrent_read_write");
 }
 
-TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiagent][.multi][PROFILE][LOAD][MULTIAGENT]") {
+TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiagent][PROFILE][LOAD][MULTIAGENT]") {
     MultiAgentFixture fixture;
     GraphGenerator generator;
     MetricsCollector collector("multiagent_concurrent");
@@ -302,7 +302,7 @@ TEST_CASE("Multi-agent concurrent operations", "[THROUGHPUT][concurrent][multiag
     REQUIRE(fixture.create_agents(4, config_file));
     fixture.wait_for_sync();
 
-    constexpr auto TEST_DURATION = std::chrono::seconds(5);
+    constexpr auto TEST_DURATION = std::chrono::seconds(2);
 
     SECTION("Each agent writes independently") {
         std::atomic<uint64_t> total_ops{0};

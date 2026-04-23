@@ -184,6 +184,88 @@ TEST_CASE("Graph size impact on performance", "[SCALABILITY][graphsize]") {
         }
     }
 
+    SECTION("Query operations vs graph size") {
+        // get_nodes, get_nodes_by_type, and name/id lookups — all at fixed graph sizes.
+        // These are O(n) or O(1) operations; measuring them here lets us detect
+        // regressions in their scaling without a separate query bench file.
+        for (uint32_t size : {100u, 1000u, 5000u}) {
+            MultiAgentFixture fixture;
+            auto config_file = generator.generate_empty_graph();
+            REQUIRE(fixture.create_agents(1, config_file));
+
+            auto* graph = fixture.get_agent(0);
+            REQUIRE(graph != nullptr);
+
+            std::vector<uint64_t> node_ids;
+            node_ids.reserve(size);
+            for (uint32_t i = 0; i < size; ++i) {
+                auto node = GraphGenerator::create_test_node(
+                    i, graph->get_agent_id(), "query_node_" + std::to_string(i));
+                auto inserted = graph->insert_node(node);
+                REQUIRE(inserted.has_value());
+                node_ids.push_back(*inserted);
+            }
+
+            // Cache warmup
+            (void)graph->get_nodes();
+            (void)graph->get_nodes_by_type("test_node");
+
+            const std::string sz = std::to_string(size);
+
+            {
+                auto bench = make_latency_bench(100, 0);
+                bench.minEpochIterations(5);
+                bench.run("get_nodes", [&] {
+                    auto nodes = graph->get_nodes();
+                    ankerl::nanobench::doNotOptimizeAway(nodes);
+                });
+                auto stats = nb_to_stats(bench);
+                collector.record_scalability("get_nodes", size, stats.mean_us(), "us",
+                    {{"graph_size", sz}});
+            }
+
+            {
+                auto bench = make_latency_bench(100, 0);
+                bench.minEpochIterations(5);
+                bench.run("get_nodes_by_type", [&] {
+                    auto nodes = graph->get_nodes_by_type("test_node");
+                    ankerl::nanobench::doNotOptimizeAway(nodes);
+                });
+                auto stats = nb_to_stats(bench);
+                collector.record_scalability("get_nodes_by_type", size, stats.mean_us(), "us",
+                    {{"graph_size", sz}});
+            }
+
+            {
+                size_t idx = 0;
+                auto bench = make_latency_bench(200, 0);
+                bench.minEpochIterations(1000);
+                bench.run("get_name_from_id", [&] {
+                    auto name = graph->get_name_from_id(node_ids[idx++ % node_ids.size()]);
+                    ankerl::nanobench::doNotOptimizeAway(name);
+                });
+                auto stats = nb_to_stats(bench);
+                collector.record_scalability("get_name_from_id", size, stats.mean_ns, "ns",
+                    {{"graph_size", sz}});
+            }
+
+            {
+                size_t idx = 0;
+                auto bench = make_latency_bench(200, 0);
+                bench.minEpochIterations(1000);
+                bench.run("get_id_from_name", [&] {
+                    auto id = graph->get_id_from_name("query_node_" + std::to_string(idx++ % size));
+                    ankerl::nanobench::doNotOptimizeAway(id);
+                });
+                auto stats = nb_to_stats(bench);
+                collector.record_scalability("get_id_from_name", size, stats.mean_ns, "ns",
+                    {{"graph_size", sz}});
+            }
+
+            INFO(size << " nodes — query ops measured");
+        }
+    }
+
     SECTION("get_nodes performance vs graph size") {
         for (uint32_t size : {100, 1000, 5000}) {
             MultiAgentFixture fixture;
