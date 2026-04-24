@@ -6,9 +6,12 @@
 #
 # Options:
 #   -b BINARY     Path to dsr_benchmarks (default: ./build/dsr_benchmarks)
+#   -g BACKEND    Graph backend for dsr_benchmarks: crdt or lww
+#                 (default: use dsr_benchmarks default)
 #   -o OUTPUT     Output root directory for run subdirectories
 #                 (default: ./results/flamegraphs)
 #   -F FREQ       perf sampling frequency in Hz (default: 999)
+#   -i            Enable inline frame expansion in stackcollapse-perf.pl
 #   -k            Keep raw perf.data files (deleted by default)
 #   -l            List matching profile targets and exit
 #   -p PRESET     Built-in preset: load, multiagent, profile
@@ -50,17 +53,21 @@ set -euo pipefail
 BINARY="./build/dsr_benchmarks"
 OUTROOT="./results/flamegraphs"
 FREQ=999
+INLINE=0
 KEEP_DATA=0
 LIST_ONLY=0
 PRESET=""
 FILTER=""
+BACKEND="${BENCH_SYNC_MODE:-}"
 RUN_ID="flamegraph-$(date +%Y%m%d-%H%M%S)"
 
-while getopts "b:o:F:klp:r:h" opt; do
+while getopts "b:g:o:F:iklp:r:h" opt; do
     case "$opt" in
         b) BINARY="$OPTARG" ;;
+        g) BACKEND="$OPTARG" ;;
         o) OUTROOT="$OPTARG" ;;
         F) FREQ="$OPTARG" ;;
+        i) INLINE=1 ;;
         k) KEEP_DATA=1 ;;
         l) LIST_ONLY=1 ;;
         p) PRESET="$OPTARG" ;;
@@ -131,6 +138,17 @@ EOF
     exit 1
 fi
 
+if [[ -n "$BACKEND" ]]; then
+    case "$BACKEND" in
+        crdt|CRDT) BACKEND="crdt" ;;
+        lww|LWW) BACKEND="lww" ;;
+        *)
+            echo "ERROR: unknown graph backend '$BACKEND' (expected: crdt or lww)" >&2
+            exit 1
+            ;;
+    esac
+fi
+
 [[ -x "$BINARY" ]] || { echo "ERROR: binary not found or not executable: $BINARY" >&2; exit 1; }
 command -v perf >/dev/null 2>&1 || { echo "ERROR: perf not found" >&2; exit 1; }
 
@@ -138,7 +156,7 @@ OUTDIR="${OUTROOT}/${RUN_ID}"
 mkdir -p "$OUTDIR"
 
 mapfile -t TEST_NAMES < <(
-    "$BINARY" --list-tests --verbosity quiet "$FILTER" 2>/dev/null \
+    BENCH_SYNC_MODE="$BACKEND" "$BINARY" --list-tests --verbosity quiet "$FILTER" 2>/dev/null \
     | sed 's/\r$//' \
     | grep -v '^[[:space:]]' \
     | grep -v '^All available test cases:' \
@@ -159,6 +177,7 @@ fi
 
 COLLAPSE="$(find_tool stackcollapse-perf.pl)"
 FLAMEGRAPH="$(find_tool flamegraph.pl)"
+COLLAPSE_ARGS=()
 
 if [[ -z "$COLLAPSE" || -z "$FLAMEGRAPH" ]]; then
     cat >&2 <<'EOF'
@@ -171,8 +190,15 @@ EOF
     exit 1
 fi
 
+if [[ $INLINE -eq 1 ]]; then
+    COLLAPSE_ARGS+=(--inline)
+fi
+
 echo "Found ${#TEST_NAMES[@]} test(s) to profile."
 echo "Output: $OUTDIR"
+if [[ -n "$BACKEND" ]]; then
+    echo "Backend: $BACKEND"
+fi
 echo
 
 PASS=0
@@ -193,10 +219,10 @@ for name in "${TEST_NAMES[@]}"; do
         -g \
         --call-graph dwarf \
         -o "$perf_tmp" \
-        -- "$BINARY" "$name" 2>/dev/null; then
+        -- env BENCH_SYNC_MODE="$BACKEND" "$BINARY" "$name" 2>/dev/null; then
 
         perf script -i "$perf_tmp" 2>/dev/null \
-            | perl "$COLLAPSE" --inline \
+            | perl "$COLLAPSE" "${COLLAPSE_ARGS[@]}" \
             | perl "$FLAMEGRAPH" --title "$name" \
             > "$svg_tmp"
 

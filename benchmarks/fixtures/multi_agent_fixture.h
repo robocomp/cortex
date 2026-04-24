@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QEventLoop>
 #include <dsr/api/dsr_api.h>
+#include <dsr/core/profiling.h>
 #include <dsr/core/types/type_checking/type_checker.h>
 #include "../core/benchmark_config.h"
 #include "../core/timing_utils.h"
@@ -61,6 +62,7 @@ public:
     // Create N agent instances with DSRGraph
     // First agent loads from config_file, others sync via DDS
     bool create_agents(uint32_t num_agents, const std::string& config_file) {
+        CORTEX_PROFILE_MIN_N("MultiAgentFixture::create_agents");
         if (num_agents == 0 || num_agents > config_.max_agent_count) {
             qWarning("Can't create agents");
             return false;
@@ -238,6 +240,7 @@ public:
 
     // Cleanup all agents
     void cleanup() {
+        CORTEX_PROFILE_MIN_N("MultiAgentFixture::cleanup");
         agents_.clear();
     }
 

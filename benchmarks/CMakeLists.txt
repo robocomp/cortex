@@ -99,6 +99,7 @@ target_include_directories(dsr_benchmarks PRIVATE
 target_link_libraries(dsr_benchmarks PRIVATE
     Catch2::Catch2
     nanobench
+    cortex_profiling
     dsr_api
     dsr_core
     Qt6::Core

@@ -95,12 +95,14 @@ SyncBackendInfo CRDTSyncEngine::backend_info() const
 
 std::unique_ptr<SyncEngine> CRDTSyncEngine::clone(SyncEngineHost& host) const
 {
+    CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::clone");
     return std::make_unique<CRDTSyncEngine>(host, *this);
 }
 
 
 std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::get_node");
     if (const auto* node = get_node_ptr(id); node != nullptr) {
         return to_user_node(*node);
     }
@@ -109,6 +111,7 @@ std::optional<Node> CRDTSyncEngine::get_node(uint64_t id) const
 
 std::optional<Edge> CRDTSyncEngine::get_edge(uint64_t from, uint64_t to, const std::string& type) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::get_edge");
     if (const auto* edge = get_crdt_edge_ptr(from, to, type); edge != nullptr) {
         return to_user_edge(*edge);
     }
@@ -117,6 +120,7 @@ std::optional<Edge> CRDTSyncEngine::get_edge(uint64_t from, uint64_t to, const s
 
 bool CRDTSyncEngine::with_node_attrs(uint64_t id, const NodeAttrsVisitor& visitor) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::with_node_attrs");
     if (const auto* node = get_node_ptr(id); node != nullptr) {
         CRDTNodeAttrsView attrs(node->attrs());
         visitor(attrs);
@@ -127,6 +131,7 @@ bool CRDTSyncEngine::with_node_attrs(uint64_t id, const NodeAttrsVisitor& visito
 
 bool CRDTSyncEngine::with_node_view(uint64_t id, const NodeViewVisitor& visitor) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::with_node_view");
     if (const auto* node = get_node_ptr(id); node != nullptr) {
         CRDTNodeView view(*node);
         visitor(view);
@@ -137,6 +142,7 @@ bool CRDTSyncEngine::with_node_view(uint64_t id, const NodeViewVisitor& visitor)
 
 bool CRDTSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor& visitor) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::for_each_edge_from");
     if (const auto* node = get_node_ptr(from); node != nullptr) {
         for (const auto& [key, edge_reg] : node->fano()) {
             if (!edge_reg.empty()) {
@@ -151,6 +157,7 @@ bool CRDTSyncEngine::for_each_edge_from(uint64_t from, const OutgoingEdgeVisitor
 
 bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& visitor) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::for_each_edge_to");
     bool found = false;
     host_.for_each_incoming_edge(to, [&](uint64_t from, const std::string& type) {
         found = true;
@@ -164,6 +171,7 @@ bool CRDTSyncEngine::for_each_edge_to(uint64_t to, const IncomingEdgeVisitor& vi
 
 void CRDTSyncEngine::for_each_edge_of_type(const std::string& type, const TypedEdgeVisitor& visitor) const
 {
+    CORTEX_PROFILE_HOT_N("CRDTSyncEngine::for_each_edge_of_type");
     host_.for_each_edge_of_type_cache(type, [&](uint64_t from, uint64_t to) {
         if (const auto* edge = get_crdt_edge_ptr(from, to, type); edge != nullptr) {
             Edge out = to_user_edge(*edge);
@@ -179,6 +187,7 @@ size_t CRDTSyncEngine::size() const
 
 std::map<uint64_t, Node> CRDTSyncEngine::snapshot() const
 {
+    CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::snapshot");
     const auto log_level = host_.get_log_level();
     std::map<uint64_t, Node> out;
     for (const auto& [id, reg] : nodes_) {
@@ -193,6 +202,7 @@ std::map<uint64_t, Node> CRDTSyncEngine::snapshot() const
 
 NodeMutationEffect CRDTSyncEngine::insert_node_local(Node&& node)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::insert_node_local");
     NodeMutationEffect effect;
     auto [applied, delta] = insert_node_raw(user_node_to_crdt(std::move(node)));
     effect.applied = applied;
@@ -208,6 +218,7 @@ NodeMutationEffect CRDTSyncEngine::insert_node_local(Node&& node)
 
 NodeMutationEffect CRDTSyncEngine::update_node_local(Node&& node)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::update_node_local");
     NodeMutationEffect effect;
     auto [applied, deltas] = update_node_raw(user_node_to_crdt(std::move(node)));
     effect.applied = applied;
@@ -223,6 +234,7 @@ NodeMutationEffect CRDTSyncEngine::update_node_local(Node&& node)
 
 NodeMutationEffect CRDTSyncEngine::delete_node_local(uint64_t id)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::delete_node_local");
     NodeMutationEffect effect;
     if (auto node = get_crdt_node(id); node.has_value()) {
         auto [applied, deleted_edges, delta_node, delta_edges] = delete_node_raw(id, *node);
@@ -245,6 +257,7 @@ NodeMutationEffect CRDTSyncEngine::delete_node_local(uint64_t id)
 
 EdgeMutationEffect CRDTSyncEngine::insert_or_assign_edge_local(Edge&& edge)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::insert_or_assign_edge_local");
     EdgeMutationEffect effect;
     auto from = edge.from();
     auto to = edge.to();
@@ -269,6 +282,7 @@ EdgeMutationEffect CRDTSyncEngine::insert_or_assign_edge_local(Edge&& edge)
 
 EdgeMutationEffect CRDTSyncEngine::delete_edge_local(uint64_t from, uint64_t to, const std::string& type)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::delete_edge_local");
     EdgeMutationEffect effect;
     effect.deleted_edge = get_edge(from, to, type);
     if (auto delta = delete_edge_raw(from, to, type); delta.has_value()) {
@@ -283,6 +297,7 @@ EdgeMutationEffect CRDTSyncEngine::delete_edge_local(uint64_t from, uint64_t to,
 
 void CRDTSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
 {
+    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::apply_remote_node_delta");
     if (auto* payload = std::get_if<MvregNodeMsg>(&delta); payload != nullptr) {
         join_delta_node(std::move(*payload));
     }
@@ -290,6 +305,7 @@ void CRDTSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
 
 void CRDTSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
 {
+    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::apply_remote_edge_delta");
     if (auto* payload = std::get_if<MvregEdgeMsg>(&delta); payload != nullptr) {
         join_delta_edge(std::move(*payload));
     }
@@ -297,6 +313,7 @@ void CRDTSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
 
 void CRDTSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& batch)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::apply_remote_node_attr_batch");
     auto* payload = std::get_if<MvregNodeAttrVec>(&batch);
     if (payload == nullptr || payload->vec.empty()) {
         return;
@@ -325,6 +342,7 @@ void CRDTSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& ba
 
 void CRDTSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& batch)
 {
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::apply_remote_edge_attr_batch");
     auto* payload = std::get_if<MvregEdgeAttrVec>(&batch);
     if (payload == nullptr || payload->vec.empty()) {
         return;
@@ -428,7 +446,7 @@ std::tuple<bool, std::optional<MvregNodeMsg>> CRDTSyncEngine::insert_node_raw(CR
 
 std::tuple<bool, std::optional<MvregNodeAttrVec>> CRDTSyncEngine::update_node_raw(CRDTNode&& node)
 {
-    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::update_node_raw");
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::update_node_raw");
     if (!host_.is_node_deleted(node.id()))
     {
         auto nit = nodes_.find(node.id());
@@ -520,7 +538,7 @@ std::optional<MvregEdgeMsg> CRDTSyncEngine::delete_edge_raw(uint64_t from, uint6
 std::tuple<bool, std::optional<MvregEdgeMsg>, std::optional<MvregEdgeAttrVec>>
 CRDTSyncEngine::insert_or_assign_edge_raw(CRDTEdge&& attrs, uint64_t from, uint64_t to)
 {
-    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::insert_or_assign_edge_raw");
+    CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::insert_or_assign_edge_raw");
     std::optional<MvregEdgeMsg> delta_edge;
     std::optional<MvregEdgeAttrVec> delta_attrs;
 
@@ -569,7 +587,7 @@ CRDTSyncEngine::insert_or_assign_edge_raw(CRDTEdge&& attrs, uint64_t from, uint6
 
 bool CRDTSyncEngine::process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge>&& delta)
 {
-    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::process_delta_edge");
+    CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::process_delta_edge");
     bool signal = false;
     auto& node = nodes_.at(from).read_reg();
     auto& fanout = node.fano();
@@ -593,7 +611,7 @@ bool CRDTSyncEngine::process_delta_edge(uint64_t from, uint64_t to, const std::s
 
 void CRDTSyncEngine::process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute>&& attr)
 {
-    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::process_delta_node_attr");
+    CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::process_delta_node_attr");
     auto& n = nodes_.at(id).read_reg();
     auto& attrs = n.attrs();
     auto& attr_reg = attrs[att_name];
@@ -606,7 +624,7 @@ void CRDTSyncEngine::process_delta_node_attr(uint64_t id, const std::string& att
 
 void CRDTSyncEngine::process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute>&& attr)
 {
-    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::process_delta_edge_attr");
+    CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::process_delta_edge_attr");
     auto& n = nodes_.at(from).read_reg().fano().at({to, type}).read_reg();
     auto& attrs = n.attrs();
     auto& attr_reg = attrs[att_name];
@@ -638,7 +656,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         std::string current_type;
 
         auto delete_unprocessed_deltas = [&](){
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node delete unprocessed deltas");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_node delete unprocessed deltas");
             unprocessed_delta_node_att_.erase(id);
             decltype(unprocessed_delta_edge_from_)::node_type node_handle = unprocessed_delta_edge_from_.extract(id);
             while (!node_handle.empty())
@@ -653,7 +671,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         };
 
         auto consume_unprocessed_deltas = [&]() {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node consume unprocessed deltas");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_node consume unprocessed deltas");
             decltype(unprocessed_delta_node_att_)::node_type node_handle_node_att = unprocessed_delta_node_att_.extract(id);
             while (!node_handle_node_att.empty())
             {
@@ -713,7 +731,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         };
 
         {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node crdt merge");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_node crdt merge");
             if (!host_.is_node_deleted(id)) {
                 if (auto it = nodes_.find(id); it != nodes_.end() && !it->second.empty()) {
                     maybe_deleted_node = it->second.read_reg();
@@ -742,7 +760,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
         }
 
         if (joined) {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node signal emit");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_node signal emit");
             if (signal) {
                 host_.on_remote_node_updated(id, current_type, mvreg.agent_id);
                 if (const auto* current = get_node_ptr(id); current != nullptr) {
@@ -790,7 +808,7 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         std::optional<Edge> deleted_edge;
 
         auto delete_unprocessed_deltas = [&](){
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge delete unprocessed deltas");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_edge delete unprocessed deltas");
             unprocessed_delta_edge_att_.erase(std::tuple{from, to, type});
             std::erase_if(unprocessed_delta_edge_to_,
                           [&](auto &it){ return std::get<0>(it.second) == from || std::get<0>(it.second) == to;});
@@ -799,7 +817,7 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         };
 
         auto consume_unprocessed_deltas = [&](){
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge consume unprocessed deltas");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_edge consume unprocessed deltas");
             auto att_key = std::tuple{from, to, type};
             decltype(unprocessed_delta_edge_att_)::node_type node_handle_edge_att = unprocessed_delta_edge_att_.extract(att_key);
             while (!node_handle_edge_att.empty()) {
@@ -817,7 +835,7 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         };
 
         {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge crdt merge");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_edge crdt merge");
             deleted_edge = get_edge(from, to, type);
             bool cfrom{nodes_.contains(from)}, cto{nodes_.contains(to)};
             bool dfrom{host_.is_node_deleted(from)}, dto{host_.is_node_deleted(to)};
@@ -860,7 +878,7 @@ void CRDTSyncEngine::join_delta_edge(MvregEdgeMsg&& mvreg)
         }
 
         if (joined) {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge signal emit");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_edge signal emit");
             if (signal) {
                 host_.on_remote_edge_updated(from, to, type, mvreg.agent_id);
             } else {
@@ -883,7 +901,7 @@ std::optional<std::string> CRDTSyncEngine::join_delta_node_attr(MvregNodeAttrMsg
         auto crdt_delta = std::move(mvreg.dk);
         auto d_empty = crdt_delta.empty();
         {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_node_attr crdt merge");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_node_attr crdt merge");
             if (nodes_.contains(id)) {
                 process_delta_node_attr(id, att_name, std::move(crdt_delta));
                 std::erase_if(unprocessed_delta_node_att_,
@@ -928,7 +946,7 @@ std::optional<std::string> CRDTSyncEngine::join_delta_edge_attr(MvregEdgeAttrMsg
         auto crdt_delta = std::move(mvreg.dk);
         auto d_empty = crdt_delta.empty();
         {
-            CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_delta_edge_attr crdt merge");
+            CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_delta_edge_attr crdt merge");
             if (nodes_.contains(from)  and nodes_.at(from).read_reg().fano().contains({to, type}))
             {
                 process_delta_edge_attr(from, to, type, att_name, std::move(crdt_delta));
@@ -972,7 +990,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     uint64_t id{0}, timestamp{0};
     uint32_t agent_id_ch{0};
     auto delete_unprocessed_deltas = [&](){
-        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph delete unprocessed deltas");
+        CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph delete unprocessed deltas");
         unprocessed_delta_node_att_.erase(id);
         decltype(unprocessed_delta_edge_from_)::node_type node_handle = unprocessed_delta_edge_from_.extract(id);
         while (!node_handle.empty())
@@ -985,7 +1003,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     };
 
     auto consume_unprocessed_deltas = [&](){
-        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph consume unprocessed deltas");
+        CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph consume unprocessed deltas");
         decltype(unprocessed_delta_node_att_)::node_type node_handle_node_att = unprocessed_delta_node_att_.extract(id);
         while (!node_handle_node_att.empty())
         {
@@ -1045,7 +1063,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     };
 
     {
-        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph crdt");
+        CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph crdt");
         for (auto &[k, val] : full_graph.m) {
             auto mv = std::move(val.dk);
             bool mv_empty = mv.empty();
@@ -1079,7 +1097,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
         }
     }
     {
-        CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::join_full_graph emit phase");
+        CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph emit phase");
         for (auto &[signal, node_id, type, nd, current_nd] : updates) {
             if (signal) {
                 if (!nd.has_value() || nd->attrs() != current_nd->attrs()) {
@@ -1112,7 +1130,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
 
 std::map<uint64_t, MvregNodeMsg> CRDTSyncEngine::export_mvreg_map() const
 {
-    CORTEX_PROFILE_ZONE_N("CRDTSyncEngine::export_mvreg_map");
+    CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::export_mvreg_map");
     const auto log_level = host_.get_log_level();
     std::map<uint64_t, MvregNodeMsg> m;
     for (const auto& kv : nodes_) {
