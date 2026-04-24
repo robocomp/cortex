@@ -7,8 +7,8 @@
 
 #include <cstdint>
 #include <utility>
-#include "type_checking/type_checker.h"
-#include "common_types.h"
+#include "dsr/core/types/type_checking/type_checker.h"
+#include "dsr/core/types/common_types.h"
 #include <dsr/core/utils.h>
 
 
@@ -104,11 +104,6 @@ namespace DSR {
                    m_attrs == rhs.m_attrs;
         }
 
-        bool operator!=(const Edge &rhs) const
-        {
-            return !(rhs == *this);
-        }
-
         bool operator<(const Edge &rhs) const
         {
             if (m_to < rhs.m_to)
@@ -124,21 +119,6 @@ namespace DSR {
             if (rhs.m_type < m_type)
                 return false;
             return true;
-        }
-
-        bool operator>(const Edge &rhs) const
-        {
-            return rhs < *this;
-        }
-
-        bool operator<=(const Edge &rhs) const
-        {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const Edge &rhs) const
-        {
-            return !(*this < rhs);
         }
 
     private:
@@ -253,11 +233,6 @@ namespace DSR {
                    m_fano == rhs.m_fano;
         }
 
-        bool operator!=(const Node &rhs) const
-        {
-            return !(rhs == *this);
-        }
-
         bool operator<(const Node &rhs) const
         {
             if (m_id < rhs.m_id)
@@ -275,22 +250,6 @@ namespace DSR {
             return true;
         }
 
-        bool operator>(const Node &rhs) const
-        {
-            return rhs < *this;
-        }
-
-        bool operator<=(const Node &rhs) const
-        {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const Node &rhs) const
-        {
-            return !(*this < rhs);
-        }
-
-    private:
         uint64_t m_id = 0;
         std::string m_type;
         std::string m_name;

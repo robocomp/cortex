@@ -49,7 +49,7 @@ TEST_CASE("NODE: from DSR representation to CRDT and back via serialization", "[
 
     static auto new_attribute_ = [&]() -> std::pair<std::string, DSR::Attribute> {
 
-        const auto val = random_choose(std::vector<ValType>{
+        const auto val = random_choose(std::vector<Value>{
             (int)12,
             random_string(),
             std::vector<float>{1.0, 2.0, 3.0}
@@ -96,64 +96,64 @@ TEST_CASE("NODE: from DSR representation to CRDT and back via serialization", "[
 
 
         SECTION("Copy node — CRDT round-trip"){
-            CRDTNode crdt_node = user_node_to_crdt(node);
-            REQUIRE(crdt_node.attrs().size() == attributes.size());
-            REQUIRE(crdt_node.fano().size() == fano.size());
-            REQUIRE(crdt_node.id() == id);
-            REQUIRE(crdt_node.name() == name);
-            REQUIRE(crdt_node.agent_id() == agent_id);
+            CRDT::Node crdt_node = user_node_to_crdt(node);
+            REQUIRE(crdt_node.attrs.size() == attributes.size());
+            REQUIRE(crdt_node.fano.size() == fano.size());
+            REQUIRE(crdt_node.id == id);
+            REQUIRE(crdt_node.name == name);
+            REQUIRE(crdt_node.agent_id == agent_id);
 
-            mvreg<CRDTNode> mvreg_node;
+            mvreg<CRDT::Node> mvreg_node;
             auto delta = mvreg_node.write(crdt_node);
 
             REQUIRE(mvreg_node.read_reg() == crdt_node);
             REQUIRE(delta.read_reg() == crdt_node);
 
             auto& reg = mvreg_node.read_reg();
-            REQUIRE(reg.attrs().size() == attributes.size());
-            REQUIRE(reg.fano().size() == fano.size());
-            REQUIRE(reg.id() == id);
-            REQUIRE(reg.name() == name);
-            REQUIRE(reg.agent_id() == agent_id);
+            REQUIRE(reg.attrs.size() == attributes.size());
+            REQUIRE(reg.fano.size() == fano.size());
+            REQUIRE(reg.id == id);
+            REQUIRE(reg.name == name);
+            REQUIRE(reg.agent_id == agent_id);
 
             // Serialization round-trip
-            CRDTNode rt = roundtrip(reg);
-            REQUIRE(rt.attrs().size() == attributes.size());
-            REQUIRE(rt.fano().size() == fano.size());
-            REQUIRE(rt.id() == id);
-            REQUIRE(rt.name() == name);
-            REQUIRE(rt.agent_id() == agent_id);
-            REQUIRE(rt.type() == robot_node_type::attr_name);
+            CRDT::Node rt = roundtrip(reg);
+            REQUIRE(rt.attrs.size() == attributes.size());
+            REQUIRE(rt.fano.size() == fano.size());
+            REQUIRE(rt.id == id);
+            REQUIRE(rt.name == name);
+            REQUIRE(rt.agent_id == agent_id);
+            REQUIRE(rt.type == robot_node_type::attr_name);
         }
 
         SECTION("Move node — CRDT round-trip"){
 
-            CRDTNode crdt_node = user_node_to_crdt(std::move(node));
-            REQUIRE(crdt_node.attrs().size() == attributes.size());
-            REQUIRE(crdt_node.fano().size() == fano.size());
-            REQUIRE(crdt_node.id() == id);
-            REQUIRE(crdt_node.name() == name);
-            REQUIRE(crdt_node.agent_id() == agent_id);
+            CRDT::Node crdt_node = user_node_to_crdt(std::move(node));
+            REQUIRE(crdt_node.attrs.size() == attributes.size());
+            REQUIRE(crdt_node.fano.size() == fano.size());
+            REQUIRE(crdt_node.id == id);
+            REQUIRE(crdt_node.name == name);
+            REQUIRE(crdt_node.agent_id == agent_id);
 
-            mvreg<CRDTNode> mvreg_node;
+            mvreg<CRDT::Node> mvreg_node;
             auto delta = mvreg_node.write(std::move(crdt_node));
 
             auto& reg = mvreg_node.read_reg();
             REQUIRE(delta.read_reg() == reg);
-            REQUIRE(reg.attrs().size() == attributes.size());
-            REQUIRE(reg.fano().size() == fano.size());
-            REQUIRE(reg.id() == id);
-            REQUIRE(reg.name() == name);
-            REQUIRE(reg.agent_id() == agent_id);
+            REQUIRE(reg.attrs.size() == attributes.size());
+            REQUIRE(reg.fano.size() == fano.size());
+            REQUIRE(reg.id == id);
+            REQUIRE(reg.name == name);
+            REQUIRE(reg.agent_id == agent_id);
 
             // Serialization round-trip
-            CRDTNode rt = roundtrip(reg);
-            REQUIRE(rt.attrs().size() == attributes.size());
-            REQUIRE(rt.fano().size() == fano.size());
-            REQUIRE(rt.id() == id);
-            REQUIRE(rt.name() == name);
-            REQUIRE(rt.agent_id() == agent_id);
-            REQUIRE(rt.type() == robot_node_type::attr_name);
+            CRDT::Node rt = roundtrip(reg);
+            REQUIRE(rt.attrs.size() == attributes.size());
+            REQUIRE(rt.fano.size() == fano.size());
+            REQUIRE(rt.id == id);
+            REQUIRE(rt.name == name);
+            REQUIRE(rt.agent_id == agent_id);
+            REQUIRE(rt.type == robot_node_type::attr_name);
         }
 
     }
@@ -184,7 +184,7 @@ TEST_CASE("Wire metadata round-trip preserves sync mode", "[TRANSLATION][SYNC_MO
         node.id(7);
         node.agent_id(3);
 
-        mvreg<CRDTNode> reg;
+        mvreg<CRDT::Node> reg;
         auto delta = reg.write(user_node_to_crdt(node));
         auto msg = CRDTNode_to_Msg(node.agent_id(), node.id(), std::move(delta));
         msg.sync_mode = sync_mode_wire_value(SyncMode::LWW);
@@ -293,7 +293,7 @@ TEST_CASE("EDGE: from DSR representation to CRDT and back via serialization", "[
 
     static auto new_attribute_ = [&]() -> std::pair<std::string, DSR::Attribute> {
 
-        auto val = random_choose(std::vector<ValType>{
+        auto val = random_choose(std::vector<Value>{
             (int)12,
             random_string(),
             std::vector<float>{1.0, 2.0, 3.0}
@@ -319,63 +319,63 @@ TEST_CASE("EDGE: from DSR representation to CRDT and back via serialization", "[
 
 
         SECTION("Copy edge — CRDT round-trip"){
-            CRDTEdge crdt_edge = user_edge_to_crdt(edge);
-            REQUIRE(crdt_edge.attrs().size() == attributes.size());
-            REQUIRE(crdt_edge.from() == from);
-            REQUIRE(crdt_edge.to() == to);
-            REQUIRE(crdt_edge.type() == in_edge_type_str);
-            REQUIRE(crdt_edge.agent_id() == agent_id);
+            CRDT::Edge crdt_edge = user_edge_to_crdt(edge);
+            REQUIRE(crdt_edge.attrs.size() == attributes.size());
+            REQUIRE(crdt_edge.from == from);
+            REQUIRE(crdt_edge.to == to);
+            REQUIRE(crdt_edge.type == in_edge_type_str);
+            REQUIRE(crdt_edge.agent_id == agent_id);
 
-            mvreg<CRDTEdge> mvreg_edge;
+            mvreg<CRDT::Edge> mvreg_edge;
             auto delta = mvreg_edge.write(crdt_edge);
 
             REQUIRE(mvreg_edge.read_reg() == crdt_edge);
             REQUIRE(delta.read_reg() == crdt_edge);
 
             auto& reg = mvreg_edge.read_reg();
-            REQUIRE(reg.attrs().size() == attributes.size());
-            REQUIRE(reg.from() == from);
-            REQUIRE(reg.to() == to);
-            REQUIRE(reg.type() == in_edge_type_str);
-            REQUIRE(reg.agent_id() == agent_id);
+            REQUIRE(reg.attrs.size() == attributes.size());
+            REQUIRE(reg.from == from);
+            REQUIRE(reg.to == to);
+            REQUIRE(reg.type == in_edge_type_str);
+            REQUIRE(reg.agent_id == agent_id);
 
             // Serialization round-trip
-            CRDTEdge rt = roundtrip(reg);
-            REQUIRE(rt.attrs().size() == attributes.size());
-            REQUIRE(rt.from() == from);
-            REQUIRE(rt.to() == to);
-            REQUIRE(rt.agent_id() == agent_id);
-            REQUIRE(rt.type() == in_edge_type_str);
+            CRDT::Edge rt = roundtrip(reg);
+            REQUIRE(rt.attrs.size() == attributes.size());
+            REQUIRE(rt.from == from);
+            REQUIRE(rt.to == to);
+            REQUIRE(rt.agent_id == agent_id);
+            REQUIRE(rt.type == in_edge_type_str);
         }
 
         SECTION("Move edge — CRDT round-trip"){
 
-            CRDTEdge crdt_edge = user_edge_to_crdt(edge);
-            REQUIRE(crdt_edge.attrs().size() == attributes.size());
-            REQUIRE(crdt_edge.from() == from);
-            REQUIRE(crdt_edge.to() == to);
-            REQUIRE(crdt_edge.type() == in_edge_type_str);
-            REQUIRE(crdt_edge.agent_id() == agent_id);
+            CRDT::Edge crdt_edge = user_edge_to_crdt(edge);
+            REQUIRE(crdt_edge.attrs.size() == attributes.size());
+            REQUIRE(crdt_edge.from == from);
+            REQUIRE(crdt_edge.to == to);
+            REQUIRE(crdt_edge.type == in_edge_type_str);
+            REQUIRE(crdt_edge.agent_id == agent_id);
 
-            mvreg<CRDTEdge> mvreg_edge;
+            mvreg<CRDT::Edge> mvreg_edge;
             auto delta = mvreg_edge.write(crdt_edge);
 
             REQUIRE(delta.read_reg() == mvreg_edge.read_reg());
 
             auto& reg = mvreg_edge.read_reg();
-            REQUIRE(reg.attrs().size() == attributes.size());
-            REQUIRE(reg.from() == from);
-            REQUIRE(reg.to() == to);
-            REQUIRE(reg.type() == in_edge_type_str);
-            REQUIRE(reg.agent_id() == agent_id);
+            REQUIRE(reg.attrs.size() == attributes.size());
+            REQUIRE(reg.from == from);
+            REQUIRE(reg.to == to);
+            REQUIRE(reg.type == in_edge_type_str);
+            REQUIRE(reg.agent_id == agent_id);
 
             // Serialization round-trip
-            CRDTEdge rt = roundtrip(reg);
-            REQUIRE(rt.attrs().size() == attributes.size());
-            REQUIRE(rt.from() == from);
-            REQUIRE(rt.to() == to);
-            REQUIRE(rt.agent_id() == agent_id);
-            REQUIRE(rt.type() == in_edge_type_str);
+            CRDT::Edge rt = roundtrip(reg);
+            REQUIRE(rt.attrs.size() == attributes.size());
+            REQUIRE(rt.from == from);
+            REQUIRE(rt.to == to);
+            REQUIRE(rt.agent_id == agent_id);
+            REQUIRE(rt.type == in_edge_type_str);
         }
 
     }
