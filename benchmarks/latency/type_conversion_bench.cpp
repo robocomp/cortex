@@ -88,7 +88,7 @@ TEST_CASE("CRDT type conversion latency", "[LATENCY][CONVERSION][BASELINE]") {
         }
 
         {
-            CRDTNode crdt_node = user_node_to_crdt(node);
+            CRDT::Node crdt_node = user_node_to_crdt(node);
 
             auto bench = make_latency_bench();
             bench.run(std::string("crdt_node_to_user_") + label, [&] {
@@ -112,7 +112,7 @@ TEST_CASE("CRDT type conversion latency", "[LATENCY][CONVERSION][BASELINE]") {
         }
 
         {
-            CRDTEdge crdt_edge = user_edge_to_crdt(edge);
+            CRDT::Edge crdt_edge = user_edge_to_crdt(edge);
 
             auto bench = make_latency_bench();
             bench.run(std::string("crdt_edge_to_user_") + label, [&] {

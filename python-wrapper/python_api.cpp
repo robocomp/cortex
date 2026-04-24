@@ -82,10 +82,10 @@ using attribute_type = std::variant<std::string,
 
 
 template<std::size_t idx, typename T>
-ValType convert_variant_fn(const attribute_type & e)
+Value convert_variant_fn(const attribute_type & e)
 {
-    //std::cout << "[PYTHON_VARIANT -> VALTYPE] " << attribute_type_TYPENAMES_UNION[e.index()] << std::endl;
-    ValType vout;
+    //std::cout << "[PYTHON_VARIANT -> Value] " << attribute_type_TYPENAMES_UNION[e.index()] << std::endl;
+    Value vout;
     if constexpr (std::is_same_v<T, py::array_t<uint8_t>>)
     {
         auto tmp = std::get<py::array_t<uint8_t>>(e);
@@ -121,9 +121,9 @@ ValType convert_variant_fn(const attribute_type & e)
 
 
 
-ValType convert_variant(const attribute_type & e)
+Value convert_variant(const attribute_type & e)
 {
-    typedef ValType (*conver_fn) (const attribute_type &);
+    typedef Value (*conver_fn) (const attribute_type &);
     constexpr std::array<conver_fn, 17> cast = { convert_variant_fn<0, std::string>,
                                                  convert_variant_fn<4, no_int_cast_bool>,
                                                  convert_variant_fn<5, py::array_t<uint8_t>>,
@@ -143,7 +143,7 @@ ValType convert_variant(const attribute_type & e)
                                                  convert_variant_fn<6, uint32_t>
                                              };
 
-    const auto idx = e.index(); //idx_ValType.at(e.index());
+    const auto idx = e.index(); //idx_Value.at(e.index());
     return cast[idx](e);
 }
 
@@ -249,12 +249,12 @@ PYBIND11_MODULE(pydsr, m) {
                 }),
                  "value"_a, "timestamp"_a, "agent_id"_a)
             .def(py::init([&](attribute_type const& v , uint32_t agent_id) {
-                //Comprobar tipos en ValType. Como se convien los arrays de numpy, las listas, los doubles, etc.
+                //Comprobar tipos en Value. Como se convien los arrays de numpy, las listas, los doubles, etc.
 
                 return Attribute(convert_variant(v), get_unix_timestamp(), agent_id);
             }),"value"_a, "agent_id"_a)
             .def(py::init([&](attribute_type const& v) {
-                //Comprobar tipos en ValType. Como se convien los arrays de numpy, las listas, los doubles, etc.
+                //Comprobar tipos en Value. Como se convien los arrays de numpy, las listas, los doubles, etc.
                 return Attribute(convert_variant(v), get_unix_timestamp(), local_agent_id);
             }),"value"_a)
             .def("__repr__", [](Attribute const &self) {

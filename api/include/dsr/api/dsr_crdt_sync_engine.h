@@ -14,7 +14,7 @@ namespace DSR {
 class CRDTSyncEngine final : public SyncEngine
 {
 public:
-    using Nodes = std::unordered_map<uint64_t, mvreg<CRDTNode>>;
+    using Nodes = std::unordered_map<uint64_t, mvreg<CRDT::Node>>;
     friend class DSRGraph;
     friend class RT_API;
 
@@ -50,18 +50,18 @@ public:
     FullGraphMessage export_full_graph() const override;
 
 private:
-    const CRDTNode* get_node_ptr(uint64_t id) const;
-    std::optional<CRDTNode> get_crdt_node(uint64_t id) const;
-    const CRDTEdge* get_crdt_edge_ptr(uint64_t from, uint64_t to, const std::string& key) const;
-    std::optional<CRDTEdge> get_crdt_edge(uint64_t from, uint64_t to, const std::string& key) const;
+    const CRDT::Node* get_node_ptr(uint64_t id) const;
+    std::optional<CRDT::Node> get_crdt_node(uint64_t id) const;
+    const CRDT::Edge* get_crdt_edge_ptr(uint64_t from, uint64_t to, const std::string& key) const;
+    std::optional<CRDT::Edge> get_crdt_edge(uint64_t from, uint64_t to, const std::string& key) const;
 
-    std::tuple<bool, std::optional<MvregNodeMsg>> insert_node_raw(CRDTNode&& node);
-    std::tuple<bool, std::optional<MvregNodeAttrVec>> update_node_raw(CRDTNode&& node);
+    std::tuple<bool, std::optional<MvregNodeMsg>> insert_node_raw(CRDT::Node&& node);
+    std::tuple<bool, std::optional<MvregNodeAttrVec>> update_node_raw(CRDT::Node&& node);
     std::tuple<bool, std::vector<Edge>, std::optional<MvregNodeMsg>, std::vector<MvregEdgeMsg>>
-    delete_node_raw(uint64_t id, const CRDTNode& node);
+    delete_node_raw(uint64_t id, const CRDT::Node& node);
     std::optional<MvregEdgeMsg> delete_edge_raw(uint64_t from, uint64_t to, const std::string& key);
     std::tuple<bool, std::optional<MvregEdgeMsg>, std::optional<MvregEdgeAttrVec>>
-    insert_or_assign_edge_raw(CRDTEdge&& attrs, uint64_t from, uint64_t to);
+    insert_or_assign_edge_raw(CRDT::Edge&& attrs, uint64_t from, uint64_t to);
 
     void join_delta_node(MvregNodeMsg&& mvreg);
     void join_delta_edge(MvregEdgeMsg&& mvreg);
@@ -71,16 +71,16 @@ private:
 
     std::map<uint64_t, MvregNodeMsg> export_mvreg_map() const;
 
-    bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge>&& delta);
-    void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute>&& attr);
-    void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute>&& attr);
+    bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDT::Edge>&& delta);
+    void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<Attribute>&& attr);
+    void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<Attribute>&& attr);
 
     SyncEngineHost& host_;
     Nodes nodes_;
-    std::unordered_multimap<uint64_t, std::tuple<std::string, mvreg<CRDTAttribute>, uint64_t>> unprocessed_delta_node_att_;
-    std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDTEdge>, uint64_t>> unprocessed_delta_edge_from_;
-    std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDTEdge>, uint64_t>> unprocessed_delta_edge_to_;
-    std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att_;
+    std::unordered_multimap<uint64_t, std::tuple<std::string, mvreg<Attribute>, uint64_t>> unprocessed_delta_node_att_;
+    std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDT::Edge>, uint64_t>> unprocessed_delta_edge_from_;
+    std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDT::Edge>, uint64_t>> unprocessed_delta_edge_to_;
+    std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<Attribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att_;
 };
 
 } // namespace DSR

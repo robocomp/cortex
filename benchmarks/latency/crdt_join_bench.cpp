@@ -10,8 +10,8 @@
 using namespace DSR::Benchmark;
 
 // Create a test attribute
-static DSR::CRDTAttribute make_test_attribute(uint32_t agent_id, int32_t value) {
-    DSR::CRDTAttribute attr;
+static DSR::Attribute make_test_attribute(uint32_t agent_id, int32_t value) {
+    DSR::Attribute attr;
     attr.value(value);
     attr.timestamp(bench_now());
     attr.agent_id(agent_id);
@@ -27,7 +27,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][MVREG][BASELINE]") {
 
     // ── mvreg write ───────────────────────────────────────────────────────────
     {
-        mvreg<DSR::CRDTAttribute> reg;
+        mvreg<DSR::Attribute> reg;
         reg.id = 100;
         int i = 0;
 
@@ -43,7 +43,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][MVREG][BASELINE]") {
 
     // ── mvreg join (same agent) ───────────────────────────────────────────────
     {
-        mvreg<DSR::CRDTAttribute> reg;
+        mvreg<DSR::Attribute> reg;
         reg.id = 100;
         auto init_attr = make_test_attribute(100, 0);
         reg.write(init_attr);
@@ -51,7 +51,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][MVREG][BASELINE]") {
 
         auto bench = make_latency_bench();
         bench.run("mvreg_join_same_agent", [&] {
-            mvreg<DSR::CRDTAttribute> delta_reg;
+            mvreg<DSR::Attribute> delta_reg;
             delta_reg.id = 100;
             auto new_attr = make_test_attribute(100, i++);
             auto delta = delta_reg.write(new_attr);
@@ -67,13 +67,13 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][MVREG][BASELINE]") {
 
         auto bench = make_latency_bench();
         bench.run("mvreg_join_different_agent", [&] {
-            mvreg<DSR::CRDTAttribute> reg;
+            mvreg<DSR::Attribute> reg;
             reg.id = 100;
             auto attr = make_test_attribute(100, 0);
             auto delta = reg.write(attr);
 
             uint32_t other_agent = 200 + (i % 10);
-            mvreg<DSR::CRDTAttribute> delta_reg;
+            mvreg<DSR::Attribute> delta_reg;
             delta_reg.id = other_agent;
             delta_reg.join(std::move(delta));
             auto new_attr = make_test_attribute(other_agent, i * 2);
@@ -88,7 +88,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][MVREG][BASELINE]") {
 
     // ── mvreg read ────────────────────────────────────────────────────────────
     {
-        mvreg<DSR::CRDTAttribute> reg;
+        mvreg<DSR::Attribute> reg;
         reg.id = 100;
         auto attr = make_test_attribute(100, 42);
         reg.write(attr);

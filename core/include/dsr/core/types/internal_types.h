@@ -1,6 +1,6 @@
 #pragma once
 
-#include "crdt_types.h"
+#include "dsr/core/types/crdt_types.h"
 #include "dsr/core/serialization/serializable.h"
 #include <map>
 #include <string>
@@ -58,11 +58,11 @@ namespace DSR {
     };
 
     // ---- MvregNodeMsg --------------------------------------------------------
-    // Delta or full mvreg<CRDTNode> plus routing metadata.
+    // Delta or full mvreg<CRDT::Node> plus routing metadata.
 
     struct MvregNodeMsg : public ISerializable<MvregNodeMsg>
     {
-        mvreg<CRDTNode> dk;
+        mvreg<CRDT::Node> dk;
         uint64_t        id{};
         uint32_t        agent_id{};
         uint64_t        timestamp{};
@@ -105,7 +105,7 @@ namespace DSR {
 
     struct MvregEdgeMsg : public ISerializable<MvregEdgeMsg>
     {
-        mvreg<CRDTEdge> dk;
+        mvreg<CRDT::Edge> dk;
         uint64_t        id{};      // "from" node id
         uint64_t        to{};
         uint64_t        from{};
@@ -160,7 +160,7 @@ namespace DSR {
 
     struct MvregNodeAttrMsg : public ISerializable<MvregNodeAttrMsg>
     {
-        mvreg<CRDTAttribute> dk;
+        mvreg<Attribute> dk;
         uint64_t             id{};        // publisher/delta id
         uint64_t             node{};      // owning node
         std::string          attr_name;
@@ -211,7 +211,7 @@ namespace DSR {
 
     struct MvregEdgeAttrMsg : public ISerializable<MvregEdgeAttrMsg>
     {
-        mvreg<CRDTAttribute> dk;
+        mvreg<Attribute> dk;
         uint64_t             id{};      // "from" node id
         uint64_t             from_node{};
         uint64_t             to_node{};

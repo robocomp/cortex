@@ -10,14 +10,28 @@ Reimplementation from https://github.com/CBaquero/delta-enabled-crdts
 #include <cstdint>
 #include <map>
 #include <set>
+#include <type_traits>
+#include <utility>
 
 #include "dsr/core/serialization/serializable.h"
 #include "dsr/core/profiling.h"
 
 using key_type = uint64_t;
 
+namespace detail {
+template<typename T>
+decltype(auto) agent_id_of(T&& value)
+{
+    if constexpr (requires { std::forward<T>(value).agent_id; }) {
+        return std::forward<T>(value).agent_id;
+    } else {
+        return std::forward<T>(value).agent_id();
+    }
+}
+} // namespace detail
+
 // Autonomous causal context, for context sharing in maps
-class dot_context : public ISerializable<dot_context> {
+struct dot_context : public ISerializable<dot_context> {
 public:
 
     std::map<key_type, int> cc; // Compact causal context
@@ -47,7 +61,6 @@ public:
         cc = std::move(cc_);
         dc = std::move(dc_);
     }
-
 
     [[nodiscard]] bool dotin(const std::pair<key_type, int> &d) const {
         const auto itm = cc.find(d.first);
@@ -321,7 +334,7 @@ public:
             } else if (it != ds.end() && ito != o.ds.end()) {
                 // dot in both
                 //replace in case of conflict if the agent id has a lower value
-                if (it->second.agent_id() > ito->second.agent_id() && *it != *ito) {
+                if (detail::agent_id_of(it->second) > detail::agent_id_of(ito->second) && *it != *ito) {
                     it = ds.erase(it);
                     ds.insert(std::move(*ito));
                 } else {

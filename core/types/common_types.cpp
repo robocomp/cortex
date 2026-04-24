@@ -113,12 +113,12 @@ namespace DSR {
         return s;
     }
 
-    const ValType &Attribute::value() const
+    const Value &Attribute::value() const
     {
         return m_value;
     }
 
-    ValType& Attribute::value()
+    Value& Attribute::value()
     {
         return m_value;
     }
@@ -138,12 +138,12 @@ namespace DSR {
         m_timestamp = t;
     }
 
-    void Attribute::value(const ValType &value)
+    void Attribute::value(const Value &value)
     {
         m_value = value;
     }
 
-    void Attribute::value(ValType &&value)
+    void Attribute::value(Value &&value)
     {
         m_value = std::move(value);
     }

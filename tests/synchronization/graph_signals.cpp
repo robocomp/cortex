@@ -139,7 +139,7 @@ TEST_CASE("Insert a node without attributes and edges", "[GRAPH][SIGNALS]"){
 
 static const auto new_attribute_ = []() -> std::pair<std::string, Attribute> {
 
-    const auto val = random_choose(std::vector<ValType>{
+    const auto val = random_choose(std::vector<Value>{
         (int)12,
         random_string(),
         std::vector<float>{1.0, 2.0, 3.0}

@@ -340,11 +340,11 @@ namespace DSR
                 elem.attrs().insert_or_assign(name::attr_name.data(), at);
             } else
             {
-                CRDTAttribute at;
+                Attribute at;
                 at.value(std::forward<Ta>(att_value));
                 at.timestamp(get_unix_timestamp());
                 if (elem.attrs().find(name::attr_name.data()) == elem.attrs().end()) {
-                    mvreg<CRDTAttribute> mv;
+                    mvreg<Attribute> mv;
                     elem.attrs().insert(make_pair(name::attr_name, mv));
                 }
                 elem.attrs().at(name::attr_name.data()).write(at);
@@ -364,11 +364,11 @@ namespace DSR
                 Attribute at(std::forward<Ta>(att_value), get_unix_timestamp(), agent_id);
                 elem.attrs().insert_or_assign(att_name, at);
             } else {
-                CRDTAttribute at;
+                Attribute at;
                 at.value(std::forward<Ta>(att_value));
                 at.timestamp(get_unix_timestamp());
                 if (elem.attrs().find(att_name) == elem.attrs().end()) {
-                    mvreg<CRDTAttribute> mv;
+                    mvreg<Attribute> mv;
                     elem.attrs().insert(make_pair(att_name, mv));
                 }
                 elem.attrs().at(att_name).write(at);
