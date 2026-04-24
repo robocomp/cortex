@@ -12,7 +12,10 @@
 #include <dsr/core/types/internal_types.h>
 #include <dsr/core/transport/transport_crtp.h>
 
-class DSRPublisher : public DSR::Transport::PublisherTransportCRTP<DSRPublisher>
+class DSRPublisher : public DSR::Transport::PublisherTransportCRTP<
+    DSRPublisher,
+    eprosima::fastdds::dds::DomainParticipant,
+    eprosima::fastdds::dds::Topic>
 {
 public:
     DSRPublisher();

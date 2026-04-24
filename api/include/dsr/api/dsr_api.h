@@ -530,7 +530,7 @@ namespace DSR
                 signal.agent_id = agent_id;
                 signal.protocol_version = DSR::DSR_PROTOCOL_VERSION;
                 signal.sync_mode = sync_mode_wire_value(sync_mode);
-                dsrpub_node.write(signal);
+                dsrparticipant.publish_node(signal);
             }
         }
 
@@ -763,53 +763,35 @@ namespace DSR
         // are destroyed, preventing use-after-free data races on shutdown.
         ThreadPool tp, tp_delta_attr;
 
-        //Custom function for each rtps topic
-        class NewMessageFn {
-        public:
-            DSRGraph *graph{};
-            std::function<void(eprosima::fastdds::dds::DataReader* reader, DSR::DSRGraph *graph)> f;
-
-            NewMessageFn(DSRGraph *graph_,
-                              std::function<void(eprosima::fastdds::dds::DataReader* reader,  DSR::DSRGraph *graph)> f_)
-                    : graph(graph_), f(std::move(f_)) {}
-
-            NewMessageFn() = default;
-
-            void operator()(eprosima::fastdds::dds::DataReader* reader) const { f(reader, graph); };
-        };
-
-        NewMessageFn make_node_subscription_functor();
-        NewMessageFn make_edge_subscription_functor();
-        NewMessageFn make_edge_attrs_subscription_functor();
-        NewMessageFn make_node_attrs_subscription_functor();
-        NewMessageFn make_fullgraph_request_functor(std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        template <typename Sample>
+        using SampleCallback = std::function<void(Sample&&, const DSR::Transport::ReceivedSampleInfo&)>;
 
         template <typename Sample>
-        NewMessageFn make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal = false);
+        SampleCallback<Sample> make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal = false);
         template <typename Sample>
-        NewMessageFn make_edge_subscription_functor_impl(const char* channel);
+        SampleCallback<Sample> make_edge_subscription_functor_impl(const char* channel);
         template <typename Batch>
-        NewMessageFn make_edge_attrs_subscription_functor_impl(const char* channel);
+        SampleCallback<Batch> make_edge_attrs_subscription_functor_impl(const char* channel);
         template <typename Batch>
-        NewMessageFn make_node_attrs_subscription_functor_impl(const char* channel);
+        SampleCallback<Batch> make_node_attrs_subscription_functor_impl(const char* channel);
         template <typename GraphSample>
-        NewMessageFn make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        SampleCallback<GraphSample> make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
 
         //Custom function for each rtps topic
         class ParticipantChangeFn {
         public:
             DSRGraph *graph{};
-            std::function<void(DSRGraph *graph_,eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f;
+            using status_type = DSR::Transport::ParticipantDiscoveryStatus;
+            using info_type = DSR::Transport::ParticipantDiscoveryInfo;
+            std::function<void(DSRGraph *graph_, status_type, const info_type&)> f;
 
             ParticipantChangeFn(DSRGraph *graph_,
-                                     std::function<void(DSRGraph *graph_, eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
-                                                        const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f_)
+                                     std::function<void(DSRGraph *graph_, status_type, const info_type&)> f_)
                     : graph(graph_), f(std::move(f_)) {}
 
             ParticipantChangeFn() = default;
 
-            void operator()(eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
-                            const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info) const
+            void operator()(status_type status, const info_type& info) const
             {
                 f(graph, status, info);
             };
@@ -834,31 +816,6 @@ namespace DSR
         std::unordered_map<std::string, bool> participant_set;
 
         mutable std::mutex participant_set_mutex;
-
-        DSRPublisher dsrpub_node;
-        DSRSubscriber dsrsub_node;
-        NewMessageFn dsrpub_call_node;
-
-        DSRPublisher dsrpub_edge;
-        DSRSubscriber dsrsub_edge;
-        NewMessageFn dsrpub_call_edge;
-
-        DSRPublisher dsrpub_node_attrs;
-        DSRSubscriber dsrsub_node_attrs;
-        NewMessageFn dsrpub_call_node_attrs;
-
-        DSRPublisher dsrpub_edge_attrs;
-        DSRSubscriber dsrsub_edge_attrs;
-        NewMessageFn dsrpub_call_edge_attrs;
-
-        DSRSubscriber dsrsub_graph_request;
-        DSRPublisher dsrpub_graph_request;
-        NewMessageFn dsrpub_graph_request_call;
-
-        DSRSubscriber dsrsub_request_answer;
-        DSRPublisher dsrpub_request_answer;
-        NewMessageFn dsrpub_request_answer_call;
-
     Q_OBJECT
     signals:
         void update_node_signal(uint64_t, const std::string &type, DSR::SignalInfo info = {});

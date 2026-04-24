@@ -9,21 +9,27 @@
 #include <dsr/core/transport/transport_crtp.h>
 
 
-class DSRSubscriber : public DSR::Transport::SubscriberTransportCRTP<DSRSubscriber>
+class DSRSubscriber : public DSR::Transport::SubscriberTransportCRTP<
+    DSRSubscriber,
+    eprosima::fastdds::dds::DomainParticipant,
+    eprosima::fastdds::dds::Topic,
+    std::function<void(eprosima::fastdds::dds::DataReader*)>>
 {
 public:
+    using subscriber_handle_type = eprosima::fastdds::dds::Subscriber;
+    using reader_handle_type = eprosima::fastdds::dds::DataReader;
 	DSRSubscriber();
 	virtual ~DSRSubscriber();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
-	          init_impl(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
-                   eprosima::fastdds::dds::Topic *topic,
+    [[nodiscard]] std::tuple<bool, subscriber_handle_type*, reader_handle_type*>
+	          init_impl(participant_handle_type *mp_participant_,
+                   topic_handle_type *topic,
                    int8_t domain_id,
-				   const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
+				   callback_type  f_,
 				   std::mutex& mtx,
 				   bool isStreamData = false);
 
-    eprosima::fastdds::dds::Subscriber *getSubscriber_impl();
-    eprosima::fastdds::dds::DataReader *getDataReader_impl();
+    subscriber_handle_type *getSubscriber_impl();
+    reader_handle_type *getDataReader_impl();
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;
@@ -40,7 +46,7 @@ private:
         void on_data_available(
                 eprosima::fastdds::dds::DataReader* reader) override;
 
-		std::function<void(eprosima::fastdds::dds::DataReader* sub)>  f;
+		callback_type  f;
 
 	} m_listener;
 
