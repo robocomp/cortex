@@ -109,7 +109,7 @@ DSRParticipant::~DSRParticipant()
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init_impl(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id, uint8_t sync_mode_wire)
+std::tuple<bool, DSRParticipant::participant_handle_type*> DSRParticipant::init_impl(uint32_t agent_id, const std::string& agent_name, int localhost, discovery_callback_type fn, int8_t domain_id, uint8_t sync_mode_wire)
 {
     domain_id_ = domain_id;
     sync_mode_wire_ = sync_mode_wire;
@@ -202,6 +202,32 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
 eprosima::fastdds::dds::DomainParticipant *DSRParticipant::getParticipant()
 {
     return mp_participant;
+}
+
+std::string DSRParticipant::participant_name() const
+{
+    if (mp_participant == nullptr) {
+        return {};
+    }
+    return mp_participant->get_qos().name().to_string();
+}
+
+bool DSRParticipant::init_builtin_publishers()
+{
+    auto init_one = [&](const char* id, DSRPublisher& publisher, eprosima::fastdds::dds::Topic* topic) {
+        auto [res, pub, writer] = publisher.init(mp_participant, topic, domain_id_);
+        if (res && topic != nullptr) {
+            add_publisher(id, std::pair{pub, writer});
+        }
+        return res;
+    };
+
+    return init_one("node", pub_node_, topic_node) &&
+           init_one("node_attrs", pub_node_attrs_, topic_node_att) &&
+           init_one("edge", pub_edge_, topic_edge) &&
+           init_one("edge_attrs", pub_edge_attrs_, topic_edge_att) &&
+           init_one("graph_request", pub_graph_request_, topic_graph_request) &&
+           init_one("graph_answer", pub_graph_answer_, topic_graph);
 }
 
 void DSRParticipant::remove_participant_and_entities_impl()
@@ -331,12 +357,12 @@ const eprosima::fastdds::rtps::GUID_t& DSRParticipant::getID() const
     return mp_participant->guid();
 }
 
-void DSRParticipant::add_subscriber_impl(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*> val)
+void DSRParticipant::add_subscriber_impl(const std::string& id, subscriber_entry_type val)
 {
     std::unique_lock<std::mutex> lck (sub_mtx);
     subscribers.emplace(id, val);
 }
-void DSRParticipant::add_publisher_impl(const std::string& id, std::pair<eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> val)
+void DSRParticipant::add_publisher_impl(const std::string& id, publisher_entry_type val)
 {
     std::unique_lock<std::mutex> lck (pub_mtx);
     publishers.emplace(id, val);
