@@ -36,7 +36,7 @@ DSRPublisher::~DSRPublisher()
 }
 
 std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*>
-        DSRPublisher::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic, int8_t domain_id, bool isStreamData )
+        DSRPublisher::init_impl(eprosima::fastdds::dds::DomainParticipant *mp_participant_, eprosima::fastdds::dds::Topic *topic, int8_t domain_id, bool isStreamData )
 {
     mp_participant = mp_participant_;
 
@@ -103,7 +103,7 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
 
 }
 
-GUID_t DSRPublisher::getParticipantID() const
+GUID_t DSRPublisher::getParticipantID_impl() const
 {
     return mp_participant->guid();
 }
@@ -123,7 +123,7 @@ bool write_with_retry(eprosima::fastdds::dds::DataWriter* writer, const T& objec
 }
 }
 
-bool DSRPublisher::write(const DSR::MvregNodeMsg& object)
+bool DSRPublisher::write_impl(const DSR::MvregNodeMsg& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing NODE " << object.id << " after 5 attempts. error code: " << rt;
@@ -131,7 +131,7 @@ bool DSRPublisher::write(const DSR::MvregNodeMsg& object)
 }
 
 
-bool DSRPublisher::write(const DSR::MvregEdgeMsg& object)
+bool DSRPublisher::write_impl(const DSR::MvregEdgeMsg& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing EDGE " << object.from << " " << object.to << " " << object.type.data() << " after 5 attempts. error code: " << rt;
@@ -139,62 +139,62 @@ bool DSRPublisher::write(const DSR::MvregEdgeMsg& object)
 }
 
 
-bool DSRPublisher::write(const DSR::OrMap& object)
+bool DSRPublisher::write_impl(const DSR::OrMap& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing GRAPH " << object.m.size() << " after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::GraphRequest& object)
+bool DSRPublisher::write_impl(const DSR::GraphRequest& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing GRAPH REQUEST after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::MvregEdgeAttrVec& object)
+bool DSRPublisher::write_impl(const DSR::MvregEdgeAttrVec& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing EDGE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::MvregNodeAttrVec& object) {
+bool DSRPublisher::write_impl(const DSR::MvregNodeAttrVec& object) {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing NODE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::LWWNodeMsg& object)
+bool DSRPublisher::write_impl(const DSR::LWWNodeMsg& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing LWW NODE " << object.id << " after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::LWWEdgeMsg& object)
+bool DSRPublisher::write_impl(const DSR::LWWEdgeMsg& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing LWW EDGE " << object.from << " " << object.to << " " << object.type.data() << " after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::LWWNodeAttrVec& object)
+bool DSRPublisher::write_impl(const DSR::LWWNodeAttrVec& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing LWW NODE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::LWWEdgeAttrVec& object)
+bool DSRPublisher::write_impl(const DSR::LWWEdgeAttrVec& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing LWW EDGE ATTRIBUTE VECTOR after 5 attempts. error code: " << rt;
     });
 }
 
-bool DSRPublisher::write(const DSR::LWWGraphSnapshot& object)
+bool DSRPublisher::write_impl(const DSR::LWWGraphSnapshot& object)
 {
     return write_with_retry(mp_writer, object, [&](ReturnCode_t rt) {
         qInfo() << "Error writing LWW GRAPH " << object.nodes.size() << " nodes after 5 attempts. error code: " << rt;

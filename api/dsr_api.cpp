@@ -219,12 +219,12 @@ DSRGraph::DSRGraph(GraphSettings settings) :
 
     {
         CORTEX_PROFILE_MIN_N("DSRGraph::DSRGraph register publishers");
-        dsrparticipant.add_publisher(dsrparticipant.getNodeTopic()->get_name(), {pub, writer});
-        dsrparticipant.add_publisher(dsrparticipant.getAttNodeTopic()->get_name(), {pub2, writer2});
-        dsrparticipant.add_publisher(dsrparticipant.getEdgeTopic()->get_name(), {pub3, writer3});
-        dsrparticipant.add_publisher(dsrparticipant.getAttEdgeTopic()->get_name(), {pub4, writer4});
-        dsrparticipant.add_publisher(dsrparticipant.getGraphRequestTopic()->get_name(), {pub5, writer5});
-        dsrparticipant.add_publisher(dsrparticipant.getGraphTopic()->get_name(), {pub6, writer6});
+        dsrparticipant.add_publisher(dsrparticipant.getNodeTopic()->get_name(), std::pair{pub, writer});
+        dsrparticipant.add_publisher(dsrparticipant.getAttNodeTopic()->get_name(), std::pair{pub2, writer2});
+        dsrparticipant.add_publisher(dsrparticipant.getEdgeTopic()->get_name(), std::pair{pub3, writer3});
+        dsrparticipant.add_publisher(dsrparticipant.getAttEdgeTopic()->get_name(), std::pair{pub4, writer4});
+        dsrparticipant.add_publisher(dsrparticipant.getGraphRequestTopic()->get_name(), std::pair{pub5, writer5});
+        dsrparticipant.add_publisher(dsrparticipant.getGraphTopic()->get_name(), std::pair{pub6, writer6});
     }
 
     // RTPS Initialize comms threads
@@ -1267,7 +1267,7 @@ void DSRGraph::node_subscription_thread()
     CORTEX_PROFILE_MIN_N("DSRGraph::node_subscription_thread setup");
     dsrpub_call_node = make_node_subscription_functor();
     auto [res, sub, reader] = dsrsub_node.init(dsrparticipant.getParticipant(), dsrparticipant.getNodeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_node, mtx_entity_creation);
-    dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), {sub, reader});
+    dsrparticipant.add_subscriber(dsrparticipant.getNodeTopic()->get_name(), std::pair{sub, reader});
 }
 
 void DSRGraph::edge_subscription_thread()
@@ -1275,7 +1275,7 @@ void DSRGraph::edge_subscription_thread()
     CORTEX_PROFILE_MIN_N("DSRGraph::edge_subscription_thread setup");
     dsrpub_call_edge = make_edge_subscription_functor();
     auto [res, sub, reader]  = dsrsub_edge.init(dsrparticipant.getParticipant(), dsrparticipant.getEdgeTopic(), dsrparticipant.get_domain_id(), dsrpub_call_edge, mtx_entity_creation);
-    dsrparticipant.add_subscriber(dsrparticipant.getEdgeTopic()->get_name(), {sub, reader});
+    dsrparticipant.add_subscriber(dsrparticipant.getEdgeTopic()->get_name(), std::pair{sub, reader});
 
 }
 
@@ -1285,7 +1285,7 @@ void DSRGraph::edge_attrs_subscription_thread()
     dsrpub_call_edge_attrs = make_edge_attrs_subscription_functor();
     auto [res, sub, reader] = dsrsub_edge_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttEdgeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_edge_attrs, mtx_entity_creation);
-    dsrparticipant.add_subscriber(dsrparticipant.getAttEdgeTopic()->get_name(), {sub, reader});
+    dsrparticipant.add_subscriber(dsrparticipant.getAttEdgeTopic()->get_name(), std::pair{sub, reader});
     //dsrsub_edge_attrs_stream.init(dsrparticipant.getParticipant(), "DSR_EDGE_ATTRS_STREAM", dsrparticipant.getEdgeAttrTopicName(),
     //                       dsrpub_call_edge_attrs, true);
 }
@@ -1296,7 +1296,7 @@ void DSRGraph::node_attrs_subscription_thread()
     dsrpub_call_node_attrs = make_node_attrs_subscription_functor();
     auto [res, sub, reader] = dsrsub_node_attrs.init(dsrparticipant.getParticipant(), dsrparticipant.getAttNodeTopic(), dsrparticipant.get_domain_id(),
                            dsrpub_call_node_attrs, mtx_entity_creation);
-    dsrparticipant.add_subscriber(dsrparticipant.getAttNodeTopic()->get_name(), {sub, reader});
+    dsrparticipant.add_subscriber(dsrparticipant.getAttNodeTopic()->get_name(), std::pair{sub, reader});
 
 }
 
@@ -1360,7 +1360,7 @@ void DSRGraph::fullgraph_server_thread()
     dsrpub_graph_request_call = NewMessageFn(this, lambda_graph_request);
     auto [res, sub, reader] = dsrsub_graph_request.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphRequestTopic(), dsrparticipant.get_domain_id(),
                               dsrpub_graph_request_call, mtx_entity_creation);
-    dsrparticipant.add_subscriber(dsrparticipant.getGraphRequestTopic()->get_name(), {sub, reader});
+    dsrparticipant.add_subscriber(dsrparticipant.getGraphRequestTopic()->get_name(), std::pair{sub, reader});
 
 }
 
@@ -1372,7 +1372,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
     dsrpub_request_answer_call = make_fullgraph_request_functor(sync, repeated);
     auto [res, sub, reader] = dsrsub_request_answer.init(dsrparticipant.getParticipant(), dsrparticipant.getGraphTopic(), dsrparticipant.get_domain_id(),
                                dsrpub_request_answer_call, mtx_entity_creation);
-    dsrparticipant.add_subscriber(dsrparticipant.getGraphTopic()->get_name(), {sub, reader});
+    dsrparticipant.add_subscriber(dsrparticipant.getGraphTopic()->get_name(), std::pair{sub, reader});
 
     {
         CORTEX_PROFILE_DETAIL_N("DSRGraph::fullgraph_request_thread initial wait");

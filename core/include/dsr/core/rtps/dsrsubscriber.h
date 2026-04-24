@@ -6,23 +6,24 @@
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 
 #include <functional>
+#include <dsr/core/transport/transport_crtp.h>
 
 
-class DSRSubscriber
+class DSRSubscriber : public DSR::Transport::SubscriberTransportCRTP<DSRSubscriber>
 {
 public:
 	DSRSubscriber();
 	virtual ~DSRSubscriber();
     [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
-	          init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
+	          init_impl(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
                    eprosima::fastdds::dds::Topic *topic,
                    int8_t domain_id,
 				   const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
 				   std::mutex& mtx,
 				   bool isStreamData = false);
 
-    eprosima::fastdds::dds::Subscriber *getSubscriber();
-    eprosima::fastdds::dds::DataReader *getDataReader();
+    eprosima::fastdds::dds::Subscriber *getSubscriber_impl();
+    eprosima::fastdds::dds::DataReader *getDataReader_impl();
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;

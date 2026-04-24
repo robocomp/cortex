@@ -10,29 +10,30 @@
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 
 #include <dsr/core/types/internal_types.h>
+#include <dsr/core/transport/transport_crtp.h>
 
-class DSRPublisher
+class DSRPublisher : public DSR::Transport::PublisherTransportCRTP<DSRPublisher>
 {
 public:
     DSRPublisher();
     virtual ~DSRPublisher();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init(
+    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init_impl(
         eprosima::fastdds::dds::DomainParticipant *mp_participant_,
         eprosima::fastdds::dds::Topic *topic,
         int8_t domain_id,
         bool isStreamData = false);
-    [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID() const;
-    bool write(const DSR::GraphRequest &object);
-    bool write(const DSR::MvregNodeMsg &object);
-    bool write(const DSR::OrMap &object);
-    bool write(const DSR::MvregEdgeMsg &object);
-    bool write(const DSR::MvregEdgeAttrVec &object);
-    bool write(const DSR::MvregNodeAttrVec &object);
-    bool write(const DSR::LWWNodeMsg &object);
-    bool write(const DSR::LWWEdgeMsg &object);
-    bool write(const DSR::LWWNodeAttrVec &object);
-    bool write(const DSR::LWWEdgeAttrVec &object);
-    bool write(const DSR::LWWGraphSnapshot &object);
+    [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID_impl() const;
+    bool write_impl(const DSR::GraphRequest &object);
+    bool write_impl(const DSR::MvregNodeMsg &object);
+    bool write_impl(const DSR::OrMap &object);
+    bool write_impl(const DSR::MvregEdgeMsg &object);
+    bool write_impl(const DSR::MvregEdgeAttrVec &object);
+    bool write_impl(const DSR::MvregNodeAttrVec &object);
+    bool write_impl(const DSR::LWWNodeMsg &object);
+    bool write_impl(const DSR::LWWEdgeMsg &object);
+    bool write_impl(const DSR::LWWNodeAttrVec &object);
+    bool write_impl(const DSR::LWWEdgeAttrVec &object);
+    bool write_impl(const DSR::LWWGraphSnapshot &object);
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;
