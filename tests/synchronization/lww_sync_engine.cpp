@@ -143,6 +143,32 @@ TEST_CASE("LWW update_node keeps full replacement API semantics", "[LWW][ENGINE]
     REQUIRE_FALSE(stored->attrs().contains("parent"));
 }
 
+TEST_CASE("LWW local node updates emit attr batches for attr-only changes", "[LWW][ENGINE]")
+{
+    FakeSyncHost host;
+    LWWSyncEngine engine(host);
+
+    auto node = make_robot(4, "robot_4", 1);
+    node.attrs()["parent"] = Attribute(7, 1, 17);
+    REQUIRE(engine.insert_node_local(std::move(node)).applied);
+
+    auto replacement = make_robot(4, "robot_4", 5);
+    auto effect = engine.update_node_local(std::move(replacement));
+
+    REQUIRE(effect.applied);
+    REQUIRE_FALSE(effect.node_delta.has_value());
+    REQUIRE(effect.node_attr_batch.has_value());
+    REQUIRE(effect.changed_attributes == std::vector<std::string>{"level", "parent"});
+
+    const auto* batch = std::get_if<LWWNodeAttrVec>(&*effect.node_attr_batch);
+    REQUIRE(batch != nullptr);
+    REQUIRE(batch->vec.size() == 2);
+    REQUIRE(batch->vec[0].attr_name == "level");
+    REQUIRE_FALSE(batch->vec[0].deleted);
+    REQUIRE(batch->vec[1].attr_name == "parent");
+    REQUIRE(batch->vec[1].deleted);
+}
+
 TEST_CASE("LWW edge tombstones allow newer recreation", "[LWW][ENGINE]")
 {
     FakeSyncHost host;
@@ -176,6 +202,36 @@ TEST_CASE("LWW edge tombstones allow newer recreation", "[LWW][ENGINE]")
     auto stored = engine.get_edge(10, 11, std::string(RT_edge_type::attr_name));
     REQUIRE(stored.has_value());
     REQUIRE(stored->attrs().at("weight").dec() == 4);
+}
+
+TEST_CASE("LWW local edge updates emit attr batches for attr-only changes", "[LWW][ENGINE]")
+{
+    FakeSyncHost host;
+    LWWSyncEngine engine(host);
+
+    REQUIRE(engine.insert_node_local(make_robot(12, "robot_c", 1)).applied);
+    REQUIRE(engine.insert_node_local(make_robot(13, "robot_d", 1)).applied);
+
+    auto edge = Edge::create<RT_edge_type>(12, 13);
+    edge.attrs()["weight"] = Attribute(1, 1, 17);
+    REQUIRE(engine.insert_or_assign_edge_local(std::move(edge)).applied);
+
+    auto updated = Edge::create<RT_edge_type>(12, 13);
+    updated.attrs()["capacity"] = Attribute(9, 1, 17);
+    auto effect = engine.insert_or_assign_edge_local(std::move(updated));
+
+    REQUIRE(effect.applied);
+    REQUIRE_FALSE(effect.edge_delta.has_value());
+    REQUIRE(effect.edge_attr_batch.has_value());
+    REQUIRE(effect.changed_attributes == std::vector<std::string>{"capacity", "weight"});
+
+    const auto* batch = std::get_if<LWWEdgeAttrVec>(&*effect.edge_attr_batch);
+    REQUIRE(batch != nullptr);
+    REQUIRE(batch->vec.size() == 2);
+    REQUIRE(batch->vec[0].attr_name == "capacity");
+    REQUIRE_FALSE(batch->vec[0].deleted);
+    REQUIRE(batch->vec[1].attr_name == "weight");
+    REQUIRE(batch->vec[1].deleted);
 }
 
 TEST_CASE("Same-process LWW agents synchronize over DDS", "[LWW][DDS]")

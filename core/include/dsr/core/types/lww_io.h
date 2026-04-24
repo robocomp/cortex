@@ -14,6 +14,94 @@ inline std::map<std::string, AttrState> to_attr_state_map(const std::map<std::st
     return out;
 }
 
+inline LWWNodeAttrVec to_node_attr_delta_batch(
+    uint64_t node_id,
+    const std::map<std::string, AttrState>& before,
+    const std::map<std::string, AttrState>& after)
+{
+    LWWNodeAttrVec batch;
+
+    for (const auto& [name, attr] : after) {
+        const auto before_it = before.find(name);
+        if (before_it == before.end() || !(before_it->second.value == attr.value)) {
+            batch.vec.emplace_back(LWWNodeAttrMsg{
+                .node_id = node_id,
+                .attr_name = name,
+                .value = attr.value,
+                .agent_id = attr.version.agent_id,
+                .timestamp = attr.version.timestamp,
+                .deleted = false,
+                .protocol_version = DSR_PROTOCOL_VERSION,
+                .sync_mode = sync_mode_wire_value(SyncMode::LWW)
+            });
+        }
+    }
+
+    for (const auto& [name, attr] : before) {
+        if (!after.contains(name)) {
+            batch.vec.emplace_back(LWWNodeAttrMsg{
+                .node_id = node_id,
+                .attr_name = name,
+                .value = attr.value,
+                .agent_id = attr.version.agent_id,
+                .timestamp = attr.version.timestamp,
+                .deleted = true,
+                .protocol_version = DSR_PROTOCOL_VERSION,
+                .sync_mode = sync_mode_wire_value(SyncMode::LWW)
+            });
+        }
+    }
+
+    return batch;
+}
+
+inline LWWEdgeAttrVec to_edge_attr_delta_batch(
+    uint64_t from,
+    uint64_t to,
+    const std::string& type,
+    const std::map<std::string, AttrState>& before,
+    const std::map<std::string, AttrState>& after)
+{
+    LWWEdgeAttrVec batch;
+
+    for (const auto& [name, attr] : after) {
+        const auto before_it = before.find(name);
+        if (before_it == before.end() || !(before_it->second.value == attr.value)) {
+            batch.vec.emplace_back(LWWEdgeAttrMsg{
+                .from = from,
+                .to = to,
+                .type = type,
+                .attr_name = name,
+                .value = attr.value,
+                .agent_id = attr.version.agent_id,
+                .timestamp = attr.version.timestamp,
+                .deleted = false,
+                .protocol_version = DSR_PROTOCOL_VERSION,
+                .sync_mode = sync_mode_wire_value(SyncMode::LWW)
+            });
+        }
+    }
+
+    for (const auto& [name, attr] : before) {
+        if (!after.contains(name)) {
+            batch.vec.emplace_back(LWWEdgeAttrMsg{
+                .from = from,
+                .to = to,
+                .type = type,
+                .attr_name = name,
+                .value = attr.value,
+                .agent_id = attr.version.agent_id,
+                .timestamp = attr.version.timestamp,
+                .deleted = true,
+                .protocol_version = DSR_PROTOCOL_VERSION,
+                .sync_mode = sync_mode_wire_value(SyncMode::LWW)
+            });
+        }
+    }
+
+    return batch;
+}
+
 inline NodeState to_node_state(const Node& node, const Version& version, uint32_t agent_id)
 {
     NodeState state;
