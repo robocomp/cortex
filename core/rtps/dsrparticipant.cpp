@@ -109,7 +109,7 @@ DSRParticipant::~DSRParticipant()
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id, uint8_t sync_mode_wire)
+std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init_impl(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id, uint8_t sync_mode_wire)
 {
     domain_id_ = domain_id;
     sync_mode_wire_ = sync_mode_wire;
@@ -204,7 +204,7 @@ eprosima::fastdds::dds::DomainParticipant *DSRParticipant::getParticipant()
     return mp_participant;
 }
 
-void DSRParticipant::remove_participant_and_entities()
+void DSRParticipant::remove_participant_and_entities_impl()
 {
     //if (!cleanup_enabled_) {
     //    return;
@@ -331,18 +331,18 @@ const eprosima::fastdds::rtps::GUID_t& DSRParticipant::getID() const
     return mp_participant->guid();
 }
 
-void DSRParticipant::add_subscriber(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*> val)
+void DSRParticipant::add_subscriber_impl(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*> val)
 {
     std::unique_lock<std::mutex> lck (sub_mtx);
     subscribers.emplace(id, val);
 }
-void DSRParticipant::add_publisher(const std::string& id, std::pair<eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> val)
+void DSRParticipant::add_publisher_impl(const std::string& id, std::pair<eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> val)
 {
     std::unique_lock<std::mutex> lck (pub_mtx);
     publishers.emplace(id, val);
 }
 
-void DSRParticipant::delete_subscriber(const std::string& id)
+void DSRParticipant::delete_subscriber_impl(const std::string& id)
 {
     std::unique_lock<std::mutex> lck (sub_mtx);
     try {
@@ -375,7 +375,7 @@ void DSRParticipant::delete_subscriber(const std::string& id)
     }
 }
 
-void DSRParticipant::delete_publisher(const std::string& id)
+void DSRParticipant::delete_publisher_impl(const std::string& id)
 {
     std::unique_lock<std::mutex> lck (pub_mtx);
     try {

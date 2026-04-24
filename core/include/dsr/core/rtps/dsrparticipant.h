@@ -11,13 +11,14 @@
 #include <dsr/core/types/internal_types.h>
 #include <dsr/core/rtps/dsrpublisher.h>
 #include <dsr/core/rtps/dsrsubscriber.h>
+#include <dsr/core/transport/transport_crtp.h>
 
-class DSRParticipant
+class DSRParticipant : public DSR::Transport::ParticipantTransportCRTP<DSRParticipant>
 {
 public:
     DSRParticipant();
     virtual ~DSRParticipant();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id=0, uint8_t sync_mode_wire = 0);
+    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::DomainParticipant *> init_impl(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id=0, uint8_t sync_mode_wire = 0);
     [[nodiscard]] int8_t get_domain_id() const { return domain_id_; }
     [[nodiscard]] uint8_t get_sync_mode_wire() const { return sync_mode_wire_; }
     [[nodiscard]] const eprosima::fastdds::rtps::GUID_t& getID() const;
@@ -36,12 +37,12 @@ public:
     [[nodiscard]] eprosima::fastdds::dds::Topic*  getAttEdgeTopic()       { return topic_edge_att;}
     [[nodiscard]] eprosima::fastdds::dds::DomainParticipant *getParticipant();
 
-    void add_subscriber(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>);
-    void add_publisher(const std::string& id, std::pair<eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*>);
-    void delete_subscriber(const std::string& id);
-    void delete_publisher(const std::string& id);
+    void add_subscriber_impl(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>);
+    void add_publisher_impl(const std::string& id, std::pair<eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*>);
+    void delete_subscriber_impl(const std::string& id);
+    void delete_publisher_impl(const std::string& id);
 
-    void remove_participant_and_entities();
+    void remove_participant_and_entities_impl();
 
 private:
     int8_t domain_id_ {0};

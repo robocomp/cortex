@@ -33,7 +33,7 @@ DSRSubscriber::~DSRSubscriber()
 = default;
 
 std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
-        DSRSubscriber::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
+        DSRSubscriber::init_impl(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
                          eprosima::fastdds::dds::Topic *topic,
                          int8_t domain_id,
                         const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
@@ -102,11 +102,11 @@ std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::Da
 }
 
 
-eprosima::fastdds::dds::Subscriber * DSRSubscriber::getSubscriber(){
+eprosima::fastdds::dds::Subscriber * DSRSubscriber::getSubscriber_impl(){
     return mp_subscriber;
 }
 
-eprosima::fastdds::dds::DataReader * DSRSubscriber::getDataReader() {
+eprosima::fastdds::dds::DataReader * DSRSubscriber::getDataReader_impl() {
     return mp_reader;
 }
 
