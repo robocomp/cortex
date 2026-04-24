@@ -68,6 +68,24 @@ TEST_CASE("Graph node operations", "[NODE]") {
         REQUIRE_FALSE(G.remove_attrib_local(n_id.value(), "level"));
     }
 
+    SECTION("Update existing node repeatedly") {
+        auto node_name = random_string();
+        auto n = Node::create<testtype_node_type>(node_name);
+        std::optional<uint64_t> r = G.insert_node(n);
+        REQUIRE(r.has_value());
+
+        for (int value : {1, 2, 3}) {
+            auto node = G.get_node(*r);
+            REQUIRE(node.has_value());
+            G.add_or_modify_attrib_local<level_att>(*node, value);
+            REQUIRE(G.update_node(*node));
+        }
+
+        auto updated = G.get_node(*r);
+        REQUIRE(updated.has_value());
+        REQUIRE(G.get_attrib_by_name<level_att>(*updated) == 3);
+    }
+
     SECTION("Can't update an existent node with different id") {
         auto node_name = random_string();
         auto n = Node::create<testtype_node_type>(node_name);
