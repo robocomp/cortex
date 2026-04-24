@@ -709,6 +709,10 @@ namespace DSR
         void update_maps_node_insert_impl(uint64_t id, std::string name, const std::string& type, const T& outgoing_edges) {
             std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
 
+            // Updates in the LWW backend flow through a delete+insert cache refresh.
+            // Re-inserting the node must clear any stale tombstone marker so future
+            // local updates are not rejected as "node is deleted".
+            deleted.erase(id);
             name_map[name] = id;
             id_map[id] = std::move(name);
             nodeType[type].emplace(id);

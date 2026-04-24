@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QtGlobal>
 #include "core/benchmark_config.h"
+#include <dsr/core/profiling.h>
 #include <cstdlib>
 #include <iostream>
 #include <optional>
@@ -74,6 +75,7 @@ void configureBenchmarkDefaultsFromEnv() {
     load_env_value("BENCH_MAX_AGENT_COUNT", config.max_agent_count);
     load_env_value("BENCH_CONCURRENT_WRITER_THREADS", config.concurrent_writer_threads);
     load_env_value("BENCH_RESULTS_DIRECTORY", config.results_directory);
+    DSR::profiling::configure_detail_level_from_env();
 }
 
 }  // namespace
@@ -128,6 +130,12 @@ int main(int argc, char* argv[]) {
     // Initialize Qt (required for signals/slots)
     QCoreApplication app(argc, argv);
     configureBenchmarkDefaultsFromEnv();
+
+    // Start profiling before benchmark fixture setup so graph construction,
+    // subscription thread bootstrap, and other one-time initialization are
+    // captured even if no hot-path zone has fired yet.
+    DSR::profiling::ensure_started();
+
     // Initialize Catch2
     Catch::Session session;
 
@@ -146,6 +154,7 @@ int main(int argc, char* argv[]) {
         std::cout << "=================================\n\n";
         std::cout << "Benchmark config:\n";
         std::cout << "  sync_mode      = " << DSR::Benchmark::sync_mode_name(DSR::Benchmark::default_config().sync_mode) << "\n";
+        std::cout << "  profile_detail = " << DSR::profiling::detail_level_name(DSR::profiling::get_detail_level()) << "\n";
         std::cout << "  warmup         = " << DSR::Benchmark::default_config().warmup_iterations << "\n";
         std::cout << "  measurements   = " << DSR::Benchmark::default_config().measurement_iterations << "\n";
         std::cout << "  sync_wait_ms   = " << DSR::Benchmark::default_config().sync_wait_time.count() << "\n";
@@ -176,10 +185,14 @@ int main(int argc, char* argv[]) {
         std::cout << "  ./dsr_benchmarks \"[.multi]\"         # Run multi-agent tests (may timeout)\n";
         std::cout << "  ./dsr_benchmarks -r json::out=x.json # Export to JSON\n";
         std::cout << "  ./dsr_benchmarks --verbose          # Show Qt debug messages\n";
+        std::cout << "  BENCH_PROFILE_DETAIL=min ./dsr_benchmarks \"[PROFILE]\" # Coarser zones\n";
+        std::cout << "  BENCH_PROFILE_DETAIL=hot ./dsr_benchmarks \"[PROFILE]\" # Full hot-path zones\n";
         std::cout << "\n";
         std::cout << "Note: [.multi] and [.extended] tests are hidden by default.\n";
         std::cout << "\n";
     }
 
-    return session.run();
+    const int result = session.run();
+    DSR::profiling::shutdown();
+    return result;
 }

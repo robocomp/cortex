@@ -1,13 +1,104 @@
 #include "dsr/core/profiling.h"
 
+#include <atomic>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
+#include <mutex>
+
+namespace DSR::profiling {
+namespace {
+
+std::atomic<int> g_detail_level{static_cast<int>(DetailLevel::Default)};
+std::atomic<bool> g_detail_level_explicit{false};
+std::once_flag g_detail_init_once;
+
+bool try_parse_detail_level_impl(const char* value, DetailLevel& out) noexcept
+{
+    if (value == nullptr || value[0] == '\0')
+        return false;
+
+    char normalized[16];
+    size_t i = 0;
+    for (; value[i] != '\0' && i + 1 < sizeof(normalized); ++i)
+        normalized[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(value[i])));
+    normalized[i] = '\0';
+
+    if (std::strcmp(normalized, "off") == 0 || std::strcmp(normalized, "0") == 0) {
+        out = DetailLevel::Off;
+    } else if (std::strcmp(normalized, "min") == 0 || std::strcmp(normalized, "1") == 0) {
+        out = DetailLevel::Min;
+    } else if (std::strcmp(normalized, "default") == 0 || std::strcmp(normalized, "2") == 0) {
+        out = DetailLevel::Default;
+    } else if (std::strcmp(normalized, "detail") == 0 || std::strcmp(normalized, "3") == 0) {
+        out = DetailLevel::Detail;
+    } else if (std::strcmp(normalized, "hot") == 0 || std::strcmp(normalized, "4") == 0) {
+        out = DetailLevel::Hot;
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace
+
+void configure_detail_level_from_env() noexcept
+{
+    std::call_once(g_detail_init_once, [] {
+        if (g_detail_level_explicit.load(std::memory_order_relaxed))
+            return;
+
+        DetailLevel parsed{};
+        if (try_parse_detail_level_impl(std::getenv("CORTEX_PROFILE_DETAIL"), parsed) ||
+            try_parse_detail_level_impl(std::getenv("BENCH_PROFILE_DETAIL"), parsed)) {
+            set_detail_level(parsed);
+        }
+    });
+}
+
+void set_detail_level(DetailLevel level) noexcept
+{
+    g_detail_level_explicit.store(true, std::memory_order_relaxed);
+    g_detail_level.store(static_cast<int>(level), std::memory_order_relaxed);
+}
+
+DetailLevel get_detail_level() noexcept
+{
+    return static_cast<DetailLevel>(g_detail_level.load(std::memory_order_relaxed));
+}
+
+bool detail_enabled(DetailLevel level) noexcept
+{
+    configure_detail_level_from_env();
+    return static_cast<int>(level) <= g_detail_level.load(std::memory_order_relaxed);
+}
+
+bool try_parse_detail_level(const char* value, DetailLevel& out) noexcept
+{
+    return try_parse_detail_level_impl(value, out);
+}
+
+const char* detail_level_name(DetailLevel level) noexcept
+{
+    switch (level) {
+        case DetailLevel::Off: return "off";
+        case DetailLevel::Min: return "min";
+        case DetailLevel::Default:
+        case DetailLevel::Detail: return "detail";
+        case DetailLevel::Hot: return "hot";
+    }
+    return "default";
+}
+
+} // namespace DSR::profiling
+
 #if defined(CORTEX_PROFILING_BACKEND_PERFETTO)
 
 #include <perfetto.h>
 
 #include <chrono>
 #include <thread>
-#include <cstdlib>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -77,13 +168,26 @@ void start_session()
 #endif
 
     perfetto::TraceConfig cfg;
-    cfg.add_buffers()->set_size_kb(32 * 1024);
+    auto* track_buffer = cfg.add_buffers();
+    track_buffer->set_size_kb(64 * 1024);
+    track_buffer->set_fill_policy(perfetto::TraceConfig::BufferConfig::DISCARD);
+#if defined(CORTEX_PERFETTO_CALLSTACK_LINUX_PERF)
+    auto* perf_buffer = cfg.add_buffers();
+    perf_buffer->set_size_kb(64 * 1024);
+#endif
+    cfg.set_flush_period_ms(1000);
+    cfg.mutable_incremental_state_config()->set_clear_period_ms(1000);
 
     {
         auto* ds_cfg = cfg.add_data_sources()->mutable_config();
         ds_cfg->set_name("track_event");
+        ds_cfg->set_target_buffer(0);
         perfetto::protos::gen::TrackEventConfig te_cfg;
         te_cfg.add_enabled_categories("*");
+        // Keep packets more self-contained on the system backend. This reduces
+        // the impact of isolated incremental-state loss, which is more common
+        // under WSL than on native Linux.
+        te_cfg.set_disable_incremental_timestamps(true);
         ds_cfg->set_track_event_config_raw(te_cfg.SerializeAsString());
     }
 
@@ -91,6 +195,7 @@ void start_session()
     {
         auto* ds_cfg = cfg.add_data_sources()->mutable_config();
         ds_cfg->set_name("linux.perf");
+        ds_cfg->set_target_buffer(1);
         perfetto::protos::gen::PerfEventConfig perf_cfg;
         perf_cfg.mutable_timebase()->set_frequency(1000);
         // Per-process scope: works without root when perf_event_paranoid <= 1.
@@ -124,6 +229,7 @@ void shutdown()
             return;
 
         DSR::profiling::TrackEvent::Flush();
+        g_session->FlushBlocking(3000);
         g_session->StopBlocking();
         const auto trace_data = g_session->ReadTraceBlocking();
 
