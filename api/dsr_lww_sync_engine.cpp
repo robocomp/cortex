@@ -12,27 +12,6 @@ using DSR::LWW::is_newer;
 using DSR::LWW::version_of;
 
 namespace {
-template <typename AttrMap>
-std::vector<std::string> collect_changed_attr_names(const AttrMap& before, const AttrMap& after)
-{
-    std::vector<std::string> changed;
-    changed.reserve(std::max(before.size(), after.size()));
-
-    for (const auto& [name, after_attr] : after) {
-        const auto before_it = before.find(name);
-        if (before_it == before.end() || !(before_it->second.value == after_attr.value)) {
-            changed.emplace_back(name);
-        }
-    }
-    for (const auto& [name, _] : before) {
-        if (!after.contains(name)) {
-            changed.emplace_back(name);
-        }
-    }
-
-    return changed;
-}
-
 SyncEngineHost::EdgeKeyList collect_outgoing_edge_keys(const LWW::FromIndex& from_idx, uint64_t from)
 {
     SyncEngineHost::EdgeKeyList outgoing_edges;
@@ -312,19 +291,29 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
     const auto old_type = it->second.type;
     auto old_outgoing_edges = collect_outgoing_edge_keys(from_idx_, node.id());
     auto version = version_of(now, host_.local_agent_id());
+    auto next_attrs = LWW::to_attr_state_map(node.attrs(), version);
+    auto attr_deltas = LWW::to_node_attr_delta_batch(node.id(), it->second.attrs, next_attrs);
+    effect.changed_attributes.reserve(attr_deltas.vec.size());
+    for (const auto& item : attr_deltas.vec) {
+        effect.changed_attributes.emplace_back(item.attr_name);
+    }
+
+    const bool metadata_changed = it->second.type != node.type() || it->second.name != node.name();
     it->second.type = node.type();
     it->second.name = node.name();
     it->second.version = version;
     it->second.agent_id = host_.local_agent_id();
-
-    std::map<std::string, AttrState> next_attrs = LWW::to_attr_state_map(node.attrs(), version);
-    effect.changed_attributes = collect_changed_attr_names(it->second.attrs, next_attrs);
     it->second.attrs = std::move(next_attrs);
 
     host_.update_maps_node_delete(node.id(), old_type, old_outgoing_edges);
     host_.update_maps_node_insert(node.id(), node.name(), node.type(), collect_outgoing_edge_keys(node.fano()));
     effect.applied = true;
-    effect.node_delta = NodeDeltaMessage{LWW::to_node_msg(it->second)};
+    if (!attr_deltas.vec.empty()) {
+        effect.node_attr_batch = NodeAttrDeltaBatchMessage{std::move(attr_deltas)};
+    }
+    if (metadata_changed) {
+        effect.node_delta = NodeDeltaMessage{LWW::to_node_msg(it->second)};
+    }
     return effect;
 }
 
@@ -397,9 +386,17 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
         }
         it->second = std::move(next_state);
         LWW::edge_index_insert(from_idx_, to_idx_, type_idx_, it->second);
+        effect.edge_delta = EdgeDeltaMessage{LWW::to_edge_msg(it->second)};
     } else {
-        effect.changed_attributes = collect_changed_attr_names(it->second.attrs, next_state.attrs);
+        auto attr_deltas = LWW::to_edge_attr_delta_batch(edge.from(), edge.to(), edge.type(), it->second.attrs, next_state.attrs);
+        effect.changed_attributes.reserve(attr_deltas.vec.size());
+        for (const auto& item : attr_deltas.vec) {
+            effect.changed_attributes.emplace_back(item.attr_name);
+        }
         it->second = std::move(next_state);
+        if (!attr_deltas.vec.empty()) {
+            effect.edge_attr_batch = EdgeAttrDeltaBatchMessage{std::move(attr_deltas)};
+        }
         // Index pointers remain valid — unordered_map guarantees pointer stability.
     }
 
@@ -408,7 +405,6 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     }
     host_.update_maps_edge_insert(edge.from(), edge.to(), edge.type());
     effect.applied = true;
-    effect.edge_delta = EdgeDeltaMessage{LWW::to_edge_msg(it->second)};
     return effect;
 }
 
