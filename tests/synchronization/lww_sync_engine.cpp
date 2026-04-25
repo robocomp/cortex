@@ -3,6 +3,7 @@
 #include <thread>
 
 #include "../utils.h"
+#include "../transport/fake_network.h"
 #include "dsr/api/dsr_api.h"
 #include "dsr/api/dsr_lww_sync_engine.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
@@ -10,55 +11,10 @@
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 
 using namespace DSR;
+using namespace DSR::Test;
 using namespace std::chrono_literals;
 
 namespace {
-
-struct FakeSyncHost final : SyncEngineHost
-{
-    uint32_t agent{17};
-    SyncMode mode{SyncMode::LWW};
-    bool copy{false};
-    std::unordered_map<uint64_t, Node> nodes;
-    std::unordered_map<std::tuple<uint64_t, uint64_t, std::string>, Edge, hash_tuple> edges;
-
-    uint32_t local_agent_id() const override { return agent; }
-    SyncMode local_sync_mode() const override { return mode; }
-    bool is_copy_graph() const override { return copy; }
-
-    void update_maps_node_insert(uint64_t id, std::string_view name, std::string_view type, const EdgeKeyList& outgoing_edges) override
-    {
-        Node node(agent, std::string{type});
-        node.id(id);
-        node.name(std::string{name});
-        for (const auto& [to, edge_type] : outgoing_edges) {
-            node.fano().emplace(std::pair{to, edge_type}, Edge(to, id, edge_type, {}, agent));
-        }
-        nodes[id] = std::move(node);
-    }
-
-    void update_maps_node_delete(uint64_t id, std::optional<std::string_view>, const EdgeKeyList&) override
-    {
-        nodes.erase(id);
-        for (auto it = edges.begin(); it != edges.end(); ) {
-            if (std::get<0>(it->first) == id || std::get<1>(it->first) == id) {
-                it = edges.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    }
-
-    void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string& type) override
-    {
-        edges[std::tuple{from, to, type}] = Edge(to, from, type, {}, agent);
-    }
-
-    void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string& type) override
-    {
-        edges.erase(std::tuple{from, to, type});
-    }
-};
 
 Node make_robot(uint64_t id, std::string name, int level)
 {

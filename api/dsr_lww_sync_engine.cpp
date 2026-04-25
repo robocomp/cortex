@@ -83,7 +83,10 @@ LWWSyncEngine::LWWSyncEngine(SyncEngineHost& host, const LWWSyncEngine& other)
       nodes_(other.nodes_),
       edges_(other.edges_),
       node_tombstones_(other.node_tombstones_),
-      edge_tombstones_(other.edge_tombstones_)
+      edge_tombstones_(other.edge_tombstones_),
+      pending_node_attrs_(other.pending_node_attrs_),
+      pending_edges_(other.pending_edges_),
+      pending_edge_attrs_(other.pending_edge_attrs_)
 {
     for (const auto& [key, state] : edges_) {
         LWW::edge_index_insert(from_idx_, to_idx_, type_idx_, state);
@@ -131,11 +134,23 @@ void LWWSyncEngine::prune_tombstones(uint64_t now)
 void LWWSyncEngine::store_node_tombstone(uint64_t id, Version version, uint64_t now)
 {
     node_tombstones_[id] = LWW::make_tombstone(version, now, tombstone_window_ms_);
+    pending_node_attrs_.erase(id);
+    std::erase_if(pending_edges_, [id](const LWWEdgeMsg& e) { return e.from == id || e.to == id; });
+    std::erase_if(pending_edge_attrs_, [id](const auto& kv) { return kv.first.from == id || kv.first.to == id; });
 }
 
 void LWWSyncEngine::store_edge_tombstone(uint64_t from, uint64_t to, const std::string& type, Version version, uint64_t now)
 {
-    edge_tombstones_[edge_key(from, to, type)] = LWW::make_tombstone(version, now, tombstone_window_ms_);
+    auto key = edge_key(from, to, type);
+    edge_tombstones_[key] = LWW::make_tombstone(version, now, tombstone_window_ms_);
+    if (auto it = pending_edge_attrs_.find(key); it != pending_edge_attrs_.end()) {
+        std::erase_if(it->second, [&version](const LWWEdgeAttrMsg& a) {
+            return !is_newer(version_of(a.timestamp, a.agent_id), version);
+        });
+        if (it->second.empty()) {
+            pending_edge_attrs_.erase(it);
+        }
+    }
 }
 
 void LWWSyncEngine::erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges)
@@ -483,6 +498,14 @@ void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
         host_.update_maps_node_insert(payload->id, payload->name, payload->type, collect_outgoing_edge_keys(from_idx_, payload->id));
     }
     host_.on_remote_node_updated(payload->id, payload->type, payload->agent_id);
+
+    if (auto pit = pending_node_attrs_.find(payload->id); pit != pending_node_attrs_.end()) {
+        LWWNodeAttrVec vec;
+        vec.vec = std::move(pit->second);
+        pending_node_attrs_.erase(pit);
+        apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(vec)});
+    }
+    flush_pending_edges();
 }
 
 void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
@@ -501,11 +524,9 @@ void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
     if (LWW::delta_is_stale(edge_tombstones_, edges_, edge_key_view(payload->from, payload->to, payload->type), version)) {
         return;
     }
-    if (!nodes_.contains(payload->from) || !nodes_.contains(payload->to)) {
-        return;
-    }
 
     auto key = edge_key(payload->from, payload->to, payload->type);
+
     if (payload->deleted) {
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::apply_remote_edge_delta delete");
         std::optional<Edge> deleted_edge;
@@ -520,6 +541,11 @@ void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
         return;
     }
 
+    if (!nodes_.contains(payload->from) || !nodes_.contains(payload->to)) {
+        pending_edges_.push_back(std::move(*payload));
+        return;
+    }
+
     {
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::apply_remote_edge_delta upsert");
         EdgeState state = LWW::to_edge_state(*payload);
@@ -530,6 +556,14 @@ void LWWSyncEngine::apply_remote_edge_delta(EdgeDeltaMessage&& delta)
         edge_tombstones_.erase(key);
         host_.update_maps_edge_insert(payload->from, payload->to, payload->type);
     }
+
+    if (auto pit = pending_edge_attrs_.find(key); pit != pending_edge_attrs_.end()) {
+        LWWEdgeAttrVec vec;
+        vec.vec = std::move(pit->second);
+        pending_edge_attrs_.erase(pit);
+        apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(vec)});
+    }
+
     host_.on_remote_edge_updated(payload->from, payload->to, payload->type, payload->agent_id);
 }
 
@@ -550,12 +584,16 @@ void LWWSyncEngine::apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage&& bat
     std::unordered_map<uint64_t, NodeAttrBatchChange> changes;
     {
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::apply_remote_node_attr_batch merge");
-        for (const auto& item : payload->vec) {
+        for (auto& item : payload->vec) {
+            auto version = version_of(item.timestamp, item.agent_id);
             auto it = nodes_.find(item.node_id);
             if (it == nodes_.end()) {
+                auto ts_it = node_tombstones_.find(item.node_id);
+                if (ts_it == node_tombstones_.end() || is_newer(version, ts_it->second.version)) {
+                    pending_node_attrs_[item.node_id].push_back(item);
+                }
                 continue;
             }
-            auto version = version_of(item.timestamp, item.agent_id);
             auto attr_it = it->second.attrs.find(item.attr_name);
             if (attr_it != it->second.attrs.end() && !is_newer(version, attr_it->second.version)) {
                 continue;
@@ -598,12 +636,16 @@ void LWWSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& bat
     std::unordered_map<EdgeKey, EdgeAttrBatchChange, EdgeKeyHash, EdgeKeyEqual> changes;
     {
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::apply_remote_edge_attr_batch merge");
-        for (const auto& item : payload->vec) {
+        for (auto& item : payload->vec) {
+            auto version = version_of(item.timestamp, item.agent_id);
             auto it = edges_.find(edge_key_view(item.from, item.to, item.type));
             if (it == edges_.end()) {
+                auto ts_it = edge_tombstones_.find(edge_key_view(item.from, item.to, item.type));
+                if (ts_it == edge_tombstones_.end() || is_newer(version, ts_it->second.version)) {
+                    pending_edge_attrs_[edge_key(item.from, item.to, item.type)].push_back(item);
+                }
                 continue;
             }
-            auto version = version_of(item.timestamp, item.agent_id);
             auto attr_it = it->second.attrs.find(item.attr_name);
             if (attr_it != it->second.attrs.end() && !is_newer(version, attr_it->second.version)) {
                 continue;
@@ -716,4 +758,18 @@ const LWW::NodeState* LWWSyncEngine::get_node_ptr(uint64_t id) const
         return &it->second;
     }
     return nullptr;
+}
+
+void LWWSyncEngine::flush_pending_edges()
+{
+    if (pending_edges_.empty()) return;
+    std::vector<LWWEdgeMsg> still_pending;
+    for (auto& msg : pending_edges_) {
+        if (!nodes_.contains(msg.from) || !nodes_.contains(msg.to)) {
+            still_pending.push_back(std::move(msg));
+            continue;
+        }
+        apply_remote_edge_delta(EdgeDeltaMessage{std::move(msg)});
+    }
+    pending_edges_ = std::move(still_pending);
 }
