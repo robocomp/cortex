@@ -24,7 +24,7 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 
 
-add_executable(tests test.cpp 
+add_executable(tests test.cpp
                      graph/edge_operations.cpp
                      graph/node_operations.cpp
                      graph/graph_operations.cpp
@@ -37,6 +37,8 @@ add_executable(tests test.cpp
                      synchronization/type_translation.cpp
                      synchronization/lww_sync_engine.cpp
                      synchronization/graph_signals.cpp
+                     synchronization/fake_network_tests.cpp
+                     transport/fake_network.h
                      utils.h)
 
 

@@ -79,6 +79,8 @@ private:
     void store_edge_tombstone(uint64_t from, uint64_t to, const std::string& type, Version version, uint64_t now);
     void erase_related_edges(uint64_t node_id, Version version, uint64_t now, std::vector<Edge>* removed_edges = nullptr);
 
+    void flush_pending_edges();
+
     SyncEngineHost& host_;
     uint64_t tombstone_window_ms_;
     uint64_t logical_clock_ms_{0};
@@ -87,6 +89,13 @@ private:
     std::unordered_map<EdgeKey, EdgeState, EdgeKeyHash, EdgeKeyEqual> edges_;
     std::unordered_map<uint64_t, Tombstone> node_tombstones_;
     std::unordered_map<EdgeKey, Tombstone, EdgeKeyHash, EdgeKeyEqual> edge_tombstones_;
+
+    // Pending buffers for out-of-order delivery.
+    // Items are buffered when their parent entity doesn't exist yet.
+    // The only reason to discard is staleness (version ≤ stored/tombstone), never missing parent.
+    std::unordered_map<uint64_t, std::vector<LWWNodeAttrMsg>> pending_node_attrs_;
+    std::vector<LWWEdgeMsg> pending_edges_;
+    std::unordered_map<EdgeKey, std::vector<LWWEdgeAttrMsg>, EdgeKeyHash, EdgeKeyEqual> pending_edge_attrs_;
 
     FromIndex from_idx_;
     ToIndex to_idx_;
