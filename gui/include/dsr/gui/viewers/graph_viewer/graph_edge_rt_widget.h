@@ -9,6 +9,8 @@
 #include <Eigen/Geometry> 
 #include "graph_edge_rt_widget_UI.h"
 
+static const int precision = 3;
+
 class GraphEdgeRTWidget : public  QWidget
 {
     Q_OBJECT
@@ -33,7 +35,6 @@ public:
         std::optional<DSR::Node> from_node = graph->get_node(from);
         std::optional<DSR::Node> to_node = graph->get_node(to);
         std::optional<DSR::Edge> edge = graph->get_edge(from, to, edge_type);
-        qDebug()<<__FUNCTION__ <<from_node.has_value()<<to_node.has_value()<<edge.has_value();
         if (edge.has_value() and from_node.has_value() and to_node.has_value())
         {
             from_string = to_node.value().name();
@@ -41,7 +42,6 @@ public:
 
             //TODO: Check this
             setWindowTitle(QString::fromStdString(edge_type) + ": " + QString::fromStdString(from_string) + "(" + QString::fromStdString(from_node.value().type()) + ") to " + QString::fromStdString(to_string) + "(" + QString::fromStdString(to_node.value().type()) + ")");
-            qDebug()<<__FUNCTION__ <<QString::fromStdString(edge_type) + ": " + QString::fromStdString(from_string) + "(" + QString::fromStdString(from_node.value().type()) + ") to " + QString::fromStdString(to_string) + "(" + QString::fromStdString(to_node.value().type()) + ")";
             connect(ui.comboBox_reference, SIGNAL(currentTextChanged(QString)), this, SLOT(update_combo(QString)));
 
             //TODO: temporary added to check yolo pose estimation
@@ -61,9 +61,7 @@ public:
                 this->ui.tableWidget_Robot->setItem(currentRowCount + 1, 1, new QTableWidgetItem("Looking rot Y"));
                 this->ui.tableWidget_Robot->setItem(currentRowCount + 1, 2, new QTableWidgetItem("Looking rot Z"));
             }
-            qDebug()<<__FUNCTION__ <<"update combo";
             update_combo(ui.comboBox_reference->currentText());
-            qDebug()<<__FUNCTION__<<"To show";
             show();
         }
     };
@@ -93,8 +91,6 @@ public:
 public slots:
     void update_combo(const QString& combo_text)
     {
-        qInfo() << "update_combo"<< combo_text;
-
         this->reference = to_string;
         if (combo_text == "root")
         {
@@ -107,7 +103,6 @@ public slots:
     };
     void update_values()
     {
-        static const int precision = 6;
         std::optional<Mat::Vector6d> transform = inner_eigen->transform_axis(this->reference, this->from_string, 0, this->edge_type);
         if (transform.has_value())
         {
@@ -118,12 +113,12 @@ public slots:
             for(int pos = 0;pos < 3;pos++)
             {
                 //Get position
-                this->ui.tableWidget_Robot->item(0, pos)->setText(QString::number(transform.value()[pos], 'f', precision));
+                this->ui.tableWidget_Robot->item(0, pos)->setText(QString::number(transform.value()[pos], 'g', precision));
 
                 //Get angles
                 angles[pos] = transform.value()[pos+3];
-                this->ui.tableWidget_Robot->item(1, pos)->setText(QString::number(angles[pos], 'f', precision)); //Radians
-                this->ui.tableWidget_Robot->item(2, pos)->setText(QString::number(angles[pos] * 180 / M_PI, 'f', precision)); //Degrees
+                this->ui.tableWidget_Robot->item(1, pos)->setText(QString::number(angles[pos], 'g', precision)); //Radians
+                this->ui.tableWidget_Robot->item(2, pos)->setText(QString::number(angles[pos] * 180 / M_PI, 'g', precision)); //Degrees
             }
 
             //Quaternion
@@ -131,10 +126,11 @@ public slots:
                                             Eigen::AngleAxisd(angles[1], Eigen::Vector3d::UnitY()) * 
                                             Eigen::AngleAxisd(angles[2], Eigen::Vector3d::UnitZ());
 
-            this->ui.tableWidget_Robot->item(3, 0)->setText(QString::number(quaternion.x(), 'f', precision));
-            this->ui.tableWidget_Robot->item(3, 1)->setText(QString::number(quaternion.y(), 'f', precision));
-            this->ui.tableWidget_Robot->item(3, 2)->setText(QString::number(quaternion.z(), 'f', precision));
-            this->ui.tableWidget_Robot->item(3, 3)->setText(QString::number(quaternion.w(), 'f', precision));
+            this->ui.tableWidget_Robot->item(3, 0)->setText(QString::number(quaternion.x(), 'g', precision));
+            this->ui.tableWidget_Robot->item(3, 1)->setText(QString::number(quaternion.y(), 'g', precision));
+            this->ui.tableWidget_Robot->item(3, 2)->setText(QString::number(quaternion.z(), 'g', precision));
+            this->ui.tableWidget_Robot->item(3, 3)->setText(QString::number(quaternion.w(), 'g', precision));
+
 
         }
         else
@@ -145,7 +141,6 @@ public slots:
     {
         if (edge_type==this->edge_type)
         {
-            std::cout<<__FUNCTION__<<"_edge-"<<edge_type<<std::endl;
             //pose values
             if(edge_type == "RT" || edge_type == "looking-at" || edge_type == "VRT")
             {
@@ -163,7 +158,6 @@ public slots:
             }
             // velocity and covariance matrix
             if (edge_type == "RT" || edge_type == "VRT"){
-                static const int precision = 6;
 
                 std::optional<DSR::Edge> edge = graph->get_edge(from, to, edge_type);
                 if(edge.has_value())
@@ -178,34 +172,34 @@ public slots:
                     
                     if(translation_vel.has_value())
                         for(int pos = 0;pos < 3;pos++)
-                            this->ui.tableWidget_Robot->item(4, pos)->setText(QString::number(translation_vel.value()[pos], 'f', precision)); //Lineal Vel
+                            this->ui.tableWidget_Robot->item(4, pos)->setText(QString::number(translation_vel.value()[pos], 'g', precision)); //Lineal Vel
 
                     if(rotation_vel.has_value())
                         for(int pos = 0;pos < 3;pos++)
-                            this->ui.tableWidget_Robot->item(5, pos)->setText(QString::number(rotation_vel.value()[pos], 'f', precision)); //Rot Vel
+                            this->ui.tableWidget_Robot->item(5, pos)->setText(QString::number(rotation_vel.value()[pos], 'g', precision)); //Rot Vel
                     
                     if(translation_acc.has_value())
                         for(int pos = 0;pos < 3;pos++)
-                            this->ui.tableWidget_Robot->item(6, pos)->setText(QString::number(translation_acc.value()[pos], 'f', precision)); //Lineal ACC
+                            this->ui.tableWidget_Robot->item(6, pos)->setText(QString::number(translation_acc.value()[pos], 'g', precision)); //Lineal ACC
     
                     if(rotation_acc.has_value())
                         for(int pos = 0;pos < 3;pos++)
-                            this->ui.tableWidget_Robot->item(7, pos)->setText(QString::number(rotation_acc.value()[pos], 'f', precision)); //Rot ACC
+                            this->ui.tableWidget_Robot->item(7, pos)->setText(QString::number(rotation_acc.value()[pos], 'g', precision)); //Rot ACC
 
                     if (se2_covariance.has_value())
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
-                                this->ui.tableWidget_covariance_pose_matrix->item(posy, posx)->setText(QString::number(se2_covariance.value()[posy*6 + posx], 'f', precision)); //Covariance Matrix
+                                this->ui.tableWidget_covariance_pose_matrix->item(posy, posx)->setText(QString::number(se2_covariance.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
 
                     if (se2_covariance_velocity.has_value())
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
-                                this->ui.tableWidget_covariance_velocity_matrix->item(posy, posx)->setText(QString::number(se2_covariance_velocity.value()[posy*6 + posx], 'f', precision)); //Covariance Matrix
+                                this->ui.tableWidget_covariance_velocity_matrix->item(posy, posx)->setText(QString::number(se2_covariance_velocity.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
 
                     if (se2_covariance_acceleration.has_value())
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
-                                this->ui.tableWidget_covariance_acceleration_matrix->item(posy, posx)->setText(QString::number(se2_covariance_acceleration.value()[posy*6 + posx], 'f', precision)); //Covariance Matrix
+                                this->ui.tableWidget_covariance_acceleration_matrix->item(posy, posx)->setText(QString::number(se2_covariance_acceleration.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
                 } 
                 else 
                     std::cerr<<__FUNCTION__<<" Error retriving RT data"<<std::endl;
