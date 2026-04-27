@@ -21,6 +21,7 @@
 #include <QScreen>
 #include <QStringList>
 #include <QStatusBar>
+#include <qsharedpointer.h>
 #include <utility>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
@@ -28,6 +29,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include "dsr/gui/viewers/graph_viewer/graph_viewer.h"
 #include "sys/times.h"
 #include <fcntl.h>
 
@@ -313,6 +315,19 @@ void DSRViewer::initialize_views(int options, view central)
         {
             qobject_cast<GraphViewer *>(widgets_by_type[view::graph]->widget)->toggle_animation(state);
         });
+
+        auto layout_menu = window->menuBar()->addMenu(window->tr("&Graph Layout"));
+
+        for (auto str : {"dot", "neato", "fdp", "sfdp", "circo", "twopi"}) {
+            auto action = std::string("Graphviz ") + str;
+            QAction *action_graphviz = new QAction(action.data(), this);
+            action_graphviz->setStatusTip(tr(action.data()));
+            layout_menu->addAction(action_graphviz);
+            connect(action_graphviz, &QAction::triggered, this, [this, str](bool state)
+            {
+                qobject_cast<GraphViewer *>(widgets_by_type[view::graph]->widget)->compute_layout(str);
+            });
+        }
     }
 
 //	Tabification of current docks
@@ -337,7 +352,7 @@ void DSRViewer::initialize_views(int options, view central)
                         tree_widget,
                         &TreeViewer::node_check_state_changed,
                         graph_widget,
-                        [=](int value, int id, const std::string &type, QTreeWidgetItem *)
+                        [=](int value, uint64_t id, const std::string &type, QTreeWidgetItem *)
                         {
                             graph_widget->hide_show_node_SLOT(id, value == 2);
                         });

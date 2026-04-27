@@ -4,6 +4,7 @@
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
 #include <dsr/gui/viewers/tree_viewer/tree_viewer.h>
+#include <qdebug.h>
 
 using namespace DSR ;
 
@@ -70,6 +71,7 @@ void TreeViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type,  
 		auto node = G->get_node(id);
 		if (tree_map.count(id)==0)
 		{
+			qDebug() << __FUNCTION__ << "new node id:" << id << "type:" << QString::fromStdString(type);
 			QTreeWidgetItem* symbol_widget = nullptr;
 			if (types_map.count(type)) {
 				symbol_widget = types_map[type];
@@ -130,8 +132,7 @@ void TreeViewer::del_edge_SLOT(const std::uint64_t from, const std::uint64_t to,
 
 void TreeViewer::del_node_SLOT(uint64_t id)
 {
-
-    qDebug()<<__FUNCTION__<<":"<<__LINE__;
+    qDebug()<<__FUNCTION__<<"node id:"<<id;
 	while (tree_map.count(id) > 0) {
 		auto item = tree_map[id];
 		this->invisibleRootItem()->removeChild(item);
@@ -154,10 +155,12 @@ void TreeViewer::category_change_SLOT(int value, QTreeWidgetItem* parent)
 void TreeViewer::node_change_SLOT(int value, uint64_t id, const std::string &type,  QTreeWidgetItem* parent)
 {
 	QCheckBox* sender = qobject_cast<QCheckBox*>(this->sender());
-	if(sender)
+	if(sender and G->get_node(id).has_value())
 	{
 		qDebug()<<"Emitting signal for "<<value<< qobject_cast<QCheckBox*>(this->itemWidget(parent,0))->text();
 		emit node_check_state_changed(value, id, type, parent);
+	} else {
+		qDebug() << __FUNCTION__ << "skipping, node no longer exists in G, id:" << id;
 	}
 }
 
@@ -257,12 +260,11 @@ void TreeViewer::update_attribute_widgets(Node* node)
 			if(not q_attr)
 				throw std::runtime_error("Problem creating tree widget for node" +node->name()+" attribute "+key);
 		}
+
 		switch (value.selected()) {
             case 0: {
-
                 QLineEdit *ledit = qobject_cast<QLineEdit *>(this->itemWidget(q_attr, 1));
                 ledit->setText(QString::fromStdString(value.str()));
-
             }
                 break;
             case 1: {
@@ -277,6 +279,10 @@ void TreeViewer::update_attribute_widgets(Node* node)
                 break;
             case 3: {
                 QWidget *widget = qobject_cast<QWidget *>(this->itemWidget(q_attr, 1));
+				if (!widget) {
+					qDebug() << __PRETTY_FUNCTION__ << " Skip Attribute " << key.data()  << " widget doesn't exist " << "\n";
+					continue;
+				}
                 int count = 0;
                 for (auto spin : widget->findChildren<QDoubleSpinBox *>()) {
                     spin->setValue(value.float_vec()[count]);

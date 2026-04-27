@@ -5,6 +5,11 @@
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
 #include <dsr/gui/viewers/graph_viewer/graph_viewer.h>
 #include <QMessageBox>
+#include <graphviz/cgraph.h>
+#include <graphviz/gvc.h>
+#include <graphviz/types.h>
+#include <qglobal.h>
+#include <string>
 
 using namespace DSR ;
 
@@ -17,6 +22,9 @@ GraphViewer::GraphViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  
     qRegisterMetaType<std::string>("std::string");
     G = std::move(G_);
 	own = std::shared_ptr<GraphViewer>(this);
+
+    graphviz_context = gvContext();
+    graphviz_graph =  agopen((char*)"G", Agdirected, nullptr);
 
     contextMenu = new QMenu(this);
     showMenu = contextMenu->addMenu(tr("&Show:"));
@@ -55,6 +63,8 @@ GraphViewer::~GraphViewer()
 
 	}
 	scene.clear();
+    agclose(graphviz_graph);
+    gvFreeContext(graphviz_context);
 }
 
 void GraphViewer::createGraph()
@@ -157,6 +167,12 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
             color = G->get_attrib_by_name<color_att>(n.value()).value_or(color);
 			gnode->set_color(color);
 			gnode->setType(type);
+            auto id_str = std::to_string(id);
+            Agnode_t* gvnode = agnode(graphviz_graph, id_str.data(), 1);
+            agset(gvnode, (char*)"width", (char*)"1.5");
+            agset(gvnode, (char*)"height", (char*)"1.5");
+            agset(gvnode, (char*)"shape", (char*)"box");
+            agset(gvnode, (char*)"fixedsize", (char*)"true");
         }
         else
 		{
@@ -186,6 +202,9 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
                 add_or_assign_edge_SLOT(edges.from(), edges.to(), edges.type());
         }
     }
+
+	this->scene.setSceneRect(scene.itemsBoundingRect());
+	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
 }
 
 GraphNode* GraphViewer::new_visual_node(uint64_t id, const std::string &type, const std::string &name, bool debug)
@@ -215,6 +234,15 @@ void GraphViewer::add_or_assign_edge_SLOT(std::uint64_t from, std::uint64_t to, 
             {
                 auto item = this->new_visual_edge(from, to, edge_tag);
                 gmap_edges.insert(std::make_pair(key, item));
+
+                auto from_str = std::to_string(from);
+                auto to_str = std::to_string(to);
+                Agnode_t *gvnode_f = agfindnode(graphviz_graph, from_str.data());
+                Agnode_t *gvnode_t = agfindnode(graphviz_graph, to_str.data());
+
+                Agedge_t* gvedge = agedge(graphviz_graph, gvnode_f, gvnode_t, nullptr, 1);
+                agset(gvedge, (char *)"type", (char *)edge_tag.data());
+
             }
             if (gmap_edges[key]) gmap_edges[key]->change_detected();
         }
@@ -252,7 +280,7 @@ GraphEdge* GraphViewer::new_visual_edge(std::uint64_t from, std::uint64_t to, co
 
 void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std::string &edge_tag)
 {
-    qDebug()<<__FUNCTION__<<":"<<__LINE__;
+    qDebug()<<__FUNCTION__<<"from:"<<from<<"to:"<<to<<"type:"<<QString::fromStdString(edge_tag);
 	try {
         //std::cout << "[SLOT] Delete edge:  "<<from << ", " << to << ", "<< edge_tag<< std::endl;
 		std::tuple<std::uint64_t, std::uint64_t, std::string> key = std::make_tuple(from, to, edge_tag);
@@ -266,6 +294,15 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
                 scene.removeItem(edge);
                 delete edge;
             }
+
+            auto from_str = std::to_string(from);
+            auto to_str = std::to_string(to);
+            Agnode_t *gvnode_f = agfindnode(graphviz_graph, from_str.data());
+            Agnode_t *gvnode_t = agfindnode(graphviz_graph, to_str.data());
+
+            if (Agedge_t *gvedge = agfindedge(graphviz_graph, gvnode_f, gvnode_t)) {
+                agdeledge(graphviz_graph, gvedge);
+            }
 		}
 	} catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 
@@ -274,14 +311,20 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
 // remove node from scene
 void GraphViewer::del_node_SLOT(uint64_t id)
 {
-    qDebug()<<__FUNCTION__<<":"<<__LINE__;
+    qDebug()<<__FUNCTION__<<"node id:"<<id;
     try {
         //std::cout << "[SLOT] Delete node:  "<<id<< std::endl;
         while (gmap.count(id) > 0) {
             auto item = gmap.at(id);
             scene.removeItem(item);
+            for (auto &[type, ids] : type_id_map)
+                ids.erase(id);
             delete item;
             gmap.erase(id);
+            auto id_str = std::to_string(id);
+            if (Agnode_t *gvnode = agfindnode(graphviz_graph, id_str.data())) {
+                agdelnode(graphviz_graph, gvnode);
+            }
         }
     } catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 
@@ -289,7 +332,12 @@ void GraphViewer::del_node_SLOT(uint64_t id)
 
 void GraphViewer::hide_show_node_SLOT(uint64_t id, bool visible)
 {
-	auto item = gmap[id];
+	auto it = gmap.find(id);
+	if (it == gmap.end() || it->second == nullptr) {
+		qDebug() << __FUNCTION__ << "skipping missing node" << id;
+		return;
+	}
+	auto item = it->second;
 	item->setVisible(visible);
 	for (const auto &gedge: item->edgeList)
 	{
@@ -333,4 +381,38 @@ void GraphViewer::remove_node_SLOT(uint64_t node_id)
 {
     std::cout << "Remove node in graph_viewer class"<<node_id <<std::endl;
     G->delete_node(node_id);
+}
+
+void GraphViewer::compute_layout(const char * alg) {
+    
+    gvLayout(graphviz_context, graphviz_graph, alg);
+
+    qreal root_x = 0.0, root_y = 0.0; 
+    for (Agnode_t* n = agfstnode(graphviz_graph); n; n = agnxtnode(graphviz_graph, n)) {
+        auto name = agnameof(n);
+        uint64_t id = std::stoull(name);
+        double x = ND_coord(n).x;
+        double y = ND_coord(n).y;
+        auto *gnode = gmap.at(id);
+        if (gnode) gnode->setPos(x, y);
+        if (std::string_view(name) == std::string_view("root")) {
+            root_x = x;
+            root_y = y;
+        }
+        // We don't need to process the edges to render them
+        //Uncomment this is the layout propagation is desired
+        //qDebug() << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id ;
+        std::optional<Node> g_node = G->get_node(id);
+        if (g_node.has_value()) {
+            G->add_or_modify_attrib_local<pos_x_att>(*g_node, (float) x);
+            G->add_or_modify_attrib_local<pos_y_att>(*g_node,  (float) y);
+            G->update_node(*g_node);
+        }
+    }
+
+    centerOn(root_x, root_y);
+	this->scene.setSceneRect(scene.itemsBoundingRect());
+	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
+
+    gvFreeLayout(graphviz_context, graphviz_graph);
 }

@@ -6,6 +6,7 @@
 #include "catch2/catch_test_macros.hpp"
 
 #include "dsr/core/types/user_types.h"
+#include "dsr/core/types/type_checking/dsr_edge_type.h"
 
 #include "dsr/api/dsr_api.h"
 #include "../utils.h"
@@ -120,6 +121,28 @@ TEST_CASE("Graph node operations", "[NODE]") {
         REQUIRE_FALSE(r);
     }
 
+    SECTION("Deleting a node removes incoming edges from other nodes") {
+        auto n1 = Node::create<testtype_node_type>();
+        auto id1 = G.insert_node(n1);
+        REQUIRE(id1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>();
+        auto id2 = G.insert_node(n2);
+        REQUIRE(id2.has_value());
+
+        // Create edge n1 -> n2
+        auto e = Edge::create<in_edge_type>(*id1, *id2);
+        REQUIRE(G.insert_or_assign_edge(e));
+        REQUIRE(G.get_edge(*id1, *id2, std::string(in_edge_type::attr_name)).has_value());
+
+        // Deleting n2 must also remove the incoming edge from n1
+        REQUIRE(G.delete_node(*id2));
+        REQUIRE_FALSE(G.get_edge(*id1, *id2, std::string(in_edge_type::attr_name)).has_value());
+
+        // n1 should still exist
+        REQUIRE(G.get_node(*id1).has_value());
+    }
+
     SECTION("Create a node with an user defined name") {
         auto name = random_string();
         Node n;
@@ -133,7 +156,70 @@ TEST_CASE("Graph node operations", "[NODE]") {
 }
 
 
-TEST_CASE("Node creation", 
+TEST_CASE("Insert node with specific id", "[NODE]") {
+
+    auto filename = make_empty_config_file();
+    DSRGraph G(random_string(10), rand() % 1200, filename);
+
+    SECTION("Insert a node with a specific id") {
+        auto node_name = random_string();
+        uint64_t specific_id = 5000;
+        auto n = Node::create<testtype_node_type>(node_name);
+        n.id(specific_id);
+        std::optional<uint64_t> r = G.insert_node_with_id(n);
+        REQUIRE(r.has_value());
+        REQUIRE(r.value() == specific_id);
+        std::optional<Node> retrieved = G.get_node(specific_id);
+        REQUIRE(retrieved.has_value());
+        REQUIRE(retrieved->name() == node_name);
+    }
+
+    SECTION("Insert a node with a duplicate id fails") {
+        auto n1 = Node::create<testtype_node_type>(random_string());
+        uint64_t specific_id = 6000;
+        n1.id(specific_id);
+        std::optional<uint64_t> r1 = G.insert_node_with_id(n1);
+        REQUIRE(r1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>(random_string());
+        n2.id(specific_id);
+        std::optional<uint64_t> r2 = G.insert_node_with_id(n2);
+        REQUIRE_FALSE(r2.has_value());
+    }
+
+    SECTION("Insert a node with empty name generates a name") {
+        uint64_t specific_id = 7000;
+        auto n = Node::create<testtype_node_type>("");
+        n.id(specific_id);
+        std::optional<uint64_t> r = G.insert_node_with_id(n);
+        REQUIRE(r.has_value());
+        std::optional<Node> retrieved = G.get_node(specific_id);
+        REQUIRE(retrieved.has_value());
+        REQUIRE_FALSE(retrieved->name().empty());
+    }
+
+    SECTION("Insert a node with a duplicate name generates a new name") {
+        auto shared_name = random_string();
+        uint64_t id1 = 8000, id2 = 8001;
+
+        auto n1 = Node::create<testtype_node_type>(shared_name);
+        n1.id(id1);
+        std::optional<uint64_t> r1 = G.insert_node_with_id(n1);
+        REQUIRE(r1.has_value());
+
+        auto n2 = Node::create<testtype_node_type>(shared_name);
+        n2.id(id2);
+        std::optional<uint64_t> r2 = G.insert_node_with_id(n2);
+        REQUIRE(r2.has_value());
+
+        std::optional<Node> retrieved = G.get_node(id2);
+        REQUIRE(retrieved.has_value());
+        REQUIRE(retrieved->name() != shared_name);
+    }
+}
+
+
+TEST_CASE("Node creation",
           "[Node]") {
 
 

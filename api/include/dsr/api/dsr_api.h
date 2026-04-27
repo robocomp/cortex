@@ -15,6 +15,7 @@
 #include <typeinfo>
 #include <optional>
 #include <type_traits>
+#include <limits>
 #include "dsr/core/crdt/delta_crdt.h"
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
@@ -30,11 +31,14 @@
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
 #include "dsr/api/dsr_graph_settings.h"
+#include "dsr/api/dsr_logging.h"
+#include "dsr/api/dsr_signal_emitter.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/utils.h"
 #include "dsr/core/id_generator.h"
+#include "dsr_signal_emitter.h"
 #include "threadpool/threadpool.h"
 
 #include <QObject>
@@ -45,6 +49,7 @@ namespace DSR
 {
     using Nodes = std::unordered_map<uint64_t , mvreg<CRDTNode>>;
     using IDType = uint64_t;
+    static constexpr uint64_t CLEAR_DELETED_SIGNAL = std::numeric_limits<uint64_t>::max();
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
@@ -52,14 +57,15 @@ namespace DSR
     class DSRGraph : public QObject
     {
         friend RT_API;
+        friend class DSRGraphTestAccess;
 
         public:
         size_t size() const;
 
         DSRGraph(GraphSettings settings);
-        DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true);
-        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true)
-                                : DSRGraph(name, id, dsr_input_file, all_same_host)
+        DSRGraph(std::string name, uint32_t id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0, SignalMode = SignalMode::QT);
+        [[deprecated("root parameter is not used anymore")]] DSRGraph(uint64_t root, std::string name, int id, const std::string& dsr_input_file = std::string(), bool all_same_host = true, int8_t domain_id=0, SignalMode mode = SignalMode::QT)
+                                : DSRGraph(name, id, dsr_input_file, all_same_host, domain_id, mode)
         {}
 
         ~DSRGraph() override;
@@ -87,6 +93,8 @@ namespace DSR
         std::optional<Node> get_node(uint64_t id);
         template<typename No>
         std::optional<uint64_t> insert_node(No &&node) requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>);
+        template<typename No>
+        std::optional<uint64_t> insert_node_with_id(No &&node) requires (std::is_same_v<std::remove_reference_t<No>, DSR::Node>);
         template<typename No>
         bool update_node(No &&node) requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>);
         bool delete_node(const DSR::Node& node);
@@ -471,6 +479,22 @@ namespace DSR
 
         }
 
+        void clear_deleted()
+        {
+            {
+                std::unique_lock<std::shared_mutex> lock(_mutex);
+                std::unique_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
+                deleted.clear();
+            }
+            if (!copy)
+            {
+                IDL::MvregNode signal;
+                signal.id(CLEAR_DELETED_SIGNAL);
+                signal.agent_id(agent_id);
+                dsrpub_node.write(&signal);
+            }
+        }
+
 
         //////////////////////////////////////////////////////
         ///  Attribute filters
@@ -547,6 +571,14 @@ namespace DSR
             return std::ranges::find(valid_edge_types, edge_type) != valid_edge_types.end();
         }
 
+
+        //////////////////////////////////////////////////
+        ///// QueuedSignals for python
+        /////////////////////////////////////////////////
+
+        QueuedSignalRunner* get_signal_runner() {
+            return emitter.runner.get();
+        }
     private:
 
         DSRGraph(const DSRGraph& G); //Private constructor for DSRCopy
@@ -561,10 +593,44 @@ namespace DSR
         const bool copy;
         std::unique_ptr<Utilities> utils;
         std::unordered_set<std::string_view> ignored_attributes;
-        ThreadPool tp, tp_delta_attr;
         bool same_host;
         id_generator generator;
         GraphSettings::LOGLEVEL log_level;
+        signals_fns emitter;
+
+        //////////////////////////////////////////////////////////////////////////
+        // Signal method
+        ///////////////////////////////////////////////////////////////////////////
+
+        void set_qt_signals (){
+            emitter = {
+                [this](std::uint64_t a, const std::string & b, SignalInfo c = {}) { DSR_LOG_DEBUG("[SIGNAL] update_node id:", a, "type:", b); emit update_node_signal(a, b, c); },
+                [this](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { DSR_LOG_DEBUG("[SIGNAL] update_node_attr id:", a); emit update_node_attr_signal(a, b, c); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { DSR_LOG_DEBUG("[SIGNAL] update_edge from:", a, "to:", b, "type:", c); emit update_edge_signal(a, b, c, d); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, const std::vector<std::string> &d, SignalInfo e = {}) { DSR_LOG_DEBUG("[SIGNAL] update_edge_attr from:", a, "to:", b, "type:", c); emit update_edge_attr_signal(a, b, c, d, e); },
+                [this](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { DSR_LOG_DEBUG("[SIGNAL] del_edge from:", a, "to:", b, "type:", c); emit del_edge_signal(a, b, c, d); },
+                [this](std::uint64_t a, SignalInfo b = {}) { DSR_LOG_DEBUG("[SIGNAL] del_node id:", a); emit  del_node_signal(a, b); },
+                [this](const Node& a, SignalInfo b = {}) { DSR_LOG_DEBUG("[SIGNAL] deleted_node name:", a.name(), "id:", a.id()); emit deleted_node_signal(a, b); },
+                [this](const Edge& a, SignalInfo b = {}) { DSR_LOG_DEBUG("[SIGNAL] deleted_edge from:", a.from(), "to:", a.to(), "type:", a.type()); emit deleted_edge_signal(a, b); },
+                nullptr
+            };
+        }
+
+        void set_queued_signals (){
+            auto runner = new QueuedSignalRunner();
+            runner->log_level = static_cast<uint8_t>(log_level);
+            emitter = {
+                [runner](std::uint64_t a, const std::string & b, SignalInfo c = {}) { runner->run_update_node_signal(a, b, c); },
+                [runner](std::uint64_t a, const std::vector<std::string> &b, SignalInfo c = {}) { runner->run_update_node_attr_signal(a, b, c); },
+                [runner](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { runner->run_update_edge_signal(a, b, c, d); },
+                [runner](std::uint64_t a, std::uint64_t b, const std::string & c, const std::vector<std::string> &d, SignalInfo e = {}) { runner->run_update_edge_attr_signal(a, b, c, d, e); },
+                [runner](std::uint64_t a, std::uint64_t b, const std::string & c, SignalInfo d = {}) { runner->run_del_edge_signal(a, b, c, d); },
+                [runner](std::uint64_t a, SignalInfo b = {}) { runner->run_del_node_signal(a, b); },
+                [runner](const Node& a, SignalInfo b = {}) { runner->run_deleted_node_signal(a, b); },
+                [runner](const Edge& a, SignalInfo b = {}) { runner->run_deleted_edge_signal(a, b); },
+                std::unique_ptr<QueuedSignalRunner>(runner)
+            };
+        }
 
         //////////////////////////////////////////////////////////////////////////
         // Cache maps
@@ -618,6 +684,11 @@ namespace DSR
         std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_from;
         std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_to;
         std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att;
+
+        // ThreadPools are declared after all data they access so that their
+        // destructors (which join worker threads) run before the data members
+        // are destroyed, preventing use-after-free data races on shutdown.
+        ThreadPool tp, tp_delta_attr;
 
         //Custom function for each rtps topic
         class NewMessageFunctor {

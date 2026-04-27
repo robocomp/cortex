@@ -14,6 +14,19 @@ using namespace eprosima;
 using namespace eprosima::fastdds;
 using namespace eprosima::fastdds::rtps;
 
+namespace {
+Locator_t domain_multicast_locator(int8_t domain_id)
+{
+    const auto domain = static_cast<uint8_t>(domain_id);
+    Locator_t locator;
+    locator.port = 7900;
+    locator.kind = LOCATOR_KIND_UDPv4;
+    IPLocator::setIPv4(locator,
+        ("239.255." + std::to_string(domain / 250) + "." + std::to_string(1 + (domain % 250))).c_str());
+    return locator;
+}
+}
+
 DSRSubscriber::DSRSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr), mp_reader(nullptr) {}
 
 DSRSubscriber::~DSRSubscriber()
@@ -22,6 +35,7 @@ DSRSubscriber::~DSRSubscriber()
 std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
         DSRSubscriber::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
                          eprosima::fastdds::dds::Topic *topic,
+                         int8_t domain_id,
                         const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
                         std::mutex& mtx,
                         bool isStreamData)
@@ -52,11 +66,7 @@ std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::Da
                               }) != mp_participant_->get_qos().transport().user_transports.end();
 
     if (not local) {
-        Locator_t locator;
-        locator.port = 7900;
-        locator.kind = LOCATOR_KIND_UDPv4;
-        IPLocator::setIPv4(locator, "239.255.1.33");
-        dataReaderQos.endpoint().multicast_locator_list.push_back(locator);
+        dataReaderQos.endpoint().multicast_locator_list.push_back(domain_multicast_locator(domain_id));
     }
 
     //Check latency
@@ -121,4 +131,3 @@ void DSRSubscriber::SubListener::on_data_available(eprosima::fastdds::dds::DataR
 {
     f(sub);
 }
-

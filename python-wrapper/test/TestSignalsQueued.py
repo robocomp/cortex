@@ -57,14 +57,14 @@ class SpecificWorker(GenericWorker):
         console.print(f"DELETED EDGE OBJ: {edge}", style='green')
 
     def connect(self):
-        signals.connect2(g, signals.UPDATE_NODE_ATTR, self.update_node_att)
-        signals.connect2(g, signals.UPDATE_NODE, self.update_node)
-        signals.connect2(g, signals.DELETE_NODE, self.delete_node)
-        signals.connect2(g, signals.UPDATE_EDGE, self.update_edge)
-        signals.connect2(g, signals.UPDATE_EDGE_ATTR, self.update_edge_att)
-        signals.connect2(g, signals.DELETE_EDGE, self.delete_edge)
-        signals.connect2(g, signals.DELETE_NODE_OBJ, self.deleted_node_obj)
-        signals.connect2(g, signals.DELETE_EDGE_OBJ, self.deleted_edge_obj)
+        signals.connect(g, signals.UPDATE_NODE_ATTR, self.update_node_att)
+        signals.connect(g, signals.UPDATE_NODE, self.update_node)
+        signals.connect(g, signals.DELETE_NODE, self.delete_node)
+        signals.connect(g, signals.UPDATE_EDGE, self.update_edge)
+        signals.connect(g, signals.UPDATE_EDGE_ATTR, self.update_edge_att)
+        signals.connect(g, signals.DELETE_EDGE, self.delete_edge)
+        signals.connect(g, signals.DELETE_NODE_OBJ, self.deleted_node_obj)
+        signals.connect(g, signals.DELETE_EDGE_OBJ, self.deleted_edge_obj)
 
 app = QtWidgets.QApplication(sys.argv)
 
@@ -101,14 +101,14 @@ agent = SpecificWorker({})
 agent.connect()
 
 
-signals.connect2(g, signals.UPDATE_NODE_ATTR, update_node_att)
-signals.connect2(g, signals.UPDATE_NODE, update_node)
-signals.connect2(g, signals.DELETE_NODE, delete_node)
-signals.connect2(g, signals.UPDATE_EDGE, update_edge)
-signals.connect2(g, signals.UPDATE_EDGE_ATTR, update_edge_att)
-signals.connect2(g, signals.DELETE_EDGE, delete_edge)
-signals.connect2(g, signals.DELETE_NODE_OBJ, deleted_node_obj)
-signals.connect2(g, signals.DELETE_EDGE_OBJ, deleted_edge_obj)
+signals.connect(g, signals.UPDATE_NODE_ATTR, update_node_att)
+signals.connect(g, signals.UPDATE_NODE, update_node)
+signals.connect(g, signals.DELETE_NODE, delete_node)
+signals.connect(g, signals.UPDATE_EDGE, update_edge)
+signals.connect(g, signals.UPDATE_EDGE_ATTR, update_edge_att)
+signals.connect(g, signals.DELETE_EDGE, delete_edge)
+signals.connect(g, signals.DELETE_NODE_OBJ, deleted_node_obj)
+signals.connect(g, signals.DELETE_EDGE_OBJ, deleted_edge_obj)
 
 
 

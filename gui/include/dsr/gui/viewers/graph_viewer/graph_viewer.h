@@ -28,6 +28,8 @@
 #include <QResizeEvent>
 #include <QMenu>
 
+#include <graphviz/gvc.h>
+#include <graphviz/cgraph.h>
 
 class GraphNode;
 class GraphEdge;
@@ -54,6 +56,7 @@ namespace DSR
 			void hide_show_node_SLOT(uint64_t id, bool visible);
 			// Others
 			void toggle_animation(bool state);
+            void compute_layout(const char * alg = "dot");
 			void reload(QWidget * widget);
             void remove_node_SLOT(uint64_t id);  // remove node from DSR
 
@@ -72,9 +75,13 @@ namespace DSR
 			std::map<std::string,std::set<std::uint64_t>> type_id_map;
 			int timerId = 0;
             void showContextMenu(QMouseEvent *event);
-
+            
+            // Graphviz layout
+            GVC_t* graphviz_context;
+            Agraph_t* graphviz_graph;
 
     	protected:
+
             void createGraph();
 			virtual void timerEvent(QTimerEvent *event);
 			virtual void mousePressEvent(QMouseEvent *event);

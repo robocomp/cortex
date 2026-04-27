@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <dsr/api/dsr_signal_emitter.h>
 
 namespace DSR {
 
@@ -16,7 +17,8 @@ struct GraphSettings {
     enum struct LOGLEVEL: uint8_t {
         DEBUGL = 0, INFOL, WARNINGL, ERRORL
     } log_level {LOGLEVEL::INFOL};
-
+    int8_t domain_id = 0;
+    SignalMode signal_mode = QT;
 };
 
 }
