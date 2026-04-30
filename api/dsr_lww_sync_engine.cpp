@@ -418,7 +418,9 @@ EdgeMutationEffect LWWSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     if (ts_it != edge_tombstones_.end()) {
         edge_tombstones_.erase(ts_it);
     }
-    host_.update_maps_edge_insert(edge.from(), edge.to(), edge.type());
+    if (inserted) {
+        host_.update_maps_edge_insert(edge.from(), edge.to(), edge.type());
+    }
     effect.applied = true;
     return effect;
 }

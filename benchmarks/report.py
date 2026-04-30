@@ -132,11 +132,29 @@ def _to_ns(value: float, unit: str) -> float:
     return value * _UNIT_TO_NS.get(unit.strip(), 1)
 
 
+def infer_sync_mode(bench: dict) -> str:
+    """Infer benchmark backend from metadata first, then filename/name suffixes."""
+    metadata = bench.get("metadata", {}) or {}
+    sync_mode = str(metadata.get("sync_mode", "")).strip().lower()
+    if sync_mode in {"crdt", "lww"}:
+        return sync_mode
+
+    candidates = [
+        bench.get("benchmark_name", ""),
+        os.path.splitext(bench.get("_source_file", ""))[0],
+    ]
+    for name in candidates:
+        lower = str(name).lower()
+        for suffix in SYNC_MODE_SUFFIXES:
+            if lower.endswith(suffix):
+                return suffix[1:]
+    return ""
+
+
 def comparison_benchmark_name(bench: dict) -> str:
     """Return a stable benchmark identity for cross-sync-mode comparisons."""
     name = bench.get("benchmark_name", bench.get("_source_file", ""))
-    metadata = bench.get("metadata", {}) or {}
-    sync_mode = str(metadata.get("sync_mode", "")).strip().lower()
+    sync_mode = infer_sync_mode(bench)
     suffixes = [f"_{sync_mode}"] if sync_mode else []
     suffixes.extend(s for s in SYNC_MODE_SUFFIXES if s not in suffixes)
     for suffix in suffixes:
@@ -186,6 +204,7 @@ def flatten_metrics(bench_files: list) -> tuple[list, list, list]:
     for bench in bench_files:
         bench_name = bench.get("benchmark_name", bench["_source_file"])
         bench_key = comparison_benchmark_name(bench)
+        sync_mode = infer_sync_mode(bench)
         lang = bench.get("_lang", "python")
         for m in bench.get("metrics", []):
             add = m.get("additional", {})
@@ -205,6 +224,7 @@ def flatten_metrics(bench_files: list) -> tuple[list, list, list]:
             entry = {
                 "benchmark": bench_name,
                 "benchmark_key": bench_key,
+                "sync_mode": sync_mode,
                 "metric": metric_name,
                 "lang": lang,
                 "profile": profile,
@@ -275,6 +295,8 @@ def flatten_scalability(bench_files: list) -> list:
     for bench in bench_files:
         lang = bench.get("_lang", "python")
         bench_name = bench.get("benchmark_name", bench["_source_file"])
+        bench_key = comparison_benchmark_name(bench)
+        sync_mode = infer_sync_mode(bench)
         for m in bench.get("metrics", []):
             tags = m.get("tags", {})
             add = m.get("additional", {})
@@ -288,6 +310,8 @@ def flatten_scalability(bench_files: list) -> list:
             cat = m.get("category", "")
             rows.append({
                 "benchmark": bench_name,
+                "benchmark_key": bench_key,
+                "sync_mode": sync_mode,
                 "operation": m["name"],
                 "lang": lang,
                 "profile": infer_profile(bench, m),
@@ -320,11 +344,11 @@ def compute_efficiency(rows: list) -> list:
     for r in rows:
         if r["category"] != "throughput":
             continue
-        key = (r["benchmark"], r["operation"], r["scale_dim"])
+        key = (r.get("benchmark_key") or r["benchmark"], r["operation"], r.get("sync_mode", ""), r["scale_dim"])
         groups[key].append(r)
 
     result = []
-    for (bench, op, dim), pts in groups.items():
+    for (bench, op, sync_mode, dim), pts in groups.items():
         pts_sorted = sorted(pts, key=lambda p: p["scale_val"])
 
         if dim in ("threads", "agents"):
@@ -339,6 +363,7 @@ def compute_efficiency(rows: list) -> list:
                 efficiency = (p["ops_per_sec"] / (N * thr_1)) * 100.0
                 result.append({
                     "benchmark": bench, "operation": op, "scale_dim": dim,
+                    "sync_mode": sync_mode,
                     "scale_val": N, "efficiency": round(efficiency, 2),
                     "ops_per_sec": p["ops_per_sec"],
                 })
@@ -351,6 +376,7 @@ def compute_efficiency(rows: list) -> list:
                 relative = (p["ops_per_sec"] / thr_min) * 100.0
                 result.append({
                     "benchmark": bench, "operation": op, "scale_dim": dim,
+                    "sync_mode": sync_mode,
                     "scale_val": p["scale_val"], "efficiency": round(relative, 2),
                     "ops_per_sec": p["ops_per_sec"],
                 })
@@ -401,6 +427,7 @@ def generate_html(
         summary.append({
             "benchmark": b.get("benchmark_name", b["_source_file"]),
             "profile": infer_profile(b),
+            "sync_mode": infer_sync_mode(b),
             "timestamp": b.get("timestamp", ""),
             "duration": f"{b.get('total_duration_sec', 0):.1f}s",
             "metrics": len(b.get("metrics", [])),
@@ -877,17 +904,17 @@ function renderOverview() {{
   // Summary table
   document.getElementById('summary-table').innerHTML = SUMMARY.map(r => `
     <tr>
-      <td>${{r.benchmark}} ${{profileBadge(r.profile)}}</td><td>${{r.timestamp}}</td>
+      <td>${{r.benchmark}} ${{syncBadge(r.sync_mode)}} ${{profileBadge(r.profile)}}</td><td>${{r.timestamp}}</td>
       <td>${{r.duration}}</td><td>${{r.metrics}}</td>
       <td style="color:var(--muted)">${{r.source}}</td>
     </tr>`).join('');
 
   // Overview latency chart
   if (LAT.length) {{
-    const labels = LAT.map(m => m.metric);
+    const labels = LAT.map(metricLabel);
     const datasets = [{{ label: 'Mean (µs)', data: LAT.map(m => m.mean_ns/1000), backgroundColor: RUN_COLOR+'cc', borderColor: RUN_COLOR, borderWidth: 1 }}];
     if (COMPARING && B_LAT.length) {{
-      const bMap = Object.fromEntries(B_LAT.map(m => [m.benchmark+'/'+m.metric, m]));
+      const bMap = buildMetricMap(B_LAT);
       datasets.push({{ label: 'Baseline Mean (µs)', data: LAT.map(m => (bMap[m.benchmark+'/'+m.metric]?.mean_ns||0)/1000), backgroundColor: BASE_COLOR+'88', borderColor: BASE_COLOR, borderWidth: 1 }});
     }}
     new Chart(document.getElementById('ov-latency'), {{
@@ -899,10 +926,10 @@ function renderOverview() {{
 
   // Overview throughput chart
   if (THR.length) {{
-    const labels = THR.map(m => m.metric);
+    const labels = THR.map(metricLabel);
     const datasets = [{{ label: 'Ops/sec', data: THR.map(m => m.ops_per_sec), backgroundColor: PALETTE[1]+'cc', borderColor: PALETTE[1], borderWidth: 1 }}];
     if (COMPARING && B_THR.length) {{
-      const bMap = Object.fromEntries(B_THR.map(m => [m.benchmark+'/'+m.metric, m]));
+      const bMap = buildMetricMap(B_THR);
       datasets.push({{ label: 'Baseline', data: THR.map(m => bMap[m.benchmark+'/'+m.metric]?.ops_per_sec||0), backgroundColor: BASE_COLOR+'88', borderColor: BASE_COLOR, borderWidth: 1 }});
     }}
     new Chart(document.getElementById('ov-throughput'), {{
@@ -935,6 +962,70 @@ function setLangFilter(tab, lang, btn) {{
 function langBadge(lang) {{
   return `<span class="badge badge-${{lang}}">${{lang}}</span>`;
 }}
+function syncBadge(mode) {{
+  if (!mode) return '';
+  return `<span class="badge" style="background:${{mode === 'lww' ? '#4fc3f733' : '#81c99533'}};color:${{mode === 'lww' ? '#4fc3f7' : '#81c995'}};border:1px solid ${{mode === 'lww' ? '#4fc3f755' : '#81c99555'}}">${{mode.toUpperCase()}}</span>`;
+}}
+function neutralMetricKey(m) {{
+  return (m.benchmark_key || m.benchmark) + '/' + m.metric;
+}}
+function backendMetricKey(m) {{
+  return neutralMetricKey(m) + '/' + (m.sync_mode || '');
+}}
+function metricLabel(m) {{
+  return m.metric + (m.sync_mode ? ` [${{m.sync_mode.toUpperCase()}}]` : '');
+}}
+function buildMetricMap(rows) {{
+  const counts = {{}};
+  rows.forEach(m => {{
+    const k = neutralMetricKey(m);
+    counts[k] = (counts[k] || 0) + 1;
+  }});
+  const exact = {{}}, neutral = {{}};
+  rows.forEach(m => {{
+    exact[backendMetricKey(m)] = m;
+    const k = neutralMetricKey(m);
+    if (counts[k] === 1) neutral[k] = m;
+  }});
+  const map = {{ exact, neutral }};
+  Object.assign(map, neutral);
+  return map;
+}}
+function baselineFor(map, m) {{
+  if (!map) return null;
+  return map.exact[backendMetricKey(m)] || map.neutral[neutralMetricKey(m)] || null;
+}}
+function backendDeltaSection(title, data, valueField, formatValue, higherBetter) {{
+  const groups = {{}};
+  data.forEach(m => {{
+    if (!m.sync_mode) return;
+    const key = neutralMetricKey(m);
+    if (!groups[key]) groups[key] = {{ benchmark: m.benchmark_key || m.benchmark, metric: m.metric }};
+    groups[key][m.sync_mode] = m;
+  }});
+  const rows = Object.values(groups).filter(g => g.crdt && g.lww).map(g => {{
+    const crdt = g.crdt[valueField];
+    const lww = g.lww[valueField];
+    const pct = crdt ? ((lww - crdt) / crdt) * 100 : 0;
+    return `<tr>
+      <td style="color:var(--muted)">${{g.benchmark}}</td>
+      <td>${{g.metric}}</td>
+      <td>${{formatValue(crdt)}}</td>
+      <td>${{formatValue(lww)}}</td>
+      <td>${{fmtDelta(pct, higherBetter)}}</td>
+    </tr>`;
+  }}).join('');
+  if (!rows) return '';
+  return `
+    <div class="subsection-title">
+      <span>${{title}}</span>
+      <span style="color:var(--muted);font-size:0.78rem">LWW vs CRDT</span>
+    </div>
+    <table style="margin-bottom:18px;">
+      <thead><tr><th>Benchmark</th><th>Metric</th><th>CRDT</th><th>LWW</th><th>Delta</th></tr></thead>
+      <tbody>${{rows}}</tbody>
+    </table>`;
+}}
 
 function renderLatency() {{
   let data = LAT;
@@ -943,9 +1034,9 @@ function renderLatency() {{
   if (benchF) data = data.filter(m => m.benchmark === benchF);
   if (profileF) data = data.filter(m => m.profile === profileF);
   if (langFilter.lat) data = data.filter(m => m.lang === langFilter.lat);
-  const bMap = COMPARING ? Object.fromEntries(B_LAT.map(m => [m.benchmark+'/'+m.metric, m])) : {{}};
+  const bMap = COMPARING ? buildMetricMap(B_LAT) : null;
 
-  const labels = data.map(m => m.metric);
+  const labels = data.map(metricLabel);
   const toUs = ns => ns/1000;
 
   if (latChart) {{ latChart.destroy(); latChart = null; }}
@@ -972,7 +1063,7 @@ function renderLatency() {{
     {{ label: 'p99',   data: data.map(m=>toUs(m.p99_ns)),  backgroundColor: PALETTE[3]+'aa' }},
   ];
   if (COMPARING && B_LAT.length) {{
-    datasets.push({{ label: 'Baseline Mean', data: data.map(m=>toUs(bMap[m.benchmark+'/'+m.metric]?.mean_ns||0)), backgroundColor: BASE_COLOR+'55', borderColor: BASE_COLOR, borderWidth: 1, borderDash: [4,2] }});
+    datasets.push({{ label: 'Baseline Mean', data: data.map(m=>toUs(baselineFor(bMap, m)?.mean_ns||0)), backgroundColor: BASE_COLOR+'55', borderColor: BASE_COLOR, borderWidth: 1, borderDash: [4,2] }});
   }}
   latChart = new Chart(document.getElementById('lat-dist'), {{
     type: 'bar', data: {{ labels, datasets }},
@@ -996,7 +1087,7 @@ function renderLatency() {{
   }});
 
   const renderLatencyRows = rows => rows.map(m => {{
-    const b = bMap[m.benchmark+'/'+m.metric];
+    const b = baselineFor(bMap, m);
     const deltaCell = b ? fmtDelta(((m.mean_ns - b.mean_ns) / b.mean_ns)*100, false) : '';
     const stddev = m.additional?.stddev_ns ?? 0;
     const cv = m.mean_ns > 0 ? (stddev / m.mean_ns) * 100 : 0;
@@ -1010,7 +1101,7 @@ function renderLatency() {{
     const pmax = m.has_percentiles ? fmtNs(m.max_ns) : na;
     return `<tr>
       <td>${{langBadge(m.lang)}}</td>
-      <td><span class="badge badge-latency">${{m.benchmark}}</span></td>
+      <td><span class="badge badge-latency">${{m.benchmark}}</span> ${{syncBadge(m.sync_mode)}}</td>
       <td>${{m.metric}}</td>
       <td style="color:var(--muted)">${{m.count > 0 ? m.count.toLocaleString() : na}}</td>
       <td>${{fmtNs(m.mean_ns)}}${{deltaCell ? ' ' + deltaCell : ''}}</td>
@@ -1040,7 +1131,8 @@ function renderLatency() {{
         <tbody>${{renderLatencyRows(rows) || '<tr><td colspan="11" class="empty">No data</td></tr>'}}</tbody>
       </table>`;
   }}).join('');
-  document.getElementById('lat-detail-sections').innerHTML = grouped || '<p class="empty">No data</p>';
+  const backendDelta = backendDeltaSection('Backend Latency Difference', data, 'mean_ns', fmtNs, false);
+  document.getElementById('lat-detail-sections').innerHTML = (grouped + backendDelta) || '<p class="empty">No data</p>';
 }}
 
 // ── Throughput ────────────────────────────────────────────────────────────────
@@ -1052,15 +1144,15 @@ function renderThroughput() {{
   if (benchF) data = data.filter(m => m.benchmark === benchF);
   if (profileF) data = data.filter(m => m.profile === profileF);
   if (langFilter.thr) data = data.filter(m => m.lang === langFilter.thr);
-  const bMap = COMPARING ? Object.fromEntries(B_THR.map(m => [m.benchmark+'/'+m.metric, m])) : {{}};
+  const bMap = COMPARING ? buildMetricMap(B_THR) : null;
 
   if (thrChart) thrChart.destroy();
   const datasets = [{{ label: 'Ops/sec', data: data.map(m=>m.ops_per_sec), backgroundColor: PALETTE[1]+'cc', borderColor: PALETTE[1], borderWidth: 1 }}];
   if (COMPARING && B_THR.length) {{
-    datasets.push({{ label: 'Baseline', data: data.map(m=>bMap[m.benchmark+'/'+m.metric]?.ops_per_sec||0), backgroundColor: BASE_COLOR+'55', borderColor: BASE_COLOR, borderWidth: 1 }});
+    datasets.push({{ label: 'Baseline', data: data.map(m=>baselineFor(bMap, m)?.ops_per_sec||0), backgroundColor: BASE_COLOR+'55', borderColor: BASE_COLOR, borderWidth: 1 }});
   }}
   thrChart = new Chart(document.getElementById('thr-bar'), {{
-    type: 'bar', data: {{ labels: data.map(m=>m.metric), datasets }},
+    type: 'bar', data: {{ labels: data.map(metricLabel), datasets }},
     options: {{ ...CD, indexAxis: 'y',
       scales: {{ ...CD.scales, x: {{ ...CD.scales.x, title: {{ display:true, text:'ops/sec', color:'#8b8fa8' }} }} }},
       plugins: {{ ...CD.plugins, tooltip: {{ ...CD.plugins.tooltip,
@@ -1069,11 +1161,11 @@ function renderThroughput() {{
   }});
 
   const renderThroughputRows = rows => rows.map(m => {{
-    const b = bMap[m.benchmark+'/'+m.metric];
+    const b = baselineFor(bMap, m);
     const deltaCell = b ? fmtDelta(((m.ops_per_sec - b.ops_per_sec) / b.ops_per_sec)*100, true) : '';
     return `<tr>
       <td>${{langBadge(m.lang)}}</td>
-      <td><span class="badge badge-throughput">${{m.benchmark}}</span> ${{profileBadge(m.profile)}}</td>
+      <td><span class="badge badge-throughput">${{m.benchmark}}</span> ${{syncBadge(m.sync_mode)}} ${{profileBadge(m.profile)}}</td>
       <td>${{m.metric}}</td>
       <td style="color:var(--accent2)">${{fmtOps(m.ops_per_sec)}}${{deltaCell ? ' ' + deltaCell : ''}}</td>
       <td style="color:var(--muted)">${{m.total_ops.toLocaleString()}}</td>
@@ -1096,7 +1188,8 @@ function renderThroughput() {{
         <tbody>${{renderThroughputRows(rows) || '<tr><td colspan="6" class="empty">No data</td></tr>'}}</tbody>
       </table>`;
   }}).join('');
-  document.getElementById('thr-detail-sections').innerHTML = grouped || '<p class="empty">No data</p>';
+  const backendDelta = backendDeltaSection('Backend Throughput Difference', data, 'ops_per_sec', fmtOps, true);
+  document.getElementById('thr-detail-sections').innerHTML = (grouped + backendDelta) || '<p class="empty">No data</p>';
 }}
 
 function renderOther() {{
@@ -1106,10 +1199,10 @@ function renderOther() {{
   if (benchF) data = data.filter(m => m.benchmark === benchF);
   if (profileF) data = data.filter(m => m.profile === profileF);
   if (langFilter.oth) data = data.filter(m => m.lang === langFilter.oth);
-  const bMap = COMPARING ? Object.fromEntries(B_OTH.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m])) : {{}};
+  const bMap = COMPARING ? buildMetricMap(B_OTH) : null;
 
   const renderRows = rows => rows.map(m => {{
-    const b = bMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
+    const b = baselineFor(bMap, m);
     const deltaCell = b && typeof m.value === 'number' && typeof b.value === 'number' && b.value !== 0
       ? fmtDelta(((m.value - b.value) / b.value) * 100, true)
       : '';
@@ -1117,7 +1210,7 @@ function renderOther() {{
     return `<tr>
       <td>${{langBadge(m.lang)}}</td>
       <td><span class="badge badge-throughput">${{m.category}}</span></td>
-      <td>${{m.benchmark}} ${{profileBadge(m.profile)}}</td>
+      <td>${{m.benchmark}} ${{syncBadge(m.sync_mode)}} ${{profileBadge(m.profile)}}</td>
       <td>${{m.metric}}</td>
       <td style="color:var(--accent2)">${{fmtValue(m.value, m.unit)}}${{deltaCell ? ' ' + deltaCell : ''}}</td>
       <td style="color:var(--muted)">${{b ? fmtValue(b.value, b.unit) : ''}}</td>
@@ -1145,6 +1238,12 @@ function renderOther() {{
 
 // ── Scalability Tab ───────────────────────────────────────────────────────────
 let sclThrChart = null, sclLatChart = null, sclEffChart = null;
+function sclSeriesKey(r) {{
+  return r.operation + '/' + (r.sync_mode || '');
+}}
+function sclSeriesLabel(r) {{
+  return r.operation + (r.sync_mode ? ` [${{r.sync_mode.toUpperCase()}}]` : '');
+}}
 
 // Show or hide an empty-state message on a canvas card.
 // Hides/shows the <canvas> and adds/removes a sibling <p class="empty">.
@@ -1172,7 +1271,7 @@ function renderScalability() {{
   let bRows = COMPARING ? B_SCL.filter(r => r.scale_dim === dim) : [];
   if (opSel) bRows = bRows.filter(r => r.operation === opSel);
 
-  const ops = [...new Set(rows.map(r => r.operation))];
+  const series = [...new Map(rows.map(r => [sclSeriesKey(r), r])).values()];
 
   // ── Empty state ───────────────────────────────────────────────────────────
   const noDataMsg = dim === 'agents'
@@ -1180,11 +1279,11 @@ function renderScalability() {{
     : `No scalability data for dimension: <strong>${{dim}}</strong>`;
 
   // ── Throughput line chart ──────────────────────────────────────────────────
-  const thrData = ops.map((op, i) => {{
-    const pts = rows.filter(r => r.operation === op && r.category === 'throughput')
+  const thrData = series.map((s, i) => {{
+    const pts = rows.filter(r => r.operation === s.operation && (r.sync_mode || '') === (s.sync_mode || '') && r.category === 'throughput')
                     .sort((a, b) => a.scale_val - b.scale_val);
     return {{
-      label: op,
+      label: sclSeriesLabel(s),
       data: pts.map(p => ({{x: p.scale_val, y: p.ops_per_sec}})),
       borderColor: PALETTE[i % PALETTE.length],
       backgroundColor: PALETTE[i % PALETTE.length] + '33',
@@ -1194,13 +1293,13 @@ function renderScalability() {{
 
   // Add dashed baseline series when comparing
   if (COMPARING && bRows.length) {{
-    const bOps = [...new Set(bRows.map(r => r.operation))];
-    bOps.forEach((op, i) => {{
-      const pts = bRows.filter(r => r.operation === op && r.category === 'throughput')
+    const bSeries = [...new Map(bRows.map(r => [sclSeriesKey(r), r])).values()];
+    bSeries.forEach((s, i) => {{
+      const pts = bRows.filter(r => r.operation === s.operation && (r.sync_mode || '') === (s.sync_mode || '') && r.category === 'throughput')
                        .sort((a, b) => a.scale_val - b.scale_val);
       if (pts.length === 0) return;
       thrData.push({{
-        label: op + ' (baseline)',
+        label: sclSeriesLabel(s) + ' (baseline)',
         data: pts.map(p => ({{x: p.scale_val, y: p.ops_per_sec}})),
         borderColor: PALETTE[i % PALETTE.length] + '88',
         backgroundColor: 'transparent',
@@ -1229,11 +1328,11 @@ function renderScalability() {{
   }}
 
   // ── Latency line chart ────────────────────────────────────────────────────
-  const latData = ops.map((op, i) => {{
-    const pts = rows.filter(r => r.operation === op && r.category === 'latency')
+  const latData = series.map((s, i) => {{
+    const pts = rows.filter(r => r.operation === s.operation && (r.sync_mode || '') === (s.sync_mode || '') && r.category === 'latency')
                     .sort((a, b) => a.scale_val - b.scale_val);
     return {{
-      label: op,
+      label: sclSeriesLabel(s),
       data: pts.map(p => ({{x: p.scale_val, y: p.mean_ns / 1000}})),
       borderColor: PALETTE[i % PALETTE.length],
       backgroundColor: PALETTE[i % PALETTE.length] + '33',
@@ -1243,13 +1342,13 @@ function renderScalability() {{
 
   // Add dashed baseline latency series when comparing
   if (COMPARING && bRows.length) {{
-    const bOps = [...new Set(bRows.map(r => r.operation))];
-    bOps.forEach((op, i) => {{
-      const pts = bRows.filter(r => r.operation === op && r.category === 'latency')
+    const bSeries = [...new Map(bRows.map(r => [sclSeriesKey(r), r])).values()];
+    bSeries.forEach((s, i) => {{
+      const pts = bRows.filter(r => r.operation === s.operation && (r.sync_mode || '') === (s.sync_mode || '') && r.category === 'latency')
                        .sort((a, b) => a.scale_val - b.scale_val);
       if (pts.length === 0) return;
       latData.push({{
-        label: op + ' (baseline)',
+        label: sclSeriesLabel(s) + ' (baseline)',
         data: pts.map(p => ({{x: p.scale_val, y: p.mean_ns / 1000}})),
         borderColor: PALETTE[i % PALETTE.length] + '88',
         backgroundColor: 'transparent',
@@ -1288,13 +1387,13 @@ function renderScalability() {{
 
   let effRows = EFF.filter(r => r.scale_dim === dim);
   if (opSel) effRows = effRows.filter(r => r.operation === opSel);
-  const effOps = [...new Set(effRows.map(r => r.operation))];
+  const effSeries = [...new Map(effRows.map(r => [sclSeriesKey(r), r])).values()];
 
-  const effData = effOps.map((op, i) => {{
-    const pts = effRows.filter(r => r.operation === op)
+  const effData = effSeries.map((s, i) => {{
+    const pts = effRows.filter(r => r.operation === s.operation && (r.sync_mode || '') === (s.sync_mode || ''))
                        .sort((a, b) => a.scale_val - b.scale_val);
     return {{
-      label: op,
+      label: sclSeriesLabel(s),
       data: pts.map(p => ({{x: p.scale_val, y: p.efficiency}})),
       borderColor: PALETTE[i % PALETTE.length],
       backgroundColor: 'transparent',
@@ -1339,17 +1438,17 @@ function renderScalability() {{
 
   // ── Detail table ──────────────────────────────────────────────────────────
   const effMap = {{}};
-  EFF.forEach(r => {{ effMap[r.operation + '/' + r.scale_dim + '/' + r.scale_val] = r.efficiency; }});
+  EFF.forEach(r => {{ effMap[r.operation + '/' + (r.sync_mode || '') + '/' + r.scale_dim + '/' + r.scale_val] = r.efficiency; }});
 
   const tableRows = rows.map(r => {{
-    const effKey = r.operation + '/' + r.scale_dim + '/' + r.scale_val;
+    const effKey = r.operation + '/' + (r.sync_mode || '') + '/' + r.scale_dim + '/' + r.scale_val;
     const eff = effMap[effKey];
     const effCell = eff !== undefined ? eff.toFixed(1) + '%' : '—';
     const thrCell = r.category === 'throughput' ? fmtOps(r.ops_per_sec) : '—';
     const latCell = r.mean_ns > 0 ? fmtNs(r.mean_ns) : '—';
     return `<tr>
       <td style="color:var(--muted)">${{r.benchmark}}</td>
-      <td>${{r.operation}}</td>
+      <td>${{r.operation}} ${{syncBadge(r.sync_mode)}}</td>
       <td style="color:var(--accent2)">${{r.scale_dim}}</td>
       <td style="font-weight:600">${{r.scale_val}}</td>
       <td style="color:var(--accent2)">${{thrCell}}</td>
@@ -1447,12 +1546,12 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap, oth, bOthMap) {{
   // Deduplicate for chart (first-seen per key)
   const seenChart = new Set(), chartItems = [];
   for (const m of langLat) {{
-    const key = (m.benchmark_key || m.benchmark) + '/' + m.metric;
-    const b = bLatMap[key];
+    const key = backendMetricKey(m);
+    const b = baselineFor(bLatMap, m);
     if (b && !seenChart.has(key)) {{
       seenChart.add(key);
       const pct = ((m.mean_ns - b.mean_ns) / b.mean_ns) * 100;
-      chartItems.push({{ key, label: m.metric + '  [' + m.benchmark + ']', pct }});
+      chartItems.push({{ key, label: metricLabel(m) + '  [' + m.benchmark + ']', pct }});
     }}
   }}
 
@@ -1469,12 +1568,12 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap, oth, bOthMap) {{
     </div>` : '';
 
   const latRows = langLat.map(m => {{
-    const b = bLatMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
-    if (!b) return `<tr><td><span class="badge badge-latency">${{m.benchmark}}</span></td><td>${{m.metric}}</td><td colspan="4" style="color:var(--muted)">no baseline</td></tr>`;
+    const b = baselineFor(bLatMap, m);
+    if (!b) return `<tr><td><span class="badge badge-latency">${{m.benchmark}}</span> ${{syncBadge(m.sync_mode)}}</td><td>${{m.metric}}</td><td colspan="4" style="color:var(--muted)">no baseline</td></tr>`;
     const pct    = ((m.mean_ns - b.mean_ns) / b.mean_ns) * 100;
     const p99pct = (m.has_percentiles && b.has_percentiles && b.p99_ns) ? ((m.p99_ns - b.p99_ns) / b.p99_ns) * 100 : null;
     return `<tr>
-      <td><span class="badge badge-latency">${{m.benchmark}}</span></td>
+      <td><span class="badge badge-latency">${{m.benchmark}}</span> ${{syncBadge(m.sync_mode)}}</td>
       <td>${{m.metric}}</td>
       <td>${{fmtNs(b.mean_ns)}}</td>
       <td>${{fmtNs(m.mean_ns)}}</td>
@@ -1484,11 +1583,11 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap, oth, bOthMap) {{
   }}).join('');
 
   const thrRows = langThr.map(m => {{
-    const b = bThrMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
-    if (!b) return `<tr><td><span class="badge badge-throughput">${{m.benchmark}}</span></td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
+    const b = baselineFor(bThrMap, m);
+    if (!b) return `<tr><td><span class="badge badge-throughput">${{m.benchmark}}</span> ${{syncBadge(m.sync_mode)}}</td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
     const pct = ((m.ops_per_sec - b.ops_per_sec) / b.ops_per_sec) * 100;
     return `<tr>
-      <td><span class="badge badge-throughput">${{m.benchmark}}</span></td>
+      <td><span class="badge badge-throughput">${{m.benchmark}}</span> ${{syncBadge(m.sync_mode)}}</td>
       <td>${{m.metric}}</td>
       <td style="color:var(--muted)">${{fmtOps(b.ops_per_sec)}}</td>
       <td style="color:var(--accent2)">${{fmtOps(m.ops_per_sec)}}</td>
@@ -1521,14 +1620,14 @@ function buildLangSection(lang, lat, bLatMap, thr, bThrMap, oth, bOthMap) {{
     </div>` : '';
 
   const othRows = langOth.map(m => {{
-    const b = bOthMap[(m.benchmark_key || m.benchmark)+'/'+m.metric];
+    const b = baselineFor(bOthMap, m);
     const deltaCell = b && typeof m.value === 'number' && typeof b.value === 'number' && b.value !== 0
       ? fmtDelta(((m.value - b.value) / b.value) * 100, true)
       : '';
-    if (!b) return `<tr><td><span class="badge badge-throughput">${{m.category}}</span></td><td>${{m.benchmark}}</td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
+    if (!b) return `<tr><td><span class="badge badge-throughput">${{m.category}}</span></td><td>${{m.benchmark}} ${{syncBadge(m.sync_mode)}}</td><td>${{m.metric}}</td><td colspan="3" style="color:var(--muted)">no baseline</td></tr>`;
     return `<tr>
       <td><span class="badge badge-throughput">${{m.category}}</span></td>
-      <td>${{m.benchmark}}</td>
+      <td>${{m.benchmark}} ${{syncBadge(m.sync_mode)}}</td>
       <td>${{m.metric}}</td>
       <td style="color:var(--muted)">${{fmtValue(b.value, b.unit)}}</td>
       <td style="color:var(--accent2)">${{fmtValue(m.value, m.unit)}}</td>
@@ -1564,9 +1663,9 @@ function renderCompare() {{
   const el = document.getElementById('tab-compare');
   if (!el || !COMPARING) return;
 
-  const bLatMap = Object.fromEntries(B_LAT.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
-  const bThrMap = Object.fromEntries(B_THR.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
-  const bOthMap = Object.fromEntries(B_OTH.map(m => [(m.benchmark_key || m.benchmark)+'/'+m.metric, m]));
+  const bLatMap = buildMetricMap(B_LAT);
+  const bThrMap = buildMetricMap(B_THR);
+  const bOthMap = buildMetricMap(B_OTH);
 
   const pySection  = buildLangSection('python', LAT, bLatMap, THR, bThrMap, OTH, bOthMap);
   const cppSection = buildLangSection('cpp',    LAT, bLatMap, THR, bThrMap, OTH, bOthMap);
