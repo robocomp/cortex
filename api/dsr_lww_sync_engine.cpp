@@ -627,6 +627,12 @@ void LWWSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& bat
     if (payload == nullptr) {
         return;
     }
+    if (payload->vec.empty()) {
+        return;
+    }
+
+    auto key = edge_key(payload->vec.front().from, payload->vec.front().to, payload->vec.front().type);
+    auto key_view = edge_key_view(key.from, key.to, key.type);
 
     struct EdgeAttrBatchChange
     {
@@ -636,26 +642,26 @@ void LWWSyncEngine::apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& bat
     std::unordered_map<EdgeKey, EdgeAttrBatchChange, EdgeKeyHash, EdgeKeyEqual> changes;
     {
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::apply_remote_edge_attr_batch merge");
+        auto edge_it = edges_.find(key_view);
+        auto ts_it = edge_it == edges_.end() ? edge_tombstones_.find(key_view) : edge_tombstones_.end();
         for (auto& item : payload->vec) {
             auto version = version_of(item.timestamp, item.agent_id);
-            auto it = edges_.find(edge_key_view(item.from, item.to, item.type));
-            if (it == edges_.end()) {
-                auto ts_it = edge_tombstones_.find(edge_key_view(item.from, item.to, item.type));
+            if (edge_it == edges_.end()) {
                 if (ts_it == edge_tombstones_.end() || is_newer(version, ts_it->second.version)) {
-                    pending_edge_attrs_[edge_key(item.from, item.to, item.type)].push_back(item);
+                    pending_edge_attrs_[key].push_back(item);
                 }
                 continue;
             }
-            auto attr_it = it->second.attrs.find(item.attr_name);
-            if (attr_it != it->second.attrs.end() && !is_newer(version, attr_it->second.version)) {
+            auto attr_it = edge_it->second.attrs.find(item.attr_name);
+            if (attr_it != edge_it->second.attrs.end() && !is_newer(version, attr_it->second.version)) {
                 continue;
             }
             if (item.deleted) {
-                it->second.attrs.erase(item.attr_name);
+                edge_it->second.attrs.erase(item.attr_name);
             } else {
-                it->second.attrs[item.attr_name] = AttrState{item.value, version};
+                edge_it->second.attrs[item.attr_name] = AttrState{item.value, version};
             }
-            auto& change = changes[edge_key(item.from, item.to, item.type)];
+            auto& change = changes[key];
             change.agent_id = item.agent_id;
             change.attrs.push_back(item.attr_name);
         }

@@ -590,12 +590,14 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
             throw std::runtime_error(
                     (std::string("Cannot update node in G, " + std::to_string(node.id()) + " is deleted") + __FILE__ +
                      " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
-        else if (( id_map.contains(node.id()) and id_map.at(node.id()) != node.name()) or
-                 ( name_map.contains(node.name()) and name_map.at(node.name()) != node.id()))
+        const auto id_it = id_map.find(node.id());
+        const auto name_it = name_map.find(node.name());
+        if ((id_it != id_map.end() && id_it->second != node.name()) ||
+            (name_it != name_map.end() && name_it->second != node.id()))
             throw std::runtime_error(
                     (std::string("Cannot update node in G, id and name must be unique") + __FILE__ + " " +
                      __FUNCTION__ + " " + std::to_string(__LINE__)).data());
-        else if (id_map.contains(node.id())) {
+        else if (id_it != id_map.end()) {
             lck_cache.unlock();
             effect = engine_->update_node_local(Node(node));
             if (!effect.applied) {
@@ -772,10 +774,10 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_type(const std::string &type)
     std::shared_lock<std::shared_mutex> lck(_mutex_cache_maps);
 
     std::vector<Node> nodes_;
-    if (nodeType.contains(type))
+    if (const auto it = nodeType.find(type); it != nodeType.end())
     {
-        nodes_.reserve(nodeType.at(type).size());
-        for (auto &id: nodeType.at(type))
+        nodes_.reserve(it->second.size());
+        for (auto &id: it->second)
         {
             if (auto node = engine_->get_node(id); node.has_value()) {
                 nodes_.emplace_back(std::move(*node));
@@ -807,14 +809,14 @@ std::vector<DSR::Node> DSRGraph::get_nodes_by_types(const std::vector<std::strin
     {
         size_t total = 0;
         for (const auto &type : types)
-            if (nodeType.contains(type)) total += nodeType.at(type).size();
+            if (const auto it = nodeType.find(type); it != nodeType.end()) total += it->second.size();
         nodes_.reserve(total);
     }
     for (auto &type : types)
     {
-        if (nodeType.contains(type))
+        if (const auto it = nodeType.find(type); it != nodeType.end())
         {
-            for (auto &id: nodeType.at(type))
+            for (auto &id: it->second)
             {
                 if (auto node = engine_->get_node(id); node.has_value()) {
                     nodes_.emplace_back(std::move(*node));
@@ -882,8 +884,8 @@ std::vector<DSR::Edge> DSRGraph::get_edges_by_type(const std::string &type)
     std::shared_lock<std::shared_mutex> lock(_mutex);
     std::shared_lock<std::shared_mutex> lock_cache(_mutex_cache_maps);
     std::vector<Edge> edges_;
-    if (edgeType.contains(type)) {
-        edges_.reserve(edgeType.at(type).size());
+    if (const auto it = edgeType.find(type); it != edgeType.end()) {
+        edges_.reserve(it->second.size());
     }
     engine_->for_each_edge_of_type(type, [&](uint64_t, uint64_t, const Edge& edge) {
         edges_.emplace_back(edge);
@@ -896,8 +898,8 @@ std::vector<DSR::Edge> DSRGraph::get_edges_to_id(uint64_t id)
     std::shared_lock<std::shared_mutex> lock(_mutex);
     std::shared_lock<std::shared_mutex> lock_cache(_mutex_cache_maps);
     std::vector<Edge> edges_;
-    if (to_edges.contains(id)) {
-        edges_.reserve(to_edges.at(id).size());
+    if (const auto it = to_edges.find(id); it != to_edges.end()) {
+        edges_.reserve(it->second.size());
     }
     engine_->for_each_edge_to(id, [&](uint64_t, const std::string&, const Edge& edge) {
         edges_.emplace_back(edge);
@@ -985,19 +987,20 @@ void DSRGraph::update_maps_edge_delete(uint64_t from, uint64_t to, const std::st
 {
 
     std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-    if (const auto tuple = std::pair{from, to}; edges.contains(tuple)) {
-        edges.at(tuple).erase(key);
-        if (edges.at(tuple).empty()) edges.erase(tuple);
+    const auto tuple = std::pair{from, to};
+    if (auto edge_it = edges.find(tuple); edge_it != edges.end()) {
+        edge_it->second.erase(key);
+        if (edge_it->second.empty()) edges.erase(edge_it);
     }
 
-    if (to_edges.contains(to)) {
-        to_edges.at(to).erase({from, key});
-        if (to_edges.at(to).empty()) to_edges.erase(to);
+    if (auto to_edge_it = to_edges.find(to); to_edge_it != to_edges.end()) {
+        to_edge_it->second.erase({from, key});
+        if (to_edge_it->second.empty()) to_edges.erase(to_edge_it);
     }
 
-    if (edgeType.contains(key)) {
-        edgeType.at(key).erase({from, to});
-        if (edgeType.at(key).empty()) edgeType.erase(key);
+    if (auto edge_type_it = edgeType.find(key); edge_type_it != edgeType.end()) {
+        edge_type_it->second.erase({from, to});
+        if (edge_type_it->second.empty()) edgeType.erase(edge_type_it);
     }
 }
 
