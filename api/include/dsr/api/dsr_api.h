@@ -16,6 +16,7 @@
 #include <optional>
 #include <type_traits>
 #include <limits>
+#include <string_view>
 #include "dsr/core/crdt/delta_crdt.h"
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
@@ -663,43 +664,63 @@ namespace DSR
         // Cache maps
         ///////////////////////////////////////////////////////////////////////////
 
+        struct TransparentStringHash
+        {
+            using is_transparent = void;
+
+            size_t operator()(std::string_view value) const noexcept
+            {
+                return std::hash<std::string_view>{}(value);
+            }
+        };
+
+        struct TransparentStringEqual
+        {
+            using is_transparent = void;
+
+            bool operator()(std::string_view lhs, std::string_view rhs) const noexcept
+            {
+                return lhs == rhs;
+            }
+        };
+
         std::unordered_set<uint64_t> deleted;     // deleted nodes, used to avoid insertion after remove.
-        std::unordered_map<std::string, uint64_t> name_map;     // mapping between name and id of nodes.
+        std::unordered_map<std::string, uint64_t, TransparentStringHash, TransparentStringEqual> name_map;     // mapping between name and id of nodes.
         std::unordered_map<uint64_t, std::string> id_map;       // mapping between id and name of nodes.
         std::unordered_map<std::pair<uint64_t, uint64_t>, std::unordered_set<std::string>, hash_tuple> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<uint64_t , std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple>> to_edges;      // collection with all graph edges. (to, (from, key))
-        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>> edgeType;  // collection with all edge types.
-        std::unordered_map<std::string, std::unordered_set<uint64_t>> nodeType;  // collection with all node types.
+        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>, TransparentStringHash, TransparentStringEqual> edgeType;  // collection with all edge types.
+        std::unordered_map<std::string, std::unordered_set<uint64_t>, TransparentStringHash, TransparentStringEqual> nodeType;  // collection with all node types.
 
         template<typename T>
         void update_maps_node_delete_impl(uint64_t id, std::optional<std::string_view> type, const T& outgoing_edges) {
             std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
-            if (id_map.contains(id))
-            {
-                name_map.erase(id_map.at(id));
-                id_map.erase(id);
+            if (auto id_it = id_map.find(id); id_it != id_map.end()) {
+                name_map.erase(id_it->second);
+                id_map.erase(id_it);
             }
             deleted.insert(id);
             to_edges.erase(id);
 
             if (type.has_value())
             {
-                if (nodeType.contains(std::string{*type})) {
-                    nodeType.at(std::string{*type}).erase(id);
-                    if (nodeType.at(std::string{*type}).empty()) nodeType.erase(std::string{*type});
+                if (auto node_type_it = nodeType.find(*type); node_type_it != nodeType.end()) {
+                    node_type_it->second.erase(id);
+                    if (node_type_it->second.empty()) nodeType.erase(node_type_it);
                 }
                 for (const auto& [to, edge_type] : outgoing_edges) {
-                    if (const auto tuple = std::pair{id, to}; edges.contains(tuple)) {
-                        edges.at(tuple).erase(edge_type);
-                        if (edges.at(tuple).empty()) edges.erase(tuple);
+                    const auto tuple = std::pair{id, to};
+                    if (auto edge_it = edges.find(tuple); edge_it != edges.end()) {
+                        edge_it->second.erase(edge_type);
+                        if (edge_it->second.empty()) edges.erase(edge_it);
                     }
-                    if (edgeType.contains(edge_type)) {
-                        edgeType.at(edge_type).erase({id, to});
-                        if (edgeType.at(edge_type).empty()) edgeType.erase(edge_type);
+                    if (auto edge_type_it = edgeType.find(edge_type); edge_type_it != edgeType.end()) {
+                        edge_type_it->second.erase({id, to});
+                        if (edge_type_it->second.empty()) edgeType.erase(edge_type_it);
                     }
-                    if (to_edges.contains(to)) {
-                        to_edges.at(to).erase({id, edge_type});
-                        if (to_edges.at(to).empty()) to_edges.erase(to);
+                    if (auto to_edge_it = to_edges.find(to); to_edge_it != to_edges.end()) {
+                        to_edge_it->second.erase({id, edge_type});
+                        if (to_edge_it->second.empty()) to_edges.erase(to_edge_it);
                     }
                 }
             }
