@@ -748,6 +748,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
                         maybe_deleted_node.has_value() ? std::optional<std::string_view>{maybe_deleted_node->type} : std::nullopt,
                         maybe_deleted_node.has_value() ? collect_outgoing_edge_keys(maybe_deleted_node->fano) : SyncEngineHost::EdgeKeyList{});
                     delete_unprocessed_deltas();
+                    nodes_.erase(id);
                 } else {
                     const auto& reg = nodes_.at(id).read_reg();
                     current_type = reg.type;
