@@ -30,6 +30,7 @@ struct EdgeType {
 inline std::unordered_set<std::string_view> edge_types::set_type_;
 
 REGISTER_EDGE_TYPE(RT)
+REGISTER_EDGE_TYPE(VRT)
 REGISTER_EDGE_TYPE(reachable)
 REGISTER_EDGE_TYPE(in)
 REGISTER_EDGE_TYPE(knows)

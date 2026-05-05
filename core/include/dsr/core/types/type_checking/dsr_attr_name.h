@@ -109,8 +109,12 @@ REGISTER_TYPE(rt_translation, std::reference_wrapper<const std::vector<float>>, 
 REGISTER_TYPE(rt_quaternion, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_translation_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_rotation_euler_xyz_velocity, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_translation_acceleration, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_rotation_euler_xyz_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_timestamps, std::reference_wrapper<const std::vector<uint64_t>> , false)
 REGISTER_TYPE(rt_se2_covariance, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_se2_covariance_velocity, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_se2_covariance_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_head_index, int, false)
 
 
@@ -373,6 +377,15 @@ REGISTER_TYPE(imu_gyroscope, std::reference_wrapper<const std::vector<float>>, f
 REGISTER_TYPE(imu_compass, float, false)
 REGISTER_TYPE(imu_time_stamp, float, false)
 REGISTER_TYPE(imu_sensor_tick, float, false)
+
+REGISTER_TYPE(imu_linear_pose, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(imu_angular_euler_xyz_pose, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(imu_angular_quaternion_pose, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(imu_linear_velocity, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(imu_angular_velocity, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(imu_linear_acceleration, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(imu_angular_acceleration, std::reference_wrapper<const std::vector<float>>, false)
+
 
 
 /*

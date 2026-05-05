@@ -265,40 +265,65 @@ PYBIND11_MODULE(pydsr, m) {
             .def_property_readonly("timestamp", [](Attribute &self) { return self.timestamp(); },
                                    "read the timestamp (ns) attribute. This property is readonly and it is updated when a change is made in the value property.")
             .def_property("value", [](Attribute &self) -> attribute_type {
-
-                              switch (self.selected()) {
-                                  case 0:
-                                      return self.str();
-                                  case 1:
-                                      return self.dec();
-                                  case 2:
-                                      return self.fl();
-                                  case 3:
-                                      return py::array_t<float> { (py::ssize_t)self.float_vec().size(), self.float_vec().data()};
-                                  case 4:
-                                      return self.bl();
-                                  case 5:
-                                      return py::array_t<uint8_t> {(py::ssize_t)self.byte_vec().size(), self.byte_vec().data()};
-                                  case 6:
-                                      return self.uint();
-                                  case 7:
-                                      return self.uint64();
-                                  case 8:
-                                      return self.dob();
-                                  case 9:
-                                      return py::array_t<uint64_t> {(py::ssize_t)self.u64_vec().size(), self.u64_vec().data()};
-                                    case 10:
-                                      return py::array_t<float> { 2, self.vec2().data()};
-                                  case 11:
-                                      return py::array_t<float> { 3, self.vec3().data()};
-                                  case 12:
-                                      return py::array_t<float> { 4, self.vec4().data()};
-                                  case 13:
-                                      return py::array_t<float> { 6, self.vec6().data()};
-                                  default:
-                                      throw /*std::runtime_error*/ pybind11::type_error("Unreachable");
-                              }
-
+                        switch (self.selected()) {
+                            // Basic types
+                            case 0: return self.str();
+                            case 1: return self.dec();
+                            case 2: return self.fl();
+                            case 6: return self.uint();
+                            case 7: return self.uint64();
+                            case 8: return self.dob();
+                            case 4: return self.bl();
+                    
+                            // Vectors types
+                            case 3:  // float_vec
+                                return py::array_t<float>(
+                                    {(py::ssize_t)self.float_vec().size()},  // Shape
+                                    {sizeof(float)},                         // Stride
+                                    self.float_vec().data(),                  // Pointer
+                                    py::cast(self)                            // Owner
+                                );
+                            case 5:  // byte_vec
+                                return py::array_t<uint8_t>(
+                                    {(py::ssize_t)self.byte_vec().size()},
+                                    {sizeof(uint8_t)},
+                                    self.byte_vec().data(),
+                                    py::cast(self)
+                                );
+                            case 9:  // u64_vec
+                                return py::array_t<uint64_t>(
+                                    {(py::ssize_t)self.u64_vec().size()},
+                                    {sizeof(uint64_t)},
+                                    self.u64_vec().data(),
+                                    py::cast(self)
+                                );
+                            case 10:  // vec2
+                                return py::array_t<float>(
+                                    {2}, {sizeof(float)},
+                                    self.vec2().data(),
+                                    py::cast(self)
+                                );
+                            case 11:  // vec3
+                                return py::array_t<float>(
+                                    {3}, {sizeof(float)},
+                                    self.vec3().data(),
+                                    py::cast(self)
+                                );
+                            case 12:  // vec4
+                                return py::array_t<float>(
+                                    {4}, {sizeof(float)},
+                                    self.vec4().data(),
+                                    py::cast(self)
+                                );
+                            case 13:  // vec6
+                                return py::array_t<float>(
+                                    {6}, {sizeof(float)},
+                                    self.vec6().data(),
+                                    py::cast(self)
+                                );
+                            default:
+                                throw pybind11::type_error("Unreachable");
+                        }
                 },
                           [&](Attribute &self, const attribute_type &val) {
                               auto excep = std::string("Attributes cannot change type. Selected type is " + std::string{DSR::TYPENAMES_UNION[self.selected()]} + " and used type is " + std::string{attribute_type_TYPENAMES_UNION[val.index()]});
@@ -615,8 +640,8 @@ PYBIND11_MODULE(pydsr, m) {
             ) {
                 self.insert_or_assign_edge_RT(n, to, translation, rotation_euler, timestamp);
             }, "node"_a, "to"_a, "trans"_a, "rot_euler"_a, "timestamp"_a=std::nullopt)
-            .def_static("get_edge_RT", &RT_API::get_edge_RT, "node"_a, "to"_a)
-            .def("get_RT_pose_from_parent", [](RT_API &self, Node &e) -> std::optional<Eigen::Matrix<double, 4, 4>> {
+            .def_static("get_edge_RT", &RT_API::get_edge_RT, "node"_a, "to"_a, "type_edge"_a="RT")
+            .def("get_RT_pose_from_parent", [](RT_API &self, Node &e, const std::string &type_edge) -> std::optional<Eigen::Matrix<double, 4, 4>> {
                 auto tmp = self.get_RT_pose_from_parent(e);
                 if (tmp.has_value()) {
                     Eigen::Matrix<double, 4, 4> Trans;
@@ -627,7 +652,7 @@ PYBIND11_MODULE(pydsr, m) {
                 } else {
                     return std::nullopt;
                 }
-            }, "node"_a)
+            }, "node"_a, "type_edge"_a="RT")
             .def("get_edge_RT_as_rtmat", [](RT_API &self, Edge &e, std::uint64_t t) -> std::optional<Eigen::Matrix<double, 4, 4>> {
                 auto tmp = self.get_edge_RT_as_rtmat(e, t);
                 if (tmp.has_value()) {
@@ -651,29 +676,33 @@ PYBIND11_MODULE(pydsr, m) {
             }), "graph"_a)
             .def("transform", static_cast<std::optional<Eigen::Vector3d> (InnerEigenAPI::*)(const std::string &,
                                                                                             const std::string &,
-                                                                                            std::uint64_t timestamp)>(&InnerEigenAPI::transform),
-                 "orig"_a, "dest"_a, "timestamp"_a=0)
+                                                                                            std::uint64_t timestamp,
+                                                                                            const std::string &type_edge)>(&InnerEigenAPI::transform),
+                 "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
             .def("transform", static_cast<std::optional<Eigen::Vector3d> (InnerEigenAPI::*)(const std::string &,
                                                                                             const Mat::Vector3d &,
                                                                                             const std::string &,
-                                                                                            std::uint64_t timestamp)>(&InnerEigenAPI::transform),
-                 "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0)
+                                                                                            std::uint64_t timestamp,
+                                                                                            const std::string &type_edge)>(&InnerEigenAPI::transform),
+                 "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
 
             .def("transform_axis", static_cast<std::optional<Mat::Vector6d> (InnerEigenAPI::*)(const std::string &,
                                                                                                const std::string &,
-                                                                                               std::uint64_t timestamp)>(&InnerEigenAPI::transform_axis),
-                 "orig"_a, "dest"_a, "timestamp"_a=0)
+                                                                                               std::uint64_t timestamp,
+                                                                                               const std::string &type_edge)>(&InnerEigenAPI::transform_axis),
+                 "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
             .def("transform_axis",
                  static_cast<std::optional<Mat::Vector6d> (InnerEigenAPI::*)(const std::string &, const Mat::Vector6d &,
                                                                              const std::string &,
-                                                                             std::uint64_t timestamp)>(&InnerEigenAPI::transform_axis),
-                 "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0)
+                                                                             std::uint64_t timestamp,
+                                                                             const std::string &type_edge)>(&InnerEigenAPI::transform_axis),
+                 "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
 
 
             .def("get_transformation_matrix",
                  [](InnerEigenAPI &self, const std::string &dest,
-                    const std::string &orig, std::uint64_t timestamp) -> std::optional<Eigen::Matrix<double, 4, 4>> {
-                     auto tmp = self.get_transformation_matrix(dest, orig, timestamp);
+                    const std::string &orig, std::uint64_t timestamp, const std::string &type_edge) -> std::optional<Eigen::Matrix<double, 4, 4>> {
+                     auto tmp = self.get_transformation_matrix(dest, orig, timestamp, type_edge);
                      if (tmp.has_value()) {
                          Eigen::Matrix<double, 4, 4> Trans;
                          Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
@@ -683,10 +712,10 @@ PYBIND11_MODULE(pydsr, m) {
                      } else {
                          return std::nullopt;
                      }
-                 }, "orig"_a, "dest"_a, "timestamp"_a=0)
-            .def("get_rotation_matrix", &InnerEigenAPI::get_rotation_matrix, "orig"_a, "dest"_a, "timestamp"_a=0)
-            .def("get_translation_vector", &InnerEigenAPI::get_translation_vector, "orig"_a, "dest"_a, "timestamp"_a=0)
-            .def("get_euler_xyz_angles", &InnerEigenAPI::get_euler_xyz_angles, "orig"_a, "dest"_a, "timestamp"_a=0);
+                 }, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+            .def("get_rotation_matrix", &InnerEigenAPI::get_rotation_matrix, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+            .def("get_translation_vector", &InnerEigenAPI::get_translation_vector, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+            .def("get_euler_xyz_angles", &InnerEigenAPI::get_euler_xyz_angles, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT");
 
 
     bind_ghistory(m);

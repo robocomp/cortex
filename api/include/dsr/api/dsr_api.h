@@ -563,6 +563,14 @@ namespace DSR
             return ret_vec;
         }
 
+        //////////////////////////////////////////////////
+        ///// Check RTs types
+        /////////////////////////////////////////////////
+        static constexpr std::array valid_edge_types = {"RT"sv, "VRT"sv};
+        static constexpr bool is_valid_edge_type(std::string_view edge_type) {
+            return std::ranges::find(valid_edge_types, edge_type) != valid_edge_types.end();
+        }
+
 
         //////////////////////////////////////////////////
         ///// QueuedSignals for python
