@@ -125,6 +125,18 @@ REGISTER_TYPE(looking_at_quaternion, std::reference_wrapper<const std::vector<fl
  * */
 REGISTER_TYPE(laser_angles, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(laser_dists, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(laser_X, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(laser_Y, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(laser_Z, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(laser_R, std::reference_wrapper<const std::vector<u_int8_t>>, true)
+REGISTER_TYPE(laser_G, std::reference_wrapper<const std::vector<u_int8_t>>, true)
+REGISTER_TYPE(laser_B, std::reference_wrapper<const std::vector<u_int8_t>>, true)
+REGISTER_TYPE(laser_D, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(laser_intensities, std::reference_wrapper<const std::vector<u_int8_t>>, true)
+REGISTER_TYPE(laser_timestamp, uint64_t, false)
+REGISTER_TYPE(laser_i, std::reference_wrapper<const std::vector<u_int8_t>>, true)
+REGISTER_TYPE(laser_j, std::reference_wrapper<const std::vector<u_int8_t>>, true)
+
 /*
  * Person
  * */
