@@ -218,7 +218,7 @@ void GraphEdge::mouse_double_clicked()
     static std::unique_ptr<QWidget> do_stuff;
     const auto graph = this->source->getGraphViewer()->getGraph();
 
-    if (this->tag->toPlainText()=="RT" or this->tag->toPlainText()=="looking-at") {
+    if (this->tag->toPlainText()=="RT" or this->tag->toPlainText()=="VRT" or this->tag->toPlainText()=="looking-at") {
         do_stuff = std::make_unique<GraphEdgeRTWidget>(graph, this->source->id_in_graph, this->dest->id_in_graph,
                 this->tag->toPlainText().toStdString());
     }

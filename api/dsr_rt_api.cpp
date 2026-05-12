@@ -9,23 +9,27 @@ RT_API::RT_API(DSR::DSRGraph *G_)
     G = G_;
 }
 
-std::optional<Edge> RT_API::get_edge_RT(const Node &n, uint64_t to)
+std::optional<Edge> RT_API::get_edge_RT(const Node &n, uint64_t to, const std::string &edge_type)
 {
+    if( not DSR::DSRGraph::is_valid_edge_type(edge_type)) 
+        return {};
     auto edges_ = n.fano();
-    auto res = edges_.find({to, "RT"});
+    auto res = edges_.find({to, edge_type});
     if (res != edges_.end())
         return res->second;
     else
         return {};
 }
 
-std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n)
+std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n, const std::string &edge_type)
 {
+    if( not DSR::DSRGraph::is_valid_edge_type(edge_type)) 
+        return {};
     auto p = G->get_parent_node(n);
     if (p.has_value())
     {
         auto edges_ = p->fano();
-        auto res = edges_.find({n.id(),"RT"});
+        auto res = edges_.find({n.id(), edge_type});
         if (res != edges_.end())
         {
             auto r = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(res->second);

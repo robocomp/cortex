@@ -17,7 +17,7 @@ namespace DSR
     class InnerEigenAPI : public QObject
     {
         Q_OBJECT
-        using KeyTransform = std::tuple<std::string, std::string>;
+        using KeyTransform = std::tuple<std::string, std::string, std::string>;
         using NodeReference = std::map<uint64_t , std::list<KeyTransform>>;
         using TransformCache = std::map<KeyTransform, Mat::RTMat>;
         using NodeMatrix = std::tuple<uint64_t , Mat::RTMat>;
@@ -28,18 +28,18 @@ namespace DSR
             /////////////////////////////////////////////////
             /// Kinematic transformation methods
             ////////////////////////////////////////////////
-            std::optional<Mat::Vector3d> transform( const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0);
-            std::optional<Mat::Vector3d> transform( const std::string &dest, const Mat::Vector3d &vector, const std::string &orig, std::uint64_t timestamp = 0);
-            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const std::string & orig, std::uint64_t timestamp = 0);
-            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const Mat::Vector6d &vector, const std::string &orig, std::uint64_t timestamp = 0);
+            std::optional<Mat::Vector3d> transform( const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Vector3d> transform( const std::string &dest, const Mat::Vector3d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const std::string & orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const Mat::Vector6d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
 
             ////////////////////////////////////////////////
             /// Transformation matrix retrieval methods
             ////////////////////////////////////////////////
-            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0);
-            std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0);
-            std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0);
-            std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0);
+            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
 
         public slots:
             void add_or_assign_edge_slot(uint64_t from, uint64_t to, const std::string& edge_type);
