@@ -5,8 +5,25 @@
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
 #include <dsr/gui/viewers/tree_viewer/tree_viewer.h>
 #include <qdebug.h>
+#include <vector>
 
 using namespace DSR ;
+
+namespace
+{
+    constexpr std::size_t max_vector_spinboxes = 32;
+
+    QString summarize_float_vector(const std::vector<float> &values)
+    {
+        if(values.empty())
+            return "vector<float>[0]";
+
+        return QString("vector<float>[%1] first=%2 last=%3")
+                .arg(values.size())
+                .arg(values.front(), 0, 'g', 6)
+                .arg(values.back(), 0, 'g', 6);
+    }
+}
 
 TreeViewer::TreeViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  QTreeWidget(parent)
 {
@@ -167,7 +184,7 @@ void TreeViewer::node_change_SLOT(int value, uint64_t id, const std::string &typ
 
 void TreeViewer::create_attribute_widgets(QTreeWidgetItem* parent, Node* node)
 {
-	for (auto[key, value] : node->attrs()) {
+	for (const auto &[key, value] : node->attrs()) {
 		// check if attribute widget already exists
 		if(attributes_map.count(node->id()) > 0 and attributes_map[node->id()].count(key) > 0)
 			continue;
@@ -176,7 +193,7 @@ void TreeViewer::create_attribute_widgets(QTreeWidgetItem* parent, Node* node)
 
 }
 
-void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, std::string key, Attribute value)
+void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, const std::string &key, const Attribute &value)
 {
 	QTreeWidgetItem* q_attr = new QTreeWidgetItem(parent);
 	attributes_map[node->id()][key] = q_attr;
@@ -208,20 +225,30 @@ void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, st
 	}
 		break;
 	case 3: {
-		QWidget* widget = new QWidget();
-		QHBoxLayout* layout = new QHBoxLayout;
-		widget->setLayout(layout);
-		if (!value.float_vec().empty()) {
-			for (std::size_t i = 0; i<value.float_vec().size(); ++i) {
+        const auto &float_vec = value.float_vec();
+        if(float_vec.size() > max_vector_spinboxes)
+        {
+            QLineEdit* ledit = new QLineEdit(summarize_float_vector(float_vec));
+            ledit->setReadOnly(true);
+            this->setItemWidget(q_attr, 1, ledit);
+        }
+        else
+        {
+            QWidget* widget = new QWidget();
+            QHBoxLayout* layout = new QHBoxLayout;
+            widget->setLayout(layout);
+            if (!float_vec.empty()) {
+                for (std::size_t i = 0; i<float_vec.size(); ++i) {
 				QDoubleSpinBox* spin = new QDoubleSpinBox();
 				spin->setReadOnly(true);
 				spin->setMinimum(-1000000);
 				spin->setMaximum(1000000);
-				spin->setValue(value.float_vec()[i]);
+				spin->setValue(float_vec[i]);
 				layout->addWidget(spin);
-			}
-			this->setItemWidget(q_attr, 1, widget);
-		}
+                }
+                this->setItemWidget(q_attr, 1, widget);
+            }
+        }
 	}
 		break;
 	case 4: {
@@ -252,7 +279,7 @@ void TreeViewer::create_attribute_widget(QTreeWidgetItem* parent, Node* node, st
 
 void TreeViewer::update_attribute_widgets(Node* node)
 {
-	for (auto[key, value] : node->attrs()) {
+	for (const auto &[key, value] : node->attrs()) {
 		QTreeWidgetItem* q_attr = attributes_map[node->id()][key];
 		if(not q_attr) {
 			create_attribute_widget(tree_map[node->id()], node, key, value);
@@ -278,6 +305,12 @@ void TreeViewer::update_attribute_widgets(Node* node)
             }
                 break;
             case 3: {
+                const auto &float_vec = value.float_vec();
+                if(QLineEdit *ledit = qobject_cast<QLineEdit *>(this->itemWidget(q_attr, 1)); ledit != nullptr)
+                {
+                    ledit->setText(summarize_float_vector(float_vec));
+                    break;
+                }
                 QWidget *widget = qobject_cast<QWidget *>(this->itemWidget(q_attr, 1));
 				if (!widget) {
 					qDebug() << __PRETTY_FUNCTION__ << " Skip Attribute " << key.data()  << " widget doesn't exist " << "\n";
@@ -285,7 +318,9 @@ void TreeViewer::update_attribute_widgets(Node* node)
 				}
                 int count = 0;
                 for (auto spin : widget->findChildren<QDoubleSpinBox *>()) {
-                    spin->setValue(value.float_vec()[count]);
+                    if(static_cast<std::size_t>(count) >= float_vec.size())
+                        break;
+                    spin->setValue(float_vec[count]);
                     count++;
                 }
             }

@@ -57,7 +57,7 @@ namespace DSR
 			std::map<uint64_t, std::map<std::string, QTreeWidgetItem*>> attributes_map;
 			void createGraph();
 			void create_attribute_widgets(QTreeWidgetItem* parent, Node* node);
-			void create_attribute_widget(QTreeWidgetItem* parent, Node* node, std::string key, Attribute value);
+			void create_attribute_widget(QTreeWidgetItem* parent, Node* node, const std::string &key, const Attribute &value);
 			void update_attribute_widgets(Node* node);
 
 		signals:
