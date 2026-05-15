@@ -6,10 +6,12 @@
 #include <fastdds/utils/IPFinder.hpp>
 #include <fastdds/rtps/common/MatchingInfo.hpp>
 
+#include <dsr/core/rtps/env_overrides.h>
 #include <dsr/core/rtps/dsrpublisher.h>
 
 #include <QDebug>
 
+#include <algorithm>
 
 using namespace eprosima::fastdds;
 using namespace eprosima::fastdds::rtps;
@@ -25,6 +27,27 @@ Locator_t domain_multicast_locator(int8_t domain_id)
     IPLocator::setIPv4(locator,
         ("239.255." + std::to_string(domain / 250) + "." + std::to_string(1 + (domain % 250))).c_str());
     return locator;
+}
+
+uint32_t env_u32_or(const char* name, uint32_t fallback, uint32_t minimum = 0)
+{
+    const auto value = DSR::RTPS::Env::read_u32(name);
+    if (!value.present()) {
+        return fallback;
+    }
+    if (!value.value.has_value() || *value.value < minimum) {
+        qWarning() << "Ignoring invalid" << name << "value" << value.raw;
+        return fallback;
+    }
+    qInfo() << "Using" << name << "override" << *value.value;
+    return *value.value;
+}
+
+eprosima::fastdds::dds::Duration_t duration_from_ms(uint32_t ms)
+{
+    return eprosima::fastdds::dds::Duration_t(
+        static_cast<int32_t>(ms / 1000U),
+        static_cast<uint32_t>((ms % 1000U) * 1000000U));
 }
 }
 
@@ -68,20 +91,29 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
     if (isStreamData) {
         dataWriterQos.reliability().kind = eprosima::fastdds::dds::BEST_EFFORT_RELIABILITY_QOS;
         dataWriterQos.history().kind = eprosima::fastdds::dds::KEEP_LAST_HISTORY_QOS;
-        dataWriterQos.history().depth = 50;
-        //dataWriterQos.resource_limits().allocated_samples = 300;
+        const auto depth = static_cast<int32_t>(env_u32_or("DSR_STREAM_HISTORY_DEPTH", 50, 1));
+        dataWriterQos.history().depth = depth;
+        dataWriterQos.resource_limits().max_samples = std::max(dataWriterQos.resource_limits().max_samples, depth);
+        dataWriterQos.resource_limits().allocated_samples =
+            std::max(dataWriterQos.resource_limits().allocated_samples, depth);
         dataWriterQos.reliable_writer_qos().disable_positive_acks.enabled = true;
+    } else {
+        const auto max_samples = static_cast<int32_t>(env_u32_or("DSR_RELIABLE_MAX_SAMPLES", 300, 1));
+        dataWriterQos.resource_limits().max_samples = max_samples;
+        dataWriterQos.resource_limits().allocated_samples = max_samples;
     }
 
     // Check ACK for sended messages.
-    dataWriterQos.reliable_writer_qos().times.heartbeat_period.seconds = 0;
-    dataWriterQos.reliable_writer_qos().times.heartbeat_period.nanosec = 20000000; //20 ms. This value should be more or less close to the sending frequency.
+    dataWriterQos.reliable_writer_qos().times.heartbeat_period =
+        duration_from_ms(env_u32_or("DSR_WRITER_HEARTBEAT_PERIOD_MS", 20));
 
     //Check latency
-    dataWriterQos.latency_budget().duration = {0,10000000}; //10ms;
+    dataWriterQos.latency_budget().duration =
+        duration_from_ms(env_u32_or("DSR_WRITER_LATENCY_BUDGET_MS", 10));
 
     //Invalidate data after 1 second. If we dont receive it after this time we probably won't get it.
-    dataWriterQos.lifespan().duration = 1;
+    dataWriterQos.lifespan().duration =
+        duration_from_ms(env_u32_or("DSR_WRITER_LIFESPAN_MS", 1000));
 
 
     int retry = 0;
