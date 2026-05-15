@@ -7,7 +7,13 @@
 #include <QDebug>
 #include <dsr/core/rtps/dsrparticipant.h>
 #include <dsr/core/rtps/CRDTPubSubTypes.h>
+#include <dsr/core/rtps/env_overrides.h>
 #include <dsr/core/types/internal_types.h>
+
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <string>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
@@ -31,6 +37,65 @@ std::vector<std::string> host_ipv4_interfaces()
 bool is_lww_mode(uint8_t sync_mode_wire)
 {
     return sync_mode_wire == 1;
+}
+
+uint32_t env_u32_or(const char* name, uint32_t fallback, uint32_t minimum = 0)
+{
+    const auto value = DSR::RTPS::Env::read_u32(name);
+    if (!value.present()) {
+        return fallback;
+    }
+    if (!value.value.has_value() || *value.value < minimum) {
+        qWarning() << "Ignoring invalid" << name << "value" << value.raw;
+        return fallback;
+    }
+    qInfo() << "Using" << name << "override" << *value.value;
+    return *value.value;
+}
+
+template <typename Apply>
+void apply_u32_env(const char* name, uint32_t minimum, Apply&& apply)
+{
+    const auto value = DSR::RTPS::Env::read_u32(name);
+    if (!value.present()) {
+        return;
+    }
+    if (!value.value.has_value() || *value.value < minimum) {
+        qWarning() << "Ignoring invalid" << name << "value" << value.raw;
+        return;
+    }
+    qInfo() << "Using" << name << "override" << *value.value;
+    apply(*value.value);
+}
+
+eprosima::fastdds::dds::Log::Kind fastdds_log_verbosity_from_env(
+        eprosima::fastdds::dds::Log::Kind fallback)
+{
+    const char* raw = std::getenv("DSR_FASTDDS_LOG_VERBOSITY");
+    if (raw == nullptr || raw[0] == '\0') {
+        return fallback;
+    }
+
+    std::string value(raw);
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::toupper(c));
+    });
+
+    if (value == "ERROR" || value == "0") {
+        qInfo() << "Using DSR_FASTDDS_LOG_VERBOSITY override ERROR";
+        return eprosima::fastdds::dds::Log::Error;
+    }
+    if (value == "WARNING" || value == "WARN" || value == "1") {
+        qInfo() << "Using DSR_FASTDDS_LOG_VERBOSITY override WARNING";
+        return eprosima::fastdds::dds::Log::Warning;
+    }
+    if (value == "INFO" || value == "2") {
+        qInfo() << "Using DSR_FASTDDS_LOG_VERBOSITY override INFO";
+        return eprosima::fastdds::dds::Log::Info;
+    }
+
+    qWarning() << "Ignoring invalid DSR_FASTDDS_LOG_VERBOSITY value" << raw;
+    return fallback;
 }
 
 struct TransportFamily
@@ -127,23 +192,32 @@ std::tuple<bool, DSRParticipant::participant_handle_type*> DSRParticipant::init_
         // Same-host deployments should prefer shared memory. Keep loopback UDP
         // as a discovery/data fallback for environments where SHM is limited.
         auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+        apply_u32_env("DSR_SHM_SEGMENT_SIZE", 0, [&](uint32_t value) {
+            shm_transport->segment_size(value);
+        });
+        apply_u32_env("DSR_SHM_PORT_QUEUE_CAPACITY", 1, [&](uint32_t value) {
+            shm_transport->port_queue_capacity(value);
+        });
+        apply_u32_env("DSR_SHM_HEALTHY_CHECK_TIMEOUT_MS", 0, [&](uint32_t value) {
+            shm_transport->healthy_check_timeout_ms(value);
+        });
         PParam.transport().user_transports.push_back(shm_transport);
 
         auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-        udp_transport->maxMessageSize = 65500;
+        udp_transport->maxMessageSize = env_u32_or("DSR_UDP_MAX_MESSAGE_SIZE", 65500, 1);
         udp_transport->interface_allowlist.emplace_back("127.0.0.1");
         PParam.transport().user_transports.push_back(udp_transport);
     } else {
         auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-        udp_transport->maxMessageSize = 65500;
+        udp_transport->maxMessageSize = env_u32_or("DSR_UDP_MAX_MESSAGE_SIZE", 65500, 1);
         for (const auto& ip : host_ipv4_interfaces()) {
             udp_transport->interface_allowlist.emplace_back(ip);
         }
         PParam.transport().user_transports.push_back(udp_transport);
     }
 
-    PParam.transport().send_socket_buffer_size = 33554432;
-    PParam.transport().listen_socket_buffer_size = 33554432;
+    PParam.transport().send_socket_buffer_size = env_u32_or("DSR_SOCKET_SEND_BUFFER_SIZE", 33554432);
+    PParam.transport().listen_socket_buffer_size = env_u32_or("DSR_SOCKET_LISTEN_BUFFER_SIZE", 33554432);
 
 
     //Discovery
@@ -155,7 +229,8 @@ std::tuple<bool, DSRParticipant::participant_handle_type*> DSRParticipant::init_
     PParam.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod =
             eprosima::fastdds::dds::Duration_t(3, 0);
 
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Error);
+    eprosima::fastdds::dds::Log::SetVerbosity(
+        fastdds_log_verbosity_from_env(eprosima::fastdds::dds::Log::Error));
 
     m_listener = std::make_unique<ParticpantListener>(std::move(fn));
 

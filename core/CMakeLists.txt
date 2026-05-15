@@ -33,6 +33,7 @@ target_sources(dsr_core
         include/dsr/core/rtps/dsrparticipant.h
         include/dsr/core/rtps/dsrpublisher.h
         include/dsr/core/rtps/dsrsubscriber.h
+        include/dsr/core/rtps/env_overrides.h
 
         include/dsr/core/rtps/CRDTPubSubTypes.h
         include/dsr/core/serialization/serializable.h
