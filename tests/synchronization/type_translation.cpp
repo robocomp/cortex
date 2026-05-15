@@ -20,6 +20,7 @@
 
 #include <fastcdr/Cdr.h>
 #include <fastcdr/FastBuffer.h>
+#include <fastdds/rtps/common/SerializedPayload.hpp>
 
 using namespace DSR;
 
@@ -36,6 +37,24 @@ T roundtrip(const T& src)
     deser.read_encapsulation();
     T dst;
     dst.deserialize_impl(deser);
+    return dst;
+}
+
+template<typename T>
+T pubsub_roundtrip(const T& src, const std::string& type_name)
+{
+    CRDTPubSubType<T> type(type_name);
+    const auto representation = eprosima::fastdds::dds::DataRepresentationId_t::XCDR_DATA_REPRESENTATION;
+    const uint32_t calculated_size = type.calculate_serialized_size(&src, representation);
+    REQUIRE(calculated_size >= eprosima::fastdds::rtps::SerializedPayload_t::representation_header_size);
+
+    eprosima::fastdds::rtps::SerializedPayload_t payload(calculated_size);
+    REQUIRE(type.serialize(&src, payload, representation));
+    REQUIRE(payload.length <= calculated_size);
+    REQUIRE(payload.length > eprosima::fastdds::rtps::SerializedPayload_t::representation_header_size);
+
+    T dst;
+    REQUIRE(type.deserialize(payload, &dst));
     return dst;
 }
 
@@ -251,6 +270,168 @@ TEST_CASE("Wire metadata round-trip preserves sync mode", "[TRANSLATION][SYNC_MO
         REQUIRE(rt.sync_mode == graph.sync_mode);
         REQUIRE(rt.nodes.size() == graph.nodes.size());
     }
+}
+
+TEST_CASE("CRDTPubSubType serializes representative wire messages", "[TRANSLATION][SERIALIZATION][DDS]")
+{
+    const Attribute level_attr(7, 1000, 2);
+    const Attribute name_attr(std::string("camera"), 1001, 2);
+    const Attribute vector_attr(std::vector<float>{1.0F, 2.0F, 3.0F}, 1002, 2);
+
+    auto node = Node::create<robot_node_type>(
+        std::map<std::string, Attribute>{
+            {"level", level_attr},
+            {"name", name_attr},
+            {"pose", vector_attr},
+        },
+        {});
+    node.id(10);
+    node.name("robot");
+    node.agent_id(2);
+
+    mvreg<CRDT::Node> node_reg;
+    auto node_delta = node_reg.write(user_node_to_crdt(node));
+    auto node_msg = CRDTNode_to_Msg(node.agent_id(), node.id(), std::move(node_delta));
+    node_msg.sync_mode = sync_mode_wire_value(SyncMode::CRDT);
+
+    auto node_rt = pubsub_roundtrip(node_msg, "MvregNodeMsg");
+    REQUIRE(node_rt.id == node_msg.id);
+    REQUIRE(node_rt.agent_id == node_msg.agent_id);
+    REQUIRE(node_rt.dk.read_reg().attrs == node_msg.dk.read_reg().attrs);
+
+    CRDT::Edge crdt_edge;
+    crdt_edge.from = 10;
+    crdt_edge.to = 20;
+    crdt_edge.type = "RT";
+    crdt_edge.agent_id = 2;
+    mvreg<Attribute> weight_attr;
+    crdt_edge.attrs.emplace("weight", weight_attr.write(Attribute(3.5F, 1003, 2)));
+    mvreg<CRDT::Edge> edge_reg;
+    auto edge_msg = CRDTEdge_to_Msg(2, crdt_edge.from, crdt_edge.to, crdt_edge.type, edge_reg.write(crdt_edge));
+
+    auto edge_rt = pubsub_roundtrip(edge_msg, "MvregEdgeMsg");
+    REQUIRE(edge_rt.from == edge_msg.from);
+    REQUIRE(edge_rt.to == edge_msg.to);
+    REQUIRE(edge_rt.type == edge_msg.type);
+    REQUIRE(edge_rt.dk.read_reg().attrs == edge_msg.dk.read_reg().attrs);
+
+    mvreg<Attribute> attr_reg;
+    auto node_attr_msg = CRDTNodeAttr_to_Msg(2, 1, node.id(), "status", attr_reg.write(Attribute(true, 1004, 2)));
+    MvregNodeAttrVec node_attr_vec;
+    node_attr_vec.vec.push_back(std::move(node_attr_msg));
+
+    auto node_attr_rt = pubsub_roundtrip(node_attr_vec, "MvregNodeAttrVec");
+    REQUIRE(node_attr_rt.vec.size() == node_attr_vec.vec.size());
+    REQUIRE(node_attr_rt.vec.front().node == node.id());
+    REQUIRE(node_attr_rt.vec.front().attr_name == "status");
+
+    mvreg<Attribute> edge_attr_reg;
+    auto edge_attr_msg = CRDTEdgeAttr_to_Msg(
+        2, 10, crdt_edge.from, crdt_edge.to, crdt_edge.type, "confidence",
+        edge_attr_reg.write(Attribute(0.75, 1005, 2)));
+    MvregEdgeAttrVec edge_attr_vec;
+    edge_attr_vec.vec.push_back(std::move(edge_attr_msg));
+
+    auto edge_attr_rt = pubsub_roundtrip(edge_attr_vec, "MvregEdgeAttrVec");
+    REQUIRE(edge_attr_rt.vec.size() == edge_attr_vec.vec.size());
+    REQUIRE(edge_attr_rt.vec.front().from_node == crdt_edge.from);
+    REQUIRE(edge_attr_rt.vec.front().to_node == crdt_edge.to);
+    REQUIRE(edge_attr_rt.vec.front().attr_name == "confidence");
+
+    OrMap graph;
+    graph.id = 2;
+    graph.to_id = 3;
+    graph.sync_mode = sync_mode_wire_value(SyncMode::CRDT);
+    graph.m.emplace(node_msg.id, node_msg);
+
+    auto graph_rt = pubsub_roundtrip(graph, "OrMap");
+    REQUIRE(graph_rt.id == graph.id);
+    REQUIRE(graph_rt.to_id == graph.to_id);
+    REQUIRE(graph_rt.m.size() == graph.m.size());
+    REQUIRE(graph_rt.m.at(node_msg.id).dk.read_reg().attrs == node_msg.dk.read_reg().attrs);
+
+    GraphRequest request;
+    request.from = "agent";
+    request.id = 9;
+    request.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+
+    auto request_rt = pubsub_roundtrip(request, "GraphRequest");
+    REQUIRE(request_rt.from == request.from);
+    REQUIRE(request_rt.id == request.id);
+    REQUIRE(request_rt.sync_mode == request.sync_mode);
+
+    LWWNodeMsg lww_node;
+    lww_node.id = 30;
+    lww_node.type = "camera";
+    lww_node.name = "front_camera";
+    lww_node.attrs.emplace("serial", Attribute(std::string("abc123"), 2000, 4));
+    lww_node.agent_id = 4;
+    lww_node.timestamp = 2000;
+    lww_node.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+
+    auto lww_node_rt = pubsub_roundtrip(lww_node, "LWWNodeMsg");
+    REQUIRE(lww_node_rt.id == lww_node.id);
+    REQUIRE(lww_node_rt.attrs == lww_node.attrs);
+    REQUIRE(lww_node_rt.sync_mode == lww_node.sync_mode);
+
+    LWWEdgeMsg lww_edge;
+    lww_edge.from = 30;
+    lww_edge.to = 10;
+    lww_edge.type = "sees";
+    lww_edge.attrs.emplace("probability", Attribute(0.9F, 2001, 4));
+    lww_edge.agent_id = 4;
+    lww_edge.timestamp = 2001;
+    lww_edge.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+
+    auto lww_edge_rt = pubsub_roundtrip(lww_edge, "LWWEdgeMsg");
+    REQUIRE(lww_edge_rt.from == lww_edge.from);
+    REQUIRE(lww_edge_rt.to == lww_edge.to);
+    REQUIRE(lww_edge_rt.attrs == lww_edge.attrs);
+
+    LWWNodeAttrVec lww_node_attrs;
+    lww_node_attrs.vec.push_back(LWWNodeAttrMsg{
+        .node_id = lww_node.id,
+        .attr_name = "serial",
+        .value = Attribute(std::string("xyz789"), 2002, 4),
+        .agent_id = 4,
+        .timestamp = 2002,
+        .deleted = false,
+        .protocol_version = DSR_PROTOCOL_VERSION,
+        .sync_mode = sync_mode_wire_value(SyncMode::LWW)});
+
+    auto lww_node_attrs_rt = pubsub_roundtrip(lww_node_attrs, "LWWNodeAttrVec");
+    REQUIRE(lww_node_attrs_rt.vec.size() == 1);
+    REQUIRE(lww_node_attrs_rt.vec.front().attr_name == "serial");
+
+    LWWEdgeAttrVec lww_edge_attrs;
+    lww_edge_attrs.vec.push_back(LWWEdgeAttrMsg{
+        .from = lww_edge.from,
+        .to = lww_edge.to,
+        .type = lww_edge.type,
+        .attr_name = "probability",
+        .value = Attribute(0.95F, 2003, 4),
+        .agent_id = 4,
+        .timestamp = 2003,
+        .deleted = false,
+        .protocol_version = DSR_PROTOCOL_VERSION,
+        .sync_mode = sync_mode_wire_value(SyncMode::LWW)});
+
+    auto lww_edge_attrs_rt = pubsub_roundtrip(lww_edge_attrs, "LWWEdgeAttrVec");
+    REQUIRE(lww_edge_attrs_rt.vec.size() == 1);
+    REQUIRE(lww_edge_attrs_rt.vec.front().attr_name == "probability");
+
+    LWWGraphSnapshot lww_graph;
+    lww_graph.id = 4;
+    lww_graph.to_id = 5;
+    lww_graph.tombstone_window_ms = 300000;
+    lww_graph.sync_mode = sync_mode_wire_value(SyncMode::LWW);
+    lww_graph.nodes.push_back(lww_node);
+    lww_graph.edges.push_back(lww_edge);
+
+    auto lww_graph_rt = pubsub_roundtrip(lww_graph, "LWWGraphSnapshot");
+    REQUIRE(lww_graph_rt.id == lww_graph.id);
+    REQUIRE(lww_graph_rt.nodes.size() == 1);
+    REQUIRE(lww_graph_rt.edges.size() == 1);
 }
 
 TEST_CASE("Sync engine interface message aliases compile", "[SYNC_ENGINE][COMPILE]")
