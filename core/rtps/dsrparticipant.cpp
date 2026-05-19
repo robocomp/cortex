@@ -65,12 +65,12 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
         PParam.transport().user_transports.push_back(shm_transport);
 
         auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-        udp_transport->maxMessageSize = 65000;
+        udp_transport->maxMessageSize = 65536;
         udp_transport->interface_allowlist.emplace_back("127.0.0.1");
         PParam.transport().user_transports.push_back(udp_transport);
     } else {
         auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-        udp_transport->maxMessageSize = 65000;
+        udp_transport->maxMessageSize = 65536;
         for (const auto& ip : host_ipv4_interfaces()) {
             udp_transport->interface_allowlist.emplace_back(ip);
         }
@@ -90,7 +90,7 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     PParam.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod =
             eprosima::fastdds::dds::Duration_t(3, 0);
 
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Info);
+    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Error);
 
     m_listener = std::make_unique<ParticpantListener>(std::move(fn));
 

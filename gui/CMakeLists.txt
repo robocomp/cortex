@@ -33,7 +33,7 @@ endif()
 
 message(STATUS ${qt3d_required} " " ${qt3d_viewer_headers} " " ${qt3d_libs} " " ${qt3d_viewer_sources})
 
-find_package(Qt6 COMPONENTS Widgets OpenGL Xml ${qt3d_required} REQUIRED)
+find_package(Qt6 COMPONENTS Widgets OpenGL OpenGLWidgets Xml ${qt3d_required} REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenSceneGraph REQUIRED COMPONENTS osg osgDB osgGA)
 find_package(cppitertools)
@@ -90,7 +90,7 @@ target_sources(dsr_gui
 
 target_link_libraries(dsr_gui
         PRIVATE
-        Qt6::Widgets Qt6::Xml
+        Qt6::Widgets Qt6::Xml Qt6::OpenGLWidgets
         Eigen3::Eigen
         fastcdr
         osgViewer osgDB osgGA OpenThreads

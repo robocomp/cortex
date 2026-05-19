@@ -17,6 +17,8 @@
 #ifndef GRAPHNODERGBDWIDGET_H
 #define GRAPHNODERGBDWIDGET_H
 
+#include <QPainter>
+
 class GraphNodeRGBDWidget : public QWidget
 {
   Q_OBJECT
@@ -64,15 +66,16 @@ class GraphNodeRGBDWidget : public QWidget
     void drawRGBDSLOT( uint64_t id, const std::vector<std::string> &type)
     {
       if( static_cast<uint64_t>(id) != node_id) return;
-      bool rgb = std::any_of(type.begin(), type.end(), [](auto& e){ return e == cam_rgb_att::attr_name;});
-      bool d = std::any_of(type.begin(), type.end(), [](auto& e){ return e == cam_depth_att::attr_name;});
-
       auto now = std::chrono::system_clock::now();
       bool update_rgb = std::chrono::duration_cast<std::chrono::microseconds>(now - last_update_rgb)  > std::chrono::milliseconds(20);
-      bool update_d = d = std::chrono::duration_cast<std::chrono::microseconds>(now - last_update_d)  > std::chrono::milliseconds(20);
+            bool update_d = std::chrono::duration_cast<std::chrono::microseconds>(now - last_update_d)  > std::chrono::milliseconds(20);
 
+            // Keep compatibility with attr-driven updates, but do not depend on them.
+            // Some producers emit empty attr-name vectors while still updating node data.
+            bool rgb_attr_changed = std::any_of(type.begin(), type.end(), [](const auto& e){ return e == cam_rgb_att::attr_name;});
+            bool d_attr_changed = std::any_of(type.begin(), type.end(), [](const auto& e){ return e == cam_depth_att::attr_name;});
 
-      if ( (rgb and update_rgb) or (d and update_d) )
+            if (update_rgb || update_d || rgb_attr_changed || d_attr_changed)
       {
           std::optional<Node> n = (show_rgb->isChecked() or show_depth->isChecked()) ?  graph->get_node(id) :  std::nullopt;
           if (n.has_value()) {
@@ -80,7 +83,7 @@ class GraphNodeRGBDWidget : public QWidget
               //auto t = get_unix_timestamp();
               //std::cout << "[DRAW IMG] " << timestamp << ", " << t << ": " << static_cast<double>(t - timestamp) / 1000000 << std::endl;
               //rgb
-              if (rgb and update_rgb) {
+              if (update_rgb) {
                   if (show_rgb->isChecked()) {
                       const auto rgb_data = graph->get_attrib_by_name<cam_rgb_att>(node);//cam->get_rgb_image();
                       const auto rgb_width = graph->get_attrib_by_name<cam_rgb_width_att>(node);
@@ -88,16 +91,45 @@ class GraphNodeRGBDWidget : public QWidget
 
                       if (rgb_data.has_value() and rgb_width.has_value() and rgb_height.has_value()) {
                           const std::vector<uint8_t> &img = rgb_data.value();//.get();
-                          auto pix = QPixmap::fromImage(
-                                  QImage(&img[0], rgb_width.value(), rgb_height.value(), QImage::Format_RGB888));
-                          rgbd_label.setPixmap(pix);
-                          last_update_rgb = now;
+                          const int w = rgb_width.value();
+                          const int h = rgb_height.value();
+                          const std::size_t needed = static_cast<std::size_t>(w) * static_cast<std::size_t>(h) * 3;
+                          if (w > 0 && h > 0 && img.size() >= needed)
+                          {
+                              const auto arrival_now = std::chrono::steady_clock::now();
+                              if (have_last_rgb_arrival_time)
+                              {
+                                  const auto dt_ms = std::chrono::duration_cast<std::chrono::milliseconds>(arrival_now - last_rgb_arrival_time).count();
+                                  if (dt_ms > 0 && dt_ms < 10000)
+                                  {
+                                      const float inst_fps = 1000.0f / static_cast<float>(dt_ms);
+                                      rgb_display_fps_hz = (rgb_display_fps_hz > 0.0f) ? (0.85f * rgb_display_fps_hz + 0.15f * inst_fps) : inst_fps;
+                                  }
+                              }
+                              last_rgb_arrival_time = arrival_now;
+                              have_last_rgb_arrival_time = true;
+
+                              QImage qimg(img.data(), w, h, w * 3, QImage::Format_RGB888);
+                              QImage frame = qimg.copy();
+                              QPainter painter(&frame);
+                              painter.setRenderHint(QPainter::TextAntialiasing, true);
+                              painter.fillRect(QRect(8, 8, 140, 26), QColor(0, 0, 0, 160));
+                              painter.setPen(QColor(255, 255, 255));
+                              const QString fps_text = (rgb_display_fps_hz > 0.0f)
+                                                          ? QString::number(rgb_display_fps_hz, 'f', 1)
+                                                          : QStringLiteral("--");
+                              painter.drawText(QRect(14, 10, 128, 22),
+                                               Qt::AlignLeft | Qt::AlignVCenter,
+                                               QStringLiteral("RGB FPS: %1").arg(fps_text));
+                              rgbd_label.setPixmap(QPixmap::fromImage(frame));
+                              last_update_rgb = now;
+                          }
                       }
                   } else
                       rgbd_label.clear();
               }
               //depth
-              if (d and update_d) {
+              if (update_d) {
                   if (show_depth->isChecked()) {
                       if (cam == nullptr) {
                           std::vector<std::string_view> att_names;
@@ -158,6 +190,9 @@ class GraphNodeRGBDWidget : public QWidget
     std::shared_ptr<DSR::DSRGraph> graph;
     std::unique_ptr<CameraAPI> cam;
     DSR::IDType node_id;
+    float rgb_display_fps_hz = 0.0f;
+    std::chrono::steady_clock::time_point last_rgb_arrival_time{};
+    bool have_last_rgb_arrival_time = false;
 };      
 
 #endif // GRAPHNODERGBDWIDGET_H

@@ -22,10 +22,11 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
 {
     if( not DSR::DSRGraph::is_valid_edge_type(edge_type)) 
         return {};
+    const bool use_cache = (timestamp == 0);
     KeyTransform key = std::make_tuple(dest, orig, edge_type);
-    if( auto it = cache.find(key) ; it != cache.end())
-        return it->second;
-    else
+    if(use_cache)
+        if( auto it = cache.find(key) ; it != cache.end())
+            return it->second;
     {
         Mat::RTMat atotal(Mat::RTMat::Identity());
         Mat::RTMat btotal(Mat::RTMat::Identity());
@@ -59,7 +60,8 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
             if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp); rtmat.has_value())
             {
                 atotal = rtmat.value() * atotal;
-                node_map[p_node.value().id()].push_back(key); // update node cache reference
+                if(use_cache)
+                    node_map[p_node.value().id()].push_back(key); // update node cache reference
                 a = p_node.value();
             }
             else return {};
@@ -79,7 +81,8 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
             if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp); rtmat.has_value())
             {
                 btotal = rtmat.value() * btotal;
-                node_map[p_node.value().id()].push_back(key); // update node cache reference
+                if(use_cache)
+                    node_map[p_node.value().id()].push_back(key); // update node cache reference
                 b = p_node.value();
             }
             else
@@ -111,8 +114,11 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                 {
                     atotal = a_rtmat.value() * atotal;
                     btotal = b_rtmat.value() * btotal;
-                    node_map[p_node.value().id()].push_back(key); // update node cache reference
-                    node_map[q_node.value().id()].push_back(key); // update node cache reference
+                    if(use_cache)
+                    {
+                        node_map[p_node.value().id()].push_back(key); // update node cache reference
+                        node_map[q_node.value().id()].push_back(key); // update node cache reference
+                    }
                     a = p_node.value();
                     b = q_node.value();
                 }
@@ -125,12 +131,15 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
             }
         }
         // update node cache reference
-        node_map[bn.value().id()].push_back(key);
-        node_map[an.value().id()].push_back(key);
+        if(use_cache)
+        {
+            node_map[bn.value().id()].push_back(key);
+            node_map[an.value().id()].push_back(key);
+        }
 
-        // update cache
         auto ret = btotal.inverse() * atotal;
-        cache[key] = ret;
+        if(use_cache)
+            cache[key] = ret;
         return ret;
     }
 }

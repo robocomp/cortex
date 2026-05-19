@@ -195,13 +195,13 @@ REGISTER_TYPE(obj_checked, bool, false)
 REGISTER_TYPE(average_size, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(is_an_obstacle, bool, false)
 REGISTER_TYPE(room_id, uint64_t, false)
+
 /*
  * Object affordances
  * 
  **/
 REGISTER_TYPE(aff_x_pos, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(aff_y_pos, std::reference_wrapper<const std::vector<float>>, true)
-
 REGISTER_TYPE(aff_interacting, bool, true)
 
 
@@ -309,8 +309,8 @@ REGISTER_TYPE(ultrasound_y_pos, std::reference_wrapper<const std::vector<float>>
  * */
 REGISTER_TYPE(delimiting_polygon_x, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(delimiting_polygon_y, std::reference_wrapper<const std::vector<float>>, false);
+REGISTER_TYPE(room_height, float, false);
 REGISTER_TYPE(room_is_oriented, bool, false);
-REGISTER_TYPE(rotation, float, false);
 REGISTER_TYPE(center_x, float, false);
 REGISTER_TYPE(center_y, float, false);
 REGISTER_TYPE(corner1, std::reference_wrapper<const std::vector<float>>, false);

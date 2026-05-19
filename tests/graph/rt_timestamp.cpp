@@ -3,6 +3,10 @@
 #include "../utils.h"
 
 #include "catch2/catch_test_macros.hpp"
+
+#include <cmath>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QEvent>
 #include "dsr/core/utils.h"
 
 using namespace DSR;
@@ -152,4 +156,110 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
     std::cout << "]]\n";
+}
+
+TEST_CASE("InnerEigen historical queries bypass cache", "[GRAPH][RT][INNER]") {
+    auto ctx = make_edge_config_file();
+    auto id1 = rand() % 1000;
+    DSRGraph G(random_string(10), id1, ctx);
+
+    auto root = G.get_node("root");
+    REQUIRE(root.has_value());
+
+    auto room = G.get_node("room");
+    REQUIRE(room.has_value());
+
+    auto rt = G.get_rt_api();
+    REQUIRE(rt);
+
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{1.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 1000);
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{10.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 2000);
+
+    auto inner = G.get_inner_eigen_api();
+    REQUIRE(inner);
+
+    auto old_transform = inner->get_translation_vector("room", "root", 1000);
+    REQUIRE(old_transform.has_value());
+    CHECK(std::abs(old_transform->x() + 1.0) < 1e-9);
+
+    auto new_transform = inner->get_translation_vector("room", "root", 2000);
+    REQUIRE(new_transform.has_value());
+    CHECK(std::abs(new_transform->x() + 10.0) < 1e-9);
+
+    auto latest_transform = inner->get_translation_vector("room", "root");
+    REQUIRE(latest_transform.has_value());
+    CHECK(std::abs(latest_transform->x() + 10.0) < 1e-9);
+}
+
+TEST_CASE("InnerEigen latest queries do not pollute historical queries", "[GRAPH][RT][INNER]") {
+    auto ctx = make_edge_config_file();
+    auto id1 = rand() % 1000;
+    DSRGraph G(random_string(10), id1, ctx);
+
+    auto root = G.get_node("root");
+    REQUIRE(root.has_value());
+
+    auto room = G.get_node("room");
+    REQUIRE(room.has_value());
+
+    auto rt = G.get_rt_api();
+    REQUIRE(rt);
+
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{1.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 1000);
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{10.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 2000);
+
+    auto inner = G.get_inner_eigen_api();
+    REQUIRE(inner);
+
+    auto latest_transform = inner->get_translation_vector("room", "root");
+    REQUIRE(latest_transform.has_value());
+    CHECK(std::abs(latest_transform->x() + 10.0) < 1e-9);
+
+    auto old_transform = inner->get_translation_vector("room", "root", 1000);
+    REQUIRE(old_transform.has_value());
+    CHECK(std::abs(old_transform->x() + 1.0) < 1e-9);
+
+    auto new_transform = inner->get_translation_vector("room", "root", 2000);
+    REQUIRE(new_transform.has_value());
+    CHECK(std::abs(new_transform->x() + 10.0) < 1e-9);
+}
+
+TEST_CASE("InnerEigen queued invalidation refreshes live cache after RT update", "[GRAPH][RT][INNER]") {
+    int argc = 0;
+    QCoreApplication app(argc, nullptr);
+
+    auto ctx = make_edge_config_file();
+    auto id1 = rand() % 1000;
+    DSRGraph G(random_string(10), id1, ctx);
+
+    auto root = G.get_node("root");
+    REQUIRE(root.has_value());
+
+    auto room = G.get_node("room");
+    REQUIRE(room.has_value());
+
+    auto rt = G.get_rt_api();
+    REQUIRE(rt);
+
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{10.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f});
+
+    auto inner = G.get_inner_eigen_api();
+    REQUIRE(inner);
+
+    auto cached_transform = inner->get_translation_vector("room", "root");
+    REQUIRE(cached_transform.has_value());
+    CHECK(std::abs(cached_transform->x() + 10.0) < 1e-9);
+
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{20.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f});
+
+    auto stale_transform = inner->get_translation_vector("room", "root");
+    REQUIRE(stale_transform.has_value());
+    CHECK(std::abs(stale_transform->x() + 10.0) < 1e-9);
+
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    QCoreApplication::processEvents();
+
+    auto refreshed_transform = inner->get_translation_vector("room", "root");
+    REQUIRE(refreshed_transform.has_value());
+    CHECK(std::abs(refreshed_transform->x() + 20.0) < 1e-9);
 }
