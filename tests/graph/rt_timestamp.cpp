@@ -158,6 +158,43 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     std::cout << "]]\n";
 }
 
+TEST_CASE("RT api interpolation mode", "[GRAPH][RT]") {
+    auto ctx = make_edge_config_file();
+    auto id1 = rand() % 1000;
+    DSRGraph G(random_string(10), id1, ctx);
+
+    auto root = G.get_node("root");
+    REQUIRE(root.has_value());
+
+    auto room = G.get_node("room");
+    REQUIRE(room.has_value());
+
+    auto rt = G.get_rt_api();
+    REQUIRE(rt);
+
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{0.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 1000);
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{10.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, static_cast<float>(M_PI_2)}, 2000);
+
+    auto nearest_translation = rt->get_translation(root->id(), room->id(), 1400);
+    REQUIRE(nearest_translation.has_value());
+    CHECK(std::abs(nearest_translation->x()) < 1e-9);
+
+    auto interpolated_translation = rt->get_translation(root->id(), room->id(), 1500, RT_API::TimeQuery::Interpolated);
+    REQUIRE(interpolated_translation.has_value());
+    CHECK(std::abs(interpolated_translation->x() - 5.0) < 1e-9);
+
+    auto edge = G.get_edge(root->id(), room->id(), "RT");
+    REQUIRE(edge.has_value());
+
+    auto interpolated_rt = rt->get_edge_RT_as_rtmat(edge.value(), 1500, RT_API::TimeQuery::Interpolated);
+    REQUIRE(interpolated_rt.has_value());
+    CHECK(std::abs(interpolated_rt->matrix()(0, 3) - 5.0) < 1e-9);
+
+    const auto rotated_x = interpolated_rt->rotation() * Eigen::Vector3d::UnitX();
+    CHECK(std::abs(rotated_x.x() - std::sqrt(0.5)) < 1e-7);
+    CHECK(std::abs(rotated_x.y() - std::sqrt(0.5)) < 1e-7);
+}
+
 TEST_CASE("InnerEigen historical queries bypass cache", "[GRAPH][RT][INNER]") {
     auto ctx = make_edge_config_file();
     auto id1 = rand() % 1000;
@@ -262,4 +299,44 @@ TEST_CASE("InnerEigen queued invalidation refreshes live cache after RT update",
     auto refreshed_transform = inner->get_translation_vector("room", "root");
     REQUIRE(refreshed_transform.has_value());
     CHECK(std::abs(refreshed_transform->x() + 20.0) < 1e-9);
+}
+
+TEST_CASE("InnerEigen interpolation mode on RT chain", "[GRAPH][RT][INNER]") {
+    auto ctx = make_edge_config_file();
+    auto id1 = rand() % 1000;
+    DSRGraph G(random_string(10), id1, ctx);
+
+    auto root = G.get_node("root");
+    REQUIRE(root.has_value());
+
+    auto room = G.get_node("room");
+    REQUIRE(room.has_value());
+
+    auto robot = G.get_node("Shadow");
+    REQUIRE(robot.has_value());
+
+    auto rt = G.get_rt_api();
+    REQUIRE(rt);
+
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{10.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 1000);
+    rt->insert_or_assign_edge_RT(root.value(), room->id(), std::vector<float>{20.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 2000);
+
+    auto fresh_room = G.get_node("room");
+    REQUIRE(fresh_room.has_value());
+    rt->insert_or_assign_edge_RT(fresh_room.value(), robot->id(), std::vector<float>{1.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 1000);
+
+    fresh_room = G.get_node("room");
+    REQUIRE(fresh_room.has_value());
+    rt->insert_or_assign_edge_RT(fresh_room.value(), robot->id(), std::vector<float>{3.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f}, 2000);
+
+    auto inner = G.get_inner_eigen_api();
+    REQUIRE(inner);
+
+    auto interpolated_transform = inner->get_translation_vector("Shadow", "root", 1500, "RT", RT_API::TimeQuery::Interpolated);
+    REQUIRE(interpolated_transform.has_value());
+    CHECK(std::abs(interpolated_transform->x() + 17.0) < 1e-9);
+
+    auto nearest_transform = inner->get_translation_vector("Shadow", "root", 1500, "RT", RT_API::TimeQuery::Nearest);
+    REQUIRE(nearest_transform.has_value());
+    CHECK(std::abs(nearest_transform->x() + 11.0) < 1e-9);
 }

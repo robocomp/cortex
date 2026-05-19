@@ -28,21 +28,22 @@ namespace DSR
             /////////////////////////////////////////////////
             /// Kinematic transformation methods
             ////////////////////////////////////////////////
-            std::optional<Mat::Vector3d> transform( const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
-            std::optional<Mat::Vector3d> transform( const std::string &dest, const Mat::Vector3d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
-            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const std::string & orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
-            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const Mat::Vector6d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::Vector3d> transform( const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Vector3d> transform( const std::string &dest, const Mat::Vector3d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const std::string & orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const Mat::Vector6d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
 
             ////////////////////////////////////////////////
             /// Transformation matrix retrieval methods
             ////////////////////////////////////////////////
-            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
-            std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
-            std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
-            std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT");
+            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
 
         public slots:
             void add_or_assign_edge_slot(uint64_t from, uint64_t to, const std::string& edge_type);
+            void add_or_assign_edge_attr_slot(uint64_t from, uint64_t to, const std::string& edge_type, const std::vector<std::string>& att_names);
             void del_node_slot(uint64_t id);
             void del_edge_slot(uint64_t from, uint64_t to, const std::string &edge_type);
 

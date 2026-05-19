@@ -16,6 +16,12 @@ namespace DSR
     class RT_API : public QObject
     {
         public:
+            enum class TimeQuery
+            {
+                Nearest,
+                Interpolated
+            };
+
             explicit RT_API(DSRGraph *G_);
 
             const int32_t BLOCK_SIZE = 3;   // size of 3-vector for translation and euler xyz angles
@@ -26,9 +32,9 @@ namespace DSR
 
             static std::optional<Edge> get_edge_RT(const Node &n, uint64_t to, const std::string &edge_type = "RT");
             std::optional<Mat::RTMat> get_RT_pose_from_parent(const Node &n, const std::string &edge_type = "RT");
-            std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0);
-            std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0);
-            std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0);
+            std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
+            std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
+            std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
             // std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Node &n, uint32_t to);
             // std::optional<std::tuple<Mat::Vector3d, Mat::Quaterniond>> get_edge_RT_as_tr_plus_quaternion(const Edge &edge);
             // std::optional<Mat::MatXX> get_jacobian(const Node &base, const Node &tip)

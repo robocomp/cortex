@@ -1,8 +1,104 @@
 #include <algorithm>
+#include <cmath>
 #include <dsr/api/dsr_rt_api.h>
 #include <dsr/api/dsr_api.h>
 
 using namespace DSR;
+
+namespace
+{
+    constexpr std::size_t RT_BLOCK_SIZE = 3;
+    using TimedBlock = std::pair<std::uint64_t, std::size_t>;
+
+    Eigen::Vector3d translation_at(const std::vector<float> &translation_pack, std::size_t block_index)
+    {
+        return {translation_pack[block_index], translation_pack[block_index + 1], translation_pack[block_index + 2]};
+    }
+
+    Eigen::Quaterniond rotation_at(const std::vector<float> &rotation_pack, std::size_t block_index)
+    {
+        return Eigen::AngleAxisd(rotation_pack[block_index], Eigen::Vector3d::UnitX()) *
+               Eigen::AngleAxisd(rotation_pack[block_index + 1], Eigen::Vector3d::UnitY()) *
+               Eigen::AngleAxisd(rotation_pack[block_index + 2], Eigen::Vector3d::UnitZ());
+    }
+
+    Mat::RTMat make_rtmat(const Eigen::Vector3d &translation, const Eigen::Quaterniond &rotation)
+    {
+        auto rtmat = Mat::RTMat::Identity();
+        rtmat.translate(translation);
+        rtmat.rotate(rotation);
+        return rtmat;
+    }
+
+    Mat::RTMat rtmat_at(const std::vector<float> &translation_pack, const std::vector<float> &rotation_pack, std::size_t block_index)
+    {
+        return make_rtmat(translation_at(translation_pack, block_index), rotation_at(rotation_pack, block_index));
+    }
+
+    std::vector<TimedBlock> valid_blocks(const std::vector<std::uint64_t> &timestamps,
+                                         const std::vector<float> &translation_pack,
+                                         const std::vector<float> *rotation_pack = nullptr)
+    {
+        std::size_t block_count = std::min(timestamps.size(), translation_pack.size() / RT_BLOCK_SIZE);
+        if (rotation_pack != nullptr)
+            block_count = std::min(block_count, rotation_pack->size() / RT_BLOCK_SIZE);
+
+        std::vector<TimedBlock> blocks;
+        blocks.reserve(block_count);
+        for (std::size_t i = 0; i < block_count; ++i)
+        {
+            if (timestamps[i] == 0)
+                continue;
+            blocks.emplace_back(timestamps[i], i * RT_BLOCK_SIZE);
+        }
+
+        std::sort(blocks.begin(), blocks.end(), [](const TimedBlock &lhs, const TimedBlock &rhs)
+        {
+            return lhs.first < rhs.first;
+        });
+
+        return blocks;
+    }
+
+    std::optional<std::size_t> nearest_block_index(const std::vector<TimedBlock> &blocks, std::uint64_t timestamp)
+    {
+        if (blocks.empty())
+            return {};
+
+        auto nearest = std::min_element(blocks.begin(), blocks.end(), [timestamp](const TimedBlock &lhs, const TimedBlock &rhs)
+        {
+            return std::llabs(static_cast<long long>(lhs.first) - static_cast<long long>(timestamp)) <
+                   std::llabs(static_cast<long long>(rhs.first) - static_cast<long long>(timestamp));
+        });
+
+        return nearest->second;
+    }
+
+    std::pair<TimedBlock, TimedBlock> bracketing_blocks(const std::vector<TimedBlock> &blocks, std::uint64_t timestamp)
+    {
+        auto upper = std::lower_bound(blocks.begin(), blocks.end(), timestamp, [](const TimedBlock &block, std::uint64_t ts)
+        {
+            return block.first < ts;
+        });
+
+        if (upper == blocks.begin())
+            return {*upper, *upper};
+        if (upper == blocks.end())
+            return {blocks.back(), blocks.back()};
+        if (upper->first == timestamp)
+            return {*upper, *upper};
+
+        return {*std::prev(upper), *upper};
+    }
+
+    double interpolation_factor(const TimedBlock &lower, const TimedBlock &upper, std::uint64_t timestamp)
+    {
+        if (lower.first == upper.first)
+            return 0.0;
+
+        return std::clamp(static_cast<double>(timestamp - lower.first) / static_cast<double>(upper.first - lower.first), 0.0, 1.0);
+    }
+}
 
 RT_API::RT_API(DSR::DSRGraph *G_)
 {
@@ -47,7 +143,7 @@ std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n, const s
     return {};
 }
 
-std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp)
+std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query)
 {
     auto r_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge);
     auto t_o =  G->get_attrib_by_name<rt_translation_att>(edge);
@@ -62,44 +158,44 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
             if (head_o.has_value())
             {
                 const auto &head = prev(head_o.value(), t.size(), 3);
-                //qInfo() << __FUNCTION__ << " ZERO " << static_cast<int64_t>(timestamp) << static_cast<int64_t>(tstamps_o.value().get()[(int)(head/BLOCK_SIZE)]);
-                return Mat::RTMat(Eigen::Translation3d(t[head], t[head+1], t[head+2]) *
-                                  Eigen::AngleAxisd(r[head], Eigen::Vector3d::UnitX()) *
-                                  Eigen::AngleAxisd(r[head+1], Eigen::Vector3d::UnitY()) *
-                                  Eigen::AngleAxisd(r[head+2], Eigen::Vector3d::UnitZ()));
+                return rtmat_at(t, r, head);
             }
             else
-                return Mat::RTMat(Eigen::Translation3d(t[0], t[1], t[2]) *
-                                  Eigen::AngleAxisd(r[0], Eigen::Vector3d::UnitX()) *
-                                  Eigen::AngleAxisd(r[1], Eigen::Vector3d::UnitY()) *
-                                  Eigen::AngleAxisd(r[2], Eigen::Vector3d::UnitZ()));
+                return rtmat_at(t, r, 0);
         }
         else  // timestamp not 0
         {
             if (head_o.has_value() and tstamps_o.has_value())
             {
                 const auto &tstamps = tstamps_o.value().get();
-                auto i = std::ranges::min_element(tstamps, [timestamp](std::uint64_t x, std::uint64_t y)
+                const auto blocks = valid_blocks(tstamps, t, &r);
+                if (not blocks.empty())
+                {
+                    if (time_query == TimeQuery::Interpolated)
                     {
-                        return abs(static_cast<int64_t>(x)-static_cast<int64_t>(timestamp)) < abs(static_cast<int64_t>(y)-static_cast<int64_t>(timestamp));
-                    });
-                auto bix = std::distance(begin(tstamps), i) * BLOCK_SIZE;
+                        const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
+                        if (lower.second == upper.second)
+                            return rtmat_at(t, r, lower.second);
 
-                //qInfo() << __FUNCTION__ << " IN " << static_cast<int64_t>(timestamp)-static_cast<int64_t>(*i);
+                        const auto alpha = interpolation_factor(lower, upper, timestamp);
+                        auto lower_rotation = rotation_at(r, lower.second);
+                        auto upper_rotation = rotation_at(r, upper.second);
+                        if (lower_rotation.dot(upper_rotation) < 0.0)
+                            upper_rotation.coeffs() *= -1.0;
 
-                return Mat::RTMat(Eigen::Translation3d(t[bix], t[bix + 1], t[bix + 2]) *
-                                  Eigen::AngleAxisd(r[bix], Eigen::Vector3d::UnitX()) *
-                                  Eigen::AngleAxisd(r[bix + 1], Eigen::Vector3d::UnitY()) *
-                                  Eigen::AngleAxisd(r[bix + 2], Eigen::Vector3d::UnitZ()));
+                        const Eigen::Vector3d interpolated_translation =
+                            (1.0 - alpha) * translation_at(t, lower.second) + alpha * translation_at(t, upper.second);
+                        auto interpolated_rtmat = make_rtmat(interpolated_translation,
+                                                             lower_rotation.slerp(alpha, upper_rotation).normalized());
+                        return interpolated_rtmat;
+                    }
+
+                    if (auto bix = nearest_block_index(blocks, timestamp); bix.has_value())
+                        return rtmat_at(t, r, bix.value());
+                }
             }
-            else
-            {
-                //qWarning() << __FUNCTION__ << "Not head or no timestamps found in RT edge from node "  << edge.from() << " to: " << edge.to() << " Returning first element in array";
-                return Mat::RTMat(Eigen::Translation3d(t[0], t[1], t[2]) *
-                                  Eigen::AngleAxisd(r[0], Eigen::Vector3d::UnitX()) *
-                                  Eigen::AngleAxisd(r[1], Eigen::Vector3d::UnitY()) *
-                                  Eigen::AngleAxisd(r[2], Eigen::Vector3d::UnitZ()));
-            }
+
+            return rtmat_at(t, r, 0);
         }
     }
     else
@@ -109,7 +205,7 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
     }
 }
 
-std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t to, std::uint64_t timestamp)
+std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
 {
     if( auto edge = get_edge_RT(n, to); edge.has_value())
     {
@@ -123,26 +219,35 @@ std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t t
             {
                 if (head_o.has_value() and tstamps_o.has_value()){
                     auto h = prev(head_o.value(), t.size(), 3);
-                    return Eigen::Vector3d(t[h], t[h + 1], t[h + 2]);
+                    return translation_at(t, h);
                 } else
-                    return Eigen::Vector3d(t[0], t[1], t[2]);
+                    return translation_at(t, 0);
             }
             else  // timestamp not 0
             {
                 if (head_o.has_value() and tstamps_o.has_value())
                 {
-                    // get first index of tstamps whose value is greater than timestamp
                     const auto &tstamps = tstamps_o.value().get();
-                    auto i = std::ranges::min_element(tstamps, [timestamp](float x, float y)
-                    { return abs(static_cast<int64_t>(x)-static_cast<int64_t>(timestamp)) < abs(static_cast<int64_t>(y)-static_cast<int64_t>(timestamp));});
-                    auto bix = std::distance(begin(tstamps), i) * BLOCK_SIZE;
-                    return Eigen::Vector3d(t[bix], t[bix + 1], t[bix + 2]);
+                    const auto blocks = valid_blocks(tstamps, t);
+                    if (not blocks.empty())
+                    {
+                        if (time_query == TimeQuery::Interpolated)
+                        {
+                            const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
+                            if (lower.second == upper.second)
+                                return translation_at(t, lower.second);
+
+                            const auto alpha = interpolation_factor(lower, upper, timestamp);
+                            return (1.0 - alpha) * translation_at(t, lower.second) + alpha * translation_at(t, upper.second);
+                        }
+
+                        if (auto bix = nearest_block_index(blocks, timestamp); bix.has_value())
+                            return translation_at(t, bix.value());
+                    }
                 }
-                else
-                {
-                    qWarning() << __FUNCTION__ << " Not timestamp or not head found in RT edge from node "  << QString::fromStdString(n.name()) << " to: " << to << " Returning first element in array";
-                    return Eigen::Vector3d(t[0], t[1], t[2]);
-                }
+
+                qWarning() << __FUNCTION__ << " Not timestamp or not head found in RT edge from node "  << QString::fromStdString(n.name()) << " to: " << to << " Returning first element in array";
+                return translation_at(t, 0);
             }
         }
         else
@@ -158,10 +263,10 @@ std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t t
     }
 }
 
-std::optional<Eigen::Vector3d> RT_API::get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp)
+std::optional<Eigen::Vector3d> RT_API::get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
 {
     if( const auto node = G->get_node(node_id); node.has_value())
-        return get_translation(node.value(), to, timestamp);
+        return get_translation(node.value(), to, timestamp, time_query);
     else
         return {};
 }

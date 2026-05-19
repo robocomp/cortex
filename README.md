@@ -12,6 +12,7 @@
   * [Tutorials to start creating agents and using existing configurations](#tutorials-to-start-creating-agents-and-using-existing-configurations)
   * [Installing existing agents from the RoboComp repository](#installing-existing-agents-from-the-robocomp-repository)
 - [Developer Documentation](#developer-documentation)
+  * [Combined C++/Python API Guide](API_CPP_PYTHON_GUIDE.md)
   * [DSR-API (C++)](#dsr-api--c---)
   * [Common examples](#common-examples)
   * [Predefined names and types](#predefined-names-and-types)
@@ -198,6 +199,9 @@ If you want to install and try some existing agents, you can clone the [dsr-grap
 
 
 # Developer Documentation
+
+[Combined C++/Python API Guide](API_CPP_PYTHON_GUIDE.md)
+
 ## DSR-API (C++)
 G-API is the user-level access layer to G. It comprises a set of core methods that access the underlying CRDT and RTPS APIs, and an extendable  set of auxiliary methods added to simplify the user coding tasks. 
 
@@ -662,6 +666,8 @@ union Val switch(long) {
 These structures are compiled into C++ code that is included in the agent, forming the deeper layer of G. On top of it, another layer called CRDT is added to provide eventual consistency while agents communicate using asynchronous updates.
 
 # Python API 
+
+[Combined C++/Python API Guide](API_CPP_PYTHON_GUIDE.md)
 
 [python-API](python_api_documentation.md)
 

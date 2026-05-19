@@ -29,6 +29,7 @@ public:
         qRegisterMetaType<std::map<std::string, DSR::Attribute>>("Attribs");
 
         connect(graph.get(), &DSR::DSRGraph::update_edge_signal, this, &GraphEdgeRTWidget::add_or_assign_edge_slot, Qt::QueuedConnection);
+        connect(graph.get(), &DSR::DSRGraph::update_edge_attr_signal, this, &GraphEdgeRTWidget::add_or_assign_edge_attr_slot, Qt::QueuedConnection);
         //Inner Api
         inner_eigen = graph->get_inner_eigen_api();
 
@@ -37,11 +38,42 @@ public:
         std::optional<DSR::Edge> edge = graph->get_edge(from, to, edge_type);
         if (edge.has_value() and from_node.has_value() and to_node.has_value())
         {
-            from_string = to_node.value().name();
-            to_string = from_node.value().name();
+            const auto is_robot_node = [](const DSR::Node &node)
+            {
+                return node.type() == "robot" || node.name() == "robot";
+            };
 
-            //TODO: Check this
-            setWindowTitle(QString::fromStdString(edge_type) + ": " + QString::fromStdString(from_string) + "(" + QString::fromStdString(from_node.value().type()) + ") to " + QString::fromStdString(to_string) + "(" + QString::fromStdString(to_node.value().type()) + ")");
+            QString display_from_type;
+            QString display_to_type;
+
+            // Prefer showing the robot pose relative to the other endpoint, regardless
+            // of whether the RT edge is parent->robot or robot->parent.
+            if (is_robot_node(from_node.value()))
+            {
+                from_string = from_node.value().name();
+                to_string = to_node.value().name();
+                display_from_type = QString::fromStdString(from_node.value().type());
+                display_to_type = QString::fromStdString(to_node.value().type());
+            }
+            else if (is_robot_node(to_node.value()))
+            {
+                from_string = to_node.value().name();
+                to_string = from_node.value().name();
+                display_from_type = QString::fromStdString(to_node.value().type());
+                display_to_type = QString::fromStdString(from_node.value().type());
+            }
+            else
+            {
+                // Preserve the previous child-in-parent default for non-robot RT edges.
+                from_string = to_node.value().name();
+                to_string = from_node.value().name();
+                display_from_type = QString::fromStdString(to_node.value().type());
+                display_to_type = QString::fromStdString(from_node.value().type());
+            }
+
+            setWindowTitle(QString::fromStdString(edge_type) + ": "
+                           + QString::fromStdString(from_string) + "(" + display_from_type + ") in "
+                           + QString::fromStdString(to_string) + "(" + display_to_type + ")");
             connect(ui.comboBox_reference, SIGNAL(currentTextChanged(QString)), this, SLOT(update_combo(QString)));
 
             //TODO: temporary added to check yolo pose estimation
@@ -103,7 +135,47 @@ public slots:
     };
     void update_values()
     {
-        std::optional<Mat::Vector6d> transform = inner_eigen->transform_axis(this->reference, this->from_string, 0, this->edge_type);
+        std::optional<Mat::Vector6d> transform;
+
+        // For the default popup view, show the clicked RT edge values directly.
+        // This avoids relying on InnerEigen's cached global transforms for a case
+        // where the user expects the edge's live stored pose.
+        if (this->edge_type == "RT" && this->reference == this->to_string)
+        {
+            auto from_node = graph->get_node(from);
+            auto to_node = graph->get_node(to);
+            auto edge = graph->get_edge(from, to, edge_type);
+            auto rt_api = graph->get_rt_api();
+
+            if (from_node.has_value() && to_node.has_value() && edge.has_value() && rt_api)
+            {
+                if (auto rtmat_opt = rt_api->get_edge_RT_as_rtmat(edge.value(), 0); rtmat_opt.has_value())
+                {
+                    Mat::RTMat rtmat = rtmat_opt.value();
+
+                    const bool raw_matches_requested =
+                        (this->reference == from_node->name() && this->from_string == to_node->name());
+                    const bool inverse_matches_requested =
+                        (this->reference == to_node->name() && this->from_string == from_node->name());
+
+                    if (inverse_matches_requested)
+                        rtmat = rtmat.inverse();
+
+                    if (raw_matches_requested || inverse_matches_requested)
+                    {
+                        Mat::Vector6d values;
+                        const auto angles = rtmat.rotation().eulerAngles(0, 1, 2);
+                        values << rtmat.translation().x(), rtmat.translation().y(), rtmat.translation().z(),
+                                  angles.x(), angles.y(), angles.z();
+                        transform = values;
+                    }
+                }
+            }
+        }
+
+        if (!transform.has_value())
+            transform = inner_eigen->transform_axis(this->reference, this->from_string, 0, this->edge_type);
+
         if (transform.has_value())
         {
     // std::vector<std::vector<std::string>> attrib_names = {{"X", "Y", "Z"}, {"RX (rad)", "RY (rad)", "RZ (rad)"}, {"RX (deg)", "RY (deg)", "RZ (deg)"} };
@@ -231,6 +303,13 @@ public slots:
             //     }
             // }
         }
+    };
+    void add_or_assign_edge_attr_slot(std::uint64_t from,
+                                      std::uint64_t to,
+                                      const std::string& edge_type,
+                                      const std::vector<std::string>& /*att_name*/)
+    {
+        add_or_assign_edge_slot(from, to, edge_type);
     };
 
 private:

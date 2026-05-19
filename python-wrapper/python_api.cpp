@@ -629,7 +629,12 @@ PYBIND11_MODULE(pydsr, m) {
             .def("get_edges_to_id", &DSRGraph::get_edges_to_id, "id"_a, "Return all the edges that point to the node")
             .def("write_to_json_file", &DSRGraph::write_to_json_file, "file"_a, "skip_atts"_a=std::vector<std::string>{}, "Return all the edges that point to the node");
     //DSR RT_API class
-    py::class_<RT_API>(m, "rt_api")
+        auto rt_api = py::class_<RT_API>(m, "rt_api");
+        py::enum_<RT_API::TimeQuery>(rt_api, "time_query")
+            .value("nearest", RT_API::TimeQuery::Nearest)
+            .value("interpolated", RT_API::TimeQuery::Interpolated);
+
+        rt_api
             .def(py::init([](DSRGraph &g) -> std::unique_ptr<RT_API> {
                 return g.get_rt_api();
             }))
@@ -653,8 +658,8 @@ PYBIND11_MODULE(pydsr, m) {
                     return std::nullopt;
                 }
             }, "node"_a, "type_edge"_a="RT")
-            .def("get_edge_RT_as_rtmat", [](RT_API &self, Edge &e, std::uint64_t t) -> std::optional<Eigen::Matrix<double, 4, 4>> {
-                auto tmp = self.get_edge_RT_as_rtmat(e, t);
+            .def("get_edge_RT_as_rtmat", [](RT_API &self, Edge &e, std::uint64_t t, RT_API::TimeQuery time_query) -> std::optional<Eigen::Matrix<double, 4, 4>> {
+                auto tmp = self.get_edge_RT_as_rtmat(e, t, time_query);
                 if (tmp.has_value()) {
                     Eigen::Matrix<double, 4, 4> Trans;
                     Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
@@ -664,11 +669,11 @@ PYBIND11_MODULE(pydsr, m) {
                 } else {
                     return std::nullopt;
                 }
-            }, "edge"_a, "timestamp"_a=0)
-            .def("get_translation", static_cast<std::optional<Eigen::Vector3d> (RT_API::*)(std::uint64_t,
-                                                                                           std::uint64_t,
-                                                                                           std::uint64_t timestamp)>(&RT_API::get_translation),
-                 "node_id"_a, "to"_a, "timestamp"_a=0);
+            }, "edge"_a, "timestamp"_a=0, "time_query"_a=RT_API::TimeQuery::Nearest)
+            .def("get_translation", [](RT_API &self, std::uint64_t node_id, std::uint64_t to, std::uint64_t timestamp, RT_API::TimeQuery time_query)
+            {
+                return self.get_translation(node_id, to, timestamp, time_query);
+            }, "node_id"_a, "to"_a, "timestamp"_a=0, "time_query"_a=RT_API::TimeQuery::Nearest);
 
     py::class_<InnerEigenAPI>(m, "inner_api")
             .def(py::init([](DSRGraph &g) -> std::unique_ptr<InnerEigenAPI> {
@@ -677,32 +682,36 @@ PYBIND11_MODULE(pydsr, m) {
             .def("transform", static_cast<std::optional<Eigen::Vector3d> (InnerEigenAPI::*)(const std::string &,
                                                                                             const std::string &,
                                                                                             std::uint64_t timestamp,
-                                                                                            const std::string &type_edge)>(&InnerEigenAPI::transform),
-                 "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+                                                                              const std::string &type_edge,
+                                                                              RT_API::TimeQuery time_query)>(&InnerEigenAPI::transform),
+                  "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
             .def("transform", static_cast<std::optional<Eigen::Vector3d> (InnerEigenAPI::*)(const std::string &,
                                                                                             const Mat::Vector3d &,
                                                                                             const std::string &,
                                                                                             std::uint64_t timestamp,
-                                                                                            const std::string &type_edge)>(&InnerEigenAPI::transform),
-                 "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+                                                                              const std::string &type_edge,
+                                                                              RT_API::TimeQuery time_query)>(&InnerEigenAPI::transform),
+                  "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
 
             .def("transform_axis", static_cast<std::optional<Mat::Vector6d> (InnerEigenAPI::*)(const std::string &,
                                                                                                const std::string &,
                                                                                                std::uint64_t timestamp,
-                                                                                               const std::string &type_edge)>(&InnerEigenAPI::transform_axis),
-                 "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+                                                                                const std::string &type_edge,
+                                                                                RT_API::TimeQuery time_query)>(&InnerEigenAPI::transform_axis),
+                  "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
             .def("transform_axis",
                  static_cast<std::optional<Mat::Vector6d> (InnerEigenAPI::*)(const std::string &, const Mat::Vector6d &,
                                                                              const std::string &,
                                                                              std::uint64_t timestamp,
-                                                                             const std::string &type_edge)>(&InnerEigenAPI::transform_axis),
-                 "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
+                                                                  const std::string &type_edge,
+                                                                  RT_API::TimeQuery time_query)>(&InnerEigenAPI::transform_axis),
+                  "orig"_a, "vector"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
 
 
             .def("get_transformation_matrix",
                  [](InnerEigenAPI &self, const std::string &dest,
-                    const std::string &orig, std::uint64_t timestamp, const std::string &type_edge) -> std::optional<Eigen::Matrix<double, 4, 4>> {
-                     auto tmp = self.get_transformation_matrix(dest, orig, timestamp, type_edge);
+                    const std::string &orig, std::uint64_t timestamp, const std::string &type_edge, RT_API::TimeQuery time_query) -> std::optional<Eigen::Matrix<double, 4, 4>> {
+                     auto tmp = self.get_transformation_matrix(dest, orig, timestamp, type_edge, time_query);
                      if (tmp.has_value()) {
                          Eigen::Matrix<double, 4, 4> Trans;
                          Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
@@ -712,10 +721,10 @@ PYBIND11_MODULE(pydsr, m) {
                      } else {
                          return std::nullopt;
                      }
-                 }, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
-            .def("get_rotation_matrix", &InnerEigenAPI::get_rotation_matrix, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
-            .def("get_translation_vector", &InnerEigenAPI::get_translation_vector, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT")
-            .def("get_euler_xyz_angles", &InnerEigenAPI::get_euler_xyz_angles, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT");
+                 }, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
+            .def("get_rotation_matrix", &InnerEigenAPI::get_rotation_matrix, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
+            .def("get_translation_vector", &InnerEigenAPI::get_translation_vector, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest)
+            .def("get_euler_xyz_angles", &InnerEigenAPI::get_euler_xyz_angles, "orig"_a, "dest"_a, "timestamp"_a=0, "type_edge"_a="RT", "time_query"_a=RT_API::TimeQuery::Nearest);
 
 
     bind_ghistory(m);
