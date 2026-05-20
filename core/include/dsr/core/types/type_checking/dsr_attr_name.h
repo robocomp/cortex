@@ -2,6 +2,17 @@
 // Created by juancarlos on 31/7/20.
 //
 
+/*
+ * Design note for RT edge covariance support.
+ *
+ * When RT edge covariance is represented as a full Gaussian on SE(3), the
+ * agreed convention is a 6x6 covariance defined on a local se(3)
+ * perturbation, ordered as [tx, ty, tz, rx, ry, rz]. The rotational block is
+ * expressed as a small-angle perturbation. This convention is intended to be
+ * shared by future uncertainty-aware transform APIs so that point, planar
+ * pose, and full 6D pose propagation can all use the same edge-level support.
+ */
+
 #ifndef DSR_ATTR_NAME_H
 #define DSR_ATTR_NAME_H
 
@@ -112,10 +123,18 @@ REGISTER_TYPE(rt_rotation_euler_xyz_velocity, std::reference_wrapper<const std::
 REGISTER_TYPE(rt_translation_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_rotation_euler_xyz_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_timestamps, std::reference_wrapper<const std::vector<uint64_t>> , false)
+REGISTER_TYPE(rt_covariance, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_covariance_velocity, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_covariance_acceleration, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_head_index, int, false)
+
+/*
+ * Legacy names kept for backward compatibility.
+ */
 REGISTER_TYPE(rt_se2_covariance, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_se2_covariance_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_se2_covariance_acceleration, std::reference_wrapper<const std::vector<float>>, true)
-REGISTER_TYPE(rt_head_index, int, false)
+
 
 
 /*

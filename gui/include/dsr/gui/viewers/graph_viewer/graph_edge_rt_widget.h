@@ -7,6 +7,8 @@
 
 #include <QLabel>
 #include <Eigen/Geometry> 
+#include <chrono>
+#include <iostream>
 #include "graph_edge_rt_widget_UI.h"
 
 static const int precision = 3;
@@ -38,42 +40,26 @@ public:
         std::optional<DSR::Edge> edge = graph->get_edge(from, to, edge_type);
         if (edge.has_value() and from_node.has_value() and to_node.has_value())
         {
-            const auto is_robot_node = [](const DSR::Node &node)
-            {
-                return node.type() == "robot" || node.name() == "robot";
-            };
-
             QString display_from_type;
             QString display_to_type;
 
-            // Prefer showing the robot pose relative to the other endpoint, regardless
-            // of whether the RT edge is parent->robot or robot->parent.
-            if (is_robot_node(from_node.value()))
-            {
-                from_string = from_node.value().name();
-                to_string = to_node.value().name();
-                display_from_type = QString::fromStdString(from_node.value().type());
-                display_to_type = QString::fromStdString(to_node.value().type());
-            }
-            else if (is_robot_node(to_node.value()))
-            {
-                from_string = to_node.value().name();
-                to_string = from_node.value().name();
-                display_from_type = QString::fromStdString(to_node.value().type());
-                display_to_type = QString::fromStdString(from_node.value().type());
-            }
-            else
-            {
-                // Preserve the previous child-in-parent default for non-robot RT edges.
-                from_string = to_node.value().name();
-                to_string = from_node.value().name();
-                display_from_type = QString::fromStdString(to_node.value().type());
-                display_to_type = QString::fromStdString(from_node.value().type());
-            }
+            // RT edges store the child pose in the parent frame, so display the
+            // clicked edge using that native child-in-parent orientation.
+            from_string = to_node.value().name();
+            to_string = from_node.value().name();
+            display_from_type = QString::fromStdString(to_node.value().type());
+            display_to_type = QString::fromStdString(from_node.value().type());
 
             setWindowTitle(QString::fromStdString(edge_type) + ": "
                            + QString::fromStdString(from_string) + "(" + display_from_type + ") in "
                            + QString::fromStdString(to_string) + "(" + display_to_type + ")");
+            if (label_ == "RT" || label_ == "VRT")
+            {
+                ui.comboBox_reference->setItemText(0, "room_in_robot");
+                ui.comboBox_reference->setItemText(1, "robot_in_room");
+                ui.comboBox_reference->setCurrentText("robot_in_room");
+                ui.comboBox_reference->setEnabled(true);
+            }
             connect(ui.comboBox_reference, SIGNAL(currentTextChanged(QString)), this, SLOT(update_combo(QString)));
 
             //TODO: temporary added to check yolo pose estimation
@@ -124,7 +110,11 @@ public slots:
     void update_combo(const QString& combo_text)
     {
         this->reference = to_string;
-        if (combo_text == "root")
+        if (this->edge_type == "RT" || this->edge_type == "VRT")
+        {
+            this->reference = combo_text.toStdString();
+        }
+        else if (combo_text == "root")
         {
             auto root_opt = graph->get_node_root();
             if(root_opt.has_value())
@@ -137,47 +127,107 @@ public slots:
     {
         std::optional<Mat::Vector6d> transform;
 
-        // For the default popup view, show the clicked RT edge values directly.
-        // This avoids relying on InnerEigen's cached global transforms for a case
-        // where the user expects the edge's live stored pose.
-        if (this->edge_type == "RT" && this->reference == this->to_string)
+        // RT/VRT popups show the raw clicked edge payload: child pose in parent.
+        if (this->edge_type == "RT" || this->edge_type == "VRT")
         {
-            auto from_node = graph->get_node(from);
-            auto to_node = graph->get_node(to);
             auto edge = graph->get_edge(from, to, edge_type);
             auto rt_api = graph->get_rt_api();
 
-            if (from_node.has_value() && to_node.has_value() && edge.has_value() && rt_api)
+            if (edge.has_value() && rt_api)
             {
+                {
+                    static auto last_rt_graph_trace = std::chrono::steady_clock::now() - std::chrono::seconds(1);
+                    const auto now_rt_graph_trace = std::chrono::steady_clock::now();
+                    if (now_rt_graph_trace - last_rt_graph_trace >= std::chrono::seconds(1))
+                    {
+                        auto translation_pack = graph->get_attrib_by_name<rt_translation_att>(edge.value());
+                        auto rotation_pack = graph->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge.value());
+                        auto timestamps = graph->get_attrib_by_name<rt_timestamps_att>(edge.value());
+                        auto head_index = graph->get_attrib_by_name<rt_head_index_att>(edge.value());
+
+                        if (translation_pack.has_value() && rotation_pack.has_value())
+                        {
+                            const auto &t = translation_pack.value().get();
+                            const auto &r = rotation_pack.value().get();
+                            std::size_t selected_block = 0;
+                            if (head_index.has_value() && t.size() >= 3)
+                                selected_block = (head_index.value() > 0) ? static_cast<std::size_t>(head_index.value() - 3) : t.size() - 3;
+
+                            std::cerr << "[RTTrace][WidgetRaw] edge=" << this->edge_type
+                                      << " ref=" << this->reference
+                                      << " orig=" << this->from_string
+                                      << " head=" << head_index.value_or(-1)
+                                      << " block=" << selected_block
+                                      << " trans_pack=[";
+                            for (std::size_t i = 0; i < t.size(); ++i)
+                            {
+                                if (i > 0) std::cerr << ",";
+                                std::cerr << t[i];
+                            }
+                            std::cerr << "] rot_pack=[";
+                            for (std::size_t i = 0; i < r.size(); ++i)
+                            {
+                                if (i > 0) std::cerr << ",";
+                                std::cerr << r[i];
+                            }
+                            std::cerr << "] timestamps=[";
+                            if (timestamps.has_value())
+                            {
+                                const auto &ts = timestamps.value().get();
+                                for (std::size_t i = 0; i < ts.size(); ++i)
+                                {
+                                    if (i > 0) std::cerr << ",";
+                                    std::cerr << ts[i];
+                                }
+                            }
+                            std::cerr << "] selected_trans=(";
+                            if (selected_block + 2 < t.size())
+                                std::cerr << t[selected_block] << "," << t[selected_block + 1] << "," << t[selected_block + 2];
+                            std::cerr << ") selected_rot=(";
+                            if (selected_block + 2 < r.size())
+                                std::cerr << r[selected_block] << "," << r[selected_block + 1] << "," << r[selected_block + 2];
+                            std::cerr << ")\n";
+                        }
+                        last_rt_graph_trace = now_rt_graph_trace;
+                    }
+                }
+
                 if (auto rtmat_opt = rt_api->get_edge_RT_as_rtmat(edge.value(), 0); rtmat_opt.has_value())
                 {
-                    Mat::RTMat rtmat = rtmat_opt.value();
-
-                    const bool raw_matches_requested =
-                        (this->reference == from_node->name() && this->from_string == to_node->name());
-                    const bool inverse_matches_requested =
-                        (this->reference == to_node->name() && this->from_string == from_node->name());
-
-                    if (inverse_matches_requested)
-                        rtmat = rtmat.inverse();
-
-                    if (raw_matches_requested || inverse_matches_requested)
-                    {
-                        Mat::Vector6d values;
-                        const auto angles = rtmat.rotation().eulerAngles(0, 1, 2);
-                        values << rtmat.translation().x(), rtmat.translation().y(), rtmat.translation().z(),
-                                  angles.x(), angles.y(), angles.z();
-                        transform = values;
-                    }
+                    const auto rtmat = (this->reference == "robot_in_room") ? rtmat_opt->inverse() : *rtmat_opt;
+                    Mat::Vector6d values;
+                    const auto euler_angles = rtmat.rotation().eulerAngles(0, 1, 2);
+                    values << rtmat.translation().x(), rtmat.translation().y(), rtmat.translation().z(),
+                              euler_angles.x(), euler_angles.y(), euler_angles.z();
+                    transform = values;
                 }
             }
         }
 
-        if (!transform.has_value())
+        if (not transform.has_value())
             transform = inner_eigen->transform_axis(this->reference, this->from_string, 0, this->edge_type);
 
         if (transform.has_value())
         {
+            {
+                static auto last_rt_trace = std::chrono::steady_clock::now() - std::chrono::seconds(1);
+                const auto now_rt_trace = std::chrono::steady_clock::now();
+                if (now_rt_trace - last_rt_trace >= std::chrono::seconds(1))
+                {
+                    std::cerr << "[RTTrace][Viewer] edge=" << this->edge_type
+                              << " ref=" << this->reference
+                              << " orig=" << this->from_string
+                              << " pose=(" << transform.value()[0]
+                              << "," << transform.value()[1]
+                              << "," << transform.value()[2]
+                              << ") rot=(" << transform.value()[3]
+                              << "," << transform.value()[4]
+                              << "," << transform.value()[5]
+                              << ")\n";
+                    last_rt_trace = now_rt_trace;
+                }
+            }
+
     // std::vector<std::vector<std::string>> attrib_names = {{"X", "Y", "Z"}, {"RX (rad)", "RY (rad)", "RZ (rad)"}, {"RX (deg)", "RY (deg)", "RZ (deg)"} };
 
             double angles[3];
@@ -225,7 +275,23 @@ public slots:
 
                     //check if any node is involved in actual reference transform
                     if(transform_set.find(from_str)!= transform_set.end() or transform_set.find(to_str) != transform_set.end())
+                    {
+                        inner_eigen->add_or_assign_edge_slot(from, to, edge_type);
+
+                        static auto last_signal_trace = std::chrono::steady_clock::now() - std::chrono::seconds(1);
+                        const auto now_signal_trace = std::chrono::steady_clock::now();
+                        if (now_signal_trace - last_signal_trace >= std::chrono::seconds(1))
+                        {
+                            std::cerr << "[RTTrace][ViewerSignal] edge=" << edge_type
+                                      << " from=" << from_str
+                                      << " to=" << to_str
+                                      << " ref=" << this->reference
+                                      << " orig=" << this->from_string
+                                      << "\n";
+                            last_signal_trace = now_signal_trace;
+                        }
                         update_values();
+                    }
                 }
             }
             // velocity and covariance matrix
@@ -238,7 +304,7 @@ public slots:
                     std::optional<const std::vector<float>>translation_vel = graph->get_attrib_by_name<rt_translation_velocity_att>(edge.value());
                     std::optional<const std::vector<float>>rotation_acc = graph->get_attrib_by_name<rt_rotation_euler_xyz_acceleration_att>(edge.value());
                     std::optional<const std::vector<float>>translation_acc = graph->get_attrib_by_name<rt_translation_acceleration_att>(edge.value());
-                    std::optional<const std::vector<float>>se2_covariance = graph->get_attrib_by_name<rt_se2_covariance_att>(edge.value());
+                    std::optional<const std::vector<float>>se2_covariance = graph->get_attrib_by_name<rt_covariance_att>(edge.value());
                     std::optional<const std::vector<float>>se2_covariance_velocity = graph->get_attrib_by_name<rt_se2_covariance_velocity_att>(edge.value());
                     std::optional<const std::vector<float>>se2_covariance_acceleration = graph->get_attrib_by_name<rt_se2_covariance_acceleration_att>(edge.value());
                     

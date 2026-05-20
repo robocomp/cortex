@@ -65,6 +65,22 @@ TEST_CASE("Attributes operations (Compile time type-checked)", "[ATTRIBUTES]") {
         REQUIRE(r);
     }
 
+    SECTION("Insert rt_covariance attribute on RT edge") {
+        std::optional<Edge> e = G.get_edge(100, 150, "RT");
+        REQUIRE(e.has_value());
+
+        const std::vector<float> covariance(36, 0.5f);
+        G.add_or_modify_attrib_local<rt_covariance_att>(e.value(), covariance);
+        REQUIRE(G.insert_or_assign_edge(e.value()));
+
+        auto stored_edge = G.get_edge(100, 150, "RT");
+        REQUIRE(stored_edge.has_value());
+
+        auto stored_covariance = G.get_attrib_by_name<rt_covariance_att>(stored_edge.value());
+        REQUIRE(stored_covariance.has_value());
+        REQUIRE(stored_covariance.value().get() == covariance);
+    }
+
     SECTION("Update attribute and update G") {
         std::optional<Node> n = G.get_node(100);
         REQUIRE(n.has_value());
@@ -145,6 +161,22 @@ TEST_CASE("Attributes operations II (Runtime time type-checked)", "[RUNTIME ATTR
         REQUIRE(e->attrs().find("new_int") != e->attrs().end());
         bool r = G.insert_or_assign_edge(e.value());
         REQUIRE(r);
+    }
+
+    SECTION("Runtime insert rt_covariance attribute on RT edge") {
+        std::optional<Edge> e = G.get_edge(100, 150, "RT");
+        REQUIRE(e.has_value());
+
+        const std::vector<float> covariance(36, 1.25f);
+        REQUIRE_NOTHROW(G.runtime_checked_add_or_modify_attrib_local(e.value(), std::string{rt_covariance_str}, covariance));
+        REQUIRE(G.insert_or_assign_edge(e.value()));
+
+        auto stored_edge = G.get_edge(100, 150, "RT");
+        REQUIRE(stored_edge.has_value());
+
+        auto stored_covariance = G.get_attrib_by_name<rt_covariance_att>(stored_edge.value());
+        REQUIRE(stored_covariance.has_value());
+        REQUIRE(stored_covariance.value().get() == covariance);
     }
 
 }
