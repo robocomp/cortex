@@ -14,25 +14,11 @@ find_package(cppitertools)
 find_package(fastdds)
 
 
-if(DEFINED GEOMETRY_API)
-    find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui 3DCore 3DRender 3DExtras 3DInput 3DAnimation)
-    set(QT_GEOM Qt6::3DCore
-            Qt6::3DRender
-            Qt6::3DAnimation
-            Qt6::3DExtras
-            Qt6::3DInput)
-    set(GEOM_API_HEADERS "include/dsr/api/dsr_geometry_queries_api.h"
-            "include/dsr/api/GeometryInfo.h")
-    set(GEOM_API_SOURCES "dsr_geometry_queries_api.cpp")
-endif(DEFINED GEOMETRY_API)
-
-
 set(headers_to_moc
         include/dsr/api/dsr_api.h
         include/dsr/api/dsr_inner_eigen_api.h
         include/dsr/api/dsr_agent_info_api.h
         include/dsr/api/dsr_signal_info.h
-        ${GEOM_API_HEADERS}
         )
 
 set(headers
@@ -54,7 +40,6 @@ target_sources(dsr_api
         dsr_utils.cpp
         dsr_signal_emitter.cpp
         GHistorySaver.cpp
-        ${GEOM_API_SOURCES}
         ${headers_to_moc}
         ${headers}
         )
@@ -65,12 +50,9 @@ target_link_libraries(dsr_api
         PRIVATE
         fastcdr
         fastdds
-        osgDB
-        OpenThreads
         Qt6::Core
         PUBLIC
         Eigen3::Eigen
-        ${QT_GEOM}
         )
 
 target_include_directories(dsr_api

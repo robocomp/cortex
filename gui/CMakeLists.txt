@@ -4,38 +4,8 @@ project(dsr_gui
         DESCRIPTION "Robocomp DSR gui library"
         LANGUAGES CXX )
 
-option(QT3D "Compile QT3D viewer WIP" OFF)
-
-if(QT3D)
-
-set(qt3d_required
-        3DCore 3DRender 3DExtras 3DInput 3DAnimation
-        )
-
-set(qt3d_viewer_headers   
-        include/dsr/gui/viewers/qt3d_viewer/qt3d_viewer.h
-        )
-
-set(qt3d_viewer_sources  
-        viewers/qt3d_viewer/qt3d_viewer.cpp
-        )
-
-set (qt3d_libs 
-        Qt6::3DCore
-        Qt6::3DRender
-        Qt6::3DAnimation
-        Qt6::3DExtras
-        Qt6::3DInput
-        )
-
-endif()
-
-
-message(STATUS ${qt3d_required} " " ${qt3d_viewer_headers} " " ${qt3d_libs} " " ${qt3d_viewer_sources})
-
-find_package(Qt6 COMPONENTS Widgets OpenGL OpenGLWidgets Xml ${qt3d_required} REQUIRED)
+find_package(Qt6 COMPONENTS Widgets OpenGL OpenGLWidgets Xml REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-find_package(OpenSceneGraph REQUIRED COMPONENTS osg osgDB osgGA)
 find_package(cppitertools)
 
 find_package(PkgConfig)
@@ -53,7 +23,6 @@ SET(CMAKE_AUTOUIC ON)
 
 # TODO: look for a better way to get automoc getting over .h files
 set(headers_to_moc
-        include/dsr/gui/viewers/osg_3d_viewer/osg_3d_viewer.h
         include/dsr/gui/viewers/qscene_2d_viewer/qscene_2d_viewer.h
         include/dsr/gui/viewers/graph_viewer/graph_viewer.h
         include/dsr/gui/viewers/graph_viewer/graph_node.h
@@ -68,7 +37,6 @@ set(headers_to_moc
         include/dsr/gui/viewers/tree_viewer/tree_viewer.h
         include/dsr/gui/viewers/_abstract_graphic_view.h
         include/dsr/gui/dsr_gui.h
-        ${qt3d_viewer_headers}
         )
 
 add_library(dsr_gui SHARED )
@@ -77,14 +45,12 @@ add_library(Robocomp::dsr_gui ALIAS dsr_gui )
 target_sources(dsr_gui
         PRIVATE
         dsr_gui.cpp
-        viewers/osg_3d_viewer/osg_3d_viewer.cpp
         viewers/qscene_2d_viewer/qscene_2d_viewer.cpp
         viewers/graph_viewer/graph_viewer.cpp
         viewers/graph_viewer/graph_node.cpp
         viewers/graph_viewer/graph_edge.cpp
         viewers/tree_viewer/tree_viewer.cpp
         viewers/_abstract_graphic_view.cpp
-        ${qt3d_viewer_sources}
         ${headers_to_moc}
         )
 
@@ -94,11 +60,9 @@ target_link_libraries(dsr_gui
         Qt6::Widgets Qt6::Xml Qt6::OpenGLWidgets
         Eigen3::Eigen
         fastcdr
-        osgViewer osgDB osgGA OpenThreads
         PUBLIC
         Qt6::OpenGL
         fastdds
-        ${qt3d_libs}
         ${GRAPHVIZ_LIBRARIES}
         )
 

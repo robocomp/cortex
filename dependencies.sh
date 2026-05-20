@@ -4,7 +4,6 @@ branch="${1:-development}"
 sudo apt install -y curl
 curl -O https://raw.githubusercontent.com/robocomp/robocomp_core/${branch}/classes/threadpool/threadpool.h && sudo mkdir -p /usr/include/threadpool && sudo mv threadpool.h /usr/include/threadpool
 sudo apt install qt6-base-dev
-sudo apt-get install -y libopenscenegraph-dev
 sudo apt install libasio-dev
 sudo apt install libtinyxml2-dev 
 sudo apt install libopencv-dev

@@ -275,7 +275,6 @@ void DSRViewer::initialize_views(int options, view central)
     //Create docks view and main widget
     std::map<view, QString> valid_options{{view::graph, "Graph"},
                                           {view::tree,  "Tree"},
-                                          {view::osg,   "3D"},
                                           {view::scene, "2D"}};
 
     // creation of docks and mainwidget
@@ -403,10 +402,6 @@ QWidget *DSRViewer::create_widget(view type)
         case view::graph:
             widget_view = new DSR::GraphViewer(G);
             break;
-//		3D
-//        case view::osg:
-//            widget_view = new DSR::OSG3dViewer(G, 1, 1);
-//            break;
 //		Tree
         case view::tree:
             widget_view = new DSR::TreeViewer(G);

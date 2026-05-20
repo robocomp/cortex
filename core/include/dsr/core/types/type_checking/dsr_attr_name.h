@@ -81,6 +81,13 @@ static constexpr auto reg_fn = []() -> auto
                             \
 
 
+#define REGISTER_TYPE_DEPRECATED(x, ot, stream, msg) \
+                            static constexpr auto    x ##_str = std::string_view(#x ); \
+                            using x##_att [[deprecated(msg)]] = Attr< x##_str, ot>;     \
+                            REGISTER_FN(x, ot, stream) \
+                            \
+
+
 #define COMMA_TEMPLATE() ,
 
 
@@ -96,9 +103,14 @@ REGISTER_TYPE(pos_y, float, false)
 REGISTER_TYPE(parent, std::uint64_t, false)
 REGISTER_TYPE(color, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(texture, std::reference_wrapper<const std::string>, false)
-REGISTER_TYPE(width, int, false)
-REGISTER_TYPE(height, int, false)
-REGISTER_TYPE(depth, int, false)
+// Legacy dimensions were historically stored as integers, commonly interpreted as millimeters.
+// Prefer the metric float attributes width_m / height_m / depth_m in new code.
+REGISTER_TYPE_DEPRECATED(width, int, false, "Use width_m_att instead; legacy width_att is deprecated.")
+REGISTER_TYPE_DEPRECATED(height, int, false, "Use height_m_att instead; legacy height_att is deprecated.")
+REGISTER_TYPE_DEPRECATED(depth, int, false, "Use depth_m_att instead; legacy depth_att is deprecated.")
+REGISTER_TYPE(width_m, float, false)  //meters
+REGISTER_TYPE(height_m, float, false)
+REGISTER_TYPE(depth_m, float, false)
 REGISTER_TYPE(mass, int, false)
 REGISTER_TYPE(scalex, int, false)
 REGISTER_TYPE(scaley, int, false)
@@ -201,9 +213,12 @@ REGISTER_TYPE(ps_intimate_y_pos, std::reference_wrapper<const std::vector<float>
  * Object
  * */
 REGISTER_TYPE(obj_id, int, false)
-REGISTER_TYPE(obj_width, int, false)
-REGISTER_TYPE(obj_height, int, false)
-REGISTER_TYPE(obj_depth, int, false)
+REGISTER_TYPE_DEPRECATED(obj_width, int, false, "Use obj_width_m_att instead; legacy obj_width_att is deprecated.")
+REGISTER_TYPE_DEPRECATED(obj_height, int, false, "Use obj_height_m_att instead; legacy obj_height_att is deprecated.")
+REGISTER_TYPE_DEPRECATED(obj_depth, int, false, "Use obj_depth_m_att instead; legacy obj_depth_att is deprecated.")
+REGISTER_TYPE(obj_width_m, float, false)
+REGISTER_TYPE(obj_height_m, float, false)
+REGISTER_TYPE(obj_depth_m, float, false)
 REGISTER_TYPE(obj_interaction_angle, float, false)
 REGISTER_TYPE(obj_interaction_space, float, false)
 REGISTER_TYPE(obj_interaction_shape, std::reference_wrapper<const std::string>, false)

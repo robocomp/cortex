@@ -15,7 +15,6 @@ RUN apt update && apt install -y \
     g++ \
     gcc \
     libeigen3-dev \
-    libopenscenegraph-dev \
     make \
     qtbase5-dev \
     sudo \ 

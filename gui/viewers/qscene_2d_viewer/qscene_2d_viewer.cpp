@@ -5,6 +5,20 @@
 
 using namespace DSR ;
 
+namespace
+{
+using legacy_width_attr = Attr<width_str, int>;
+using legacy_height_attr = Attr<height_str, int>;
+using legacy_depth_attr = Attr<depth_str, int>;
+
+int metric_attr_to_scene_units(std::optional<float> meters, std::optional<int> legacy_value)
+{
+    if (meters.has_value())
+        return static_cast<int>(std::lround(meters.value() * 1000.f));
+    return legacy_value.value_or(0);
+}
+}
+
 QScene2dViewer::QScene2dViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) : AbstractGraphicViewer(parent)
 {
     qDebug()<<"***************INIT QScene2dViewer********************";
@@ -230,9 +244,12 @@ void QScene2dViewer::add_or_assign_plane(Node &node)
     color = G->get_attrib_by_name<color_att>(node).value_or(color);
     std::string texture;
     texture = G->get_attrib_by_name<texture_att>(node).value_or(texture);
-    int width = G->get_attrib_by_name<width_att>(node).value_or(0);
-    int height = G->get_attrib_by_name<height_att>(node).value_or(0);
-    int depth = G->get_attrib_by_name<depth_att>(node).value_or(0);
+    int width = metric_attr_to_scene_units(G->get_attrib_by_name<width_m_att>(node),
+                                           G->get_attrib_by_name<legacy_width_attr>(node));
+    int height = metric_attr_to_scene_units(G->get_attrib_by_name<height_m_att>(node),
+                                            G->get_attrib_by_name<legacy_height_attr>(node));
+    int depth = metric_attr_to_scene_units(G->get_attrib_by_name<depth_m_att>(node),
+                                           G->get_attrib_by_name<legacy_depth_attr>(node));
 
 //    qDebug()<<"Draw plane"<<QString::fromStdString(node.name())<<"("<<width<<","<<height<<","<<depth<<")";
      
@@ -297,15 +314,18 @@ void  QScene2dViewer::add_or_assign_mesh(Node &node)
     std::string color = "orange";
     color = G->get_attrib_by_name<color_att>(node).value_or(color);
 
-	int width = G->get_attrib_by_name<width_att>(node).value_or(0);
+    int width = metric_attr_to_scene_units(G->get_attrib_by_name<width_m_att>(node),
+                                           G->get_attrib_by_name<legacy_width_attr>(node));
 	if(width == 0)
 		width = G->get_attrib_by_name<scalex_att>(node).value_or(0);
     
-	int height = G->get_attrib_by_name<height_att>(node).value_or(0); 
+    int height = metric_attr_to_scene_units(G->get_attrib_by_name<height_m_att>(node),
+                                            G->get_attrib_by_name<legacy_height_attr>(node)); 
 	if(height == 0)
 		height = G->get_attrib_by_name<scaley_att>(node).value_or(0);
     
-	int depth = G->get_attrib_by_name<depth_att>(node).value_or(0);
+    int depth = metric_attr_to_scene_units(G->get_attrib_by_name<depth_m_att>(node),
+                                           G->get_attrib_by_name<legacy_depth_attr>(node));
     if (depth == 0)
 		depth = G->get_attrib_by_name<scalez_att>(node).value_or(0);
 

@@ -27,7 +27,6 @@
 #include <dsr/api/dsr_api.h>
 #include <typeinfo>
 #include <QDockWidget>
-//#include <dsr/gui/viewers/osg_3d_viewer/osg_3d_viewer.h>
 #include <dsr/gui/viewers/qscene_2d_viewer/qscene_2d_viewer.h>
 #include <dsr/gui/viewers/graph_viewer/graph_viewer.h>
 #include <dsr/gui/viewers/tree_viewer/tree_viewer.h>
@@ -70,9 +69,8 @@ public:
     {
         none = -1,
         graph = (1 << 0),
-        osg = (1 << 1),
-        scene = (1 << 2),
-        tree = (1 << 3),
+        scene = (1 << 1),
+        tree = (1 << 2),
     };
     struct WidgetContainer
     {
@@ -101,10 +99,6 @@ private:
     QMenu *viewMenu;
     QMenu *fileMenu;
     QMenu *forcesMenu;
-//			std::shared_ptr<DSR::OSG3dViewer> dsr_to_osg_viewer;
-//			std::shared_ptr<DSR::QScene2dViewer> dsr_to_graphicscene_viewer;
-//			std::shared_ptr<DSR::GraphViewer> dsr_to_graph_viewer;
-//			std::shared_ptr<DSR::DSRtoTreeViewer> dsr_to_tree_viewer;
     std::map<QString, QDockWidget *> docks;
     std::map<QString, WidgetContainer *> widgets;
     std::map<view, WidgetContainer *> widgets_by_type;
