@@ -70,7 +70,7 @@ set_target_properties(dsr_core PROPERTIES
         CXX_EXTENSIONS ON)
 
 
-target_compile_options(dsr_core PUBLIC -O3 -g -fmax-errors=5 -std=c++23)
+target_compile_options(dsr_core PUBLIC -O3 -march=native -fmax-errors=5 -std=c++23)
 
 # 'make install' to the correct locations (provided by GNUInstallDirs).
 install(TARGETS dsr_core EXPORT dsr_coreConfig

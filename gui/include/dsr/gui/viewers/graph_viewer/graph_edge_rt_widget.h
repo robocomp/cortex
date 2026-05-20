@@ -7,8 +7,6 @@
 
 #include <QLabel>
 #include <Eigen/Geometry> 
-#include <chrono>
-#include <iostream>
 #include "graph_edge_rt_widget_UI.h"
 
 static const int precision = 3;
@@ -135,63 +133,6 @@ public slots:
 
             if (edge.has_value() && rt_api)
             {
-                {
-                    static auto last_rt_graph_trace = std::chrono::steady_clock::now() - std::chrono::seconds(1);
-                    const auto now_rt_graph_trace = std::chrono::steady_clock::now();
-                    if (now_rt_graph_trace - last_rt_graph_trace >= std::chrono::seconds(1))
-                    {
-                        auto translation_pack = graph->get_attrib_by_name<rt_translation_att>(edge.value());
-                        auto rotation_pack = graph->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge.value());
-                        auto timestamps = graph->get_attrib_by_name<rt_timestamps_att>(edge.value());
-                        auto head_index = graph->get_attrib_by_name<rt_head_index_att>(edge.value());
-
-                        if (translation_pack.has_value() && rotation_pack.has_value())
-                        {
-                            const auto &t = translation_pack.value().get();
-                            const auto &r = rotation_pack.value().get();
-                            std::size_t selected_block = 0;
-                            if (head_index.has_value() && t.size() >= 3)
-                                selected_block = (head_index.value() > 0) ? static_cast<std::size_t>(head_index.value() - 3) : t.size() - 3;
-
-                            std::cerr << "[RTTrace][WidgetRaw] edge=" << this->edge_type
-                                      << " ref=" << this->reference
-                                      << " orig=" << this->from_string
-                                      << " head=" << head_index.value_or(-1)
-                                      << " block=" << selected_block
-                                      << " trans_pack=[";
-                            for (std::size_t i = 0; i < t.size(); ++i)
-                            {
-                                if (i > 0) std::cerr << ",";
-                                std::cerr << t[i];
-                            }
-                            std::cerr << "] rot_pack=[";
-                            for (std::size_t i = 0; i < r.size(); ++i)
-                            {
-                                if (i > 0) std::cerr << ",";
-                                std::cerr << r[i];
-                            }
-                            std::cerr << "] timestamps=[";
-                            if (timestamps.has_value())
-                            {
-                                const auto &ts = timestamps.value().get();
-                                for (std::size_t i = 0; i < ts.size(); ++i)
-                                {
-                                    if (i > 0) std::cerr << ",";
-                                    std::cerr << ts[i];
-                                }
-                            }
-                            std::cerr << "] selected_trans=(";
-                            if (selected_block + 2 < t.size())
-                                std::cerr << t[selected_block] << "," << t[selected_block + 1] << "," << t[selected_block + 2];
-                            std::cerr << ") selected_rot=(";
-                            if (selected_block + 2 < r.size())
-                                std::cerr << r[selected_block] << "," << r[selected_block + 1] << "," << r[selected_block + 2];
-                            std::cerr << ")\n";
-                        }
-                        last_rt_graph_trace = now_rt_graph_trace;
-                    }
-                }
-
                 if (auto rtmat_opt = rt_api->get_edge_RT_as_rtmat(edge.value(), 0); rtmat_opt.has_value())
                 {
                     const auto rtmat = (this->reference == "robot_in_room") ? rtmat_opt->inverse() : *rtmat_opt;
@@ -209,49 +150,43 @@ public slots:
 
         if (transform.has_value())
         {
-            {
-                static auto last_rt_trace = std::chrono::steady_clock::now() - std::chrono::seconds(1);
-                const auto now_rt_trace = std::chrono::steady_clock::now();
-                if (now_rt_trace - last_rt_trace >= std::chrono::seconds(1))
-                {
-                    std::cerr << "[RTTrace][Viewer] edge=" << this->edge_type
-                              << " ref=" << this->reference
-                              << " orig=" << this->from_string
-                              << " pose=(" << transform.value()[0]
-                              << "," << transform.value()[1]
-                              << "," << transform.value()[2]
-                              << ") rot=(" << transform.value()[3]
-                              << "," << transform.value()[4]
-                              << "," << transform.value()[5]
-                              << ")\n";
-                    last_rt_trace = now_rt_trace;
-                }
-            }
-
     // std::vector<std::vector<std::string>> attrib_names = {{"X", "Y", "Z"}, {"RX (rad)", "RY (rad)", "RZ (rad)"}, {"RX (deg)", "RY (deg)", "RZ (deg)"} };
 
             double angles[3];
+            auto ensure_item = [this](int row, int column) -> QTableWidgetItem *
+            {
+                if (auto *item = this->ui.tableWidget_Robot->item(row, column); item != nullptr)
+                    return item;
+
+                auto *item = new QTableWidgetItem();
+                this->ui.tableWidget_Robot->setItem(row, column, item);
+                return item;
+            };
 
             for(int pos = 0;pos < 3;pos++)
             {
                 //Get position
-                this->ui.tableWidget_Robot->item(0, pos)->setText(QString::number(transform.value()[pos], 'g', precision));
+                ensure_item(0, pos)->setText(QString::number(transform.value()[pos], 'g', precision));
 
                 //Get angles
                 angles[pos] = transform.value()[pos+3];
-                this->ui.tableWidget_Robot->item(1, pos)->setText(QString::number(angles[pos], 'g', precision)); //Radians
-                this->ui.tableWidget_Robot->item(2, pos)->setText(QString::number(angles[pos] * 180 / M_PI, 'g', precision)); //Degrees
+                ensure_item(1, pos)->setText(QString::number(angles[pos], 'g', precision)); //Radians
+                ensure_item(2, pos)->setText(QString::number(angles[pos] * 180 / M_PI, 'g', precision)); //Degrees
             }
+
+            // Show the planar yaw explicitly as a dedicated summary column.
+            ensure_item(1, 3)->setText(QString::number(angles[2], 'g', precision));
+            ensure_item(2, 3)->setText(QString::number(angles[2] * 180 / M_PI, 'g', precision));
 
             //Quaternion
             Eigen::Quaterniond quaternion = Eigen::AngleAxisd(angles[0], Eigen::Vector3d::UnitX()) * 
                                             Eigen::AngleAxisd(angles[1], Eigen::Vector3d::UnitY()) * 
                                             Eigen::AngleAxisd(angles[2], Eigen::Vector3d::UnitZ());
 
-            this->ui.tableWidget_Robot->item(3, 0)->setText(QString::number(quaternion.x(), 'g', precision));
-            this->ui.tableWidget_Robot->item(3, 1)->setText(QString::number(quaternion.y(), 'g', precision));
-            this->ui.tableWidget_Robot->item(3, 2)->setText(QString::number(quaternion.z(), 'g', precision));
-            this->ui.tableWidget_Robot->item(3, 3)->setText(QString::number(quaternion.w(), 'g', precision));
+            ensure_item(3, 0)->setText(QString::number(quaternion.x(), 'g', precision));
+            ensure_item(3, 1)->setText(QString::number(quaternion.y(), 'g', precision));
+            ensure_item(3, 2)->setText(QString::number(quaternion.z(), 'g', precision));
+            ensure_item(3, 3)->setText(QString::number(quaternion.w(), 'g', precision));
 
 
         }
@@ -277,19 +212,6 @@ public slots:
                     if(transform_set.find(from_str)!= transform_set.end() or transform_set.find(to_str) != transform_set.end())
                     {
                         inner_eigen->add_or_assign_edge_slot(from, to, edge_type);
-
-                        static auto last_signal_trace = std::chrono::steady_clock::now() - std::chrono::seconds(1);
-                        const auto now_signal_trace = std::chrono::steady_clock::now();
-                        if (now_signal_trace - last_signal_trace >= std::chrono::seconds(1))
-                        {
-                            std::cerr << "[RTTrace][ViewerSignal] edge=" << edge_type
-                                      << " from=" << from_str
-                                      << " to=" << to_str
-                                      << " ref=" << this->reference
-                                      << " orig=" << this->from_string
-                                      << "\n";
-                            last_signal_trace = now_signal_trace;
-                        }
                         update_values();
                     }
                 }

@@ -8,7 +8,9 @@ using namespace DSR;
 namespace
 {
     constexpr std::size_t RT_BLOCK_SIZE = 3;
+    constexpr std::size_t RT_COVARIANCE_BLOCK_SIZE = 36;
     using TimedBlock = std::pair<std::uint64_t, std::size_t>;
+    using CovarianceMatrix = Eigen::Matrix<double, 6, 6>;
 
     Eigen::Vector3d translation_at(const std::vector<float> &translation_pack, std::size_t block_index)
     {
@@ -35,21 +37,31 @@ namespace
         return make_rtmat(translation_at(translation_pack, block_index), rotation_at(rotation_pack, block_index));
     }
 
-    std::vector<TimedBlock> valid_blocks(const std::vector<std::uint64_t> &timestamps,
-                                         const std::vector<float> &translation_pack,
-                                         const std::vector<float> *rotation_pack = nullptr)
+    CovarianceMatrix covariance_at(const std::vector<float> &covariance_pack, std::size_t block_index)
     {
-        std::size_t block_count = std::min(timestamps.size(), translation_pack.size() / RT_BLOCK_SIZE);
-        if (rotation_pack != nullptr)
-            block_count = std::min(block_count, rotation_pack->size() / RT_BLOCK_SIZE);
+        CovarianceMatrix covariance = CovarianceMatrix::Zero();
+        for (std::size_t row = 0; row < 6; ++row)
+            for (std::size_t col = 0; col < 6; ++col)
+                covariance(static_cast<Eigen::Index>(row), static_cast<Eigen::Index>(col)) =
+                    covariance_pack[block_index + row * 6 + col];
+        return covariance;
+    }
 
+    std::size_t latest_slot_from_head(std::size_t head_index, std::size_t history_size)
+    {
+        const auto next_slot = (head_index / RT_BLOCK_SIZE) % history_size;
+        return (next_slot == 0) ? history_size - 1 : next_slot - 1;
+    }
+
+    std::vector<TimedBlock> valid_blocks(const std::vector<std::uint64_t> &timestamps, std::size_t block_count)
+    {
         std::vector<TimedBlock> blocks;
         blocks.reserve(block_count);
         for (std::size_t i = 0; i < block_count; ++i)
         {
             if (timestamps[i] == 0)
                 continue;
-            blocks.emplace_back(timestamps[i], i * RT_BLOCK_SIZE);
+            blocks.emplace_back(timestamps[i], i);
         }
 
         std::sort(blocks.begin(), blocks.end(), [](const TimedBlock &lhs, const TimedBlock &rhs)
@@ -57,6 +69,19 @@ namespace
             return lhs.first < rhs.first;
         });
 
+        return blocks;
+    }
+
+    std::vector<TimedBlock> valid_blocks(const std::vector<std::uint64_t> &timestamps,
+                                         const std::vector<float> &translation_pack,
+                                         const std::vector<float> *rotation_pack = nullptr)
+    {
+        std::size_t block_count = std::min(timestamps.size(), translation_pack.size() / RT_BLOCK_SIZE);
+        if (rotation_pack != nullptr)
+            block_count = std::min(block_count, rotation_pack->size() / RT_BLOCK_SIZE);
+        auto blocks = valid_blocks(timestamps, block_count);
+        for (auto &[timestamp, block_index] : blocks)
+            block_index *= RT_BLOCK_SIZE;
         return blocks;
     }
 
@@ -205,6 +230,55 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
     }
 }
 
+std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query)
+{
+    auto covariance_o = G->get_attrib_by_name<rt_covariance_att>(edge);
+    auto head_o = G->get_attrib_by_name<rt_head_index_att>(edge);
+    auto tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(edge);
+
+    if (not covariance_o.has_value() || covariance_o->get().size() < RT_COVARIANCE_BLOCK_SIZE)
+        return {};
+
+    const auto &covariance_pack = covariance_o->get();
+    if (timestamp == 0)
+    {
+        if (head_o.has_value() && covariance_pack.size() >= RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE)
+        {
+            const auto block_index = latest_slot_from_head(static_cast<std::size_t>(head_o.value()), HISTORY_SIZE) * RT_COVARIANCE_BLOCK_SIZE;
+            if (block_index + RT_COVARIANCE_BLOCK_SIZE <= covariance_pack.size())
+                return covariance_at(covariance_pack, block_index);
+        }
+        return covariance_at(covariance_pack, 0);
+    }
+
+    if (head_o.has_value() && tstamps_o.has_value() && covariance_pack.size() >= RT_COVARIANCE_BLOCK_SIZE * 2)
+    {
+        const auto &timestamps = tstamps_o->get();
+        const auto blocks = valid_blocks(timestamps, covariance_pack.size() / RT_COVARIANCE_BLOCK_SIZE);
+        if (not blocks.empty())
+        {
+            if (time_query == TimeQuery::Interpolated)
+            {
+                const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
+                const auto lower_index = lower.second * RT_COVARIANCE_BLOCK_SIZE;
+                const auto upper_index = upper.second * RT_COVARIANCE_BLOCK_SIZE;
+                if (lower.second == upper.second)
+                    return covariance_at(covariance_pack, lower_index);
+
+                const auto alpha = interpolation_factor(lower, upper, timestamp);
+                const auto lower_covariance = covariance_at(covariance_pack, lower_index);
+                const auto upper_covariance = covariance_at(covariance_pack, upper_index);
+                return (1.0 - alpha) * lower_covariance + alpha * upper_covariance;
+            }
+
+            if (auto block_index = nearest_block_index(blocks, timestamp); block_index.has_value())
+                return covariance_at(covariance_pack, block_index.value() * RT_COVARIANCE_BLOCK_SIZE);
+        }
+    }
+
+    return covariance_at(covariance_pack, 0);
+}
+
 std::optional<Eigen::Vector3d> RT_API::get_translation(const Node &n, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
 {
     if( auto edge = get_edge_RT(n, to); edge.has_value())
@@ -271,200 +345,52 @@ std::optional<Eigen::Vector3d> RT_API::get_translation(uint64_t node_id, uint64_
         return {};
 }
 
+std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(const Node &n, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
+{
+    if (auto edge = get_edge_RT(n, to); edge.has_value())
+        return get_edge_RT_covariance(edge.value(), timestamp, time_query);
+    return {};
+}
+
+std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(uint64_t node_id, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
+{
+    if (const auto node = G->get_node(node_id); node.has_value())
+        return get_covariance_matrix(node.value(), to, timestamp, time_query);
+    return {};
+}
+
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler, std::optional<uint64_t> timestamp)
 {
-    bool r1 = false;
-    bool r2 = false;
-    bool no_send = true;
-
-    std::optional<IDL::MvregEdge> node1_insert;
-    std::optional<std::vector<IDL::MvregEdgeAttr>> node1_update;
-    std::optional<std::vector<IDL::MvregNodeAttr>> node2;
-    std::optional<CRDTNode> to_n;
-    {
-        std::unique_lock<std::shared_mutex> lock(G->_mutex);
-        if (G->nodes.contains(to))
-        {
-            CRDTEdge e;
-            if (HISTORY_SIZE <= 0)
-            {
-                e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
-                CRDTAttribute tr(trans, get_unix_timestamp(), 0);
-                CRDTAttribute rot(rot_euler, get_unix_timestamp(), 0);
-
-                auto [it, new_el] = e.attrs().emplace("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
-                it->second.write(std::move(rot));
-                auto [it2, new_el2] = e.attrs().emplace("rt_translation", mvreg<CRDTAttribute> ());
-                it2->second.write(std::move(tr));
-            } else {
-
-                e = G->get_edge_(n.id(), to, "RT").value_or(CRDTEdge());
-                e.to(to);  e.from(n.id()); e.type("RT"); e.agent_id(G->agent_id);
-                auto head_o = G->get_attrib_by_name<rt_head_index_att>(e);
-                std::optional<std::vector<uint64_t>> tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(e);
-                std::optional<std::vector<float>> tr_pack_o = G->get_attrib_by_name<rt_translation_att>(e);
-                std::optional<std::vector<float>> rot_pack_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(e);
-                auto time_stamps = tstamps_o.value_or(std::vector<std::uint64_t>(HISTORY_SIZE, 0));
-                auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
-                auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
-
-                if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(HISTORY_SIZE);
-                if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
-                if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
-
-                bool update_index = true;
-                auto timestamp_index = 0;
-                if (!head_o.has_value()) {
-                        timestamp_index = 0;
-                } else {
-                        timestamp_index = (int)(head_o.value_or(0)/BLOCK_SIZE) % HISTORY_SIZE;
-                }
-                int index = timestamp_index * BLOCK_SIZE;
-
-                auto timestamp_v = (timestamp.has_value()) ? *timestamp : static_cast<std::uint64_t>(
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch()).count());
-
-
-
-                if (timestamp_v < time_stamps[prev(timestamp_index, HISTORY_SIZE)]) {
-                    std::vector<int64_t> diffs;
-                    std::transform(time_stamps.begin(), time_stamps.end(), std::back_inserter(diffs),
-                                 [t = *timestamp](auto &val) {
-                                    return ((int64_t)t - (int64_t)val > 0) ? ((int64_t)t - (int64_t)val) : std::numeric_limits<int64_t>::min();
-                                 });
-
-                    auto pos = (((std::min_element(diffs.begin(), diffs.end())) - diffs.begin()))  % HISTORY_SIZE;
-
-                    // too old to insert it
-                    if (pos == timestamp_index && timestamp_v < time_stamps[pos]) {return;}
-                    if (pos > timestamp_index) {
-                        update_index = false;
-                    }
-
-                    time_stamps.erase(time_stamps.begin() + timestamp_index);
-                    tr_pack.erase(tr_pack.begin() + index, tr_pack.begin() + index + 3);
-                    rot_pack.erase(rot_pack.begin() + index, rot_pack.begin() + index + 3);
-
-                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE, trans[0]);
-                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 1, trans[1]);
-                    tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 2, trans[2]);
-                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE, rot_euler[0]);
-                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 1, rot_euler[1]);
-                    rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 2, rot_euler[2]);
-                    time_stamps.insert(time_stamps.begin() + pos, *timestamp);
-
-                } else {
-
-                    tr_pack[index] = trans[0];
-                    tr_pack[index + 1] = trans[1];
-                    tr_pack[index + 2] = trans[2];
-                    rot_pack[index] = rot_euler[0];
-                    rot_pack[index + 1] = rot_euler[1];
-                    rot_pack[index + 2] = rot_euler[2];
-                    time_stamps[timestamp_index] = timestamp_v;
-                }
-
-                CRDTAttribute tr(std::move(tr_pack), get_unix_timestamp(), 0);
-                CRDTAttribute rot(std::move(rot_pack), get_unix_timestamp(), 0);
-                CRDTAttribute head_index(index+3, get_unix_timestamp(), 0);
-                CRDTAttribute timestamps(std::move(time_stamps), get_unix_timestamp(), 0);
-
-                auto [it, new_el] = e.attrs().insert_or_assign("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
-                it->second.write(std::move(rot));
-                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_translation", mvreg<CRDTAttribute> ());
-                it->second.write(std::move(tr));
-                if (update_index) {
-                    std::tie(it, new_el) = e.attrs().insert_or_assign("rt_head_index", mvreg<CRDTAttribute> ());
-                    it->second.write(std::move(head_index));
-                }
-                std::tie(it, new_el) = e.attrs().insert_or_assign("rt_timestamps", mvreg<CRDTAttribute> ());
-                it->second.write(std::move(timestamps));
-            }
-
-            to_n = G->get_(to).value();
-            if (auto x = G->get_crdt_attrib_by_name<parent_att>(to_n.value()); x.has_value())
-            {
-                if ( x.value() != n.id())
-                {
-                    no_send = !G->modify_attrib_local<parent_att>(to_n.value(), n.id());
-                }
-            }
-            else
-            {
-                no_send = !G->add_attrib_local<parent_att>(to_n.value(), n.id());
-            }
-
-            if (auto x = G->get_crdt_attrib_by_name<level_att>(to_n.value()); x.has_value())
-            {
-                if (x.value() != G->get_node_level(n).value() + 1)
-                {
-                    no_send = !G->modify_attrib_local<level_att>(to_n.value(),  G->get_node_level(n).value() + 1 );
-                }
-            }
-            else
-            {
-                no_send = !G->add_attrib_local<level_att>(to_n.value(),  G->get_node_level(n).value() + 1 );
-            }
-
-            //Check if RT edge exist.
-            if (!n.fano().contains({to, "RT"}))
-            {
-                //Create -> from: IDL::MvregEdge, to: vector<IDL::MvregNodeAttr>
-                std::tie(r1, node1_insert, std::ignore) = G->insert_or_assign_edge_(std::move(e), n.id(), to);
-                if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n.value()));
-
-            }
-            else
-            {
-                //Update -> from: IDL::MvregEdgeAttr, to: vector<IDL::MvregNodeAttr>
-                std::tie(r1, std::ignore, node1_update) = G->insert_or_assign_edge_(std::move(e), n.id(), to);
-                if (!no_send) std::tie(r2, node2) = G->update_node_(std::move(to_n.value()));
-
-            }
-            if (!r1)
-            {
-                throw std::runtime_error(
-                        "Could not insert Node " + std::to_string(n.id()) + " in G in insert_or_assign_edge_RT() " +
-                        __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
-            }
-            if (!r2 and !no_send)
-            {
-                throw std::runtime_error(
-                        "Could not insert Node " + std::to_string(to_n->id()) + " in G in insert_or_assign_edge_RT() " +
-                        __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
-            }
-        } else
-            throw std::runtime_error(
-                    "Destination node " + std::to_string(to) + " not found in G in insert_or_assign_edge_RT() " +
-                    __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
-    }
-    if (!G->copy)
-    {
-        if (node1_insert.has_value())
-        {
-            G->dsrpub_edge.write(&node1_insert.value());
-
-        }
-        if (node1_update.has_value()) G->dsrpub_edge_attrs.write(&node1_update.value());
-
-        if (!no_send and node2.has_value()) G->dsrpub_node_attrs.write(&node2.value());
-
-        G->emitter.update_edge_attr_signal(n.id(), to, "RT" ,{"rt_rotation_euler_xyz", "rt_translation"}, SignalInfo{ G->agent_id });
-        G->emitter.update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
-        if (!no_send)
-        {
-            G->emitter.update_node_signal(to_n->id(), to_n->type(), SignalInfo{ G->agent_id });
-            G->emitter.update_node_attr_signal(to_n->id(), {"level", "parent"}, SignalInfo{ G->agent_id });
-        }
-    }
+    insert_or_assign_edge_RT_impl(n, to, trans, rot_euler, std::nullopt, timestamp);
 }
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler, std::optional<uint64_t> timestamp)
 {
+    insert_or_assign_edge_RT_impl(n, to, std::move(trans), std::move(rot_euler), std::nullopt, timestamp);
+}
+
+void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler,
+                                      const std::vector<float> &covariance, std::optional<uint64_t> timestamp)
+{
+    insert_or_assign_edge_RT_impl(n, to, trans, rot_euler, covariance, timestamp);
+}
+
+void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler,
+                                      std::vector<float> &&covariance, std::optional<uint64_t> timestamp)
+{
+    insert_or_assign_edge_RT_impl(n, to, std::move(trans), std::move(rot_euler), std::move(covariance), timestamp);
+}
+
+void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<float> trans, std::vector<float> rot_euler,
+                                           std::optional<std::vector<float>> covariance, std::optional<uint64_t> timestamp)
+{
+    if (covariance.has_value() && covariance->size() != RT_COVARIANCE_BLOCK_SIZE)
+        throw std::runtime_error("RT covariance must contain exactly 36 float values");
+
     bool r1 = false;
     bool r2 = false;
     bool no_send = true;
+    const bool with_covariance = covariance.has_value();
 
     std::optional<IDL::MvregEdge> node1_insert;
     std::optional<std::vector<IDL::MvregEdgeAttr>> node1_update;
@@ -485,6 +411,12 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 it->second.write(std::move(rot));
                 auto [it2, new_el2] = e.attrs().emplace("rt_translation", mvreg<CRDTAttribute> ());
                 it2->second.write(std::move(tr));
+                if (with_covariance)
+                {
+                    CRDTAttribute cov(std::move(covariance.value()), get_unix_timestamp(), 0);
+                    auto [cov_it, cov_new] = e.attrs().emplace("rt_covariance", mvreg<CRDTAttribute> ());
+                    cov_it->second.write(std::move(cov));
+                }
             } else {
 
                 e = G->get_edge_(n.id(), to, "RT").value_or(CRDTEdge());
@@ -493,13 +425,23 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 std::optional<std::vector<uint64_t>> tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(e);
                 std::optional<std::vector<float>> tr_pack_o = G->get_attrib_by_name<rt_translation_att>(e);
                 std::optional<std::vector<float>> rot_pack_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(e);
+                std::optional<std::vector<float>> cov_pack_o;
                 auto time_stamps = tstamps_o.value_or(std::vector<std::uint64_t>(HISTORY_SIZE, 0));
                 auto tr_pack = tr_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
                 auto rot_pack = rot_pack_o.value_or(std::vector<float> (BLOCK_SIZE * HISTORY_SIZE, 0.f));
+                std::vector<float> cov_pack;
+                if (with_covariance)
+                    cov_pack_o = G->get_attrib_by_name<rt_covariance_att>(e);
 
                 if (time_stamps.size() < BLOCK_SIZE * HISTORY_SIZE) time_stamps.resize(HISTORY_SIZE);
                 if (tr_pack.size() < BLOCK_SIZE * HISTORY_SIZE) tr_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
                 if (rot_pack.size() < BLOCK_SIZE * HISTORY_SIZE) rot_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+                if (with_covariance)
+                {
+                    cov_pack = cov_pack_o.value_or(std::vector<float>(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE, 0.f));
+                    if (cov_pack.size() < RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE)
+                        cov_pack.resize(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE);
+                }
 
                 bool update_index = true;
                 auto timestamp_index = 0;
@@ -532,6 +474,11 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     time_stamps.erase(time_stamps.begin() + timestamp_index);
                     tr_pack.erase(tr_pack.begin() + index, tr_pack.begin() + index + 3);
                     rot_pack.erase(rot_pack.begin() + index, rot_pack.begin() + index + 3);
+                    if (with_covariance)
+                    {
+                        const auto covariance_index = timestamp_index * RT_COVARIANCE_BLOCK_SIZE;
+                        cov_pack.erase(cov_pack.begin() + covariance_index, cov_pack.begin() + covariance_index + RT_COVARIANCE_BLOCK_SIZE);
+                    }
 
                     tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE, trans[0]);
                     tr_pack.insert(tr_pack.begin() + pos*BLOCK_SIZE + 1, trans[1]);
@@ -539,6 +486,8 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE, rot_euler[0]);
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 1, rot_euler[1]);
                     rot_pack.insert(rot_pack.begin() + pos*BLOCK_SIZE + 2, rot_euler[2]);
+                    if (with_covariance)
+                        cov_pack.insert(cov_pack.begin() + pos * RT_COVARIANCE_BLOCK_SIZE, covariance->begin(), covariance->end());
                     time_stamps.insert(time_stamps.begin() + pos, *timestamp);
 
                 } else {
@@ -549,6 +498,8 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                     rot_pack[index] = rot_euler[0];
                     rot_pack[index + 1] = rot_euler[1];
                     rot_pack[index + 2] = rot_euler[2];
+                    if (with_covariance)
+                        std::copy(covariance->begin(), covariance->end(), cov_pack.begin() + timestamp_index * RT_COVARIANCE_BLOCK_SIZE);
                     time_stamps[timestamp_index] = timestamp_v;
                 }
 
@@ -557,11 +508,19 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
                 CRDTAttribute rot(std::move(rot_pack), get_unix_timestamp(), 0);
                 CRDTAttribute head_index(index+3, get_unix_timestamp(), 0);
                 CRDTAttribute timestamps(std::move(time_stamps), get_unix_timestamp(), 0);
+                std::optional<CRDTAttribute> covariance_attr;
+                if (with_covariance)
+                    covariance_attr.emplace(std::move(cov_pack), get_unix_timestamp(), 0);
 
                 auto [it, new_el] = e.attrs().insert_or_assign("rt_rotation_euler_xyz", mvreg<CRDTAttribute> ());
                 it->second.write(std::move(rot));
                 std::tie(it, new_el) = e.attrs().insert_or_assign("rt_translation", mvreg<CRDTAttribute> ());
                 it->second.write(std::move(tr));
+                if (covariance_attr.has_value())
+                {
+                    std::tie(it, new_el) = e.attrs().insert_or_assign("rt_covariance", mvreg<CRDTAttribute> ());
+                    it->second.write(std::move(covariance_attr.value()));
+                }
                 if (update_index) {
                     std::tie(it, new_el) = e.attrs().insert_or_assign("rt_head_index", mvreg<CRDTAttribute> ());
                     it->second.write(std::move(head_index));
@@ -629,6 +588,10 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
     }
     if (!G->copy)
     {
+        std::vector<std::string> updated_attributes{"rt_rotation_euler_xyz", "rt_translation"};
+        if (with_covariance)
+            updated_attributes.emplace_back("rt_covariance");
+
         if (node1_insert.has_value())
         {
             G->dsrpub_edge.write(&node1_insert.value());
@@ -637,7 +600,7 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
 
         if (!no_send and node2.has_value()) G->dsrpub_node_attrs.write(&node2.value());
 
-        G->emitter.update_edge_attr_signal(n.id(), to, "RT",{"rt_rotation_euler_xyz", "rt_translation"}, SignalInfo{ G->agent_id });
+        G->emitter.update_edge_attr_signal(n.id(), to, "RT", updated_attributes, SignalInfo{ G->agent_id });
         G->emitter.update_edge_signal(n.id(), to, "RT", SignalInfo{ G->agent_id });
         if (!no_send)
         {
