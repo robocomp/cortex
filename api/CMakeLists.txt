@@ -49,6 +49,7 @@ target_sources(dsr_api
         dsr_camera_api.cpp
         dsr_agent_info_api.cpp
         dsr_inner_eigen_api.cpp
+        dsr_inner_gaussian_api.cpp
         dsr_rt_api.cpp
         dsr_utils.cpp
         dsr_signal_emitter.cpp

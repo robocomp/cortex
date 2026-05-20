@@ -17,6 +17,7 @@
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 //#include <dsr/gui/viewers/graph_viewer/node_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_colors.h>
+#include <dsr/gui/viewers/graph_viewer/graph_node_imu_widget.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_laser_widget.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_widget.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_rgbd_widget.h>
@@ -62,7 +63,7 @@ void GraphNode::setTag(const std::string &tag_)
 void GraphNode::setType(const std::string &type_)
 {
     type = type_;
-    if(type == "laser" or type == "rgbd" or type == "person")
+    if(type == "laser" or type == "rgbd" or type == "person" or type == "imu")
     {
         QAction *stuff_action = new QAction("View data");
         contextMenu->addAction(stuff_action);
@@ -256,6 +257,8 @@ void GraphNode::show_node_widget(const std::string &show_type)
         node_widget = std::make_unique<GraphNodeRGBDWidget>(graph, id_in_graph);
     else if(show_type=="person")
         node_widget = std::make_unique<GraphNodePersonWidget>(graph, id_in_graph);
+    else if(show_type=="imu")
+        node_widget = std::make_unique<GraphNodeIMUWidget>(graph, id_in_graph);
     else
         node_widget = std::make_unique<GraphNodeWidget>(graph, id_in_graph);
 

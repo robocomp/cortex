@@ -26,6 +26,7 @@
 #include "dsr/core/traits.h"
 #include "dsr/api/dsr_agent_info_api.h"
 #include "dsr/api/dsr_inner_eigen_api.h"
+#include "dsr/api/dsr_inner_gaussian_api.h"
 #include "dsr/api/dsr_camera_api.h"
 #include "dsr/api/dsr_rt_api.h"
 #include "dsr/api/dsr_utils.h"
@@ -80,6 +81,7 @@ namespace DSR
         std::map<uint64_t, Node> getCopy() const;
 
         std::unique_ptr<InnerEigenAPI> get_inner_eigen_api() { return std::make_unique<InnerEigenAPI>(this); };
+        std::unique_ptr<InnerGaussianAPI> get_inner_gaussian_api() { return std::make_unique<InnerGaussianAPI>(this); };
         std::unique_ptr<RT_API> get_rt_api() { return std::make_unique<RT_API>(this); };
         std::unique_ptr<CameraAPI> get_camera_api(const DSR::Node &camera_node) { return std::make_unique<CameraAPI>(this, camera_node); };
 
