@@ -192,7 +192,7 @@ TEST_CASE("RT api interpolation mode", "[GRAPH][RT]") {
     REQUIRE(interpolated_rt.has_value());
     CHECK(std::abs(interpolated_rt->matrix()(0, 3) - 5.0) < 1e-9);
 
-    const auto rotated_x = interpolated_rt->rotation() * Eigen::Vector3d::UnitX();
+    const Eigen::Vector3d rotated_x = interpolated_rt->rotation() * Eigen::Vector3d::UnitX();
     CHECK(std::abs(rotated_x.x() - std::sqrt(0.5)) < 1e-7);
     CHECK(std::abs(rotated_x.y() - std::sqrt(0.5)) < 1e-7);
 }

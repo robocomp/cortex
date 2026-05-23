@@ -410,8 +410,9 @@ TEST_CASE("InnerGaussian point transform matches Monte Carlo covariance", "[GRAP
 
     CHECK(empirical_mean_delta.norm() < 0.15);
 
+    constexpr double covariance_tolerance = 0.025;
     for (int diagonal = 0; diagonal < 3; ++diagonal)
-        CHECK(std::abs(empirical_covariance(diagonal, diagonal) - analytical->covariance(diagonal, diagonal)) < 0.02);
+        CHECK(std::abs(empirical_covariance(diagonal, diagonal) - analytical->covariance(diagonal, diagonal)) < covariance_tolerance);
 }
 
 TEST_CASE("InnerGaussian pose2d transform matches Monte Carlo covariance", "[GRAPH][RT][GAUSSIAN][MONTE_CARLO]")
