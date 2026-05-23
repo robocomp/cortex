@@ -52,7 +52,7 @@ target_sources(dsr_core
 
 target_link_libraries(dsr_core
         PRIVATE
-        Qt6::Core fastcdr fastdds osgDB OpenThreads Eigen3::Eigen
+        Qt6::Core fastcdr fastdds Eigen3::Eigen
         cortex_profiling)
 
 
