@@ -269,6 +269,7 @@ REGISTER_TYPE(viriato_head_pan_tilt_nose_speed_ref, std::reference_wrapper<const
 REGISTER_TYPE(robot_current_advance_speed, float, true) // robot frame
 REGISTER_TYPE(robot_current_angular_speed, float, true)
 REGISTER_TYPE(robot_current_side_speed, float, true)
+REGISTER_TYPE(robot_current_speed_timestamp, uint64_t, true)
 REGISTER_TYPE(robot_local_linear_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_local_angular_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_ref_adv_speed, float, true) // robot frame
