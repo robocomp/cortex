@@ -9,14 +9,13 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 if (NOT PYBIND_FORCE_PYTHON310)
 
-find_package(PythonLibs REQUIRED)
-find_package(Python3)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 else()
 
 set(Python3_SITEARCH "/usr/local/lib/python3.10/dist-packages")
-set(PYTHON_LIBRARIES "/usr/lib/x86_64-linux-gnu/libpython3.10.so")
-set(PYTHON_INCLUDE_DIRS "/usr/include/python3.10")
+set(Python3_LIBRARIES "/usr/lib/x86_64-linux-gnu/libpython3.10.so")
+set(Python3_INCLUDE_DIRS "/usr/include/python3.10")
 
 endif()
 
@@ -36,7 +35,7 @@ target_link_libraries(pydsr
         Eigen3::Eigen
         Robocomp::dsr_api
         Robocomp::dsr_core
-        ${PYTHON_LIBRARIES}
+        ${Python3_LIBRARIES}
         )
 
 target_include_directories(pydsr
@@ -47,7 +46,7 @@ target_include_directories(pydsr
         # Own include
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
         PRIVATE
-        ${PYTHON_INCLUDE_DIRS}
+        ${Python3_INCLUDE_DIRS}
         )
 
 

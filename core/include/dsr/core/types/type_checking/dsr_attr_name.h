@@ -245,7 +245,7 @@ REGISTER_TYPE(aff_interacting, bool, true)
 REGISTER_TYPE(cam_rgb, std::reference_wrapper<const std::vector<uint8_t>>, true)
 REGISTER_TYPE(cam_depth_focalx, int, false)
 REGISTER_TYPE(cam_depth_focaly, int, false)
-REGISTER_TYPE(cam_depth_alivetime, int, false)
+REGISTER_TYPE(cam_depth_alivetime, uint64_t, false)
 REGISTER_TYPE(cam_rgb_cameraID, int, false)
 REGISTER_TYPE(cam_rgb_focalx, int, false)
 REGISTER_TYPE(cam_rgb_focaly, int, false)
@@ -266,14 +266,15 @@ REGISTER_TYPE(cam_depth_width, int, false)
 REGISTER_TYPE(viriato_head_pan_tilt_nose_pos_ref, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(viriato_head_pan_tilt_nose_speed_ref, std::reference_wrapper<const std::vector<float>>, true)
 
-REGISTER_TYPE(robot_current_advance_speed, float, true)
+REGISTER_TYPE(robot_current_advance_speed, float, true) // robot frame
 REGISTER_TYPE(robot_current_angular_speed, float, true)
 REGISTER_TYPE(robot_current_side_speed, float, true)
 REGISTER_TYPE(robot_local_linear_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_local_angular_velocity, std::reference_wrapper<const std::vector<float>>, true)
-REGISTER_TYPE(robot_ref_adv_speed, float, true)
+REGISTER_TYPE(robot_ref_adv_speed, float, true) // robot frame
 REGISTER_TYPE(robot_ref_rot_speed, float, true)
 REGISTER_TYPE(robot_ref_side_speed, float, true)
+REGISTER_TYPE(robot_ref_speed_timestamp, uint64_t, true)
 REGISTER_TYPE(robot_target_x, float, true)
 REGISTER_TYPE(robot_target_y, float, true)
 REGISTER_TYPE(robot_target_angle, float, true)
@@ -351,6 +352,11 @@ REGISTER_TYPE(corner1, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner2, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner3, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(corner4, std::reference_wrapper<const std::vector<float>>, false);
+
+/*
+*meshes
+*/
+REGISTER_TYPE(mesh_vertices, std::reference_wrapper<const std::vector<float>>, false)
 
 
 /* * * * * * * * * * *
@@ -529,5 +535,29 @@ REGISTER_TYPE(test_vec6_type, std::reference_wrapper<const vec6> , false)
 */
 REGISTER_TYPE(compresssed_id, int, false)
 REGISTER_TYPE(compressed_data, std::reference_wrapper<const std::vector<uint8_t>>, false)
+
+// NEW ATTRIBUTES FOR ACTIVE INFERENCE AGENTS
+// ── table-concept sensing interface (written by robot_concept, read by table-concept) ───────────
+REGISTER_TYPE(candidate_pts,       std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(residual_pts,        std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(residual_mass,       int,                                               false)
+REGISTER_TYPE(explanation_ratio,   float,                                             false)
+REGISTER_TYPE(last_sensing_frame,  int,                                               false)
+REGISTER_TYPE(rfe_pts,             std::reference_wrapper<const std::vector<float>>, false)
+
+
+// ── table-concept inference outputs (written by table-concept) ────────────────────────────────
+REGISTER_TYPE(free_energy,         float,                                             false)
+REGISTER_TYPE(model_stable,        bool,                                              false)
+REGISTER_TYPE(model_generation,    int,                                               false)
+REGISTER_TYPE(model_uncertainty,   float,                                             false)
+REGISTER_TYPE(request_full_sample, bool,                                              false)
+
+// ── epistemic action proposal (written by table-concept, read by mission-controller) ────────
+REGISTER_TYPE(epistemic_target_x_m,   float,                                             false)
+REGISTER_TYPE(epistemic_target_y_m,   float,                                             false)
+REGISTER_TYPE(epistemic_target_yaw_rad,float,                                            false)
+REGISTER_TYPE(epistemic_gain,          float,                                             false)
+REGISTER_TYPE(epistemic_pending,       bool,                                              false)
 
 #endif //DSR_ATTR_NAME_H
