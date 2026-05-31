@@ -198,6 +198,9 @@ public slots:
     {
         if (edge_type==this->edge_type)
         {
+            if (edge_type == "RT" || edge_type == "VRT")
+                update_values();
+
             //pose values
             if(edge_type == "RT" || edge_type == "looking-at" || edge_type == "VRT")
             {
@@ -217,9 +220,12 @@ public slots:
                 }
             }
             // velocity and covariance matrix
-            if (edge_type == "RT" || edge_type == "VRT"){
+            // Always read from the popup's own edge (this->from / this->to / this->edge_type),
+            // never from the signal parameters: an unrelated RT update under the same parent
+            // would otherwise inject foreign velocity/covariance values into this popup.
+            if (this->edge_type == "RT" || this->edge_type == "VRT"){
 
-                std::optional<DSR::Edge> edge = graph->get_edge(from, to, edge_type);
+                std::optional<DSR::Edge> edge = graph->get_edge(this->from, this->to, this->edge_type);
                 if(edge.has_value())
                 {
                     std::optional<const std::vector<float>>rotation_vel = graph->get_attrib_by_name<rt_rotation_euler_xyz_velocity_att>(edge.value());
@@ -260,7 +266,7 @@ public slots:
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
                                 this->ui.tableWidget_covariance_acceleration_matrix->item(posy, posx)->setText(QString::number(se2_covariance_acceleration.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
-                } 
+                }
                 else 
                     std::cerr<<__FUNCTION__<<" Error retriving RT data"<<std::endl;
             }
@@ -297,6 +303,9 @@ public slots:
                                       const std::string& edge_type,
                                       const std::vector<std::string>& /*att_name*/)
     {
+        if ((edge_type == "RT" || edge_type == "VRT") && from == this->from && to == this->to)
+            update_values();
+
         add_or_assign_edge_slot(from, to, edge_type);
     };
 

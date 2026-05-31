@@ -69,7 +69,27 @@ DSRGraph::DSRGraph(GraphSettings settings) :
                                                                         std::unique_lock<std::mutex> lck(participant_set_mutex);
                                                                         graph->participant_set.erase(info.participant_name.to_string());
                                                                         std::cout << "Participant unmatched [" << info.participant_name.to_string() << "]" << std::endl;
-                                                                        graph->delete_node(info.participant_name.to_string());
+                                                                        // Participant name is "Participant_<id> ( <agent_name> )" which doesn't
+                                                                        // match the DSR node name "<agent_name> <id>". Find the agent node by
+                                                                        // its agent_id attribute instead.
+                                                                        const std::string pname = info.participant_name.to_string();
+                                                                        const std::string prefix = "Participant_";
+                                                                        bool deleted = false;
+                                                                        if (pname.size() > prefix.size() && pname.substr(0, prefix.size()) == prefix) {
+                                                                            try {
+                                                                                uint32_t peer_id = static_cast<uint32_t>(std::stoul(pname.substr(prefix.size())));
+                                                                                for (auto& node : graph->get_nodes_by_type("agent")) {
+                                                                                    auto attr = graph->get_attrib_by_name<agent_id_att>(node);
+                                                                                    if (attr.has_value() && attr.value() == peer_id) {
+                                                                                        graph->delete_node(node.id());
+                                                                                        deleted = true;
+                                                                                        break;
+                                                                                    }
+                                                                                }
+                                                                            } catch (...) {}
+                                                                        }
+                                                                        if (!deleted)
+                                                                            graph->delete_node(pname);
                                                                     }
                                                                 }), settings.domain_id);
 

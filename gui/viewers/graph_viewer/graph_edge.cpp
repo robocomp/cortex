@@ -15,6 +15,7 @@
  */
 
 #include <dsr/gui/viewers/graph_viewer/graph_edge.h>
+#include <QFont>
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <qmath.h>
 #include <QPainter>
@@ -36,6 +37,7 @@ GraphEdge::GraphEdge(GraphNode* sourceNode, GraphNode* destNode, const QString& 
     auto flags = ItemIsSelectable | ItemSendsGeometryChanges | ItemUsesExtendedStyleOption;
     setFlags(flags);
     tag = new QGraphicsTextItem(edge_name, this);
+    { QFont f = tag->font(); f.setPointSize(7); tag->setFont(f); }
     tag->setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
     tag->installEventFilter(this);
     color = QString::fromStdString(GraphColors<DSR::Edge>()[edge_name.toStdString()]);

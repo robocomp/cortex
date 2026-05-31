@@ -553,6 +553,12 @@ void DSRViewer::compute()
     {
         status += " HZ: " + std::to_string(external_hz);
     }
+    if (external_fps >= 0.f)
+    {
+        std::stringstream fps_ss;
+        fps_ss << std::fixed << std::setprecision(1) << external_fps;
+        status += "  FPS: " + fps_ss.str();
+    }
     m_stMessage->setText(QString::fromStdString(status));
 }
 
@@ -570,14 +576,40 @@ void DSRViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
 {
     if (type == "agent")
     {
-        std::string name = G->get_name_from_id(id).value_or("No_name");
+        // If the name is not yet available locally, skip — the next update will retry.
+        auto name_opt = G->get_name_from_id(id);
+        if (!name_opt.has_value()) return;
+        std::string name = name_opt.value();
+
+        // If this id was previously registered under a different name (e.g. a
+        // transient placeholder), remove the stale LED before creating the real one.
+        auto id_it = agents_names.find(id);
+        if (id_it != agents_names.end() && id_it->second != name)
+        {
+            auto stale = agents_leds.find(id_it->second);
+            if (stale != agents_leds.end())
+            {
+                m_stBar1L->removeWidget(stale->second);
+                stale->second->hide();
+                stale->second->deleteLater();
+                agents_leds.erase(stale);
+            }
+            agents_names.erase(id_it);
+        }
+
         auto it = agents_leds.find(name);
         if (it == agents_leds.end())  //not found ==> creation
         {
-            int pos = name.find('(') + 2;
-            std::string show_name = name.substr(pos, 6);
+            // Build a short display label from "agent_name id" → "agent_id".
+            // Strip "_concept" suffix and replace the space before the numeric id with "_".
+            std::string show_name = name;
+            const auto concept_pos = show_name.find("_concept");
+            if (concept_pos != std::string::npos)
+                show_name.erase(concept_pos, 8);  // remove "_concept"
+            const auto space_pos = show_name.find(' ');
+            if (space_pos != std::string::npos)
+                show_name[space_pos] = '_';        // "room 5" → "room_5"
             LedWidget *newWidget = new LedWidget(show_name);
-            //m_stBar1->addPermanentWidget(newWidget);
             m_stBar1L->insertWidget(m_stBar1L->count() - 1, newWidget);
             agents_names[id] = name;
             agents_leds[name] = newWidget;
@@ -595,7 +627,14 @@ void DSRViewer::del_node_SLOT(uint64_t id)
     auto it = agents_names.find(id);
     if (it != agents_names.end())
     {
-        agents_leds[it->second]->turnOff();
+        auto led_it = agents_leds.find(it->second);
+        if (led_it != agents_leds.end())
+        {
+            m_stBar1L->removeWidget(led_it->second);
+            led_it->second->hide();
+            led_it->second->deleteLater();
+            agents_leds.erase(led_it);
+        }
         agents_names.erase(it);
     }
 }
@@ -618,5 +657,15 @@ float DSRViewer::get_external_hz() const
 void DSRViewer::set_external_hz(float external_hz_)
 {
     this->external_hz = external_hz_;
+}
+
+float DSRViewer::get_external_fps() const
+{
+    return external_fps;
+}
+
+void DSRViewer::set_external_fps(float fps)
+{
+    this->external_fps = fps;
 }
 

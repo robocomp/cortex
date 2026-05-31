@@ -53,7 +53,7 @@ namespace DSR {
     
     void AgentInfoAPI::create_or_update_agent()
     {
-        auto str = "Participant_" + std::to_string(G->get_agent_id()) + " ( " + G->get_agent_name() + " )";
+        auto str = G->get_agent_name() + " " + std::to_string(G->get_agent_id());
         pid_t pid = getpid();
 
 

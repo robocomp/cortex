@@ -263,11 +263,11 @@ namespace DSR {
             m_name = node.name();
             m_type = node.type();
             for (const auto &[k,v] : node.attrs()) {
-                assert(!v.dk.ds.empty());
+                if (v.dk.ds.empty()) continue;  // guard: skip attrs with empty delta-set (partial network update)
                 m_attrs.emplace(k, v.dk.ds.begin()->second);
             }
             for (const auto &[k,v] : node.fano()) {
-                assert(!v.dk.ds.empty());
+                if (v.dk.ds.empty()) continue;  // guard: skip edges with empty delta-set
                 m_fano.emplace(k, v.dk.ds.begin()->second);
             }
         }
@@ -279,11 +279,11 @@ namespace DSR {
             m_name = node.name();
             m_type = node.type();
             for (auto &[k,v] : node.attrs()) {
-                assert(!v.dk.ds.empty());
+                if (v.dk.ds.empty()) continue;  // guard: skip attrs with empty delta-set
                 m_attrs.emplace(k, std::move(v.dk.ds.begin()->second));
             }
             for (auto &[k,v] : node.fano()) {
-                assert(!v.dk.ds.empty());
+                if (v.dk.ds.empty()) continue;  // guard: skip edges with empty delta-set
                 m_fano.emplace(k, std::move(v.dk.ds.begin()->second));
             }
         }
@@ -295,11 +295,11 @@ namespace DSR {
             m_name = node.name();
             m_type = node.type();
             for (const auto &[k,v] : node.attrs()) {
-                assert(!v.dk.ds.empty());
+                if (v.dk.ds.empty()) continue;  // guard: skip attrs with empty delta-set
                 m_attrs.emplace(k, v.dk.ds.begin()->second);
             }
             for (const auto &[k,v] : node.fano()) {
-                assert(!v.dk.ds.empty());
+                if (v.dk.ds.empty()) continue;  // guard: skip edges with empty delta-set
                 m_fano.emplace(k, v.dk.ds.begin()->second);
             }
 

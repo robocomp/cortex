@@ -15,6 +15,7 @@
  */
 
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
+#include <QFont>
 //#include <dsr/gui/viewers/graph_viewer/node_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_imu_widget.h>
@@ -56,8 +57,9 @@ void GraphNode::setTag(const std::string &tag_)
 {
     QString c = QString::fromStdString(tag_);
 	tag = new QGraphicsSimpleTextItem(c, this);
-	tag->setX(DEFAULT_DIAMETER);
-	tag->setY(-10);
+        QFont f = tag->font(); f.setPointSize(7); tag->setFont(f);
+        tag->setX(DEFAULT_DIAMETER);
+        tag->setY(-10);
 }
 
 void GraphNode::setType(const std::string &type_)

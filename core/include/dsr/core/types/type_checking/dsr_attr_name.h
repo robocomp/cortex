@@ -266,18 +266,17 @@ REGISTER_TYPE(cam_depth_width, int, false)
 REGISTER_TYPE(viriato_head_pan_tilt_nose_pos_ref, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(viriato_head_pan_tilt_nose_speed_ref, std::reference_wrapper<const std::vector<float>>, true)
 
-REGISTER_TYPE(robot_current_advance_speed, float, true) // robot frame
-REGISTER_TYPE(robot_current_angular_speed, float, true)
-REGISTER_TYPE(robot_current_side_speed, float, true)
+REGISTER_TYPE(robot_current_advance_speed, float, true) // robot frame m/s
+REGISTER_TYPE(robot_current_angular_speed, float, true)     // robot frame rad/s
+REGISTER_TYPE(robot_current_side_speed, float, true)    // robot frame m/s
 REGISTER_TYPE(robot_current_speed_timestamp, uint64_t, true)
 REGISTER_TYPE(robot_local_linear_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_local_angular_velocity, std::reference_wrapper<const std::vector<float>>, true)
-REGISTER_TYPE(robot_ref_adv_speed, float, true) // robot frame
-REGISTER_TYPE(robot_ref_rot_speed, float, true)
-REGISTER_TYPE(robot_ref_side_speed, float, true)
-REGISTER_TYPE(robot_ref_speed_timestamp, uint64_t, true)
-REGISTER_TYPE(robot_target_x, float, true)
-REGISTER_TYPE(robot_target_y, float, true)
+REGISTER_TYPE(robot_ref_adv_speed, float, true) // robot frame m/s
+REGISTER_TYPE(robot_ref_rot_speed, float, true) // robot frame rad/s
+REGISTER_TYPE(robot_ref_side_speed, float, true) // robot frame m/s
+REGISTER_TYPE(robot_ref_speed_timestamp, uint64_t, true) //ms
+REGISTER_TYPE(robot_target_x, float, true) 
 REGISTER_TYPE(robot_target_angle, float, true)
 REGISTER_TYPE(robot_occupied, bool, false)
 /*

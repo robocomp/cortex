@@ -44,13 +44,14 @@ public:
     LedWidget(std::string name, QWidget *parent = nullptr): QLabel(QString::fromStdString(name), parent)
     {
         setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+        setStyleSheet("QLabel { font-size: 8pt; }");
         adjustSize();
     }
 
 
 public slots:
-    void turnOff() { if(status){status= false; setStyleSheet("QLabel { background-color : red; color : white; }"); }}
-    void turnOn() {if(not status) {status = true; setStyleSheet("QLabel { background-color : green; color : white; }");}}
+    void turnOff() { if(status){status= false; setStyleSheet("QLabel { background-color : red; color : white; font-size: 8pt; }"); }}
+    void turnOn() {if(not status) {status = true; setStyleSheet("QLabel { background-color : green; color : white; font-size: 8pt; }");}}
 
 private:
     bool status= false;
@@ -87,6 +88,8 @@ public:
     void add_custom_widget_to_dock(const QString& name, QWidget* view);
     float get_external_hz() const;
     void set_external_hz(float external_hz);
+    float get_external_fps() const;
+    void set_external_fps(float fps);
 
 protected:
     virtual void keyPressEvent(QKeyEvent *event);
