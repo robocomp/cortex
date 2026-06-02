@@ -81,6 +81,10 @@ static const std::map<std::string, std::string> node_colors = {
         { "gps", "Gray"},
         { "grid", "Gray"},
 
+        { "wall", "SteelBlue"},
+        { "floor", "BurlyWood"},
+        { "affordance", "DarkOrange"},
+
 //Agent
         { "agent", "Gray"}
 };
