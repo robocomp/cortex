@@ -118,6 +118,8 @@ REGISTER_TYPE(scalez, int, false)
 REGISTER_TYPE(path, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(name, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(active, bool, false)
+REGISTER_TYPE(frequency, float, false)  // 
+
 
 /*
 * Edge creation timestamp

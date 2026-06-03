@@ -12,7 +12,8 @@
 namespace DSR {
 
     namespace {
-        struct PipeCloser {
+        struct PipeCloser
+        {
             void operator()(FILE *pipe) const
             {
                 if (pipe != nullptr)
