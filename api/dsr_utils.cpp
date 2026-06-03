@@ -123,7 +123,7 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
             uint64_t srcn = link_obj.value("src").toString().toULongLong();
             uint64_t dstn = link_obj.value("dst").toString().toULongLong();
             std::string edgeName = link_obj.value("label").toString().toStdString();
-            std::map<std::string, CRDTAttribute> attrs;
+            std::map<std::string, Attribute> attrs;
 
             Edge edge;
             edge.to(dstn);

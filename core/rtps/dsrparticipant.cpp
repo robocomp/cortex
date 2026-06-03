@@ -6,6 +6,14 @@
 
 #include <QDebug>
 #include <dsr/core/rtps/dsrparticipant.h>
+#include <dsr/core/rtps/CRDTPubSubTypes.h>
+#include <dsr/core/rtps/env_overrides.h>
+#include <dsr/core/types/internal_types.h>
+
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <string>
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
@@ -25,31 +33,153 @@ std::vector<std::string> host_ipv4_interfaces()
     }
     return ips;
 }
+
+bool is_lww_mode(uint8_t sync_mode_wire)
+{
+    return sync_mode_wire == 1;
+}
+
+uint32_t env_u32_or(const char* name, uint32_t fallback, uint32_t minimum = 0)
+{
+    const auto value = DSR::RTPS::Env::read_u32(name);
+    if (!value.present()) {
+        return fallback;
+    }
+    if (!value.value.has_value() || *value.value < minimum) {
+        qWarning() << "Ignoring invalid" << name << "value" << value.raw;
+        return fallback;
+    }
+    qInfo() << "Using" << name << "override" << *value.value;
+    return *value.value;
+}
+
+template <typename Apply>
+void apply_u32_env(const char* name, uint32_t minimum, Apply&& apply)
+{
+    const auto value = DSR::RTPS::Env::read_u32(name);
+    if (!value.present()) {
+        return;
+    }
+    if (!value.value.has_value() || *value.value < minimum) {
+        qWarning() << "Ignoring invalid" << name << "value" << value.raw;
+        return;
+    }
+    qInfo() << "Using" << name << "override" << *value.value;
+    apply(*value.value);
+}
+
+eprosima::fastdds::dds::Log::Kind fastdds_log_verbosity_from_env(
+        eprosima::fastdds::dds::Log::Kind fallback)
+{
+    const char* raw = std::getenv("DSR_FASTDDS_LOG_VERBOSITY");
+    if (raw == nullptr || raw[0] == '\0') {
+        return fallback;
+    }
+
+    std::string value(raw);
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::toupper(c));
+    });
+
+    if (value == "ERROR" || value == "0") {
+        qInfo() << "Using DSR_FASTDDS_LOG_VERBOSITY override ERROR";
+        return eprosima::fastdds::dds::Log::Error;
+    }
+    if (value == "WARNING" || value == "WARN" || value == "1") {
+        qInfo() << "Using DSR_FASTDDS_LOG_VERBOSITY override WARNING";
+        return eprosima::fastdds::dds::Log::Warning;
+    }
+    if (value == "INFO" || value == "2") {
+        qInfo() << "Using DSR_FASTDDS_LOG_VERBOSITY override INFO";
+        return eprosima::fastdds::dds::Log::Info;
+    }
+
+    qWarning() << "Ignoring invalid DSR_FASTDDS_LOG_VERBOSITY value" << raw;
+    return fallback;
+}
+
+struct TransportFamily
+{
+    const char* node_topic_name;
+    const char* edge_topic_name;
+    const char* node_attr_topic_name;
+    const char* edge_attr_topic_name;
+    const char* graph_request_topic_name;
+    const char* graph_answer_topic_name;
+    eprosima::fastdds::dds::TypeSupport node_type;
+    eprosima::fastdds::dds::TypeSupport graph_request_type;
+    eprosima::fastdds::dds::TypeSupport graph_answer_type;
+    eprosima::fastdds::dds::TypeSupport edge_type;
+    eprosima::fastdds::dds::TypeSupport node_attr_type;
+    eprosima::fastdds::dds::TypeSupport edge_attr_type;
+    bool cleanup_enabled{true};
+};
+
+TransportFamily make_transport_family(uint8_t sync_mode_wire)
+{
+    if (is_lww_mode(sync_mode_wire)) {
+        return TransportFamily{
+            "LWW_NODE",
+            "LWW_EDGE",
+            "LWW_NODE_ATTS",
+            "LWW_EDGE_ATTS",
+            "LWW_GRAPH_REQUEST",
+            "LWW_GRAPH_ANSWER",
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeMsg>("LWWNodeMsg")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWGraphSnapshot>("LWWGraphSnapshot")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeMsg>("LWWEdgeMsg")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWNodeAttrVec>("LWWNodeAttrVec")),
+            eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::LWWEdgeAttrVec>("LWWEdgeAttrVec")),
+            false
+        };
+    }
+
+    return TransportFamily{
+        "DSR_NODE",
+        "DSR_EDGE",
+        "DSR_NODE_ATTS",
+        "DSR_EDGE_ATTS",
+        "GRAPH_REQUEST",
+        "GRAPH_ANSWER",
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregNodeMsg>("MvregNodeMsg")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::OrMap>("OrMap")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregEdgeMsg>("MvregEdgeMsg")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregNodeAttrVec>("MvregNodeAttrVec")),
+        eprosima::fastdds::dds::TypeSupport(new CRDTPubSubType<DSR::MvregEdgeAttrVec>("MvregEdgeAttrVec")),
+        true
+    };
+}
 }
 
 DSRParticipant::DSRParticipant() : mp_participant(nullptr),
-                                   dsrgraphType(new MvregNodePubSubType()),
-                                   graphrequestType(new GraphRequestPubSubType()),
-                                   graphRequestAnswerType(new OrMapPubSubType()),
-                                   dsrEdgeType(new MvregEdgePubSubType()),
-                                   dsrNodeAttrType(new MvregNodeAttrVecPubSubType()),
-                                   dsrEdgeAttrType(new MvregEdgeAttrVecPubSubType()),
+                                   dsrgraphType(new CRDTPubSubType<DSR::MvregNodeMsg>("MvregNodeMsg")),
+                                   graphrequestType(new CRDTPubSubType<DSR::GraphRequest>("GraphRequest")),
+                                   graphRequestAnswerType(new CRDTPubSubType<DSR::OrMap>("OrMap")),
+                                   dsrEdgeType(new CRDTPubSubType<DSR::MvregEdgeMsg>("MvregEdgeMsg")),
+                                   dsrNodeAttrType(new CRDTPubSubType<DSR::MvregNodeAttrVec>("MvregNodeAttrVec")),
+                                   dsrEdgeAttrType(new CRDTPubSubType<DSR::MvregEdgeAttrVec>("MvregEdgeAttrVec")),
                                    m_listener(nullptr)
 
 {}
 
 DSRParticipant::~DSRParticipant()
 {
-
-    remove_participant_and_entities();
+    if (cleanup_enabled_) {
+        remove_participant_and_entities();
+    }
 
     qDebug()  << "Removing DSRParticipant" ;
 
 }
 
-std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::init(uint32_t agent_id, const std::string& agent_name, int localhost, std::function<void(eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> fn, int8_t domain_id)
+std::tuple<bool, DSRParticipant::participant_handle_type*> DSRParticipant::init_impl(uint32_t agent_id, const std::string& agent_name, int localhost, discovery_callback_type fn, int8_t domain_id, uint8_t sync_mode_wire)
 {
     domain_id_ = domain_id;
+    sync_mode_wire_ = sync_mode_wire;
+    auto family = make_transport_family(sync_mode_wire);
+    cleanup_enabled_ = family.cleanup_enabled;
     // Create RTPSParticipant     
     DomainParticipantQos PParam;
     PParam.name(("Participant_" + std::to_string(agent_id)+ " ( " + agent_name + " )").data() );
@@ -62,23 +192,32 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
         // Same-host deployments should prefer shared memory. Keep loopback UDP
         // as a discovery/data fallback for environments where SHM is limited.
         auto shm_transport = std::make_shared<SharedMemTransportDescriptor>();
+        apply_u32_env("DSR_SHM_SEGMENT_SIZE", 0, [&](uint32_t value) {
+            shm_transport->segment_size(value);
+        });
+        apply_u32_env("DSR_SHM_PORT_QUEUE_CAPACITY", 1, [&](uint32_t value) {
+            shm_transport->port_queue_capacity(value);
+        });
+        apply_u32_env("DSR_SHM_HEALTHY_CHECK_TIMEOUT_MS", 0, [&](uint32_t value) {
+            shm_transport->healthy_check_timeout_ms(value);
+        });
         PParam.transport().user_transports.push_back(shm_transport);
 
         auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-        udp_transport->maxMessageSize = 65500;
+        udp_transport->maxMessageSize = env_u32_or("DSR_UDP_MAX_MESSAGE_SIZE", 65500, 1);
         udp_transport->interface_allowlist.emplace_back("127.0.0.1");
         PParam.transport().user_transports.push_back(udp_transport);
     } else {
         auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
-        udp_transport->maxMessageSize = 65500;
+        udp_transport->maxMessageSize = env_u32_or("DSR_UDP_MAX_MESSAGE_SIZE", 65500, 1);
         for (const auto& ip : host_ipv4_interfaces()) {
             udp_transport->interface_allowlist.emplace_back(ip);
         }
         PParam.transport().user_transports.push_back(udp_transport);
     }
 
-    PParam.transport().send_socket_buffer_size = 33554432;
-    PParam.transport().listen_socket_buffer_size = 33554432;
+    PParam.transport().send_socket_buffer_size = env_u32_or("DSR_SOCKET_SEND_BUFFER_SIZE", 33554432);
+    PParam.transport().listen_socket_buffer_size = env_u32_or("DSR_SOCKET_LISTEN_BUFFER_SIZE", 33554432);
 
 
     //Discovery
@@ -90,7 +229,8 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     PParam.wire_protocol().builtin.discovery_config.leaseDuration_announcementperiod =
             eprosima::fastdds::dds::Duration_t(3, 0);
 
-    eprosima::fastdds::dds::Log::SetVerbosity(eprosima::fastdds::dds::Log::Error);
+    eprosima::fastdds::dds::Log::SetVerbosity(
+        fastdds_log_verbosity_from_env(eprosima::fastdds::dds::Log::Error));
 
     m_listener = std::make_unique<ParticpantListener>(std::move(fn));
 
@@ -107,7 +247,12 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     {
         qFatal("Could not create particpant after 5 attemps");
     }
-
+    dsrgraphType = std::move(family.node_type);
+    graphrequestType = std::move(family.graph_request_type);
+    graphRequestAnswerType = std::move(family.graph_answer_type);
+    dsrEdgeType = std::move(family.edge_type);
+    dsrNodeAttrType = std::move(family.node_attr_type);
+    dsrEdgeAttrType = std::move(family.edge_attr_type);
 
     //Register types
     dsrgraphType.register_type(mp_participant);
@@ -119,12 +264,12 @@ std::tuple<bool, eprosima::fastdds::dds::DomainParticipant*> DSRParticipant::ini
     dsrEdgeAttrType.register_type(mp_participant);
 
     //Create topics
-    topic_node = mp_participant->create_topic("DSR_NODE", dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_edge = mp_participant->create_topic("DSR_EDGE", dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_node_att = mp_participant->create_topic("DSR_NODE_ATTS", dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_edge_att = mp_participant->create_topic("DSR_EDGE_ATTS", dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_graph_request = mp_participant->create_topic("GRAPH_REQUEST", graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
-    topic_graph = mp_participant->create_topic("GRAPH_ANSWER", graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_node = mp_participant->create_topic(family.node_topic_name, dsrgraphType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_edge = mp_participant->create_topic(family.edge_topic_name, dsrEdgeType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_node_att = mp_participant->create_topic(family.node_attr_topic_name, dsrNodeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_edge_att = mp_participant->create_topic(family.edge_attr_topic_name, dsrEdgeAttrType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_graph_request = mp_participant->create_topic(family.graph_request_topic_name, graphrequestType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
+    topic_graph = mp_participant->create_topic(family.graph_answer_topic_name, graphRequestAnswerType.get_type_name(), eprosima::fastdds::dds::TOPIC_QOS_DEFAULT);
 
     return std::make_tuple(true, mp_participant);
 }
@@ -134,8 +279,37 @@ eprosima::fastdds::dds::DomainParticipant *DSRParticipant::getParticipant()
     return mp_participant;
 }
 
-void DSRParticipant::remove_participant_and_entities()
+std::string DSRParticipant::participant_name() const
 {
+    if (mp_participant == nullptr) {
+        return {};
+    }
+    return mp_participant->get_qos().name().to_string();
+}
+
+bool DSRParticipant::init_builtin_publishers()
+{
+    auto init_one = [&](const char* id, DSRPublisher& publisher, eprosima::fastdds::dds::Topic* topic) {
+        auto [res, pub, writer] = publisher.init(mp_participant, topic, domain_id_);
+        if (res && topic != nullptr) {
+            add_publisher(id, std::pair{pub, writer});
+        }
+        return res;
+    };
+
+    return init_one("node", pub_node_, topic_node) &&
+           init_one("node_attrs", pub_node_attrs_, topic_node_att) &&
+           init_one("edge", pub_edge_, topic_edge) &&
+           init_one("edge_attrs", pub_edge_attrs_, topic_edge_att) &&
+           init_one("graph_request", pub_graph_request_, topic_graph_request) &&
+           init_one("graph_answer", pub_graph_answer_, topic_graph);
+}
+
+void DSRParticipant::remove_participant_and_entities_impl()
+{
+    //if (!cleanup_enabled_) {
+    //    return;
+    //}
     if (mp_participant != nullptr)
     {
 
@@ -258,18 +432,18 @@ const eprosima::fastdds::rtps::GUID_t& DSRParticipant::getID() const
     return mp_participant->guid();
 }
 
-void DSRParticipant::add_subscriber(const std::string& id, std::pair<eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*> val)
+void DSRParticipant::add_subscriber_impl(const std::string& id, subscriber_entry_type val)
 {
     std::unique_lock<std::mutex> lck (sub_mtx);
     subscribers.emplace(id, val);
 }
-void DSRParticipant::add_publisher(const std::string& id, std::pair<eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> val)
+void DSRParticipant::add_publisher_impl(const std::string& id, publisher_entry_type val)
 {
     std::unique_lock<std::mutex> lck (pub_mtx);
     publishers.emplace(id, val);
 }
 
-void DSRParticipant::delete_subscriber(const std::string& id)
+void DSRParticipant::delete_subscriber_impl(const std::string& id)
 {
     std::unique_lock<std::mutex> lck (sub_mtx);
     try {
@@ -302,7 +476,7 @@ void DSRParticipant::delete_subscriber(const std::string& id)
     }
 }
 
-void DSRParticipant::delete_publisher(const std::string& id)
+void DSRParticipant::delete_publisher_impl(const std::string& id)
 {
     std::unique_lock<std::mutex> lck (pub_mtx);
     try {

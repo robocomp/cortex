@@ -9,25 +9,34 @@
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 
-#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
+#include <dsr/core/types/internal_types.h>
+#include <dsr/core/transport/transport_crtp.h>
 
-class DSRPublisher
+class DSRPublisher : public DSR::Transport::PublisherTransportCRTP<
+    DSRPublisher,
+    eprosima::fastdds::dds::DomainParticipant,
+    eprosima::fastdds::dds::Topic>
 {
 public:
     DSRPublisher();
     virtual ~DSRPublisher();
-    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init(
+    [[nodiscard]] std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::DataWriter*> init_impl(
         eprosima::fastdds::dds::DomainParticipant *mp_participant_,
         eprosima::fastdds::dds::Topic *topic,
         int8_t domain_id,
         bool isStreamData = false);
-    [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID() const;
-    bool write(IDL::GraphRequest *object);
-    bool write(IDL::MvregNode *object);
-    bool write(IDL::OrMap *object);
-    bool write(IDL::MvregEdge *object);
-    bool write(std::vector<IDL::MvregEdgeAttr> *object);
-    bool write(std::vector<IDL::MvregNodeAttr> *object);
+    [[nodiscard]] eprosima::fastdds::rtps::GUID_t getParticipantID_impl() const;
+    bool write_impl(const DSR::GraphRequest &object);
+    bool write_impl(const DSR::MvregNodeMsg &object);
+    bool write_impl(const DSR::OrMap &object);
+    bool write_impl(const DSR::MvregEdgeMsg &object);
+    bool write_impl(const DSR::MvregEdgeAttrVec &object);
+    bool write_impl(const DSR::MvregNodeAttrVec &object);
+    bool write_impl(const DSR::LWWNodeMsg &object);
+    bool write_impl(const DSR::LWWEdgeMsg &object);
+    bool write_impl(const DSR::LWWNodeAttrVec &object);
+    bool write_impl(const DSR::LWWEdgeAttrVec &object);
+    bool write_impl(const DSR::LWWGraphSnapshot &object);
 
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;

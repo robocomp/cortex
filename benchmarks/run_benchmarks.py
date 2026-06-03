@@ -8,7 +8,7 @@ Usage:
     python run_benchmarks.py --cpp-only              # skip Python
     python run_benchmarks.py --python-only           # skip C++
     python run_benchmarks.py --build                 # cmake build before running
-    python run_benchmarks.py --all                   # include hidden tests ([.multi], [.extended])
+    python run_benchmarks.py --all                   # include hidden tests ([.extended])
     python run_benchmarks.py --cpp-filter "[LATENCY]"# pass filter to dsr_benchmarks
     python run_benchmarks.py --report                # open HTML report when done
     python run_benchmarks.py --compare <run-id>      # compare against a previous run
@@ -37,13 +37,22 @@ PYTHON_DIR = os.path.join(SCRIPT_DIR, "python")
 BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 RESULTS_ROOT = os.path.join(SCRIPT_DIR, "results")
 RUNS_INDEX = os.path.join(RESULTS_ROOT, "runs.json")
-BASELINE_CPP_FILTER = "[BASELINE]~[.multi]"
+BASELINE_CPP_FILTER = "[BASELINE]"
 # Catch2 v3 has no single spec that matches both visible and hidden tests.
 # _run_cpp_once detects this sentinel and runs the binary twice:
 #   1. no filter   → all visible tests
 #   2. "[.]"        → all hidden tests (tags starting with '.')
 ALL_CPP_FILTER = "__ALL_INCLUDING_HIDDEN__"
 DEFAULT_STABILITY_WARN_PCT = 5.0
+
+
+def parse_sync_mode_selection(value: str) -> list[str]:
+    mapping = {
+        "crdt": ["crdt"],
+        "lww": ["lww"],
+        "both": ["crdt", "lww"],
+    }
+    return mapping[value]
 
 
 # ── Index helpers (mirrors python/run_all.py) ──────────────────────────────────
@@ -454,12 +463,13 @@ def _build_cpp_cmd(binary: str, catch2_filter: Optional[str], verbose: bool,
 
 
 def _run_cpp_once(binary: str, cpp_cwd: str, catch2_filter: Optional[str],
-                  verbose: bool, priority: Optional[int], taskset: Optional[str]) -> tuple[bool, float]:
+                  verbose: bool, priority: Optional[int], taskset: Optional[str],
+                  extra_env: Optional[dict[str, str]] = None) -> tuple[bool, float]:
     # Catch2 v3 has no single-spec "run everything including hidden".
     # Handle the sentinel by running visible tests then hidden tests in the same cwd.
     if catch2_filter == ALL_CPP_FILTER:
-        ok1, dur1 = _run_cpp_once(binary, cpp_cwd, None,  verbose, priority, taskset)
-        ok2, dur2 = _run_cpp_once(binary, cpp_cwd, "[.]", verbose, priority, taskset)
+        ok1, dur1 = _run_cpp_once(binary, cpp_cwd, None,  verbose, priority, taskset, extra_env)
+        ok2, dur2 = _run_cpp_once(binary, cpp_cwd, "[.]", verbose, priority, taskset, extra_env)
         return ok1 and ok2, dur1 + dur2
 
     os.makedirs(cpp_cwd, exist_ok=True)
@@ -468,7 +478,7 @@ def _run_cpp_once(binary: str, cpp_cwd: str, catch2_filter: Optional[str],
         wsl_cwd = win_to_wsl(cpp_cwd)
         cmd_str = _build_cpp_cmd(binary, catch2_filter, verbose, priority, taskset)
         bash_cmd = f"cd {wsl_cwd} && {cmd_str}"
-        result = subprocess.run(["wsl", "-e", "bash", "-c", bash_cmd])
+        result = subprocess.run(["wsl", "-e", "bash", "-c", bash_cmd], env={**os.environ, **(extra_env or {})})
     else:
         cmd = []
         if taskset:
@@ -480,14 +490,16 @@ def _run_cpp_once(binary: str, cpp_cwd: str, catch2_filter: Optional[str],
             cmd.append(catch2_filter)
         if verbose:
             cmd.append("--verbose")
-        result = subprocess.run(cmd, cwd=cpp_cwd)
+        result = subprocess.run(cmd, cwd=cpp_cwd, env={**os.environ, **(extra_env or {})})
     duration = time.time() - start
     return result.returncode == 0, duration
 
 
 def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bool,
             repeat: int = 1, priority: Optional[int] = None, taskset: Optional[str] = None,
-            stability_warn_pct: Optional[float] = DEFAULT_STABILITY_WARN_PCT):
+            stability_warn_pct: Optional[float] = DEFAULT_STABILITY_WARN_PCT,
+            sync_modes: Optional[list[str]] = None,
+            bench_env: Optional[dict[str, str]] = None):
     """
     Run dsr_benchmarks 'repeat' times.  If repeat > 1, each invocation writes
     to a separate cpp_N/ subdirectory; results are then median-merged into
@@ -505,6 +517,9 @@ def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bo
         print(f"Priority: nice {priority:+d}")
     if taskset:
         print(f"CPU affinity: {taskset}")
+    sync_modes = sync_modes or ["crdt"]
+    bench_env = bench_env or {}
+    print(f"Sync modes: {', '.join(sync_modes)}")
     print("=" * 70)
 
     total_start = time.time()
@@ -515,16 +530,28 @@ def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bo
         # Single run — original behaviour
         cpp_cwd = os.path.join(run_dir, "cpp")
         print(f"Output : {cpp_cwd}/results/")
-        ok, dur = _run_cpp_once(binary, cpp_cwd, catch2_filter, verbose, priority, taskset)
-        all_ok = ok
+        for sync_mode in sync_modes:
+            print(f"  -> sync_mode={sync_mode}")
+            ok, _dur = _run_cpp_once(
+                binary, cpp_cwd, catch2_filter, verbose, priority, taskset,
+                {**bench_env, "BENCH_SYNC_MODE": sync_mode}
+            )
+            all_ok = all_ok and ok
     else:
         # Multiple runs → median merge
         run_cwds = []
         for r in range(1, repeat + 1):
             cpp_cwd = os.path.join(run_dir, f"cpp_{r}")
             print(f"\n--- Run {r}/{repeat} → {cpp_cwd}/results/ ---")
-            ok, dur = _run_cpp_once(binary, cpp_cwd, catch2_filter, verbose, priority, taskset)
-            if not ok:
+            run_ok = True
+            for sync_mode in sync_modes:
+                print(f"    -> sync_mode={sync_mode}")
+                ok, _dur = _run_cpp_once(
+                    binary, cpp_cwd, catch2_filter, verbose, priority, taskset,
+                    {**bench_env, "BENCH_SYNC_MODE": sync_mode}
+                )
+                run_ok = run_ok and ok
+            if not run_ok:
                 print(f"  Warning: run {r} exited non-zero")
                 all_ok = False
             run_cwds.append(cpp_cwd)
@@ -542,7 +569,8 @@ def run_cpp(binary: str, run_dir: str, catch2_filter: Optional[str], verbose: bo
 
 # ── Run Python suite ──────────────────────────────────────────────────────────
 
-def run_python(run_dir: str, label: Optional[str], baseline: bool = False):
+def run_python(run_dir: str, label: Optional[str], baseline: bool = False,
+               sync_mode: str = "both"):
     """
     Delegate to python/run_all.py passing BENCH_RESULTS_DIR so Python files
     land directly in <run_dir>/ (not a subdirectory).
@@ -552,7 +580,7 @@ def run_python(run_dir: str, label: Optional[str], baseline: bool = False):
     print(f"Output : {run_dir}/")
     print("=" * 70)
 
-    env = {**os.environ, "BENCH_RESULTS_DIR": run_dir}
+    env = {**os.environ, "BENCH_RESULTS_DIR": run_dir, "BENCH_SYNC_MODE": sync_mode}
     cmd = [sys.executable, os.path.join(PYTHON_DIR, "run_all.py"), "--direct"]
     if baseline:
         cmd.append("--baseline")
@@ -685,6 +713,23 @@ def cmd_run(args):
     elif args.baseline and not effective_cpp_filter:
         effective_cpp_filter = BASELINE_CPP_FILTER
 
+    cpp_sync_modes = parse_sync_mode_selection(args.cpp_sync_mode)
+    cpp_bench_env: dict[str, str] = {}
+    if args.warmup_iterations is not None:
+        cpp_bench_env["BENCH_WARMUP_ITERATIONS"] = str(args.warmup_iterations)
+    if args.measurement_iterations is not None:
+        cpp_bench_env["BENCH_MEASUREMENT_ITERATIONS"] = str(args.measurement_iterations)
+    if args.sync_wait_ms is not None:
+        cpp_bench_env["BENCH_SYNC_WAIT_MS"] = str(args.sync_wait_ms)
+    if args.max_convergence_timeout_s is not None:
+        cpp_bench_env["BENCH_MAX_CONVERGENCE_TIMEOUT_S"] = str(args.max_convergence_timeout_s)
+    if args.default_agent_count is not None:
+        cpp_bench_env["BENCH_DEFAULT_AGENT_COUNT"] = str(args.default_agent_count)
+    if args.max_agent_count is not None:
+        cpp_bench_env["BENCH_MAX_AGENT_COUNT"] = str(args.max_agent_count)
+    if args.writer_threads is not None:
+        cpp_bench_env["BENCH_CONCURRENT_WRITER_THREADS"] = str(args.writer_threads)
+
     # Optionally build C++
     if args.build:
         if not build_cpp():
@@ -709,6 +754,8 @@ def cmd_run(args):
                     binary, run_dir, effective_cpp_filter, args.verbose,
                     repeat=args.repeat, priority=args.priority, taskset=args.taskset,
                     stability_warn_pct=args.stability_warn_pct,
+                    sync_modes=cpp_sync_modes,
+                    bench_env=cpp_bench_env,
                 )
                 results["cpp"] = {"ok": ok, "duration_sec": dur, "stability": stability}
                 suites_run.append("cpp")
@@ -719,7 +766,10 @@ def cmd_run(args):
 
         # Python suite
         if not args.cpp_only:
-            ok, dur = run_python(run_dir, args.label, baseline=args.baseline)
+            ok, dur = run_python(
+                run_dir, args.label, baseline=args.baseline,
+                sync_mode=args.python_sync_mode,
+            )
             results["python"] = {"ok": ok, "duration_sec": dur}
             suites_run.append("python")
 
@@ -748,6 +798,8 @@ def cmd_run(args):
         "git_hash": git_hash,
         "platform": platform.platform(),
         "python": sys.version.split()[0],
+        "cpp_sync_mode": args.cpp_sync_mode,
+        "python_sync_mode": args.python_sync_mode,
     }
 
     cpp_stability = results.get("cpp", {}).get("stability")
@@ -817,12 +869,16 @@ def main():
                         help=f"Path to dsr_benchmarks binary (default: {os.path.join(BUILD_DIR, 'dsr_benchmarks')})")
     parser.add_argument("--cpp-filter", metavar="FILTER",
                         help='Catch2 test filter, e.g. "[LATENCY]" or "[THROUGHPUT]"')
+    parser.add_argument("--cpp-sync-mode", choices=["crdt", "lww", "both"], default="crdt",
+                        help="Backend for C++ benchmarks (default: crdt)")
+    parser.add_argument("--python-sync-mode", choices=["crdt", "lww", "both"], default="both",
+                        help="Backend selection for Python benchmarks (default: both)")
     parser.add_argument("--build", action="store_true",
                         help="Build C++ benchmarks before running")
     parser.add_argument("--cpp-only", action="store_true", help="Skip Python suite")
     parser.add_argument("--python-only", action="store_true", help="Skip C++ suite")
     parser.add_argument("--all", action="store_true",
-                        help="Run all C++ tests including hidden ones ([.multi], [.extended])")
+                        help="Run all C++ tests including hidden ones ([.extended])")
     parser.add_argument("--baseline", action="store_true",
                         help="Run only the curated low-noise baseline benchmark set")
     parser.add_argument("--verbose", "-v", action="store_true",
@@ -847,6 +903,20 @@ def main():
     parser.add_argument("--stability-warn-pct", type=float, default=DEFAULT_STABILITY_WARN_PCT,
                         metavar="PCT",
                         help="Warn when repeated C++ metrics exceed this spread percentage")
+    parser.add_argument("--warmup-iterations", type=int, metavar="N",
+                        help="Override C++ benchmark warmup iterations")
+    parser.add_argument("--measurement-iterations", type=int, metavar="N",
+                        help="Override C++ benchmark measurement iterations")
+    parser.add_argument("--sync-wait-ms", type=int, metavar="MS",
+                        help="Override C++ benchmark sync wait time in milliseconds")
+    parser.add_argument("--max-convergence-timeout-s", type=int, metavar="S",
+                        help="Override C++ benchmark convergence timeout in seconds")
+    parser.add_argument("--default-agent-count", type=int, metavar="N",
+                        help="Override C++ benchmark default agent count")
+    parser.add_argument("--max-agent-count", type=int, metavar="N",
+                        help="Override C++ benchmark max agent count")
+    parser.add_argument("--writer-threads", type=int, metavar="N",
+                        help="Override C++ benchmark concurrent writer thread count")
 
     args = parser.parse_args()
 

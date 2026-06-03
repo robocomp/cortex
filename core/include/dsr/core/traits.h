@@ -14,8 +14,14 @@
 namespace DSR {
     class Node;
     class Edge;
-    class CRDTNode;
-    class CRDTEdge;
+    namespace CRDT {
+        class Node;
+        class Edge;
+    }
+    namespace LWW {
+        class NodeState;
+        class EdgeState;
+    };
 };
 
 
@@ -48,14 +54,16 @@ concept allowed_types = one_of<T , int32_t, uint32_t, uint64_t,
                                    >::value;
 
 template<typename Va>
-concept any_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTEdge, DSR::Node, DSR::Edge>::value;;
+concept any_node_or_edge = one_of<Va, DSR::CRDT::Node, DSR::CRDT::Edge, DSR::Node, DSR::Edge, DSR::LWW::NodeState, DSR::LWW::EdgeState>::value;;
 
 template<typename Va>
 concept node_or_edge = one_of<Va, DSR::Node, DSR::Edge>::value;;
 
+template<typename Va>
+concept lww_node_or_edge = one_of<Va, DSR::LWW::NodeState, DSR::LWW::EdgeState>::value;
 
 template<typename Va>
-concept crdt_node_or_edge = one_of<Va, DSR::CRDTNode, DSR::CRDTNode>::value;;
+concept crdt_node_or_edge = one_of<Va, DSR::CRDT::Node, DSR::CRDT::Node>::value;;
 
 
 //Attributes requires valid types to be defined

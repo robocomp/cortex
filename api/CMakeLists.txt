@@ -23,6 +23,9 @@ set(headers_to_moc
 
 set(headers
         include/dsr/api/dsr_graph_settings.h
+        include/dsr/api/dsr_sync_engine.h
+        include/dsr/api/dsr_crdt_sync_engine.h
+        include/dsr/api/dsr_lww_sync_engine.h
 )
 
 add_library(dsr_api SHARED)
@@ -32,6 +35,8 @@ add_library(Robocomp::dsr_api ALIAS dsr_api )
 target_sources(dsr_api
         PRIVATE
         dsr_api.cpp
+        dsr_crdt_sync_engine.cpp
+        dsr_lww_sync_engine.cpp
         dsr_camera_api.cpp
         dsr_agent_info_api.cpp
         dsr_inner_eigen_api.cpp
@@ -54,6 +59,8 @@ target_link_libraries(dsr_api
         PUBLIC
         Eigen3::Eigen
         )
+
+target_link_libraries(dsr_api PRIVATE cortex_profiling)
 
 target_include_directories(dsr_api
         PUBLIC

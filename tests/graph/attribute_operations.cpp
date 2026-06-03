@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 
@@ -32,9 +33,11 @@ REGISTER_TYPE(att_no_reference, vec6, false)
 
 
 TEST_CASE("Attributes operations (Compile time type-checked)", "[ATTRIBUTES]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
 
     SECTION("Insert attribute (node) and insert node in G") {
@@ -104,9 +107,11 @@ TEST_CASE("Attributes operations (Compile time type-checked)", "[ATTRIBUTES]") {
 }
 
 TEST_CASE("Attributes operations II (Runtime time type-checked)", "[RUNTIME ATTRIBUTES]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Insert an attribute") {
         std::optional<Node> n = G.get_node(100);
@@ -182,9 +187,11 @@ TEST_CASE("Attributes operations II (Runtime time type-checked)", "[RUNTIME ATTR
 }
 
 TEST_CASE("Other attribute operations and checks", "[ATTRIBUTES]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Get attribute timestamp") {
         std::optional<Node> n = G.get_node(100);
@@ -295,9 +302,11 @@ TEST_CASE("Other attribute operations and checks", "[ATTRIBUTES]") {
     }
 }
 TEST_CASE("Native types in attributes", "[ATTRIBUTES]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Insert a string attribute") {
         std::optional<Node> n = G.get_node(100);

@@ -7,6 +7,7 @@
 #include <sstream>
 #include <filesystem>
 #include "metrics_collector.h"
+#include "benchmark_config.h"
 
 namespace DSR::Benchmark {
 
@@ -176,6 +177,13 @@ private:
             // Generate filename from benchmark name and timestamp
             name = "benchmark_" + sanitize_filename(result.benchmark_name) +
                    "_" + sanitize_filename(result.timestamp);
+        }
+
+        const auto suffix = sync_mode_suffix(default_config().sync_mode);
+        if (!suffix.empty() && name.size() >= suffix.size()) {
+            if (name.substr(name.size() - suffix.size()) != suffix) {
+                name += suffix;
+            }
         }
 
         // Remove extension if present

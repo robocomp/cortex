@@ -10,8 +10,8 @@
 using namespace DSR::Benchmark;
 
 // Create a test attribute
-static DSR::CRDTAttribute make_test_attribute(uint32_t agent_id, int32_t value) {
-    DSR::CRDTAttribute attr;
+static DSR::Attribute make_test_attribute(uint32_t agent_id, int32_t value) {
+    DSR::Attribute attr;
     attr.value(value);
     attr.timestamp(bench_now());
     attr.agent_id(agent_id);
@@ -20,13 +20,14 @@ static DSR::CRDTAttribute make_test_attribute(uint32_t agent_id, int32_t value) 
 
 // All four mvreg operations in a single TEST_CASE so they export together
 // to one JSON file.
-TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
+TEST_CASE("CRDT mvreg operations", "[CRDT][MVREG][BASELINE]") {
+    if (strcmp(sync_mode_name(default_config().sync_mode),"lww")) return;
     MetricsCollector collector("crdt_mvreg");
     collector.add_metadata("profile", "baseline");
 
     // ── mvreg write ───────────────────────────────────────────────────────────
     {
-        mvreg<DSR::CRDTAttribute> reg;
+        mvreg<DSR::Attribute> reg;
         reg.id = 100;
         int i = 0;
 
@@ -34,6 +35,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
         bench.run("mvreg_write", [&] {
             auto attr = make_test_attribute(100, i++);
             auto delta = reg.write(attr);
+            ankerl::nanobench::doNotOptimizeAway(attr);
             ankerl::nanobench::doNotOptimizeAway(delta);
         });
         collector.record_latency_stats("mvreg_write", nb_to_stats(bench));
@@ -41,7 +43,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
 
     // ── mvreg join (same agent) ───────────────────────────────────────────────
     {
-        mvreg<DSR::CRDTAttribute> reg;
+        mvreg<DSR::Attribute> reg;
         reg.id = 100;
         auto init_attr = make_test_attribute(100, 0);
         reg.write(init_attr);
@@ -49,7 +51,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
 
         auto bench = make_latency_bench();
         bench.run("mvreg_join_same_agent", [&] {
-            mvreg<DSR::CRDTAttribute> delta_reg;
+            mvreg<DSR::Attribute> delta_reg;
             delta_reg.id = 100;
             auto new_attr = make_test_attribute(100, i++);
             auto delta = delta_reg.write(new_attr);
@@ -65,13 +67,13 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
 
         auto bench = make_latency_bench();
         bench.run("mvreg_join_different_agent", [&] {
-            mvreg<DSR::CRDTAttribute> reg;
+            mvreg<DSR::Attribute> reg;
             reg.id = 100;
             auto attr = make_test_attribute(100, 0);
             auto delta = reg.write(attr);
 
             uint32_t other_agent = 200 + (i % 10);
-            mvreg<DSR::CRDTAttribute> delta_reg;
+            mvreg<DSR::Attribute> delta_reg;
             delta_reg.id = other_agent;
             delta_reg.join(std::move(delta));
             auto new_attr = make_test_attribute(other_agent, i * 2);
@@ -86,7 +88,7 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
 
     // ── mvreg read ────────────────────────────────────────────────────────────
     {
-        mvreg<DSR::CRDTAttribute> reg;
+        mvreg<DSR::Attribute> reg;
         reg.id = 100;
         auto attr = make_test_attribute(100, 42);
         reg.write(attr);
@@ -106,7 +108,8 @@ TEST_CASE("CRDT mvreg operations", "[CRDT][mvreg][BASELINE]") {
     reporter.export_all(result, "crdt_mvreg");
 }
 
-TEST_CASE("CRDT dot_context operations", "[CRDT][dot_context][BASELINE]") {
+TEST_CASE("CRDT dot_context operations", "[CRDT][DOT_CONTEXT][BASELINE]") {
+    if (strcmp(sync_mode_name(default_config().sync_mode),"lww")) return;
     MetricsCollector collector("crdt_dot_context");
     collector.add_metadata("profile", "baseline");
 
@@ -171,47 +174,4 @@ TEST_CASE("CRDT dot_context operations", "[CRDT][dot_context][BASELINE]") {
     auto result = collector.finalize();
     ReportGenerator reporter("results");
     reporter.export_all(result, "crdt_dot_context");
-}
-
-// Catch2 BENCHMARK macros — kept hidden; run with [!benchmark] to activate.
-TEST_CASE("CRDT micro-benchmarks (Catch2 BENCHMARK)", "[.][crdt][!benchmark]") {
-
-    BENCHMARK("mvreg write") {
-        mvreg<DSR::CRDTAttribute> reg;
-        reg.id = 100;
-        auto attr = make_test_attribute(100, 42);
-        return reg.write(attr);
-    };
-
-    BENCHMARK("mvreg join") {
-        mvreg<DSR::CRDTAttribute> reg;
-        reg.id = 100;
-        auto attr1 = make_test_attribute(100, 1);
-        auto delta = reg.write(attr1);
-
-        mvreg<DSR::CRDTAttribute> delta_reg;
-        delta_reg.id = 200;
-        delta_reg.join(std::move(delta));
-        auto attr2 = make_test_attribute(200, 2);
-        delta = delta_reg.write(attr2);
-
-        reg.join(std::move(delta));
-        return reg.read_reg();
-    };
-
-    BENCHMARK("dot_context makedot") {
-        dot_context ctx;
-        return ctx.makedot(100);
-    };
-
-    BENCHMARK("dot_context join") {
-        dot_context ctx1;
-        dot_context ctx2;
-        for (int i = 0; i < 10; ++i) {
-            ctx1.makedot(100);
-            ctx2.makedot(200);
-        }
-        ctx1.join(ctx2);
-        return ctx1.cc.size();
-    };
 }

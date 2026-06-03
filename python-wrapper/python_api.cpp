@@ -82,10 +82,10 @@ using attribute_type = std::variant<std::string,
 
 
 template<std::size_t idx, typename T>
-ValType convert_variant_fn(const attribute_type & e)
+Value convert_variant_fn(const attribute_type & e)
 {
-    //std::cout << "[PYTHON_VARIANT -> VALTYPE] " << attribute_type_TYPENAMES_UNION[e.index()] << std::endl;
-    ValType vout;
+    //std::cout << "[PYTHON_VARIANT -> Value] " << attribute_type_TYPENAMES_UNION[e.index()] << std::endl;
+    Value vout;
     if constexpr (std::is_same_v<T, py::array_t<uint8_t>>)
     {
         auto tmp = std::get<py::array_t<uint8_t>>(e);
@@ -121,9 +121,9 @@ ValType convert_variant_fn(const attribute_type & e)
 
 
 
-ValType convert_variant(const attribute_type & e)
+Value convert_variant(const attribute_type & e)
 {
-    typedef ValType (*conver_fn) (const attribute_type &);
+    typedef Value (*conver_fn) (const attribute_type &);
     constexpr std::array<conver_fn, 17> cast = { convert_variant_fn<0, std::string>,
                                                  convert_variant_fn<4, no_int_cast_bool>,
                                                  convert_variant_fn<5, py::array_t<uint8_t>>,
@@ -143,7 +143,7 @@ ValType convert_variant(const attribute_type & e)
                                                  convert_variant_fn<6, uint32_t>
                                              };
 
-    const auto idx = e.index(); //idx_ValType.at(e.index());
+    const auto idx = e.index(); //idx_Value.at(e.index());
     return cast[idx](e);
 }
 
@@ -152,6 +152,11 @@ PYBIND11_MAKE_OPAQUE(std::map<std::string, Attribute>)
 
 
 PYBIND11_MODULE(pydsr, m) {
+    py::enum_<SyncMode>(m, "SyncMode")
+        .value("CRDT", SyncMode::CRDT)
+        .value("LWW", SyncMode::LWW)
+        .export_values();
+
     py::bind_map<std::map<std::pair<uint64_t, std::string>, Edge>>(m, "MapStringEdge");
     py::bind_dsr_map<std::map<std::string, Attribute>>(m, "MapStringAttribute");
 
@@ -244,12 +249,12 @@ PYBIND11_MODULE(pydsr, m) {
                 }),
                  "value"_a, "timestamp"_a, "agent_id"_a)
             .def(py::init([&](attribute_type const& v , uint32_t agent_id) {
-                //Comprobar tipos en ValType. Como se convien los arrays de numpy, las listas, los doubles, etc.
+                //Comprobar tipos en Value. Como se convien los arrays de numpy, las listas, los doubles, etc.
 
                 return Attribute(convert_variant(v), get_unix_timestamp(), agent_id);
             }),"value"_a, "agent_id"_a)
             .def(py::init([&](attribute_type const& v) {
-                //Comprobar tipos en ValType. Como se convien los arrays de numpy, las listas, los doubles, etc.
+                //Comprobar tipos en Value. Como se convien los arrays de numpy, las listas, los doubles, etc.
                 return Attribute(convert_variant(v), get_unix_timestamp(), local_agent_id);
             }),"value"_a)
             .def("__repr__", [](Attribute const &self) {
@@ -575,12 +580,21 @@ PYBIND11_MODULE(pydsr, m) {
     py::class_<DSRGraph>(m, "DSRGraph")
             .def(py::init([&](int root, const std::string &name, int id,
                               const std::string &dsr_input_file = "",
-                              bool all_same_host = true, int8_t domain_id = 0) -> std::unique_ptr<DSRGraph> {
+                              bool all_same_host = true, int8_t domain_id = 0,
+                              SyncMode sync_mode = SyncMode::CRDT) -> std::unique_ptr<DSRGraph> {
                      local_agent_id = id;
-                     auto g = std::make_unique<DSRGraph>(root, name, id, dsr_input_file, all_same_host, domain_id, SignalMode::Queue);
+                     GraphSettings settings;
+                     settings.agent_id = id;
+                     settings.graph_name = name;
+                     settings.input_file = dsr_input_file;
+                     settings.same_host = all_same_host;
+                     settings.domain_id = domain_id;
+                     settings.signal_mode = SignalMode::Queue;
+                     settings.sync_mode = sync_mode;
+                     auto g = std::make_unique<DSRGraph>(settings);
                      return g;
                  }), "root"_a, "name"_a, "id"_a, "dsr_input_file"_a = "",
-                 "all_same_host"_a = true, "domain_id"_a=0, py::call_guard<py::gil_scoped_release>())
+                 "all_same_host"_a = true, "domain_id"_a=0, "sync_mode"_a = SyncMode::CRDT, py::call_guard<py::gil_scoped_release>())
             .def("get_agent_id", &DSRGraph::get_agent_id, "get agent_id")
             .def("get_agent_name", &DSRGraph::get_agent_name, "get agent_id")
             .def("get_node", [](DSRGraph &self, uint64_t id) -> std::optional<Node> {

@@ -5,6 +5,10 @@ project(dsr
         LANGUAGES CXX)
 
 include(GNUInstallDirs)
+include(FetchContent)
+find_package(Threads REQUIRED)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # -DTSAN=ON  enables ThreadSanitizer across the whole build (library + tests/benchmarks).
 # Must be applied before any add_subdirectory so every TU is instrumented.
@@ -18,6 +22,8 @@ if (TSAN)
     add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
     add_link_options(-fsanitize=thread)
 endif()
+
+include(cmake/profiling.cmake)
 
 add_definitions(-I/usr/include/x86_64-linux-gnu/qt6/QtOpenGLWidgets/)
 

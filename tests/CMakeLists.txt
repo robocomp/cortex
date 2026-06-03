@@ -24,7 +24,7 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 
 
-add_executable(tests test.cpp 
+add_executable(tests test.cpp
                      graph/edge_operations.cpp
                      graph/node_operations.cpp
                      graph/graph_operations.cpp
@@ -35,7 +35,10 @@ add_executable(tests test.cpp
                      crdt/crdt_operations.cpp
                      synchronization/graph_synchronization.cpp
                      synchronization/type_translation.cpp
+                     synchronization/lww_sync_engine.cpp
                      synchronization/graph_signals.cpp
+                     synchronization/fake_network_tests.cpp
+                     transport/fake_network.h
                      utils.h)
 
 
@@ -47,12 +50,34 @@ CXX_EXTENSIONS ON)
 target_compile_options(tests PUBLIC -g -std=c++23)
 
 
-target_link_libraries(tests PRIVATE 
+target_link_libraries(tests PRIVATE
                             Catch2::Catch2WithMain
                             Robocomp::dsr_api
                             Robocomp::dsr_core
+                            cortex_profiling
                             Qt6::Core
                             Eigen3::Eigen
                             fastdds
                             fastcdr)
 
+# ── Perfetto integration tests ────────────────────────────────────────────────
+# Built only when the Perfetto backend is active (any mode).
+if (TARGET cortex_profiling)
+    get_target_property(_pf_defs cortex_profiling INTERFACE_COMPILE_DEFINITIONS)
+    if (_pf_defs AND _pf_defs MATCHES "CORTEX_PROFILING_BACKEND_PERFETTO")
+        add_executable(perfetto_tests
+            profiling/perfetto_test.cpp)
+
+        set_target_properties(perfetto_tests PROPERTIES
+            CXX_STANDARD 23
+            CXX_STANDARD_REQUIRED ON)
+
+        target_compile_options(perfetto_tests PRIVATE -g -std=c++23)
+
+        target_link_libraries(perfetto_tests PRIVATE
+            Catch2::Catch2
+            Robocomp::dsr_api
+            Robocomp::dsr_core
+            cortex_profiling)
+    endif()
+endif()

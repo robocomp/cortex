@@ -3,6 +3,7 @@
 #include "../utils.h"
 
 #include "catch2/catch_test_macros.hpp"
+#include <catch2/generators/catch_generators.hpp>
 
 #include <cmath>
 #include <QtCore/QCoreApplication>
@@ -13,10 +14,11 @@ using namespace DSR;
 
 //TODO: add REQUIRES, I'm checking manually
 TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    INFO("sync_mode=" << sync_mode_label(sync_mode));
     auto ctx = make_edge_config_file();
     auto id1 = rand() % 1000;
-    int argc = 0;
-    DSRGraph G(random_string(10), id1, ctx);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
     auto node_name = random_string();
     auto n = Node::create<testtype_node_type>(node_name);
     G.add_attrib_local<level_att>(n, 0);
@@ -42,7 +44,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     auto edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
     
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -56,7 +58,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -70,7 +72,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -84,7 +86,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -97,7 +99,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -111,7 +113,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -124,7 +126,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -138,7 +140,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -151,7 +153,7 @@ TEST_CASE("RT api timestamp", "[GRAPH][RT]") {
     edge_rt = rt->get_edge_RT(n, *r2);
     REQUIRE(edge_rt.has_value());
 
-    std::cout << "IDL::EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
+    std::cout << "EdgeAttribs[" << edge_rt->type() << ", from:" << std::to_string(edge_rt->from()) << "-> to:" << std::to_string(edge_rt->to())
             << " Attribs:[";
     for (const auto &v : edge_rt->attrs())
         std::cout << v.first << ":" << v.second << " - \n";
@@ -190,7 +192,7 @@ TEST_CASE("RT api interpolation mode", "[GRAPH][RT]") {
     REQUIRE(interpolated_rt.has_value());
     CHECK(std::abs(interpolated_rt->matrix()(0, 3) - 5.0) < 1e-9);
 
-    const auto rotated_x = interpolated_rt->rotation() * Eigen::Vector3d::UnitX();
+    const Eigen::Vector3d rotated_x = interpolated_rt->rotation() * Eigen::Vector3d::UnitX();
     CHECK(std::abs(rotated_x.x() - std::sqrt(0.5)) < 1e-7);
     CHECK(std::abs(rotated_x.y() - std::sqrt(0.5)) < 1e-7);
 }

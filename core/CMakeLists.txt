@@ -19,6 +19,8 @@ target_sources(dsr_core
         include/dsr/core/types/crdt_types.h
         include/dsr/core/types/user_types.h
         include/dsr/core/types/common_types.h
+        include/dsr/core/types/crdt_io.h
+        include/dsr/core/types/lww_index.h
         include/dsr/core/types/translator.h
         include/dsr/core/types/type_checking/dsr_attr_name.h
         include/dsr/core/types/type_checking/dsr_edge_type.h
@@ -31,13 +33,10 @@ target_sources(dsr_core
         include/dsr/core/rtps/dsrparticipant.h
         include/dsr/core/rtps/dsrpublisher.h
         include/dsr/core/rtps/dsrsubscriber.h
+        include/dsr/core/rtps/env_overrides.h
 
-        topics/IDLGraphPubSubTypes.cxx
-        #topics/IDLGraph.cxx
-        topics/IDLGraphCdrAux.ipp
-        include/dsr/core/topics/IDLGraph.hpp
-        include/dsr/core/topics/IDLGraphPubSubTypes.hpp
-        include/dsr/core/topics/IDLGraphCdrAux.hpp
+        include/dsr/core/rtps/CRDTPubSubTypes.h
+        include/dsr/core/serialization/serializable.h
 
         include/dsr/core/crdt/delta_crdt.h
 
@@ -46,12 +45,15 @@ target_sources(dsr_core
 
         include/dsr/core/traits.h
         include/dsr/core/utils.h
+        include/dsr/core/profiling.h
+        profiling.cpp
         )
 
 
 target_link_libraries(dsr_core
         PRIVATE
-        Qt6::Core fastcdr fastdds Eigen3::Eigen)
+        Qt6::Core fastcdr fastdds Eigen3::Eigen
+        cortex_profiling)
 
 
 target_include_directories(dsr_core

@@ -2,7 +2,7 @@
 #define INNER_EIGEN_API
 
 #include <QObject>
-#include <dsr/core/topics/IDLGraphPubSubTypes.hpp>
+#include <dsr/core/types/internal_types.h>
 #include <dsr/api/dsr_eigen_defs.h>
 #include <dsr/api/dsr_rt_api.h>
 #include <optional>

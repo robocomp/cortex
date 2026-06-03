@@ -5,11 +5,14 @@
 #ifndef DSR_COMMON_TYPES_H
 #define DSR_COMMON_TYPES_H
 
-#include "../topics/IDLGraph.hpp"
+#include "dsr/core/serialization/serializable.h"
 
 #include <variant>
 #include <cassert>
 #include <iostream>
+#include <vector>
+#include <string>
+#include <array>
 
 
 namespace DSR {
@@ -20,12 +23,15 @@ namespace DSR {
             "UINT64_VEC", "FLOAT_VEC2", "FLOAT_VEC3",
             "FLOAT_VEC4", "FLOAT_VEC6"};
 
-    using ValType = std::variant<std::string, int32_t, float,
+    using Value = std::variant<std::string, int32_t, float,
             std::vector<float>, bool, std::vector<uint8_t>,
             uint32_t, uint64_t, double, std::vector<uint64_t>,
             std::array<float, 2>, std::array<float, 3>,
             std::array<float, 4>, std::array<float, 6>>;
 
+
+    //Compatibility. Will be removed at some point.
+    using ValType = Value;
 
     enum Types : uint32_t {
         STRING = 0,
@@ -45,146 +51,90 @@ namespace DSR {
     };
 
 
-    class Attribute
+    class Attribute : public ISerializable<Attribute>
     {
     public:
 
         Attribute() = default;
         ~Attribute() = default;
 
-        Attribute(const ValType &value, uint64_t timestamp, uint32_t agent_id)
-                : m_value(ValType(value)), m_timestamp(timestamp), m_agent_id(agent_id)
+        Attribute(const Value &value, uint64_t timestamp, uint32_t agent_id)
+                : m_value(Value(value)), m_timestamp(timestamp), m_agent_id(agent_id)
         {}
 
-        Attribute (const Attribute& attr)
-        {
-            m_timestamp = attr.timestamp();
-            m_agent_id = attr.agent_id();
-            m_value = attr.m_value;
-        }
+        Attribute (const Attribute& attr) = default;
+        Attribute (Attribute&& attr) noexcept = default;
+        Attribute& operator= (const Attribute& attr) = default;
+        Attribute& operator= (Attribute&& attr) noexcept = default;
 
-        Attribute (Attribute&& attr) noexcept
-        {
-            m_timestamp = attr.timestamp();
-            m_agent_id = attr.agent_id();
-            m_value = std::move(attr.m_value);
-        }
-
-        explicit Attribute (IDL::Attrib &&x) noexcept
-        {
-            m_timestamp = x.timestamp();
-            m_value = std::move(get_valtype(std::move(x.value())));
-            m_agent_id = x.agent_id();
-        }
-
-        Attribute& operator= (const Attribute& attr)
-        {
-            m_timestamp = attr.timestamp();
-            m_agent_id = attr.agent_id();
-            m_value = attr.m_value;
-            return *this;
-        }
-
-        Attribute& operator= (Attribute&& attr) noexcept
-        {
-            m_timestamp = attr.timestamp();
-            m_agent_id = attr.agent_id();
-            m_value = std::move(attr.m_value);
-            return *this;
-        }
-
-        Attribute &operator=(IDL::Attrib &&x)
-        {
-            m_timestamp = x.timestamp();
-            m_value = std::move(get_valtype(std::move(x.value())));
-            m_agent_id = x.agent_id();
-            return *this;
-        }
-
-        [[nodiscard]] IDL::Val to_IDL_val();
-
-        [[nodiscard]] IDL::Attrib to_IDL_attrib();
+        // ---- ISerializable implementation ----
+        void serialize_impl(eprosima::fastcdr::Cdr& cdr) const;
+        void deserialize_impl(eprosima::fastcdr::Cdr& cdr);
+        size_t serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const;
 
         ///////////////////////
         // Members
         //////////////////////
 
         [[nodiscard]] uint64_t timestamp() const;
-
         void timestamp(uint64_t t);
-
         [[nodiscard]] uint32_t agent_id() const;
-
         void agent_id(uint32_t agent_id);
-
         [[nodiscard]] std::size_t selected() const;
 
         ///////////////////////
         // Variant
         //////////////////////
-        void value(const ValType &value);
+        void value(const Value &value);
+        void value(Value &&value);
 
-        void value(ValType &&value);
-
-        [[nodiscard]] const ValType &value() const;
-
-        [[nodiscard]] ValType& value();
+        [[nodiscard]] const Value &value() const;
+        [[nodiscard]] Value& value();
         ///////////////////////
         // String
         //////////////////////
 
         [[nodiscard]] std::string &str();
-
         [[nodiscard]] const std::string &str() const;
-
         void str(const std::string &str);
-
         void str(std::string &&str);
 
         ///////////////////////
         // int32
         //////////////////////
         void dec(int32_t dec);
-
         [[nodiscard]] int32_t dec() const;
 
         ///////////////////////
         // uint32
         //////////////////////
         void uint(uint32_t uint);
-
         [[nodiscard]] uint32_t uint() const;
 
         ///////////////////////
         // uint64
         //////////////////////
         void uint64(uint64_t uint);
-
         [[nodiscard]] uint64_t uint64() const;
 
         ///////////////////////
         // float
         //////////////////////
         void fl(float fl);
-
         [[nodiscard]] float fl() const;
 
         ///////////////////////
         // double
         //////////////////////
         void dob(double dob);
-
         [[nodiscard]] double dob() const;
 
         ///////////////////////
         // vector<float>
         //////////////////////
         void float_vec(const std::vector<float> &float_vec);
-
         void float_vec(std::vector<float> &&float_vec);
-
         [[nodiscard]] const std::vector<float> &float_vec() const;
-
         std::vector<float> &float_vec();
 
         ///////////////////////
@@ -198,58 +148,44 @@ namespace DSR {
         // vector<uint8>
         //////////////////////
         void byte_vec(const std::vector<uint8_t> &float_vec);
-
         void byte_vec(std::vector<uint8_t> &&float_vec);
-
         [[nodiscard]] const std::vector<uint8_t> &byte_vec() const;
-
         [[nodiscard]] std::vector<uint8_t> &byte_vec();
 
         ///////////////////////
         // vector<uint64>
         //////////////////////
         void u64_vec(const std::vector<uint64_t> &uint64_vec);
-
         void u64_vec(std::vector<uint64_t> &&uint64_vec);
-
         [[nodiscard]] const std::vector<uint64_t> &u64_vec() const;
-
         [[nodiscard]] std::vector<uint64_t> &u64_vec();
 
         ///////////////////////
         // array<flaot, 2>
         //////////////////////
         void vec2(const std::array<float, 2> &vec_float2);
-
         [[nodiscard]] const std::array<float, 2> &vec2() const;
-
         [[nodiscard]] std::array<float, 2> &vec2();
 
         ///////////////////////
         // array<flaot, 3>
         //////////////////////
         void vec3(const std::array<float, 3> &vec_float3);
-
         [[nodiscard]] const std::array<float, 3> &vec3() const;
-
         [[nodiscard]] std::array<float, 3> &vec3();
 
         ///////////////////////
         // array<flaot, 4>
         //////////////////////
         void vec4(const std::array<float, 4> &vec_float4);
-
         [[nodiscard]] const std::array<float, 4> &vec4() const;
-
         [[nodiscard]] std::array<float, 4> &vec4();
 
         ///////////////////////
         // array<flaot, 6>
         //////////////////////
         void vec6(const std::array<float, 6> &vec_float6);
-
         [[nodiscard]] const std::array<float, 6> &vec6() const;
-
         [[nodiscard]] std::array<float, 6> &vec6();
 
         ///////////////////////
@@ -329,99 +265,19 @@ namespace DSR {
             return os;
         }
 
-        bool operator==(const Attribute &rhs) const
-        {
-            return m_value == rhs.m_value;
-        }
+        bool operator==(const Attribute& rhs) const                                     
+        {                                                                               
+            return m_value == rhs.m_value;                                              
+        }                                                                               
+                                                                                        
+        bool operator<(const Attribute& rhs) const                                      
+        {                                                                               
+            return m_value < rhs.m_value;                                               
+        } 
 
-        bool operator!=(const Attribute &rhs) const
-        {
-            return !(rhs == *this);
-        }
-
-        bool operator<(const Attribute &rhs) const
-        {
-            return m_value < rhs.m_value;
-        }
-
-        bool operator>(const Attribute &rhs) const
-        {
-            return rhs < *this;
-        }
-
-        bool operator<=(const Attribute &rhs) const
-        {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const Attribute &rhs) const
-        {
-            return !(*this < rhs);
-        }
-
-        [[nodiscard]] static ValType get_valtype(IDL::Val &&x)
-        {
-            ValType val;
-            switch (x._d()) {
-                case 0:
-                    val = std::move(x.str());
-                    break;
-                case 1:
-                    val = x.dec();
-                    break;
-                case 2:
-                    val = x.fl();
-                    break;
-                case 3:
-                    val = std::move(x.float_vec());
-                    break;
-                case 4:
-                    val = x.bl();
-                    break;
-                case 5: {
-                    val = std::move(x.byte_vec());
-                    break;
-                }
-                case 6: {
-                    val = x.uint();
-                    break;
-                }
-                case 7: {
-                    val = x.u64();
-                    break;
-                }
-                case 8: {
-                    val = x.dob();
-                    break;
-                }
-                case 9: {
-                    val = std::move(x.uint64_vec());
-                    break;
-                }
-                case 10: {
-                    val = x.vec_float2();
-                    break;
-                }
-                case 11: {
-                    val = x.vec_float3();
-                    break;
-                }
-                case 12: {
-                    val = x.vec_float4();
-                    break;
-                }
-                case 13: {
-                    val = x.vec_float6();
-                    break;
-                }
-                default:
-                    assert(false);
-            }
-            return val;
-        }
     private:
 
-        ValType m_value;
+        Value m_value;
         uint64_t m_timestamp = 0;
         uint32_t m_agent_id = 0;
     };

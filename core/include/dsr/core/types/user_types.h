@@ -7,9 +7,8 @@
 
 #include <cstdint>
 #include <utility>
-#include "type_checking/type_checker.h"
-#include "common_types.h"
-#include "crdt_types.h"
+#include "dsr/core/types/type_checking/type_checker.h"
+#include "dsr/core/types/common_types.h"
 #include <dsr/core/utils.h>
 
 
@@ -33,7 +32,6 @@ namespace DSR {
         Edge() = default;
         ~Edge() = default;
 
-        [[deprecated("Use Edge::create<example_edge_type>(...)")]]
         Edge(uint64_t to, uint64_t from, std::string type, uint32_t agent_id)
             : m_to(to),
             m_from(from),
@@ -46,7 +44,6 @@ namespace DSR {
             }
         }
 
-        [[deprecated("Use Edge::create<example_edge_type>(...)")]]
         Edge(uint64_t to, uint64_t from, std::string type,
                    std::map<std::string, Attribute> attrs,
                    uint32_t agent_id)
@@ -73,45 +70,6 @@ namespace DSR {
             requires(edge_type::edge_type)
         {
             return Edge(from, to, std::string(edge_type::attr_name.data()), 0, attrs);
-        }
-
-        explicit Edge (const CRDTEdge& edge)
-        {
-            m_agent_id = edge.agent_id();
-            m_from = edge.from();
-            m_to = edge.to();
-            m_type = edge.type();
-            for (const auto &[k,v] : edge.attrs()) {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-
-        }
-
-        explicit Edge (CRDTEdge&& edge)
-        {
-            m_agent_id = edge.agent_id();
-            m_from = edge.from();
-            m_to = edge.to();
-            m_type = edge.type();
-            for (auto &[k,v] : edge.attrs()) {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, std::move(v.dk.ds.begin()->second));
-            }
-
-        }
-
-        Edge& operator= (const CRDTEdge& attr)
-        {
-            m_agent_id = attr.agent_id();
-            m_from = attr.from();
-            m_to = attr.to();
-            m_type = attr.type();
-            for (const auto &[k,v] : attr.attrs()) {
-                assert(!v.dk.ds.empty());
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-            return *this;
         }
 
         [[nodiscard]] uint64_t to() const;
@@ -146,11 +104,6 @@ namespace DSR {
                    m_attrs == rhs.m_attrs;
         }
 
-        bool operator!=(const Edge &rhs) const
-        {
-            return !(rhs == *this);
-        }
-
         bool operator<(const Edge &rhs) const
         {
             if (m_to < rhs.m_to)
@@ -166,21 +119,6 @@ namespace DSR {
             if (rhs.m_type < m_type)
                 return false;
             return true;
-        }
-
-        bool operator>(const Edge &rhs) const
-        {
-            return rhs < *this;
-        }
-
-        bool operator<=(const Edge &rhs) const
-        {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const Edge &rhs) const
-        {
-            return !(*this < rhs);
         }
 
     private:
@@ -211,7 +149,6 @@ namespace DSR {
         Node() = default;
         ~Node() = default;
 
-        [[deprecated("Use Node::create<example_node_type>(...)")]]
         Node(uint64_t agent_id, std::string type)
             : m_id(0),
             m_type(std::move(type)),
@@ -224,7 +161,6 @@ namespace DSR {
             }
         }
 
-        [[deprecated("Use Node::create<example_node_type>(...)")]]
         Node(std::string type, uint32_t agent_id,
                    std::map<std::string, Attribute> attrs,
                    std::map<std::pair<uint64_t, std::string>, Edge > fano)
@@ -254,56 +190,6 @@ namespace DSR {
             requires(node_type::node_type)
         {
             return Node( std::string(node_type::attr_name.data()), 0, attrs, fano, name);
-        }
-
-        explicit Node (const CRDTNode& node)
-        {
-            m_agent_id = node.agent_id();
-            m_id = node.id();
-            m_name = node.name();
-            m_type = node.type();
-            for (const auto &[k,v] : node.attrs()) {
-                if (v.dk.ds.empty()) continue;  // guard: skip attrs with empty delta-set (partial network update)
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-            for (const auto &[k,v] : node.fano()) {
-                if (v.dk.ds.empty()) continue;  // guard: skip edges with empty delta-set
-                m_fano.emplace(k, v.dk.ds.begin()->second);
-            }
-        }
-
-        explicit Node (CRDTNode&& node)
-        {
-            m_agent_id = node.agent_id();
-            m_id = node.id();
-            m_name = node.name();
-            m_type = node.type();
-            for (auto &[k,v] : node.attrs()) {
-                if (v.dk.ds.empty()) continue;  // guard: skip attrs with empty delta-set
-                m_attrs.emplace(k, std::move(v.dk.ds.begin()->second));
-            }
-            for (auto &[k,v] : node.fano()) {
-                if (v.dk.ds.empty()) continue;  // guard: skip edges with empty delta-set
-                m_fano.emplace(k, std::move(v.dk.ds.begin()->second));
-            }
-        }
-
-        Node& operator= (const CRDTNode& node )
-        {
-            m_agent_id = node.agent_id();
-            m_id = node.id();
-            m_name = node.name();
-            m_type = node.type();
-            for (const auto &[k,v] : node.attrs()) {
-                if (v.dk.ds.empty()) continue;  // guard: skip attrs with empty delta-set
-                m_attrs.emplace(k, v.dk.ds.begin()->second);
-            }
-            for (const auto &[k,v] : node.fano()) {
-                if (v.dk.ds.empty()) continue;  // guard: skip edges with empty delta-set
-                m_fano.emplace(k, v.dk.ds.begin()->second);
-            }
-
-            return *this;
         }
 
         [[nodiscard]] uint64_t id() const;
@@ -347,11 +233,6 @@ namespace DSR {
                    m_fano == rhs.m_fano;
         }
 
-        bool operator!=(const Node &rhs) const
-        {
-            return !(rhs == *this);
-        }
-
         bool operator<(const Node &rhs) const
         {
             if (m_id < rhs.m_id)
@@ -369,22 +250,6 @@ namespace DSR {
             return true;
         }
 
-        bool operator>(const Node &rhs) const
-        {
-            return rhs < *this;
-        }
-
-        bool operator<=(const Node &rhs) const
-        {
-            return !(rhs < *this);
-        }
-
-        bool operator>=(const Node &rhs) const
-        {
-            return !(*this < rhs);
-        }
-
-    private:
         uint64_t m_id = 0;
         std::string m_type;
         std::string m_name;

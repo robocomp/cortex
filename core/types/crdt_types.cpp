@@ -4,305 +4,134 @@
 
 
 #include <dsr/core/types/crdt_types.h>
-#include <dsr/core/types/translator.h>
+#include <fastcdr/Cdr.h>
+#include <fastcdr/CdrSizeCalculator.hpp>
 
 namespace DSR {
 
-    CRDTEdge::CRDTEdge (IDL::IDLEdge &&x) noexcept
+    void CRDT::Edge::serialize_impl(eprosima::fastcdr::Cdr& cdr) const
     {
-
-        m_to = x.to();
-        m_type = std::move(x.type());
-        m_from = x.from();
-        if (!x.attrs().empty()) {
-            for (auto&[k, v] : x.attrs()) {
-                m_attrs.emplace(k , IDLEdgeAttr_to_CRDT(std::move(v)));
-            }
-        }
-        m_agent_id = x.agent_id();
-
-    }
-
-    CRDTEdge &CRDTEdge::operator=(IDL::IDLEdge &&x)
-    {
-
-        m_to = x.to();
-        m_type = std::move(x.type());
-        m_from = x.from();
-        if (!x.attrs().empty()) {
-            for (auto&[k, v] : x.attrs()) {
-                m_attrs.emplace(k , IDLEdgeAttr_to_CRDT(std::move(v)));
-            }
-        }
-        m_agent_id = x.agent_id();
-
-        return *this;
-    }
-
-    void CRDTEdge::to(uint64_t  _to)
-    {
-        m_to = _to;
-    }
-
-    uint64_t  CRDTEdge::to() const
-    {
-        return m_to;
-    }
-
-    void CRDTEdge::type(const std::string &type)
-    {
-        m_type = type;
-    }
-
-    void CRDTEdge::type(std::string &&type)
-    {
-        m_type = std::move(type);
-    }
-
-    const std::string &CRDTEdge::type() const 
-    {
-        return m_type;
-    }
-
-    std::string &CRDTEdge::type()
-    {
-        return m_type;
-    }
-
-    void CRDTEdge::from(uint64_t from)
-    {
-        m_from = from;
-    }
-
-    uint64_t  CRDTEdge::from() const
-    {
-        return m_from;
-    }
-
-    void CRDTEdge::attrs(const std::map<std::string, mvreg<CRDTAttribute>> &attrs)
-    {
-        m_attrs = attrs;
-    }
-
-    void CRDTEdge::attrs(std::map<std::string, mvreg<CRDTAttribute>> &&attrs)
-    {
-        m_attrs = std::move(attrs);
-    }
-
-    const std::map<std::string, mvreg<CRDTAttribute>> &CRDTEdge::attrs() const
-    {
-        return m_attrs;
-    }
-
-    std::map<std::string, mvreg<CRDTAttribute>> &CRDTEdge::attrs()
-    {
-        return m_attrs;
-    }
-
-    void CRDTEdge::agent_id(uint32_t agent_id)
-    {
-        m_agent_id = agent_id;
-    }
-
-    uint32_t CRDTEdge::agent_id() const
-    {
-        return m_agent_id;
-    }
-
-    IDL::IDLEdge CRDTEdge::to_IDL_edge(uint64_t id) {
-        IDL::IDLEdge edge;
-        edge.from(m_from);
-        edge.to(m_to);
-        edge.type(m_type);
-        edge.agent_id(m_agent_id);
-        for (auto &[k, v] : m_attrs) {
-
-            IDL::MvregEdgeAttr edgeAttr;
-            for (auto &kv_dots : v.dk.ds) {
-                IDL::PairInt pi;
-                pi.first(kv_dots.first.first);
-                pi.second(kv_dots.first.second);
-
-                edgeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
-                edgeAttr.dk().cbase().cc().emplace(kv_dots.first);
-
-            }
-
-            edgeAttr.from(m_from);
-            edgeAttr.to(m_to);
-            edgeAttr.type(m_type);
-            edgeAttr.agent_id(v.read_reg().agent_id());
-            edgeAttr.id(id);
-
-            edge.attrs().emplace(k, std::move(edgeAttr));
-        }
-        return edge;
-    }
-
-
-    CRDTNode::CRDTNode(IDL::IDLNode &&x)
-    {
-        m_type = std::move(x.type());
-        m_name = std::move(x.name());
-        m_id = x.id();
-        m_agent_id = x.agent_id();
-        for (auto&[k, v] : x.attrs()) {
-            m_attrs.emplace(k, IDLNodeAttr_to_CRDT(std::move(v)));
-        }
-        for (auto&[k, v] : x.fano()) {
-            m_fano.emplace(std::pair<uint64_t, std::string>{k.to(), k.type()},
-                           IDLEdge_to_CRDT(std::move(v)));
+        cdr << to;
+        cdr << from;
+        cdr << type;
+        cdr << agent_id;
+        // serialize attrs map: uint32_t count, then key + value
+        auto count = static_cast<uint32_t>(attrs.size());
+        cdr << count;
+        for (const auto &[k, v] : attrs) {
+            cdr << k;
+            v.serialize(cdr);
         }
     }
 
-    void CRDTNode::type(const std::string &type)
+    void CRDT::Edge::deserialize_impl(eprosima::fastcdr::Cdr& cdr)
     {
-        m_type = type;
-    }
-
-    void CRDTNode::type(std::string &&type)
-    {
-        m_type = std::move(type);
-    }
-
-    const std::string &CRDTNode::type() const
-    {
-        return m_type;
-    }
-
-    std::string &CRDTNode::type()
-    {
-        return m_type;
-    }
-
-    void CRDTNode::name(const std::string &name)
-    {
-        m_name = name;
-    }
-
-    void CRDTNode::name(std::string &&name)
-    {
-        m_name = std::move(name);
-    }
-
-    const std::string &CRDTNode::name() const
-    {
-        return m_name;
-    }
-
-    std::string &CRDTNode::name()
-    {
-        return m_name;
-    }
-
-    void CRDTNode::id(uint64_t id)
-    {
-        m_id = id;
-    }
-
-    uint64_t CRDTNode::id() const
-    {
-        return m_id;
-    }
-
-    void CRDTNode::agent_id(uint32_t agent_id)
-    {
-        m_agent_id = agent_id;
-    }
-
-    uint32_t CRDTNode::agent_id() const
-    {
-        return m_agent_id;
-    }
-
-    void CRDTNode::attrs(const std::map<std::string, mvreg<CRDTAttribute>> &attrs)
-    {
-        m_attrs = attrs;
-    }
-
-    void CRDTNode::attrs(std::map<std::string, mvreg<CRDTAttribute>> &&attrs)
-    {
-        m_attrs = std::move(attrs);
-    }
-
-    std::map<std::string, mvreg<CRDTAttribute>> &CRDTNode::attrs() &
-    {
-        return m_attrs;
-    }
-
-    const std::map<std::string, mvreg<CRDTAttribute>> &CRDTNode::attrs() const &
-    {
-        return m_attrs;
-    }
-
-    void CRDTNode::fano(const std::map<std::pair<uint64_t , std::string>, mvreg<CRDTEdge>> &fano)
-    {
-        m_fano = fano;
-    }
-
-    void CRDTNode::fano(std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &&fano)
-    {
-        m_fano = std::move(fano);
-    }
-
-    std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &CRDTNode::fano()
-    {
-        return m_fano;
-    }
-
-    const std::map<std::pair<uint64_t, std::string>, mvreg<CRDTEdge>> &CRDTNode::fano() const
-    {
-        return m_fano;
-    }
-
-
-    IDL::IDLNode CRDTNode::to_IDL_node(uint64_t id) {
-        IDL::IDLNode node;
-        node.id(m_id);
-        node.name(m_name);
-        node.type(m_type);
-        node.agent_id(m_agent_id);
-        for (auto &[k, v] : m_attrs) {
-            IDL::MvregNodeAttr nodeAttr;
-            for (auto &kv_dots : v.dk.ds) {
-                IDL::PairInt pi;
-                pi.first(kv_dots.first.first);
-                pi.second(kv_dots.first.second);
-
-                nodeAttr.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_attrib()));
-                nodeAttr.dk().cbase().cc().emplace(kv_dots.first);
-            }
-
-            nodeAttr.id(id);
-            nodeAttr.attr_name(k);
-            nodeAttr.agent_id(v.read_reg().agent_id());
-            node.attrs().emplace(k, std::move(nodeAttr));
+        cdr >> to;
+        cdr >> from;
+        cdr >> type;
+        cdr >> agent_id;
+        uint32_t count = 0;
+        cdr >> count;
+        attrs.clear();
+        for (uint32_t i = 0; i < count; ++i) {
+            std::string key;
+            cdr >> key;
+            mvreg<Attribute> val;
+            val.deserialize(cdr);
+            attrs.emplace(std::move(key), std::move(val));
         }
-
-        for (auto &[k, v] : m_fano) {
-            IDL::MvregEdge mvregCRDTEdge;
-            for (auto &kv_dots : v.dk.ds) {
-                IDL::PairInt pi;
-                pi.first(kv_dots.first.first);
-                pi.second(kv_dots.first.second);
-
-                mvregCRDTEdge.dk().ds().emplace(std::make_pair(pi, kv_dots.second.to_IDL_edge(id)));
-                mvregCRDTEdge.dk().cbase().cc().emplace(kv_dots.first);
-
-            }
-
-            mvregCRDTEdge.id(id);
-            mvregCRDTEdge.agent_id(v.read_reg().agent_id());
-            mvregCRDTEdge.to(k.first);
-            mvregCRDTEdge.from(v.read_reg().from());
-            mvregCRDTEdge.type(k.second);
-            IDL::EdgeKey ek;
-            ek.to(k.first);
-            ek.type(k.second);
-            node.fano().emplace(ek, std::move(mvregCRDTEdge));
-        }
-        return node;
     }
 
+    size_t CRDT::Edge::serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const
+    {
+        size_t size = 0;
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), to, ca);
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(1), from, ca);
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(2), type, ca);
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(3), agent_id, ca);
+        auto count = static_cast<uint32_t>(attrs.size());
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(4), count, ca);
+        for (const auto &[k, v] : attrs) {
+            size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(5), k, ca);
+            size += v.serialized_size(calc, ca);
+        }
+        return size;
+    }
+
+    void CRDT::Node::serialize_impl(eprosima::fastcdr::Cdr& cdr) const
+    {
+        cdr << id;
+        cdr << type;
+        cdr << name;
+        cdr << agent_id;
+        // attrs map
+        auto attr_count = static_cast<uint32_t>(attrs.size());
+        cdr << attr_count;
+        for (const auto &[k, v] : attrs) {
+            cdr << k;
+            v.serialize(cdr);
+        }
+        // fano map: key is pair<uint64_t, string>
+        auto fano_count = static_cast<uint32_t>(fano.size());
+        cdr << fano_count;
+        for (const auto &[k, v] : fano) {
+            cdr << k.first;
+            cdr << k.second;
+            v.serialize(cdr);
+        }
+    }
+
+    void CRDT::Node::deserialize_impl(eprosima::fastcdr::Cdr& cdr)
+    {
+        cdr >> id;
+        cdr >> type;
+        cdr >> name;
+        cdr >> agent_id;
+        uint32_t attr_count = 0;
+        cdr >> attr_count;
+        attrs.clear();
+        for (uint32_t i = 0; i < attr_count; ++i) {
+            std::string key;
+            cdr >> key;
+            mvreg<Attribute> val;
+            val.deserialize(cdr);
+            attrs.emplace(std::move(key), std::move(val));
+        }
+        uint32_t fano_count = 0;
+        cdr >> fano_count;
+        fano.clear();
+        for (uint32_t i = 0; i < fano_count; ++i) {
+            uint64_t fano_to = 0;
+            std::string fano_type;
+            cdr >> fano_to;
+            cdr >> fano_type;
+            mvreg<CRDT::Edge> val;
+            val.deserialize(cdr);
+            fano.emplace(std::make_pair(fano_to, std::move(fano_type)), std::move(val));
+        }
+    }
+
+    size_t CRDT::Node::serialized_size_impl(eprosima::fastcdr::CdrSizeCalculator& calc, size_t& ca) const
+    {
+        size_t size = 0;
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), id, ca);
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(1), type, ca);
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(2), name, ca);
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(3), agent_id, ca);
+        auto attr_count = static_cast<uint32_t>(attrs.size());
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(4), attr_count, ca);
+        for (const auto &[k, v] : attrs) {
+            size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(5), k, ca);
+            size += v.serialized_size(calc, ca);
+        }
+        auto fano_count = static_cast<uint32_t>(fano.size());
+        size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(6), fano_count, ca);
+        for (const auto &[k, v] : fano) {
+            size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(7), k.first, ca);
+            size += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(8), k.second, ca);
+            size += v.serialized_size(calc, ca);
+        }
+        return size;
+    }
 }
 

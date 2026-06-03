@@ -4,11 +4,14 @@
 #include "dsr/api/dsr_api.h"
 #include "../utils.h"
 #include <thread>
+#include <barrier>
+#include <memory>
+#include <vector>
 
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/generators/catch_generators.hpp"
 
-#include "dsr/core/topics/IDLGraph.hpp"
+#include "dsr/core/types/internal_types.h"
 
 using namespace DSR;
 using namespace std::chrono_literals;
@@ -18,27 +21,36 @@ namespace DSR
 class DSRGraphTestAccess
 {
 public:
-    static std::map<uint64_t, IDL::MvregNode> Map(DSRGraph& graph)
+    static std::map<uint64_t, DSR::MvregNodeMsg> export_crdt_map(DSRGraph& graph)
     {
-        return graph.Map();
+        auto full_graph = graph.engine_->export_full_graph();
+        auto* payload = std::get_if<DSR::OrMap>(&full_graph);
+        REQUIRE(payload != nullptr);
+        return payload->m;
     }
 
-    static void join_full_graph(DSRGraph& graph, IDL::OrMap&& full_graph)
+    static void apply_node_delta(DSRGraph& graph, DSR::MvregNodeMsg&& delta)
     {
-        graph.join_full_graph(std::move(full_graph));
+        graph.engine_->apply_remote_node_delta(DSR::NodeDeltaMessage{std::move(delta)});
+    }
+
+    static void import_full_graph(DSRGraph& graph, DSR::OrMap&& full_graph)
+    {
+        graph.engine_->import_full_graph(DSR::FullGraphMessage{std::move(full_graph)});
     }
 };
 }
 
 TEST_CASE("Connect and receive the graph from other agent", "[SYNCHRONIZATION][GRAPH]"){
-
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = GENERATE(make_edge_config_file, make_empty_config_file);
     auto ctx = filename();
     auto id1 = rand() % 1000;
     auto id2 = id1 + 1;
-    DSRGraph G(random_string(10), id1, ctx);
-    DSRGraph G2(random_string(11), id2);
+    DSRGraph G(make_test_graph_settings(random_string(10), id1, ctx, true, 0, SignalMode::QT, sync_mode));
+    DSRGraph G2(make_test_graph_settings(random_string(11), id2, std::string{}, true, 0, SignalMode::QT, sync_mode));
     std::this_thread::sleep_for(200ms);
     REQUIRE(G2.size() == G.size());
     
@@ -46,13 +58,15 @@ TEST_CASE("Connect and receive the graph from other agent", "[SYNCHRONIZATION][G
 
 TEST_CASE("Same-process agents discover each other and exchange updates", "[SYNCHRONIZATION][GRAPH][REGRESSION][DDS]")
 {
-    const auto same_host = GENERATE(true, false);
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    const auto same_host = (sync_mode == SyncMode::LWW) ? true : GENERATE(true, false);
+    CAPTURE(sync_mode_label(sync_mode), same_host);
     auto ctx = make_edge_config_file();
     auto id1 = static_cast<uint32_t>(rand() % 1000 + 1000);
     auto id2 = id1 + 1;
 
-    DSRGraph loader(random_string(10), id1, ctx, same_host);
-    DSRGraph follower(random_string(11), id2, std::string{}, same_host);
+    DSRGraph loader(make_test_graph_settings(random_string(10), id1, ctx, same_host, 0, SignalMode::QT, sync_mode));
+    DSRGraph follower(make_test_graph_settings(random_string(11), id2, std::string{}, same_host, 0, SignalMode::QT, sync_mode));
 
     auto wait_until = [](auto&& predicate, std::chrono::milliseconds timeout = 2000ms)
     {
@@ -108,17 +122,66 @@ TEST_CASE("Full graph join does not leave empty node registers after local delet
     REQUIRE(graph.insert_node_with_id(node).has_value());
     REQUIRE(graph.size() == initial_size + 1);
 
-    IDL::OrMap full_graph;
-    full_graph.id(graph.get_agent_id());
-    full_graph.to_id(graph.get_agent_id());
-    full_graph.m(DSRGraphTestAccess::Map(graph));
+    DSR::OrMap full_graph;
+    full_graph.id = graph.get_agent_id();
+    full_graph.to_id = graph.get_agent_id();
+    full_graph.m = DSRGraphTestAccess::export_crdt_map(graph);
 
     REQUIRE(graph.delete_node(node.id()));
     REQUIRE(graph.size() == initial_size);
     REQUIRE_FALSE(graph.get_node(node.id()).has_value());
 
-    DSRGraphTestAccess::join_full_graph(graph, std::move(full_graph));
+    DSRGraphTestAccess::import_full_graph(graph, std::move(full_graph));
 
     REQUIRE(graph.size() == initial_size);
     REQUIRE_FALSE(graph.get_node(node.id()).has_value());
 }
+
+TEST_CASE("Full graph join rejects incompatible protocol versions", "[SYNCHRONIZATION][GRAPH][VERSION]")
+{
+    auto ctx = make_empty_config_file();
+    DSRGraph sender(random_string(10), static_cast<uint32_t>(rand() % 2000 + 1000), ctx);
+    DSRGraph receiver(random_string(10), static_cast<uint32_t>(rand() % 1000 + 3000), ctx);
+
+    auto node = Node::create<testtype_node_type>("version_mismatch_node");
+    node.id(2000);
+    node.agent_id(sender.get_agent_id());
+
+    REQUIRE(sender.insert_node_with_id(node).has_value());
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+
+    DSR::OrMap full_graph;
+    full_graph.id = static_cast<int32_t>(sender.get_agent_id());
+    full_graph.to_id = receiver.get_agent_id();
+    full_graph.protocol_version = DSR::DSR_PROTOCOL_VERSION + 1;
+    full_graph.m = DSRGraphTestAccess::export_crdt_map(sender);
+
+    DSRGraphTestAccess::import_full_graph(receiver, std::move(full_graph));
+
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+}
+
+TEST_CASE("Node delta join rejects incompatible protocol versions", "[SYNCHRONIZATION][GRAPH][VERSION]")
+{
+    auto ctx = make_empty_config_file();
+    DSRGraph sender(random_string(10), static_cast<uint32_t>(rand() % 2000 + 1000), ctx);
+    DSRGraph receiver(random_string(10), static_cast<uint32_t>(rand() % 1000 + 3000), ctx);
+
+    auto node = Node::create<testtype_node_type>("delta_version_mismatch_node");
+    node.id(3000);
+    node.agent_id(sender.get_agent_id());
+
+    REQUIRE(sender.insert_node_with_id(node).has_value());
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+
+    auto map = DSRGraphTestAccess::export_crdt_map(sender);
+    auto it = map.find(node.id());
+    REQUIRE(it != map.end());
+
+    auto delta = std::move(it->second);
+    delta.protocol_version = DSR::DSR_PROTOCOL_VERSION + 1;
+    DSRGraphTestAccess::apply_node_delta(receiver, std::move(delta));
+
+    REQUIRE_FALSE(receiver.get_node(node.id()).has_value());
+}
+

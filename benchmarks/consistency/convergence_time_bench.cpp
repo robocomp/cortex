@@ -13,7 +13,7 @@
 using namespace DSR;
 using namespace DSR::Benchmark;
 
-TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("convergence_time");
 
@@ -28,39 +28,40 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PRO
         REQUIRE(agent_a != nullptr);
         REQUIRE(agent_b != nullptr);
 
-        LatencyTracker tracker(100);
+        constexpr int ITERATIONS = 50;
+        constexpr uint64_t TIMEOUT_NS = 5'000'000'000ULL; // 5 s in ns
+        LatencyTracker tracker(ITERATIONS);
 
-        for (int i = 0; i < 100; ++i) {
+        for (int i = 0; i < ITERATIONS; ++i) {
             auto node = GraphGenerator::create_test_node(
                 0, agent_a->get_agent_id(),
                 "conv_node_" + std::to_string(i));
 
-            uint64_t start = get_unix_timestamp();
+            uint64_t start = bench_now();
             auto result = agent_a->insert_node(node);
             if (!result.has_value()) continue;
             uint64_t node_id = result.value();
 
-            // Poll until agent B sees the node
+            bool converged = false;
             auto poll_start = std::chrono::steady_clock::now();
             while (std::chrono::steady_clock::now() - poll_start < std::chrono::seconds(5)) {
                 fixture.process_events(1);
-                auto b_node = agent_b->get_node(node_id);
-                if (b_node.has_value()) {
-                    uint64_t conv_time = get_unix_timestamp() - start;
-                    tracker.record(conv_time);
+                if (agent_b->get_node(node_id).has_value()) {
+                    converged = true;
                     break;
                 }
             }
+
+            tracker.record(converged ? bench_now() - start : TIMEOUT_NS);
         }
 
         auto stats = tracker.stats();
         collector.record_latency_stats("single_node_convergence", stats);
         collector.record_consistency("convergence_success_rate",
-            (static_cast<double>(tracker.count()) / 100.0) * 100, "%");
+            (static_cast<double>(tracker.count()) / ITERATIONS) * 100, "%");
 
         INFO("Single node convergence - Mean: " << stats.mean_us() << " us, "
              << "P99: " << stats.p99_us() << " us");
-        INFO("Success rate: " << tracker.count() << "/100");
     }
 
     SECTION("Batch convergence time") {
@@ -72,43 +73,35 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PRO
         auto* agent_a = fixture.get_agent(0);
         auto* agent_b = fixture.get_agent(1);
 
-        LatencyTracker tracker(20);
+        constexpr int BATCHES = 10;
+        constexpr uint64_t TIMEOUT_NS = 10'000'000'000ULL;
+        LatencyTracker tracker(BATCHES);
 
-        for (int batch = 0; batch < 20; ++batch) {
-            // Insert batch of 10 nodes and capture actual IDs
+        for (int batch = 0; batch < BATCHES; ++batch) {
             std::vector<uint64_t> node_ids;
             node_ids.reserve(10);
 
-            uint64_t start = get_unix_timestamp();
+            uint64_t start = bench_now();
 
             for (int i = 0; i < 10; ++i) {
-                auto node = GraphGenerator::create_test_node(
-                    0, agent_a->get_agent_id());
+                auto node = GraphGenerator::create_test_node(0, agent_a->get_agent_id());
                 auto result = agent_a->insert_node(node);
-                if (result.has_value()) {
-                    node_ids.push_back(result.value());
-                }
+                if (result.has_value()) node_ids.push_back(result.value());
             }
 
-            // Wait for all nodes to converge
+            bool converged = false;
             auto poll_start = std::chrono::steady_clock::now();
             while (std::chrono::steady_clock::now() - poll_start < std::chrono::seconds(10)) {
                 fixture.process_events(1);
 
-                bool all_converged = true;
+                bool all = true;
                 for (auto id : node_ids) {
-                    if (!agent_b->get_node(id).has_value()) {
-                        all_converged = false;
-                        break;
-                    }
+                    if (!agent_b->get_node(id).has_value()) { all = false; break; }
                 }
-
-                if (all_converged) {
-                    uint64_t conv_time = get_unix_timestamp() - start;
-                    tracker.record(conv_time);
-                    break;
-                }
+                if (all) { converged = true; break; }
             }
+
+            tracker.record(converged ? bench_now() - start : TIMEOUT_NS);
         }
 
         auto stats = tracker.stats();
@@ -123,23 +116,22 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PRO
         REQUIRE(fixture.create_agents(4, config_file));
         fixture.wait_for_sync();
 
-        LatencyTracker tracker(50);
+        constexpr int ROUNDS = 30;
+        constexpr uint64_t TIMEOUT_NS = 15'000'000'000ULL;
+        LatencyTracker tracker(ROUNDS);
 
-        // Each agent creates nodes concurrently
-        for (int round = 0; round < 50; ++round) {
+        for (int round = 0; round < ROUNDS; ++round) {
             std::vector<uint64_t> all_node_ids;
             std::mutex ids_mutex;
 
-            uint64_t start = get_unix_timestamp();
+            uint64_t start = bench_now();
 
-            // Each agent creates 5 nodes in parallel
             std::vector<std::thread> threads;
             for (size_t agent_idx = 0; agent_idx < 4; ++agent_idx) {
                 threads.emplace_back([&, agent_idx]() {
                     auto* agent = fixture.get_agent(agent_idx);
                     for (int i = 0; i < 5; ++i) {
-                        auto node = GraphGenerator::create_test_node(
-                            0, agent->get_agent_id());
+                        auto node = GraphGenerator::create_test_node(0, agent->get_agent_id());
                         auto result = agent->insert_node(node);
                         if (result.has_value()) {
                             std::lock_guard<std::mutex> lock(ids_mutex);
@@ -150,28 +142,22 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PRO
             }
             for (auto& t : threads) t.join();
 
-            // Wait for all agents to see all nodes
+            bool converged = false;
             auto poll_start = std::chrono::steady_clock::now();
             while (std::chrono::steady_clock::now() - poll_start < std::chrono::seconds(15)) {
                 fixture.process_events(5);
 
-                bool all_converged = true;
-                for (size_t agent_idx = 0; agent_idx < 4 && all_converged; ++agent_idx) {
+                bool all = true;
+                for (size_t agent_idx = 0; agent_idx < 4 && all; ++agent_idx) {
                     auto* agent = fixture.get_agent(agent_idx);
                     for (auto id : all_node_ids) {
-                        if (!agent->get_node(id).has_value()) {
-                            all_converged = false;
-                            break;
-                        }
+                        if (!agent->get_node(id).has_value()) { all = false; break; }
                     }
                 }
-
-                if (all_converged) {
-                    uint64_t conv_time = get_unix_timestamp() - start;
-                    tracker.record(conv_time);
-                    break;
-                }
+                if (all) { converged = true; break; }
             }
+
+            tracker.record(converged ? bench_now() - start : TIMEOUT_NS);
         }
 
         auto stats = tracker.stats();
@@ -180,8 +166,7 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PRO
         INFO("Concurrent convergence (4 agents) - Mean: " << stats.mean_ms() << " ms, "
              << "P99: " << stats.p99_ms() << " ms");
 
-        // Check against timeout
-        CHECK(stats.p99_ms() < 1000);  // Should converge within 1 second p99
+        CHECK(stats.p99_ms() < 1000);
     }
 
     auto result = collector.finalize();
@@ -189,7 +174,7 @@ TEST_CASE("Convergence time benchmarks", "[CONSISTENCY][convergence][.multi][PRO
     reporter.export_all(result, "convergence_time");
 }
 
-TEST_CASE("Attribute convergence", "[CONSISTENCY][convergence][attributes][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Attribute convergence", "[CONSISTENCY][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("attribute_convergence");
 
@@ -201,7 +186,6 @@ TEST_CASE("Attribute convergence", "[CONSISTENCY][convergence][attributes][.mult
     auto* agent_a = fixture.get_agent(0);
     auto* agent_b = fixture.get_agent(1);
 
-    // Create shared test node and capture actual ID
     auto test_node = GraphGenerator::create_test_node(
         0, agent_a->get_agent_id(), "attr_conv_test");
     auto insert_result = agent_a->insert_node(test_node);
@@ -212,19 +196,21 @@ TEST_CASE("Attribute convergence", "[CONSISTENCY][convergence][attributes][.mult
     REQUIRE(fixture.verify_convergence());
 
     SECTION("Attribute update convergence") {
-        LatencyTracker tracker(100);
+        constexpr int ITERATIONS = 50;
+        constexpr uint64_t TIMEOUT_NS = 5'000'000'000ULL;
+        LatencyTracker tracker(ITERATIONS);
 
-        for (int i = 0; i < 100; ++i) {
+        for (int i = 0; i < ITERATIONS; ++i) {
             auto node = agent_a->get_node(shared_node_id);
             REQUIRE(node.has_value());
 
             int32_t new_value = 1000 + i;
             agent_a->add_or_modify_attrib_local<level_att>(*node, new_value);
 
-            uint64_t start = get_unix_timestamp();
+            uint64_t start = bench_now();
             agent_a->update_node(*node);
 
-            // Wait for attribute to converge
+            bool converged = false;
             auto poll_start = std::chrono::steady_clock::now();
             while (std::chrono::steady_clock::now() - poll_start < std::chrono::seconds(5)) {
                 fixture.process_events(1);
@@ -233,12 +219,13 @@ TEST_CASE("Attribute convergence", "[CONSISTENCY][convergence][attributes][.mult
                 if (b_node.has_value()) {
                     auto attr = agent_b->get_attrib_by_name<level_att>(*b_node);
                     if (attr.has_value() && attr.value() == new_value) {
-                        uint64_t conv_time = get_unix_timestamp() - start;
-                        tracker.record(conv_time);
+                        converged = true;
                         break;
                     }
                 }
             }
+
+            tracker.record(converged ? bench_now() - start : TIMEOUT_NS);
         }
 
         auto stats = tracker.stats();

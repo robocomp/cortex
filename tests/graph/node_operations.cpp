@@ -4,6 +4,7 @@
 
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 
 #include "dsr/core/types/user_types.h"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
@@ -17,10 +18,11 @@ using namespace DSR;
 
 
 TEST_CASE("Graph node operations", "[NODE]") {
-
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_empty_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Try to get a node that does not exists by a id") {
         std::optional<Node> n_id = G.get_node(random_number());
@@ -64,6 +66,24 @@ TEST_CASE("Graph node operations", "[NODE]") {
         G.update_node(*n_id);
         REQUIRE(n_id->attrs().find("level") == n_id->attrs().end());
         REQUIRE_FALSE(G.remove_attrib_local(n_id.value(), "level"));
+    }
+
+    SECTION("Update existing node repeatedly") {
+        auto node_name = random_string();
+        auto n = Node::create<testtype_node_type>(node_name);
+        std::optional<uint64_t> r = G.insert_node(n);
+        REQUIRE(r.has_value());
+
+        for (int value : {1, 2, 3}) {
+            auto node = G.get_node(*r);
+            REQUIRE(node.has_value());
+            G.add_or_modify_attrib_local<level_att>(*node, value);
+            REQUIRE(G.update_node(*node));
+        }
+
+        auto updated = G.get_node(*r);
+        REQUIRE(updated.has_value());
+        REQUIRE(G.get_attrib_by_name<level_att>(*updated) == 3);
     }
 
     SECTION("Can't update an existent node with different id") {
@@ -157,9 +177,11 @@ TEST_CASE("Graph node operations", "[NODE]") {
 
 
 TEST_CASE("Insert node with specific id", "[NODE]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_empty_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Insert a node with a specific id") {
         auto node_name = random_string();

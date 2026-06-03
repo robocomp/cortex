@@ -32,9 +32,9 @@ public:
             std::map<std::string, DSR::Attribute> attribs;
             attribs = edge.value().attrs();
             // show id type and name as attributes
-            //attribs["ID"] = Attribute(ValType(node_id), 0, 0);
-            attribs["type"] = Attribute(ValType(edge.value().type()), 0, 0);
-            //attribs["name"] = Attribute(ValType(edge.value().name()), 0, 0);
+            //attribs["ID"] = Attribute(Value(node_id), 0, 0);
+            attribs["type"] = Attribute(Value(edge.value().type()), 0, 0);
+            //attribs["name"] = Attribute(Value(edge.value().name()), 0, 0);
             setHorizontalHeaderLabels(QStringList{"Key", "Value"});
             for (auto &&[k, v] : attribs) {
                 //TODO: check value range and attributes that could be editable

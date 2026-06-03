@@ -17,18 +17,19 @@ using namespace DSR;
 using namespace DSR::Benchmark;
 using namespace std::chrono;
 
-// Multi-agent scaling benchmarks.  Tagged [.multi] so they are excluded from
-// the default test run (DDS multi-agent tests are slow and require specific
-// network setup).  Opt in with: --cpp-filter "[SCALABILITY][agents]"
+// Multi-agent scaling benchmarks.  Tagged so they are excluded from
+// the default test run.  Opt in with: --cpp-filter "[SCALABILITY][agents]"
 //
 // Loop over {1, 2, 4} agents.  One thread per agent operates on its own
-// DSRGraph instance; a 3-second window measures total throughput and latency.
+// DSRGraph instance; a 3-second window measures total throughput.
+// Latency is not collected here — merged per-thread percentiles are
+// misleading.  Use the single-agent latency benchmarks for latency.
 
 static constexpr auto AGENT_DUR = std::chrono::seconds(3);
 
 // ── Node insert ───────────────────────────────────────────────────────────────
 
-TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("node_insert_agent_scaling");
 
@@ -43,9 +44,6 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
-        std::vector<std::vector<uint64_t>> per_thread_samples(N);
-        for (auto& s : per_thread_samples) s.reserve(500000 / N);
-
         std::vector<std::thread> threads;
         threads.reserve(N);
 
@@ -56,16 +54,13 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
                 auto* graph = fixture.get_agent(agent_idx);
                 uint64_t base_id = 800000ULL + agent_idx * 200000ULL;
                 uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[agent_idx];
 
                 sync_point.arrive_and_wait();
 
                 while (!stop_flag.load(std::memory_order_relaxed)) {
                     auto node = GraphGenerator::create_test_node(
                         base_id + local_ops, graph->get_agent_id());
-                    uint64_t ts = bench_now();
                     auto res = graph->insert_node(node);
-                    samples.push_back(bench_now() - ts);
                     if (!res.has_value())
                         failed_ops.fetch_add(1, std::memory_order_relaxed);
                     local_ops++;
@@ -85,16 +80,8 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
-        LatencyTracker merged;
-        for (auto& s : per_thread_samples)
-            for (auto v : s) merged.record(v);
-
         const std::string n_str = std::to_string(N);
-        collector.record_throughput("node_insert", total_ops.load(), dur,
-            {{"agents", n_str}});
-        if (!merged.empty())
-            collector.record_latency_stats("node_insert", merged.stats(),
-                {{"agents", n_str}});
+        collector.record_throughput("node_insert", total_ops.load(), dur, {{"agents", n_str}});
 
         double ops_per_sec = static_cast<double>(total_ops.load()) /
                              (static_cast<double>(dur.count()) / 1000.0);
@@ -109,7 +96,7 @@ TEST_CASE("Node insert agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
 
 // ── Node read ─────────────────────────────────────────────────────────────────
 
-TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("node_read_agent_scaling");
 
@@ -119,7 +106,6 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MUL
         REQUIRE(fixture.create_agents(N, config_file));
         fixture.wait_for_sync();
 
-        // Pre-populate 1000 nodes on agent 0; they sync to all agents.
         auto* graph0 = fixture.get_agent(0);
         std::vector<uint64_t> node_ids;
         node_ids.reserve(1000);
@@ -138,9 +124,6 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MUL
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
-        std::vector<std::vector<uint64_t>> per_thread_samples(N);
-        for (auto& s : per_thread_samples) s.reserve(500000 / N);
-
         std::vector<std::thread> threads;
         threads.reserve(N);
 
@@ -150,15 +133,12 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MUL
             threads.emplace_back([&, agent_idx = i]() {
                 auto* graph = fixture.get_agent(agent_idx);
                 uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[agent_idx];
 
                 sync_point.arrive_and_wait();
 
                 while (!stop_flag.load(std::memory_order_relaxed)) {
                     uint64_t id = node_ids[local_ops % pool_size];
-                    uint64_t ts = bench_now();
                     auto node = graph->get_node(id);
-                    samples.push_back(bench_now() - ts);
                     if (!node.has_value())
                         failed_ops.fetch_add(1, std::memory_order_relaxed);
                     local_ops++;
@@ -178,16 +158,8 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MUL
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
-        LatencyTracker merged;
-        for (auto& s : per_thread_samples)
-            for (auto v : s) merged.record(v);
-
         const std::string n_str = std::to_string(N);
-        collector.record_throughput("node_read", total_ops.load(), dur,
-            {{"agents", n_str}});
-        if (!merged.empty())
-            collector.record_latency_stats("node_read", merged.stats(),
-                {{"agents", n_str}});
+        collector.record_throughput("node_read", total_ops.load(), dur, {{"agents", n_str}});
 
         double ops_per_sec = static_cast<double>(total_ops.load()) /
                              (static_cast<double>(dur.count()) / 1000.0);
@@ -202,7 +174,7 @@ TEST_CASE("Node read agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MUL
 
 // ── Node update ───────────────────────────────────────────────────────────────
 
-TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][MULTIAGENT]") {
+TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][PROFILE][MULTIAGENT]") {
     GraphGenerator generator;
     MetricsCollector collector("node_update_agent_scaling");
 
@@ -212,7 +184,6 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
         REQUIRE(fixture.create_agents(N, config_file));
         fixture.wait_for_sync();
 
-        // Each agent gets its own dedicated node to avoid update contention.
         std::vector<uint64_t> agent_node_ids(N);
         for (uint32_t i = 0; i < N; ++i) {
             auto* graph = fixture.get_agent(i);
@@ -230,9 +201,6 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
         std::atomic<bool> stop_flag{false};
         std::barrier sync_point(N);
 
-        std::vector<std::vector<uint64_t>> per_thread_samples(N);
-        for (auto& s : per_thread_samples) s.reserve(500000 / N);
-
         std::vector<std::thread> threads;
         threads.reserve(N);
 
@@ -243,7 +211,6 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
                 auto* graph = fixture.get_agent(agent_idx);
                 uint64_t nid = agent_node_ids[agent_idx];
                 uint64_t local_ops = 0;
-                auto& samples = per_thread_samples[agent_idx];
 
                 sync_point.arrive_and_wait();
 
@@ -252,9 +219,7 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
                     if (node) {
                         graph->add_or_modify_attrib_local<level_att>(
                             *node, static_cast<int32_t>(local_ops % 1000));
-                        uint64_t ts = bench_now();
                         bool ok = graph->update_node(*node);
-                        samples.push_back(bench_now() - ts);
                         if (!ok)
                             failed_ops.fetch_add(1, std::memory_order_relaxed);
                         local_ops++;
@@ -277,16 +242,8 @@ TEST_CASE("Node update agent scaling", "[SCALABILITY][agents][.multi][PROFILE][M
 
         auto dur = duration_cast<milliseconds>(steady_clock::now() - wall_start);
 
-        LatencyTracker merged;
-        for (auto& s : per_thread_samples)
-            for (auto v : s) merged.record(v);
-
         const std::string n_str = std::to_string(N);
-        collector.record_throughput("node_update", total_ops.load(), dur,
-            {{"agents", n_str}});
-        if (!merged.empty())
-            collector.record_latency_stats("node_update", merged.stats(),
-                {{"agents", n_str}});
+        collector.record_throughput("node_update", total_ops.load(), dur, {{"agents", n_str}});
 
         double ops_per_sec = static_cast<double>(total_ops.load()) /
                              (static_cast<double>(dur.count()) / 1000.0);

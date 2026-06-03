@@ -3,6 +3,7 @@
 //
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/types/user_types.h"
@@ -17,9 +18,11 @@ using namespace DSR;
 
 
 TEST_CASE("Graph edge operations", "[EDGE]") {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_empty_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     SECTION("Get an edge that does not exists by id") {
         std::optional<Edge> e_id = G.get_edge(random_number(), random_number(), random_string());

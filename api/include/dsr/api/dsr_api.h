@@ -16,13 +16,13 @@
 #include <optional>
 #include <type_traits>
 #include <limits>
+#include <string_view>
 #include "dsr/core/crdt/delta_crdt.h"
 #include "dsr/core/rtps/dsrparticipant.h"
 #include "dsr/core/rtps/dsrpublisher.h"
 #include "dsr/core/rtps/dsrsubscriber.h"
 #include "dsr/core/types/crdt_types.h"
 #include "dsr/core/types/user_types.h"
-#include "dsr/core/types/translator.h"
 #include "dsr/core/traits.h"
 #include "dsr/api/dsr_agent_info_api.h"
 #include "dsr/api/dsr_inner_eigen_api.h"
@@ -31,6 +31,7 @@
 #include "dsr/api/dsr_rt_api.h"
 #include "dsr/api/dsr_utils.h"
 #include "dsr/api/dsr_signal_info.h"
+#include "dsr/api/dsr_sync_engine.h"
 #include "dsr/api/dsr_graph_settings.h"
 #include "dsr/api/dsr_logging.h"
 #include "dsr/api/dsr_signal_emitter.h"
@@ -48,17 +49,21 @@
 
 namespace DSR
 {
-    using Nodes = std::unordered_map<uint64_t , mvreg<CRDTNode>>;
     using IDType = uint64_t;
     static constexpr uint64_t CLEAR_DELETED_SIGNAL = std::numeric_limits<uint64_t>::max();
+
+    class CRDTSyncEngine;
+    class LWWSyncEngine;
 
     /////////////////////////////////////////////////////////////////
     /// CRDT API
     /////////////////////////////////////////////////////////////////
-    class DSRGraph : public QObject
+    class DSRGraph : public QObject, public SyncEngineHost
     {
         friend RT_API;
         friend class DSRGraphTestAccess;
+        friend class CRDTSyncEngine;
+        friend class LWWSyncEngine;
 
         public:
         size_t size() const;
@@ -169,6 +174,7 @@ namespace DSR
 
             const auto &av = [&]() -> const DSR::Attribute& {
                 if constexpr (node_or_edge<Type>) return value->second;
+                else if constexpr (lww_node_or_edge<Type>) return value->value;
                 else return value->second.read_reg();
             }();
 
@@ -205,6 +211,44 @@ namespace DSR
             }
         }
 
+        template <typename name>
+        inline std::optional<decltype(name::type)> get_attrib_by_name(const Attribute &av)
+            requires(is_attr_name<name>) {
+            using name_type = std::remove_cv_t<unwrap_reference_wrapper_t<std::remove_reference_t<std::remove_cv_t<decltype(name::type)>>>>;
+
+            if constexpr (std::is_same_v< name_type, float>)
+                return av.fl();
+            else if constexpr (std::is_same_v< name_type, double>)
+                return av.dob();
+            else if constexpr (std::is_same_v< name_type, std::string>)
+                return std::cref(av.str());
+            else if constexpr (std::is_same_v< name_type, std::int32_t>)
+                return av.dec();
+            else if constexpr (std::is_same_v< name_type, std::uint32_t>)
+                return av.uint();
+            else if constexpr (std::is_same_v< name_type, std::uint64_t>)
+                return av.uint64();
+            else if constexpr (std::is_same_v< name_type, bool>)
+                return av.bl();
+            else if constexpr (std::is_same_v< name_type, std::vector<float>>)
+                return std::cref(av.float_vec());
+            else if constexpr (std::is_same_v< name_type, std::vector<uint8_t>>)
+                return std::cref(av.byte_vec());
+            else if constexpr (std::is_same_v< name_type, std::vector<uint64_t>>)
+                return std::cref(av.u64_vec());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 2>>)
+                return std::cref(av.vec2());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 3>>)
+                return std::cref(av.vec3());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 4>>)
+                return std::cref(av.vec4());
+            else if constexpr (std::is_same_v< name_type, std::array<float, 6>>)
+                return std::cref(av.vec6());
+            else {
+                []<bool flag = false>() { static_assert(flag, "Unreachable"); }();
+            }
+        }
+
 
         template <typename name>
         inline std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>> get_attrib_by_name(uint64_t id)
@@ -212,18 +256,20 @@ namespace DSR
         {
             using ret_type = std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>;
             std::shared_lock<std::shared_mutex> lock(_mutex);
-            std::optional<CRDTNode> n = get_(id);
-            if (n.has_value()) {
-                auto tmp = get_attrib_by_name<name>(n.value());
-                if (tmp.has_value())
-                {
-                    if constexpr(is_reference_wrapper<decltype(name::type)>::value) {
-                        return ret_type{tmp.value().get()};
-                    } else {
-                        return tmp;
+            std::optional<ret_type> out;
+            with_node_attrs_(id, [&](const SyncEngine::NodeAttrsView& attrs) {
+                if (const auto* attr = attrs.find(name::attr_name.data()); attr != nullptr) {
+                    auto tmp = get_attrib_by_name<name>(*attr);
+                    if (tmp.has_value()) {
+                        if constexpr(is_reference_wrapper<decltype(name::type)>::value) {
+                            out = tmp.value().get();
+                        } else {
+                            out = tmp;
+                        }
                     }
                 }
-            }
+            });
+            if (out.has_value()) return out;
             return {};
         }
 
@@ -256,24 +302,27 @@ namespace DSR
         {
             using ret_type = std::tuple<std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(name::type)>>> ...>;
             std::shared_lock<std::shared_mutex> lock(_mutex);
-            std::optional<CRDTNode> node = get_(id);
-            if (node.has_value())
-            {
+            std::optional<ret_type> out;
+            with_node_view_(id, [&](const SyncEngine::NodeView& node_view) {
+                const auto& attrs_view = node_view.attrs();
                 auto get_by_name = [&]<typename n>(n* dummy) -> std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(n::type)>>>
                 {
-                    auto tmp = get_attrib_by_name<n>(node.value());
-                    if (tmp.has_value())
-                    {
-                        if constexpr(is_reference_wrapper<decltype(n::type)>::value) {
-                            return tmp.value().get();
-                        } else {
-                            return tmp;
+                    if (const auto* attr = attrs_view.find(n::attr_name.data()); attr != nullptr) {
+                        auto tmp = get_attrib_by_name<n>(*attr);
+                        if (tmp.has_value())
+                        {
+                            if constexpr(is_reference_wrapper<decltype(n::type)>::value) {
+                                return tmp.value().get();
+                            } else {
+                                return tmp;
+                            }
                         }
-                    } else  return {};
+                    }
+                    return {};
                 };
-
-                return ret_type(std::move(get_by_name(static_cast<name*>(nullptr))) ...);
-            }
+                out = ret_type(std::move(get_by_name(static_cast<name*>(nullptr))) ...);
+            });
+            if (out.has_value()) return *out;
             constexpr auto return_nullopt = []<typename n>(n* dummy) { return std::optional<std::remove_cvref_t<unwrap_reference_wrapper_t<decltype(n::type)>>>{}; };
             return ret_type( return_nullopt(static_cast<name*>(nullptr)) ...);
         }
@@ -292,11 +341,11 @@ namespace DSR
                 elem.attrs().insert_or_assign(name::attr_name.data(), at);
             } else
             {
-                CRDTAttribute at;
+                Attribute at;
                 at.value(std::forward<Ta>(att_value));
                 at.timestamp(get_unix_timestamp());
                 if (elem.attrs().find(name::attr_name.data()) == elem.attrs().end()) {
-                    mvreg<CRDTAttribute> mv;
+                    mvreg<Attribute> mv;
                     elem.attrs().insert(make_pair(name::attr_name, mv));
                 }
                 elem.attrs().at(name::attr_name.data()).write(at);
@@ -316,11 +365,11 @@ namespace DSR
                 Attribute at(std::forward<Ta>(att_value), get_unix_timestamp(), agent_id);
                 elem.attrs().insert_or_assign(att_name, at);
             } else {
-                CRDTAttribute at;
+                Attribute at;
                 at.value(std::forward<Ta>(att_value));
                 at.timestamp(get_unix_timestamp());
                 if (elem.attrs().find(att_name) == elem.attrs().end()) {
-                    mvreg<CRDTAttribute> mv;
+                    mvreg<Attribute> mv;
                     elem.attrs().insert(make_pair(att_name, mv));
                 }
                 elem.attrs().at(att_name).write(at);
@@ -466,20 +515,7 @@ namespace DSR
         inline uint64_t get_agent_id() const { return agent_id; };
         inline std::string get_agent_name() const { return agent_name; };
 
-        void reset()
-        {
-            dsrparticipant.remove_participant_and_entities();
-
-            nodes.clear();
-            deleted.clear();
-            name_map.clear();
-            id_map.clear();
-            edges.clear();
-            edgeType.clear();
-            nodeType.clear();
-            to_edges.clear();
-
-        }
+        void reset();
 
         void clear_deleted()
         {
@@ -490,10 +526,12 @@ namespace DSR
             }
             if (!copy)
             {
-                IDL::MvregNode signal;
-                signal.id(CLEAR_DELETED_SIGNAL);
-                signal.agent_id(agent_id);
-                dsrpub_node.write(&signal);
+                DSR::MvregNodeMsg signal;
+                signal.id = CLEAR_DELETED_SIGNAL;
+                signal.agent_id = agent_id;
+                signal.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+                signal.sync_mode = sync_mode_wire_value(sync_mode);
+                dsrparticipant.publish_node(signal);
             }
         }
 
@@ -525,22 +563,8 @@ namespace DSR
         {
             utils->read_from_json_file(file, [&] (const Node& node) -> std::optional<uint64_t>
             {
-                bool r = false;
-                {
-                    std::unique_lock<std::shared_mutex> lock(_mutex);
-                    if (auto t1 = !id_map.contains(node.id()), t2 = !name_map.contains(node.name()); t1 and t2) {
-                        std::tie(r, std::ignore) = insert_node_(user_node_to_crdt(node));
-                    } else {
-                        if (!t1 and t2) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                        if (t1) throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                        throw std::runtime_error((std::string("Cannot insert node in G, a node with the same name (" +  node.name() +") and same id (" +  std::to_string(node.id()) +") already exists ") + __FILE__ + " " + " " + std::to_string(__LINE__)).data());
-                    }
-
-                }
-                if (r) {
-                    return node.id();
-                }
-                return {};
+                auto copy = node;
+                return insert_node_with_id(copy);
             });
         };
 
@@ -557,7 +581,8 @@ namespace DSR
         std::vector<std::string> get_connected_agents()
         {
             std::unique_lock<std::mutex> lck(participant_set_mutex);
-            std::vector<std::string> ret_vec(participant_set.size());
+            std::vector<std::string> ret_vec;
+            ret_vec.reserve(participant_set.size());
             for (auto &[k, _]: participant_set)
             {
                 ret_vec.emplace_back(k);
@@ -585,7 +610,6 @@ namespace DSR
 
         DSRGraph(const DSRGraph& G); //Private constructor for DSRCopy
 
-        Nodes nodes;
         mutable std::shared_mutex _mutex;
         mutable std::shared_mutex _mutex_cache_maps;
         mutable std::mutex mtx_entity_creation;
@@ -593,12 +617,14 @@ namespace DSR
         const uint32_t agent_id;
         const std::string agent_name;
         const bool copy;
+        const SyncMode sync_mode;
         std::unique_ptr<Utilities> utils;
         std::unordered_set<std::string_view> ignored_attributes;
         bool same_host;
         id_generator generator;
         GraphSettings::LOGLEVEL log_level;
         signals_fns emitter;
+        SyncEnginePtr engine_;
 
         //////////////////////////////////////////////////////////////////////////
         // Signal method
@@ -638,90 +664,155 @@ namespace DSR
         // Cache maps
         ///////////////////////////////////////////////////////////////////////////
 
+        struct TransparentStringHash
+        {
+            using is_transparent = void;
+
+            size_t operator()(std::string_view value) const noexcept
+            {
+                return std::hash<std::string_view>{}(value);
+            }
+        };
+
+        struct TransparentStringEqual
+        {
+            using is_transparent = void;
+
+            bool operator()(std::string_view lhs, std::string_view rhs) const noexcept
+            {
+                return lhs == rhs;
+            }
+        };
+
         std::unordered_set<uint64_t> deleted;     // deleted nodes, used to avoid insertion after remove.
-        std::unordered_map<std::string, uint64_t> name_map;     // mapping between name and id of nodes.
+        std::unordered_map<std::string, uint64_t, TransparentStringHash, TransparentStringEqual> name_map;     // mapping between name and id of nodes.
         std::unordered_map<uint64_t, std::string> id_map;       // mapping between id and name of nodes.
         std::unordered_map<std::pair<uint64_t, uint64_t>, std::unordered_set<std::string>, hash_tuple> edges;      // collection with all graph edges. ((from, to), key)
         std::unordered_map<uint64_t , std::unordered_set<std::pair<uint64_t, std::string>,hash_tuple>> to_edges;      // collection with all graph edges. (to, (from, key))
-        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>> edgeType;  // collection with all edge types.
-        std::unordered_map<std::string, std::unordered_set<uint64_t>> nodeType;  // collection with all node types.
+        std::unordered_map<std::string, std::unordered_set<std::pair<uint64_t, uint64_t>, hash_tuple>, TransparentStringHash, TransparentStringEqual> edgeType;  // collection with all edge types.
+        std::unordered_map<std::string, std::unordered_set<uint64_t>, TransparentStringHash, TransparentStringEqual> nodeType;  // collection with all node types.
 
-        void update_maps_node_delete(uint64_t id, const std::optional<CRDTNode>& n);
-        void update_maps_node_insert(uint64_t id, const CRDTNode &n);
-        void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "");
-        void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key);
+        template<typename T>
+        void update_maps_node_delete_impl(uint64_t id, std::optional<std::string_view> type, const T& outgoing_edges) {
+            std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
+            if (auto id_it = id_map.find(id); id_it != id_map.end()) {
+                name_map.erase(id_it->second);
+                id_map.erase(id_it);
+            }
+            deleted.insert(id);
+            to_edges.erase(id);
+
+            if (type.has_value())
+            {
+                if (auto node_type_it = nodeType.find(*type); node_type_it != nodeType.end()) {
+                    node_type_it->second.erase(id);
+                    if (node_type_it->second.empty()) nodeType.erase(node_type_it);
+                }
+                for (const auto& [to, edge_type] : outgoing_edges) {
+                    const auto tuple = std::pair{id, to};
+                    if (auto edge_it = edges.find(tuple); edge_it != edges.end()) {
+                        edge_it->second.erase(edge_type);
+                        if (edge_it->second.empty()) edges.erase(edge_it);
+                    }
+                    if (auto edge_type_it = edgeType.find(edge_type); edge_type_it != edgeType.end()) {
+                        edge_type_it->second.erase({id, to});
+                        if (edge_type_it->second.empty()) edgeType.erase(edge_type_it);
+                    }
+                    if (auto to_edge_it = to_edges.find(to); to_edge_it != to_edges.end()) {
+                        to_edge_it->second.erase({id, edge_type});
+                        if (to_edge_it->second.empty()) to_edges.erase(to_edge_it);
+                    }
+                }
+            }
+        }
+
+        template<typename T>
+        void update_maps_node_insert_impl(uint64_t id, std::string name, const std::string& type, const T& outgoing_edges) {
+            std::unique_lock<std::shared_mutex> lck(_mutex_cache_maps);
+
+            // Updates in the LWW backend flow through a delete+insert cache refresh.
+            // Re-inserting the node must clear any stale tombstone marker so future
+            // local updates are not rejected as "node is deleted".
+            deleted.erase(id);
+            name_map[name] = id;
+            id_map[id] = std::move(name);
+            nodeType[type].emplace(id);
+            for (const auto& [to, edge_type] : outgoing_edges)
+            {
+                edges[{id, to}].insert(edge_type);
+                edgeType[edge_type].insert({id, to});
+                to_edges[to].insert({id, edge_type});
+            }
+        }
+        void update_maps_edge_delete(uint64_t from, uint64_t to, const std::string &key = "") override;
+        void update_maps_edge_insert(uint64_t from, uint64_t to, const std::string &key) override;
+
+        uint32_t local_agent_id() const override { return agent_id; }
+        SyncMode local_sync_mode() const override { return sync_mode; }
+        bool is_copy_graph() const override { return copy; }
+        void update_maps_node_insert(uint64_t id, std::string_view name, std::string_view type, const EdgeKeyList& outgoing_edges) override;
+        void update_maps_node_delete(uint64_t id, std::optional<std::string_view> type, const EdgeKeyList& outgoing_edges) override;
+        
+
+        GraphSettings::LOGLEVEL get_log_level() const override { return log_level; }
+        bool is_attribute_ignored(const std::string& name) const override;
+        bool is_node_deleted(uint64_t id) const override;
+        void for_each_incoming_edge(uint64_t to, std::function<void(uint64_t from, const std::string& type)> visitor) const override;
+        void for_each_edge_of_type_cache(const std::string& type, std::function<void(uint64_t from, uint64_t to)> visitor) const override;
+
+        void on_remote_node_updated(uint64_t id, const std::string& type, uint32_t agent_id) override;
+        void on_remote_node_deleted(uint64_t id, const std::optional<Node>& node, const std::vector<Edge>& edges, uint32_t agent_id) override;
+        void on_remote_edge_updated(uint64_t from, uint64_t to, const std::string& type, uint32_t agent_id) override;
+        void on_remote_edge_deleted(uint64_t from, uint64_t to, const std::string& type, const std::optional<Edge>& edge, uint32_t agent_id) override;
+        void on_remote_node_attrs_updated(uint64_t id, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id) override;
+        void on_remote_edge_attrs_updated(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id) override;
 
 
         //////////////////////////////////////////////////////////////////////////
         // Non-blocking graph operations
         //////////////////////////////////////////////////////////////////////////
-        std::optional<CRDTNode> get_(uint64_t id);
-        std::optional<CRDTEdge> get_edge_(uint64_t from, uint64_t to, const std::string &key);
-        std::tuple<bool, std::optional<IDL::MvregNode>> insert_node_(CRDTNode &&node);
-        std::tuple<bool, std::optional<std::vector<IDL::MvregNodeAttr>>> update_node_(CRDTNode &&node);
-        std::tuple<bool, std::vector<Edge>, std::optional<IDL::MvregNode>, std::vector<IDL::MvregEdge>> delete_node_(uint64_t id);
-        std::optional<IDL::MvregEdge> delete_edge_(uint64_t from, uint64_t t, const std::string &key);
-        std::tuple<bool, std::optional<IDL::MvregEdge>, std::optional<std::vector<IDL::MvregEdgeAttr>>> insert_or_assign_edge_(CRDTEdge &&attrs, uint64_t from, uint64_t to);
-
-        //////////////////////////////////////////////////////////////////////////
-        // Other methods
-        //////////////////////////////////////////////////////////////////////////
-        std::map<uint64_t , IDL::MvregNode> Map();
-
-        //////////////////////////////////////////////////////////////////////////
-        // CRDT join operations
-        ///////////////////////////////////////////////////////////////////////////
-        void join_delta_node(IDL::MvregNode &&mvreg);
-        void join_delta_edge(IDL::MvregEdge &&mvreg);
-        std::optional<std::string> join_delta_node_attr(IDL::MvregNodeAttr &&mvreg);
-        std::optional<std::string> join_delta_edge_attr(IDL::MvregEdgeAttr &&mvreg);
-        void join_full_graph(IDL::OrMap &&full_graph);
-
-        bool process_delta_edge(uint64_t from, uint64_t to, const std::string& type, mvreg<CRDTEdge> && delta);
-        void process_delta_node_attr(uint64_t id, const std::string& att_name, mvreg<CRDTAttribute> && attr);
-        void process_delta_edge_attr(uint64_t from, uint64_t to, const std::string& type, const std::string& att_name, mvreg<CRDTAttribute> && attr);
-
-        //Maps for temporary deltas
-        std::unordered_multimap<uint64_t, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t> > unprocessed_delta_node_att;
-        std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_from;
-        std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<DSR::CRDTEdge>, uint64_t>> unprocessed_delta_edge_to;
-        std::unordered_multimap<std::tuple<uint64_t, uint64_t, std::string>, std::tuple<std::string, mvreg<DSR::CRDTAttribute>, uint64_t>, hash_tuple> unprocessed_delta_edge_att;
+        bool with_node_attrs_(uint64_t id, const SyncEngine::NodeAttrsVisitor& visitor) const;
+        bool with_node_view_(uint64_t id, const SyncEngine::NodeViewVisitor& visitor) const;
+        void publish_node_message(const NodeDeltaMessage &message);
+        void publish_node_attr_batch(const NodeAttrDeltaBatchMessage &message);
+        void publish_edge_message(const EdgeDeltaMessage &message);
+        void publish_edge_attr_batch(const EdgeAttrDeltaBatchMessage &message);
+        void publish_full_graph_message(FullGraphMessage &&message, int32_t sender_id);
 
         // ThreadPools are declared after all data they access so that their
         // destructors (which join worker threads) run before the data members
         // are destroyed, preventing use-after-free data races on shutdown.
         ThreadPool tp, tp_delta_attr;
 
+        template <typename Sample>
+        using SampleCallback = std::function<void(Sample&&, const DSR::Transport::ReceivedSampleInfo&)>;
+
+        template <typename Sample>
+        SampleCallback<Sample> make_node_subscription_functor_impl(const char* channel, bool clear_deleted_signal = false);
+        template <typename Sample>
+        SampleCallback<Sample> make_edge_subscription_functor_impl(const char* channel);
+        template <typename Batch>
+        SampleCallback<Batch> make_edge_attrs_subscription_functor_impl(const char* channel);
+        template <typename Batch>
+        SampleCallback<Batch> make_node_attrs_subscription_functor_impl(const char* channel);
+        template <typename GraphSample>
+        SampleCallback<GraphSample> make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
+
         //Custom function for each rtps topic
-        class NewMessageFunctor {
+        class ParticipantChangeFn {
         public:
             DSRGraph *graph{};
-            std::function<void(eprosima::fastdds::dds::DataReader* reader, DSR::DSRGraph *graph)> f;
+            using status_type = DSR::Transport::ParticipantDiscoveryStatus;
+            using info_type = DSR::Transport::ParticipantDiscoveryInfo;
+            std::function<void(DSRGraph *graph_, status_type, const info_type&)> f;
 
-            NewMessageFunctor(DSRGraph *graph_,
-                              std::function<void(eprosima::fastdds::dds::DataReader* reader,  DSR::DSRGraph *graph)> f_)
+            ParticipantChangeFn(DSRGraph *graph_,
+                                     std::function<void(DSRGraph *graph_, status_type, const info_type&)> f_)
                     : graph(graph_), f(std::move(f_)) {}
 
-            NewMessageFunctor() = default;
+            ParticipantChangeFn() = default;
 
-            void operator()(eprosima::fastdds::dds::DataReader* reader) const { f(reader, graph); };
-        };
-
-        //Custom function for each rtps topic
-        class ParticipantChangeFunctor {
-        public:
-            DSRGraph *graph{};
-            std::function<void(DSRGraph *graph_,eprosima::fastdds::rtps::ParticipantDiscoveryStatus, const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f;
-
-            ParticipantChangeFunctor(DSRGraph *graph_,
-                                     std::function<void(DSRGraph *graph_, eprosima::fastdds::rtps::ParticipantDiscoveryStatus,
-                                                        const eprosima::fastdds::rtps::ParticipantBuiltinTopicData&)> f_)
-                    : graph(graph_), f(std::move(f_)) {}
-
-            ParticipantChangeFunctor() = default;
-
-            void operator()(eprosima::fastdds::rtps::ParticipantDiscoveryStatus status,
-                            const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info) const
+            void operator()(status_type status, const info_type& info) const
             {
                 f(graph, status, info);
             };
@@ -746,31 +837,6 @@ namespace DSR
         std::unordered_map<std::string, bool> participant_set;
 
         mutable std::mutex participant_set_mutex;
-
-        DSRPublisher dsrpub_node;
-        DSRSubscriber dsrsub_node;
-        NewMessageFunctor dsrpub_call_node;
-
-        DSRPublisher dsrpub_edge;
-        DSRSubscriber dsrsub_edge;
-        NewMessageFunctor dsrpub_call_edge;
-
-        DSRPublisher dsrpub_node_attrs;
-        DSRSubscriber dsrsub_node_attrs;
-        NewMessageFunctor dsrpub_call_node_attrs;
-
-        DSRPublisher dsrpub_edge_attrs;
-        DSRSubscriber dsrsub_edge_attrs;
-        NewMessageFunctor dsrpub_call_edge_attrs;
-
-        DSRSubscriber dsrsub_graph_request;
-        DSRPublisher dsrpub_graph_request;
-        NewMessageFunctor dsrpub_graph_request_call;
-
-        DSRSubscriber dsrsub_request_answer;
-        DSRPublisher dsrpub_request_answer;
-        NewMessageFunctor dsrpub_request_answer_call;
-
     Q_OBJECT
     signals:
         void update_node_signal(uint64_t, const std::string &type, DSR::SignalInfo info = {});

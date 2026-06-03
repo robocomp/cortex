@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dsr/core/types/internal_types.h"
 #include <cstdint>
 #include <string>
 #include <dsr/api/dsr_signal_emitter.h>
@@ -19,6 +20,7 @@ struct GraphSettings {
     } log_level {LOGLEVEL::INFOL};
     int8_t domain_id = 0;
     SignalMode signal_mode = QT;
+    SyncMode sync_mode = SyncMode::CRDT;
 };
 
 }

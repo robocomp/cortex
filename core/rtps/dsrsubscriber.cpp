@@ -6,9 +6,12 @@
 #include <fastdds/rtps/common/MatchingInfo.hpp>
 #include <fastdds/utils/IPFinder.hpp>
 
+#include <dsr/core/rtps/env_overrides.h>
 #include <dsr/core/rtps/dsrsubscriber.h>
 
 #include <QDebug>
+
+#include <algorithm>
 
 using namespace eprosima;
 using namespace eprosima::fastdds;
@@ -25,6 +28,27 @@ Locator_t domain_multicast_locator(int8_t domain_id)
         ("239.255." + std::to_string(domain / 250) + "." + std::to_string(1 + (domain % 250))).c_str());
     return locator;
 }
+
+uint32_t env_u32_or(const char* name, uint32_t fallback, uint32_t minimum = 0)
+{
+    const auto value = DSR::RTPS::Env::read_u32(name);
+    if (!value.present()) {
+        return fallback;
+    }
+    if (!value.value.has_value() || *value.value < minimum) {
+        qWarning() << "Ignoring invalid" << name << "value" << value.raw;
+        return fallback;
+    }
+    qInfo() << "Using" << name << "override" << *value.value;
+    return *value.value;
+}
+
+eprosima::fastdds::dds::Duration_t duration_from_ms(uint32_t ms)
+{
+    return eprosima::fastdds::dds::Duration_t(
+        static_cast<int32_t>(ms / 1000U),
+        static_cast<uint32_t>((ms % 1000U) * 1000000U));
+}
 }
 
 DSRSubscriber::DSRSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr), mp_reader(nullptr) {}
@@ -32,11 +56,11 @@ DSRSubscriber::DSRSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr)
 DSRSubscriber::~DSRSubscriber()
 = default;
 
-std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::DataReader*>
-        DSRSubscriber::init(eprosima::fastdds::dds::DomainParticipant *mp_participant_,
-                         eprosima::fastdds::dds::Topic *topic,
+std::tuple<bool, DSRSubscriber::subscriber_handle_type*, DSRSubscriber::reader_handle_type*>
+        DSRSubscriber::init_impl(participant_handle_type *mp_participant_,
+                         topic_handle_type *topic,
                          int8_t domain_id,
-                        const std::function<void(eprosima::fastdds::dds::DataReader*)>&  f_,
+                        callback_type  f_,
                         std::mutex& mtx,
                         bool isStreamData)
 {
@@ -70,13 +94,22 @@ std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::Da
     }
 
     //Check latency
-    dataReaderQos.latency_budget().duration = {0,50000000}; //50ms;
+    dataReaderQos.latency_budget().duration =
+        duration_from_ms(env_u32_or("DSR_READER_LATENCY_BUDGET_MS", 50));
 
     if (isStreamData) {
         dataReaderQos.reliability().kind = eprosima::fastdds::dds::BEST_EFFORT_RELIABILITY_QOS;
         dataReaderQos.history().kind = eprosima::fastdds::dds::KEEP_LAST_HISTORY_QOS;
-        dataReaderQos.history().depth = 50;
+        const auto depth = static_cast<int32_t>(env_u32_or("DSR_STREAM_HISTORY_DEPTH", 50, 1));
+        dataReaderQos.history().depth = depth;
+        dataReaderQos.resource_limits().max_samples = std::max(dataReaderQos.resource_limits().max_samples, depth);
+        dataReaderQos.resource_limits().allocated_samples =
+            std::max(dataReaderQos.resource_limits().allocated_samples, depth);
         dataReaderQos.reliable_reader_qos().disable_positive_acks.enabled = true;
+    } else {
+        const auto max_samples = static_cast<int32_t>(env_u32_or("DSR_RELIABLE_MAX_SAMPLES", 400, 1));
+        dataReaderQos.resource_limits().max_samples = max_samples;
+        dataReaderQos.resource_limits().allocated_samples = max_samples;
     }
 
 
@@ -102,11 +135,11 @@ std::tuple<bool, eprosima::fastdds::dds::Subscriber*, eprosima::fastdds::dds::Da
 }
 
 
-eprosima::fastdds::dds::Subscriber * DSRSubscriber::getSubscriber(){
+DSRSubscriber::subscriber_handle_type * DSRSubscriber::getSubscriber_impl(){
     return mp_subscriber;
 }
 
-eprosima::fastdds::dds::DataReader * DSRSubscriber::getDataReader() {
+DSRSubscriber::reader_handle_type * DSRSubscriber::getDataReader_impl() {
     return mp_reader;
 }
 

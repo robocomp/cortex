@@ -40,6 +40,16 @@ namespace DSR {
 
     std::string AgentInfoAPI::exec(const char* cmd)
     {
+        struct PipeCloser
+        {
+            void operator()(FILE* pipe) const noexcept
+            {
+                if (pipe != nullptr) {
+                    pclose(pipe);
+                }
+            }
+        };
+
         std::array<char, 128> buffer{};
         std::string result;
         std::unique_ptr<FILE, PipeCloser> pipe(popen(cmd, "r"));

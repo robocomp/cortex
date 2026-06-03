@@ -8,6 +8,7 @@
 #include <optional>
 
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/generators/catch_generators.hpp"
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include "dsr/core/types/type_checking/dsr_node_type.h"
 
@@ -37,9 +38,11 @@ REGISTER_TYPE(att_no_reference, vec6, false)
 
 
 SCENARIO( "Node insertions, updates and removals", "[NODE]" ) {
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
 
     auto filename = make_edge_config_file();
-    DSRGraph G(random_string(10), rand() % 1200, filename);
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1200, filename, true, 0, SignalMode::QT, sync_mode));
 
     GIVEN("A new Node")
     {
