@@ -40,8 +40,8 @@
 #include "dsr/core/types/type_checking/dsr_attr_name.h"
 #include "dsr/core/utils.h"
 #include "dsr/core/id_generator.h"
+#include "dsr/core/threadpool/threadpool.h"
 #include "dsr_signal_emitter.h"
-#include "threadpool/threadpool.h"
 
 #include <QObject>
 

@@ -134,8 +134,8 @@ DSRGraph::DSRGraph(GraphSettings settings) :
         agent_name(std::move(settings.graph_name)),
         copy(false),
         sync_mode(settings.sync_mode),
-        tp(settings.theradpool_threads, "join"),
-        tp_delta_attr(settings.attribute_threadpool_threads, "attr"),
+    tp(settings.theradpool_threads, "graph"),
+    tp_delta_attr(settings.attribute_threadpool_threads, "graph-attr"),
         same_host(settings.same_host),
         generator(settings.agent_id),
         log_level(settings.log_level),
@@ -583,6 +583,12 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
     CORTEX_PROFILE_ZONE_N("DSRGraph::update_node");
     NodeMutationEffect effect;
 
+    // Cache id/type up-front: when the caller passes an rvalue Node we forward
+    // (move) it into the engine below, after which `node` is moved-from and must
+    // not be read. These cached values are used by the post-lock signal emission.
+    const uint64_t cached_node_id = node.id();
+    const std::string cached_node_type = node.type();
+
     {
         std::unique_lock<std::shared_mutex> lock(_mutex);
         std::shared_lock<std::shared_mutex> lck_cache(_mutex_cache_maps);
@@ -599,7 +605,9 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
                      __FUNCTION__ + " " + std::to_string(__LINE__)).data());
         else if (id_it != id_map.end()) {
             lck_cache.unlock();
-            effect = engine_->update_node_local(Node(node));
+            // Perfect-forward into the engine: rvalue callers move (no deep blob
+            // copy under _mutex), lvalue/const callers still copy as before.
+            effect = engine_->update_node_local(Node(std::forward<No>(node)));
             if (!effect.applied) {
                 return false;
             }
@@ -617,10 +625,10 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
         }
         CORTEX_PROFILE_DETAIL_N("DSRGraph::update_node emit signals");
         if (effect.node_delta.has_value() || effect.node_attr_batch.has_value()) {
-            DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", node.id(), node.type());
-            emitter.update_node_signal(node.id(), node.type(), SignalInfo{agent_id});
+            DSR_LOG_DEBUG("[UPDATE_NODE] emitting update_node_signal", cached_node_id, cached_node_type);
+            emitter.update_node_signal(cached_node_id, cached_node_type, SignalInfo{agent_id});
             if (!effect.changed_attributes.empty()) {
-                emitter.update_node_attr_signal(node.id(), effect.changed_attributes, SignalInfo{agent_id});
+                emitter.update_node_attr_signal(cached_node_id, effect.changed_attributes, SignalInfo{agent_id});
             }
         }
     }
@@ -1301,8 +1309,8 @@ DSRGraph::DSRGraph(const DSRGraph &G)
       generator(G.agent_id),
       log_level(G.log_level),
       engine_(make_sync_engine(*this, G.sync_mode)),
-      tp(1, "join-copy"),
-      tp_delta_attr(1, "attr-copy")
+    tp(1, "graph"),
+    tp_delta_attr(1, "graph-attr")
 {
     std::shared_lock<std::shared_mutex> lock(G._mutex);
     std::shared_lock<std::shared_mutex> lock_cache(G._mutex_cache_maps);

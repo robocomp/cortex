@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-#include "threadpool/threadpool.h"
+#include "dsr/core/threadpool/threadpool.h"
 
 
 #include <bsoncxx/json.hpp>
@@ -190,7 +190,7 @@ public:
     }
 
 private:
-    Logger() : worker(1), client{mongocxx::uri{"mongodb://localhost:27017"}}
+    Logger() : worker(1, "logger"), client{mongocxx::uri{"mongodb://localhost:27017"}}
     {
     }
 

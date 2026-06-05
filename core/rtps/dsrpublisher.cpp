@@ -101,6 +101,33 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
         const auto max_samples = static_cast<int32_t>(env_u32_or("DSR_RELIABLE_MAX_SAMPLES", 300, 1));
         dataWriterQos.resource_limits().max_samples = max_samples;
         dataWriterQos.resource_limits().allocated_samples = max_samples;
+
+        // Phase 1 liveliness-decoupling: by default the reliable writers use KEEP_ALL, which
+        // pins the history full of un-ACKed samples when a reader is slow/saturated. That
+        // blocks every subsequent write() — including the tiny agent heartbeat published via
+        // update_node() — for as long as the reader stays behind (observed: a 135 s heartbeat
+        // freeze under CPU load, which the presence protocol misread as a crashed peer).
+        // Opting into KEEP_LAST(depth) makes a full history discard the OLDEST sample instead
+        // of blocking, so bulk sensor traffic (lidar/camera node updates) can never perpetually
+        // starve liveliness updates. Disabled (0) by default to preserve legacy behaviour; set
+        // DSR_RELIABLE_KEEP_LAST_DEPTH>0 to enable.
+        const auto keep_last_depth = static_cast<int32_t>(env_u32_or("DSR_RELIABLE_KEEP_LAST_DEPTH", 0));
+        if (keep_last_depth > 0) {
+            dataWriterQos.history().kind = eprosima::fastdds::dds::KEEP_LAST_HISTORY_QOS;
+            dataWriterQos.history().depth = keep_last_depth;
+            dataWriterQos.resource_limits().max_samples =
+                std::max(dataWriterQos.resource_limits().max_samples, keep_last_depth);
+            dataWriterQos.resource_limits().allocated_samples =
+                std::max(dataWriterQos.resource_limits().allocated_samples, keep_last_depth);
+        }
+    }
+
+    // Bound how long a single write() may block waiting for history space. 0 (default) keeps
+    // the FastDDS default behaviour. A small value (e.g. 20 ms) guarantees update_node()
+    // returns promptly instead of stalling the calling thread — notably the heartbeat thread —
+    // when a reader falls behind. Set DSR_WRITER_MAX_BLOCKING_MS>0 to enable.
+    if (const auto max_blocking_ms = env_u32_or("DSR_WRITER_MAX_BLOCKING_MS", 0); max_blocking_ms > 0) {
+        dataWriterQos.reliability().max_blocking_time = duration_from_ms(max_blocking_ms);
     }
 
     // Check ACK for sended messages.

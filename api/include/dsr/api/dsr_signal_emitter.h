@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <dsr/core/threadpool/threadpool.h>
 #include <functional>
 #include <string>
-#include <threadpool/threadpool.h>
 #include <variant>
 
 namespace DSR {
@@ -63,7 +63,7 @@ struct QueuedSignalRunner {
   std::vector<del_node_signal_noinfo_t> den_fns;
   std::vector<deleted_node_signal_noinfo_t> dn_fns;
   std::vector<deleted_edge_signal_noinfo_t> de_fns;
-  explicit QueuedSignalRunner() : tp(2)
+  explicit QueuedSignalRunner() : tp(2, "signals")
   {}
 
   void connect(signal_fn_ptr_t fn, const std::string& type) {
