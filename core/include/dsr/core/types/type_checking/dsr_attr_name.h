@@ -562,4 +562,16 @@ REGISTER_TYPE(epistemic_target_yaw_rad,float,                                   
 REGISTER_TYPE(epistemic_gain,          float,                                             false)
 REGISTER_TYPE(epistemic_pending,       bool,                                              false)
 
+// ── semantic labeling attributes (written by voxelizer, read by table-concept) ───────────────
+REGISTER_TYPE(mask_frame_id,          int,                                               false)
+REGISTER_TYPE(mask_count,             int,                                               false)
+REGISTER_TYPE(mask_labels,            std::reference_wrapper<const std::string>,         false)
+REGISTER_TYPE(mask_label_ids,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_confidences,       std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_support_offsets,   std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_support_points,    std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_centroids_xyz,     std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_bbox_min_xyz,      std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_bbox_max_xyz,      std::reference_wrapper<const std::vector<float>>,  false)
+
 #endif //DSR_ATTR_NAME_H

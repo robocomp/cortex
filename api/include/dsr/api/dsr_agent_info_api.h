@@ -39,7 +39,7 @@ namespace DSR {
                         qDebug() << "[TIMER - DEBUG] Execution time was: "<<  static_cast<double>(wait_time.count())/1000
                                << "ms. Sleeping " << t.count()/1000
                                << "ms. Total: " << static_cast<double>(wait_time.count())/1000+ static_cast<double>(t.count())/1000;
-                        std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>(t/1000));
+                        std::this_thread::sleep_for(t);   // t is already microseconds; the old duration_cast<ms>(t/1000) slept ~0 and busy-spun
                     } else {
                         qWarning() << "[TIMER] Execution time it's longer than period.";
                     }
@@ -88,10 +88,23 @@ namespace DSR {
 
         static std::string exec(const char* cmd);
         void create_or_update_agent();
+        void refresh_process_metrics();
 
         DSRGraph *G;
         uint64_t timestamp_start{0};
         uint32_t period;
+
+        // Process metrics (top/pstree) are expensive to collect, so they are
+        // refreshed on a short-lived background thread at a slow cadence and
+        // cached here. Every heartbeat just reads these atomics, so the heartbeat
+        // thread never blocks on popen/fork and keeps its period.
+        std::atomic<float>   cached_cpu{-1.0f};
+        std::atomic<int64_t> cached_memory_kb{-1};
+        std::atomic<int>     cached_nprocs{-1};
+        std::atomic_bool     metrics_in_flight{false};
+        uint32_t heartbeat_count{0};
+        uint32_t metrics_every_n{8};
+
         Timer timer;
     };
 

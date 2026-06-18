@@ -249,12 +249,12 @@ public:
         key_type dummy_u64 = 0;
         int32_t dummy_i32 = 0;
         s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca);
-        for (const auto& [k, v] : cc) {
+        for (size_t i = 0; i < cc.size(); ++i) {
             s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca);
             s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_i32, ca);
         }
         s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u32, ca);
-        for (const auto& [k, v] : dc) {
+        for (size_t i = 0; i < dc.size(); ++i) {
             s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_u64, ca);
             s += calc.calculate_member_serialized_size(eprosima::fastcdr::MemberId(0), dummy_i32, ca);
         }

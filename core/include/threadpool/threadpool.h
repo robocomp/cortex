@@ -66,7 +66,7 @@ public:
     ThreadPool(ThreadPool &tp) = delete;
     ThreadPool &operator=(const ThreadPool &tp) = delete;
 
-    ThreadPool(uint32_t num_threads = 0, std::string name = "worker") : done(false), pool_name(std::move(name))
+    ThreadPool(uint32_t num_threads = 0, std::string name = "worker") : pool_name(std::move(name)), done(false)
     {
         uint32_t nt = (num_threads == 0) ? std::thread::hardware_concurrency() : num_threads;
         for (std::size_t i = 0; i < nt; i++)

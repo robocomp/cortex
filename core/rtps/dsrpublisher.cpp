@@ -109,9 +109,9 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
         // freeze under CPU load, which the presence protocol misread as a crashed peer).
         // Opting into KEEP_LAST(depth) makes a full history discard the OLDEST sample instead
         // of blocking, so bulk sensor traffic (lidar/camera node updates) can never perpetually
-        // starve liveliness updates. Disabled (0) by default to preserve legacy behaviour; set
-        // DSR_RELIABLE_KEEP_LAST_DEPTH>0 to enable.
-        const auto keep_last_depth = static_cast<int32_t>(env_u32_or("DSR_RELIABLE_KEEP_LAST_DEPTH", 0));
+        // starve liveliness updates. Default to KEEP_LAST(64) for this deployment; the
+        // environment variable still overrides it when a different depth is needed.
+        const auto keep_last_depth = static_cast<int32_t>(env_u32_or("DSR_RELIABLE_KEEP_LAST_DEPTH", 64));
         if (keep_last_depth > 0) {
             dataWriterQos.history().kind = eprosima::fastdds::dds::KEEP_LAST_HISTORY_QOS;
             dataWriterQos.history().depth = keep_last_depth;
@@ -122,11 +122,10 @@ std::tuple<bool, eprosima::fastdds::dds::Publisher*, eprosima::fastdds::dds::Dat
         }
     }
 
-    // Bound how long a single write() may block waiting for history space. 0 (default) keeps
-    // the FastDDS default behaviour. A small value (e.g. 20 ms) guarantees update_node()
-    // returns promptly instead of stalling the calling thread — notably the heartbeat thread —
-    // when a reader falls behind. Set DSR_WRITER_MAX_BLOCKING_MS>0 to enable.
-    if (const auto max_blocking_ms = env_u32_or("DSR_WRITER_MAX_BLOCKING_MS", 0); max_blocking_ms > 0) {
+    // Bound how long a single write() may block waiting for history space. Default to 20 ms so
+    // update_node() returns promptly instead of stalling the calling thread — notably the
+    // heartbeat thread — when a reader falls behind. The environment variable still overrides it.
+    if (const auto max_blocking_ms = env_u32_or("DSR_WRITER_MAX_BLOCKING_MS", 20); max_blocking_ms > 0) {
         dataWriterQos.reliability().max_blocking_time = duration_from_ms(max_blocking_ms);
     }
 

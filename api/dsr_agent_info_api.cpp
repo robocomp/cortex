@@ -62,11 +62,9 @@ namespace DSR {
         return result;
     }
     
-    void AgentInfoAPI::create_or_update_agent()
+    void AgentInfoAPI::refresh_process_metrics()
     {
-        auto str = G->get_agent_name() + " " + std::to_string(G->get_agent_id());
         pid_t pid = getpid();
-
 
         int nprocs = -1;
         int64_t memory_kb = -1;
@@ -130,6 +128,29 @@ namespace DSR {
             std::cerr << "Error in stoi. (parsing value "<< number_of_process << ")." << __FILE__ << ":" << __LINE__  << std::endl;
         }
 
+        cached_cpu.store(cpu, std::memory_order_relaxed);
+        cached_memory_kb.store(memory_kb, std::memory_order_relaxed);
+        cached_nprocs.store(nprocs, std::memory_order_relaxed);
+        metrics_in_flight.store(false, std::memory_order_release);
+    }
+
+    void AgentInfoAPI::create_or_update_agent()
+    {
+        // Collect expensive process metrics (top/pstree) off the heartbeat thread
+        // at a slow cadence. The first beat seeds the values; subsequent beats just
+        // read the cache, so the heartbeat thread never blocks on popen/fork.
+        if ((heartbeat_count++ % metrics_every_n) == 0)
+        {
+            bool expected = false;
+            if (metrics_in_flight.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+                std::thread([this]{ refresh_process_metrics(); }).detach();
+        }
+
+        const float   cpu       = cached_cpu.load(std::memory_order_relaxed);
+        const int64_t memory_kb = cached_memory_kb.load(std::memory_order_relaxed);
+        const int     nprocs    = cached_nprocs.load(std::memory_order_relaxed);
+
+        auto str = G->get_agent_name() + " " + std::to_string(G->get_agent_id());
 
         if (auto node = G->get_node(str))
         {

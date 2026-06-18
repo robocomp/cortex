@@ -27,6 +27,7 @@
 #include <QOpenGLWidget>
 #include <QResizeEvent>
 #include <QMenu>
+#include <QTimer>
 
 #include <graphviz/gvc.h>
 #include <graphviz/cgraph.h>
@@ -74,6 +75,11 @@ namespace DSR
 			QMenu *contextMenu, *showMenu;
 			std::map<std::string,std::set<std::uint64_t>> type_id_map;
 			int timerId = 0;
+			// Coalesces the (expensive, full-scene) setSceneRect/fitInView refit so a burst of
+			// high-frequency node/attribute updates triggers it at most a few times per second
+			// instead of once per update — avoids the GUI-thread repaint storm under fast graphs.
+			QTimer refit_timer_;
+			void schedule_refit();
             void showContextMenu(QMouseEvent *event);
             
             // Graphviz layout

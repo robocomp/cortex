@@ -42,6 +42,20 @@ GraphViewer::GraphViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  
 	connect(G.get(), &DSR::DSRGraph::update_edge_signal, this, &GraphViewer::add_or_assign_edge_SLOT, Qt::QueuedConnection);
 	connect(G.get(), &DSR::DSRGraph::del_edge_signal, this, &GraphViewer::del_edge_SLOT, Qt::QueuedConnection);
 	connect(G.get(), &DSR::DSRGraph::del_node_signal, this, &GraphViewer::del_node_SLOT, Qt::QueuedConnection);
+
+	// Coalesced refit: one fitInView per burst of updates instead of one per update.
+	refit_timer_.setSingleShot(true);
+	connect(&refit_timer_, &QTimer::timeout, this, [this]()
+	{
+		this->scene.setSceneRect(scene.itemsBoundingRect());
+		this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio);
+	});
+}
+
+void GraphViewer::schedule_refit()
+{
+	if (not refit_timer_.isActive())
+		refit_timer_.start(150);   // ≤ ~6-7 refits/s regardless of graph update rate
 }
 
 
@@ -203,8 +217,7 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
         }
     }
 
-	this->scene.setSceneRect(scene.itemsBoundingRect());
-	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
+	schedule_refit();
 }
 
 GraphNode* GraphViewer::new_visual_node(uint64_t id, const std::string &type, const std::string &name, bool debug)
@@ -314,6 +327,22 @@ void GraphViewer::del_node_SLOT(uint64_t id)
     qDebug()<<__FUNCTION__<<"node id:"<<id;
     try {
         //std::cout << "[SLOT] Delete node:  "<<id<< std::endl;
+        // Remove every edge touching this node BEFORE deleting the node. GraphEdge keeps raw
+        // source/dest pointers (graph_edge.cpp) that paint()/adjust()/calculateForces()
+        // dereference, so deleting a node while its edges remain in the scene leaves dangling
+        // edges → use-after-free on the next paint/force-layout (the free(stack-addr) crash in
+        // QWidgetRepaintManager::paintAndFlush). We must not rely on del_edge_signal arriving
+        // before del_node_signal, nor on DSR cascading the edge deletes — clean them here.
+        std::vector<std::tuple<std::uint64_t, std::uint64_t, std::string>> connected_edges;
+        for (const auto &[key, edge] : gmap_edges)
+        {
+            const auto &[from, to, tag] = key;
+            if (from == id or to == id)
+                connected_edges.push_back(key);
+        }
+        for (const auto &[from, to, tag] : connected_edges)
+            del_edge_SLOT(from, to, tag);
+
         while (gmap.count(id) > 0) {
             auto item = gmap.at(id);
             scene.removeItem(item);

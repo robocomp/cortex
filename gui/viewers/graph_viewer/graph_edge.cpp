@@ -117,10 +117,13 @@ QRectF GraphEdge::boundingRect() const
 
 void GraphEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget*)
 {
-    painter->save();
+    // Validity check BEFORE save(): returning between save() and restore() leaves the
+    // QPainter state stack unbalanced, which corrupts the backing store / QRegion over
+    // repeated paints (the QRegion::~QRegion / free() crash in paintAndFlush).
     if (!source || !dest)
         return;
 
+    painter->save();
     draw_arrows(painter);
     draw_arc(painter);
     painter->restore();

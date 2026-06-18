@@ -1221,6 +1221,11 @@ void DSRGraph::fullgraph_server_thread()
             {
                 if (it->second) {
                     lck.unlock();
+                    // export_full_graph() serializes ALL of nodes_ (each node's fano Rb-tree included).
+                    // It MUST exclude the delta-apply writers (unique_lock(_mutex)); without _mutex it
+                    // races them on a peer's join -> corrupted fano tree -> later get_node() SEGV.
+                    // It is a const read, so shared_lock is the correct (reader) lock.
+                    std::shared_lock<std::shared_mutex> graph_lock(_mutex);
                     auto repeated_graph = engine_->export_full_graph();
                     std::visit([&](auto&& payload) {
                         using T = std::decay_t<decltype(payload)>;
@@ -1240,6 +1245,9 @@ void DSRGraph::fullgraph_server_thread()
         }
         if (static_cast<uint32_t>(sample.id) != agent_id ) {
             qDebug() << " Received Full Graph request: from " << m_info.source_entity_id;
+            // Hold _mutex (shared) so the full-graph serialization can't race the delta-apply
+            // writers (which hold unique_lock(_mutex)). See note at the other export_full_graph call.
+            std::shared_lock<std::shared_mutex> graph_lock(_mutex);
             auto full_graph_message = engine_->export_full_graph();
             publish_full_graph_message(std::move(full_graph_message), static_cast<int32_t>(get_agent_id()));
             qDebug() << "Full graph written";

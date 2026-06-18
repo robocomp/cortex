@@ -86,6 +86,17 @@ set_target_properties(dsr_gui
 
 target_compile_options(dsr_gui PUBLIC -O3 -g -fmax-errors=5 -std=c++20 -fno-char8_t )
 
+# AddressSanitizer (opt-in): cmake -B build-asan -DENABLE_ASAN=ON
+# Only needed for redzone-precise detection INSIDE the graph viewer. Do NOT `make install`
+# an ASan build to /usr/local/lib — it would break every non-ASan agent. Build it locally and
+# point the ASan voxelizer at it via LD_LIBRARY_PATH.
+option(ENABLE_ASAN "Build dsr_gui with AddressSanitizer" OFF)
+if(ENABLE_ASAN)
+  message(STATUS "AddressSanitizer ENABLED for dsr_gui")
+  target_compile_options(dsr_gui PUBLIC -fsanitize=address -fno-omit-frame-pointer -O1)
+  target_link_options(dsr_gui PUBLIC -fsanitize=address)
+endif()
+
 # 'make install' to the correct locations (provided by GNUInstallDirs).
 install(TARGETS dsr_gui EXPORT dsr_guiConfig
         ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
