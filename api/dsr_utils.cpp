@@ -239,6 +239,14 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
             }
 
         } //foreach(links)
+
+    // Derive/repair level & parent from the authoritative RT edges. The JSON's stored `level`/
+    // `parent` are advisory and silently go stale on hand/tool edits; a wrong `level` breaks
+    // inner_eigen's level-based common-ancestor walk (an up-walk returns no transform, with NO
+    // error at load time). check_RT_tree(true) recomputes both from the RT tree and logs every
+    // fix, so a stale bootstrap is corrected and made visible here at load.
+    if (auto rt = G->get_rt_api(); rt)
+        rt->check_RT_tree(/*repair*/ true);
 }
 
 QJsonObject Utilities::Edge_to_QObject(const Edge& edge)

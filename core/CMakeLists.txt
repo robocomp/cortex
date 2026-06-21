@@ -57,9 +57,6 @@ target_link_libraries(dsr_core
 
 
 target_include_directories(dsr_core
-        PRIVATE
-        # TODO: Don't like, try to fix
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../classes/>
         PUBLIC
         # Own headers
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>

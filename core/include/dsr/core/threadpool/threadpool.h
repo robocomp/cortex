@@ -10,6 +10,13 @@
 // It is also used to launch tasks that the user does not need to wait for to complete (Used in doublebuffer).
 // Another use would be to spawn multiple tasks that can be executed in parallel and wait for all of them to
 // be completed after that.
+//
+// CORTEX-OWNED COPY. This is the threadpool DSR depends on. It lives here, under the
+// installed include/dsr subtree, on purpose: CORTEX must not depend on robocomp_core, so
+// this header must not forward to <threadpool2/threadpool.h> (which resolves into
+// robocomp_core's classes/). Keeping the implementation in this installed location means
+// downstream consumers of dsr_api.h get a complete, self-contained header with no
+// robocomp_core include path required.
 
 #ifndef SIMPLE_THREADPOOL
 #define SIMPLE_THREADPOOL

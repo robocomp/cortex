@@ -15,7 +15,11 @@ AbstractGraphicViewer::AbstractGraphicViewer(QWidget* parent) :  QGraphicsView(p
 	scene.setSceneRect(-5000,-5000, 10000, 10000);
 	this->setScene(&scene);
 	this->setCacheMode(QGraphicsView::CacheBackground);
-	this->setViewport(new QOpenGLWidget());
+	// NOTE: do NOT use a QOpenGLWidget viewport here. A QGraphicsView rendering through a GL
+	// viewport corrupts its backing store when the scene churns under paint — the heap corruption
+	// that surfaced as a stack-address free in QWidgetRepaintManager::paintAndFlush() whenever a
+	// peer (e.g. bottle_concept) joined and the graph gained/lost many nodes+edges at once. The
+	// default raster viewport is robust and more than adequate for a node-link debug graph.
 	this->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	this->setRenderHint(QPainter::Antialiasing);
 	this->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);

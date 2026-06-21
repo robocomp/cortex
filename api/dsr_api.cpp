@@ -121,6 +121,45 @@ inline size_t full_graph_payload_size(const DSR::LWWGraphSnapshot& sample)
 {
     return sample.nodes.size() + sample.edges.size();
 }
+
+// ── Deferred signal emission (fix for the bottle-join heap-corruption data race) ─────────────────
+// Remote deltas are applied on the MAIN thread (the subscription functors marshal via
+// QMetaObject::invokeMethod) while holding unique_lock(_mutex). Emitting DSR Qt signals there is
+// hazardous twice over: (1) a queued std::string payload emitted from a worker thread races the
+// receiver's QMetaType marshaling (TSan-confirmed; corrupts the heap, fatal in heavy-heap consumers
+// like voxelizer); (2) emitting WHILE holding _mutex lets a same-thread re-entrant slot deadlock
+// (EDEADLK). So during a remote apply we DEFER every emit into this thread-local buffer and flush it
+// AFTER releasing the lock, on the main thread — no cross-thread payload, no re-entrant deadlock.
+// Outside a deferred apply (defer depth 0, e.g. local writes) emits fire immediately as before.
+thread_local int            tl_defer_depth = 0;
+thread_local std::vector<std::function<void()>> tl_deferred_signals;
+
+void defer_or_emit(std::function<void()> emit_fn)
+{
+    if (tl_defer_depth > 0)
+        tl_deferred_signals.push_back(std::move(emit_fn));
+    else
+        emit_fn();
+}
+
+// RAII for a remote-delta apply: turn on deferral for the duration, then on destruction (which the
+// caller arranges to happen AFTER the unique_lock block has ended) flush the buffered emits. So the
+// signal emits fire on the main thread, after the graph lock is released.
+struct RemoteApplyScope
+{
+    RemoteApplyScope() { ++tl_defer_depth; }
+    ~RemoteApplyScope()
+    {
+        if (--tl_defer_depth == 0)
+        {
+            auto pending = std::move(tl_deferred_signals);
+            tl_deferred_signals.clear();
+            for (auto& f : pending) f();
+        }
+    }
+    RemoteApplyScope(const RemoteApplyScope&) = delete;
+    RemoteApplyScope& operator=(const RemoteApplyScope&) = delete;
+};
 }
 
 void print_sample_info(DSR::GraphSettings::LOGLEVEL log_level, const DSR::Transport::ReceivedSampleInfo& info);
@@ -340,10 +379,17 @@ DSRGraph::SampleCallback<Sample> DSRGraph::make_node_subscription_functor_impl(c
                 qDebug() << name << " Received:" << std::to_string(sample.id).c_str() << " node from: "
                          << m_info.source_entity_id;
             }
-            tp.spawn_task([this, sample = std::move(sample)]() mutable {
-                std::unique_lock<std::shared_mutex> lock(_mutex);
-                engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
-            });
+            // Apply on the graph's (main) thread with deferred emit: marshal to main so the apply +
+            // (deferred) signal emits run on the main/GUI thread — no std::string Qt payload crosses
+            // a thread boundary (the bottle-join heap-corruption race) — and RemoteApplyScope flushes
+            // the emits AFTER the unique_lock block ends (no re-entrant EDEADLK). Sample is MOVED in.
+            QMetaObject::invokeMethod(this, [this, sample = std::move(sample)]() mutable {
+                RemoteApplyScope defer;
+                {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_node_delta(NodeDeltaMessage{std::move(sample)});
+                }
+            }, Qt::QueuedConnection);
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
@@ -366,10 +412,14 @@ DSRGraph::SampleCallback<Sample> DSRGraph::make_edge_subscription_functor_impl(c
             if (!network_compatibility_or_fatal(channel, sample.protocol_version, sample.sync_mode, sync_mode)) {
                 return;
             }
-            tp.spawn_task([this, sample = std::move(sample)]() mutable {
-                std::unique_lock<std::shared_mutex> lock(_mutex);
-                engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
-            });
+            // Apply on the graph's (main) thread with deferred emit — see apply_remote_node_delta note.
+            QMetaObject::invokeMethod(this, [this, sample = std::move(sample)]() mutable {
+                RemoteApplyScope defer;
+                {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_edge_delta(EdgeDeltaMessage{std::move(sample)});
+                }
+            }, Qt::QueuedConnection);
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
@@ -396,11 +446,15 @@ DSRGraph::SampleCallback<Batch> DSRGraph::make_edge_attrs_subscription_functor_i
                 qDebug() << name << " Received:" << samples.vec.size() << " edge attr from: "
                          << m_info.source_entity_id;
             }
-            tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+            // Apply on the graph's (main) thread with deferred emit — see apply_remote_node_delta note.
+            QMetaObject::invokeMethod(this, [this, samples = std::move(samples)]() mutable {
                 CORTEX_PROFILE_ZONE_N("DSRGraph::edge_attrs_subscription_thread apply batch");
-                std::unique_lock<std::shared_mutex> lock(_mutex);
-                engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
-            });
+                RemoteApplyScope defer;
+                {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage{std::move(samples)});
+                }
+            }, Qt::QueuedConnection);
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
@@ -427,11 +481,15 @@ DSRGraph::SampleCallback<Batch> DSRGraph::make_node_attrs_subscription_functor_i
                 qDebug() << name << " Received:" << samples.vec.size() << " node attrs from: "
                          << m_info.source_entity_id;
             }
-            tp_delta_attr.spawn_task([this, samples = std::move(samples)]() mutable {
+            // Apply on the graph's (main) thread with deferred emit — see apply_remote_node_delta note.
+            QMetaObject::invokeMethod(this, [this, samples = std::move(samples)]() mutable {
                 CORTEX_PROFILE_ZONE_N("DSRGraph::node_attrs_subscription_thread apply batch");
-                std::unique_lock<std::shared_mutex> lock(_mutex);
-                engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
-            });
+                RemoteApplyScope defer;
+                {
+                    std::unique_lock<std::shared_mutex> lock(_mutex);
+                    engine_->apply_remote_node_attr_batch(NodeAttrDeltaBatchMessage{std::move(samples)});
+                }
+            }, Qt::QueuedConnection);
         }
         catch (const std::exception &ex) { std::cerr << ex.what() << std::endl; }
     };
@@ -1052,46 +1110,57 @@ void DSRGraph::for_each_edge_of_type_cache(const std::string& type, std::functio
     }
 }
 
+// NOTE: these run during a remote-delta apply (on the main thread, under unique_lock(_mutex)).
+// defer_or_emit buffers each emit (args captured by value, produced here on main) so it fires AFTER
+// the lock is released — see the deferred-emission note near the top of this file.
 void DSRGraph::on_remote_node_updated(uint64_t id, const std::string& type, uint32_t agent_id)
 {
-    emitter.update_node_signal(id, type, SignalInfo{agent_id});
+    defer_or_emit([this, id, type, agent_id]{ emitter.update_node_signal(id, type, SignalInfo{agent_id}); });
 }
 
 void DSRGraph::on_remote_node_deleted(uint64_t id, const std::optional<Node>& node, const std::vector<Edge>& removed_edges, uint32_t agent_id)
 {
-    emitter.del_node_signal(id, SignalInfo{agent_id});
-    if (node.has_value()) {
-        emitter.deleted_node_signal(*node, SignalInfo{agent_id});
-    }
-    for (const auto& edge : removed_edges) {
-        emitter.del_edge_signal(edge.from(), edge.to(), edge.type(), SignalInfo{agent_id});
-        emitter.deleted_edge_signal(edge, SignalInfo{agent_id});
-    }
+    defer_or_emit([this, id, node, removed_edges, agent_id]{
+        emitter.del_node_signal(id, SignalInfo{agent_id});
+        if (node.has_value()) {
+            emitter.deleted_node_signal(*node, SignalInfo{agent_id});
+        }
+        for (const auto& edge : removed_edges) {
+            emitter.del_edge_signal(edge.from(), edge.to(), edge.type(), SignalInfo{agent_id});
+            emitter.deleted_edge_signal(edge, SignalInfo{agent_id});
+        }
+    });
 }
 
 void DSRGraph::on_remote_edge_updated(uint64_t from, uint64_t to, const std::string& type, uint32_t agent_id)
 {
-    emitter.update_edge_signal(from, to, type, SignalInfo{agent_id});
+    defer_or_emit([this, from, to, type, agent_id]{ emitter.update_edge_signal(from, to, type, SignalInfo{agent_id}); });
 }
 
 void DSRGraph::on_remote_edge_deleted(uint64_t from, uint64_t to, const std::string& type, const std::optional<Edge>& edge, uint32_t agent_id)
 {
-    emitter.del_edge_signal(from, to, type, SignalInfo{agent_id});
-    if (edge.has_value()) {
-        emitter.deleted_edge_signal(*edge, SignalInfo{agent_id});
-    }
+    defer_or_emit([this, from, to, type, edge, agent_id]{
+        emitter.del_edge_signal(from, to, type, SignalInfo{agent_id});
+        if (edge.has_value()) {
+            emitter.deleted_edge_signal(*edge, SignalInfo{agent_id});
+        }
+    });
 }
 
 void DSRGraph::on_remote_node_attrs_updated(uint64_t id, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id)
 {
-    emitter.update_node_attr_signal(id, attrs, SignalInfo{agent_id});
-    emitter.update_node_signal(id, type, SignalInfo{agent_id});
+    defer_or_emit([this, id, type, attrs, agent_id]{
+        emitter.update_node_attr_signal(id, attrs, SignalInfo{agent_id});
+        emitter.update_node_signal(id, type, SignalInfo{agent_id});
+    });
 }
 
 void DSRGraph::on_remote_edge_attrs_updated(uint64_t from, uint64_t to, const std::string& type, const std::vector<std::string>& attrs, uint32_t agent_id)
 {
-    emitter.update_edge_attr_signal(from, to, type, attrs, SignalInfo{agent_id});
-    emitter.update_edge_signal(from, to, type, SignalInfo{agent_id});
+    defer_or_emit([this, from, to, type, attrs, agent_id]{
+        emitter.update_edge_attr_signal(from, to, type, attrs, SignalInfo{agent_id});
+        emitter.update_edge_signal(from, to, type, SignalInfo{agent_id});
+    });
 }
 
 

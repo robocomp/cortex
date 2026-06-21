@@ -220,11 +220,12 @@ void DSRViewer::initialize_file_menu()
 
 DSRViewer::~DSRViewer()
 {
-    QSettings settings("RoboComp", "DSR");
-    settings.beginGroup("MainWindow");
-    settings.setValue("size", window->size());
-    settings.setValue("pos", window->pos());
-    settings.endGroup();
+    // Window geometry is intentionally NOT saved here. `window` is borrowed (GenericWorker owns it via
+    // unique_ptr<QMainWindow>) and is destroyed BEFORE this viewer during teardown — reading
+    // window->size()/pos() here is a use-after-free (the Ctrl-C shutdown segfault). Detecting the
+    // freed window would require making `window` a QPointer, but that changes DSRViewer's size and
+    // breaks the ABI for every agent that does `new DSRViewer` (heap overflow at startup). If
+    // persisting geometry is wanted, do it from a closeEvent on the live window, not from here.
 }
 
 
@@ -444,6 +445,20 @@ void DSRViewer::create_dock_and_menu(const QString &name, QWidget *view)
     dock_widget->setAllowedAreas(Qt::AllDockWidgetAreas);
     window->addDockWidget(Qt::RightDockWidgetArea, dock_widget);
     dock_widget->raise();
+}
+
+void DSRViewer::add_custom_widget_in_own_window(const QString &name, QWidget *custom_view)
+{
+    // Own top-level window => its own backing store, decoupled from the graph view's churn-driven
+    // repaints. Parent it to `window` so it is destroyed together with the main window (no extra
+    // bookkeeping member, keeping this ABI-safe). Qt::Window makes it a separate top-level window
+    // despite having a parent for ownership.
+    auto *holder = new QMainWindow(window);
+    holder->setWindowFlag(Qt::Window, true);
+    holder->setWindowTitle(name);
+    holder->setCentralWidget(custom_view);
+    holder->resize(900, 650);
+    holder->show();
 }
 
 void DSRViewer::add_custom_widget_to_dock(const QString &name, QWidget *custom_view)

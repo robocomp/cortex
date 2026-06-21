@@ -53,9 +53,14 @@ public:
                            + QString::fromStdString(to_string) + "(" + display_to_type + ")");
             if (label_ == "RT" || label_ == "VRT")
             {
-                ui.comboBox_reference->setItemText(0, "room_in_robot");
-                ui.comboBox_reference->setItemText(1, "robot_in_room");
-                ui.comboBox_reference->setCurrentText("robot_in_room");
+                // Offer the two directions of THIS edge, named by the actual nodes
+                // (not the hard-coded room/robot pair). from_string is the child
+                // (the RT 'to' node); to_string is the parent (the RT 'from' node).
+                child_in_parent_label = from_string + " in " + to_string;  // native RT payload: child pose in parent
+                parent_in_child_label = to_string + " in " + from_string;  // inverse
+                ui.comboBox_reference->setItemText(0, QString::fromStdString(child_in_parent_label));
+                ui.comboBox_reference->setItemText(1, QString::fromStdString(parent_in_child_label));
+                ui.comboBox_reference->setCurrentText(QString::fromStdString(child_in_parent_label)); // default = stored payload (matches title)
                 ui.comboBox_reference->setEnabled(true);
             }
             connect(ui.comboBox_reference, SIGNAL(currentTextChanged(QString)), this, SLOT(update_combo(QString)));
@@ -135,7 +140,8 @@ public slots:
             {
                 if (auto rtmat_opt = rt_api->get_edge_RT_as_rtmat(edge.value(), 0); rtmat_opt.has_value())
                 {
-                    const auto rtmat = (this->reference == "robot_in_room") ? rtmat_opt->inverse() : *rtmat_opt;
+                    // Native payload is child-in-parent; invert only when the user picked parent-in-child.
+                    const auto rtmat = (this->reference == parent_in_child_label) ? rtmat_opt->inverse() : *rtmat_opt;
                     Mat::Vector6d values;
                     const auto euler_angles = rtmat.rotation().eulerAngles(0, 1, 2);
                     values << rtmat.translation().x(), rtmat.translation().y(), rtmat.translation().z(),
@@ -317,6 +323,8 @@ private:
     std::string from_string;
     std::string to_string;
     std::string reference;
+    std::string child_in_parent_label;   // "<child> in <parent>" — native RT payload direction
+    std::string parent_in_child_label;   // "<parent> in <child>" — inverse direction
     //std::map<int, QLineEdit*> attrib_widgets;
     //std::vector<std::vector<std::string>> attrib_names = {{"X", "Y", "Z"}, {"RX (rad)", "RY (rad)", "RZ (rad)"}, {"RX (deg)", "RY (deg)", "RZ (deg)"} };
     std::set<std::string> transform_set;

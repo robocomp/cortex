@@ -77,7 +77,7 @@ namespace DSR {
 
     public:
         explicit AgentInfoAPI(DSR::DSRGraph *g, uint32_t period_ = 1000)
-        : G(g), period(period_), timer(period, [this]() { create_or_update_agent();})
+        : G(g), period(period_), timer(period, [this]() { heartbeat_tick();})
         {}
 
         void stopTimer();
@@ -87,6 +87,13 @@ namespace DSR {
     private:
 
         static std::string exec(const char* cmd);
+        // Runs on the raw Timer std::thread. Marshals the actual agent-node update to the DSRGraph's
+        // (main) thread so create_or_update_agent()'s graph write + Qt-signal emit NEVER happen on
+        // this non-GUI thread. Emitting DSR Qt signals (update_node_signal, ... carrying std::string/
+        // vector<string> payloads) from a worker thread races the main-thread slots' QMetaType arg
+        // marshaling (TSan-confirmed); the heap corruption is fatal in heavy-heap consumers
+        // (voxelizer) under participant-join churn. Defined in the .cpp where DSRGraph is complete.
+        void heartbeat_tick();
         void create_or_update_agent();
         void refresh_process_metrics();
 

@@ -34,6 +34,12 @@ namespace DSR
             void insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler,
                                           std::vector<float> &&covariance, std::optional<uint64_t> timestamp = std::nullopt);
 
+            // Verify (and optionally repair) the whole RT tree: every node's level == parent.level+1
+            // and its parent attr == its RT-edge source, single root, no cycles / multi-parents.
+            // Returns true if the tree was already consistent. With repair=true it rewrites the
+            // offending level/parent attributes (use after a json bootstrap that may carry stale levels).
+            bool check_RT_tree(bool repair = false);
+
             static std::optional<Edge> get_edge_RT(const Node &n, uint64_t to, const std::string &edge_type = "RT");
             std::optional<Mat::RTMat> get_RT_pose_from_parent(const Node &n, const std::string &edge_type = "RT");
             std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
@@ -56,6 +62,12 @@ namespace DSR
             static constexpr auto prev = [](auto v, int size, int inc = 1) { return (v > 0) ? v - inc : size - inc; };
             void insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<float> trans, std::vector<float> rot_euler,
                                                std::optional<std::vector<float>> covariance, std::optional<uint64_t> timestamp);
+
+            // Shared BFS over the RT subtree rooted at start_id, re-deriving level = parent.level+1
+            // and parent = RT source for every descendant. With repair=true it writes corrections;
+            // with report=true it logs each defect/fix. Returns true if the subtree was consistent.
+            // Used by insert_or_assign_edge_RT (cascade after a re-parent) and check_RT_tree (whole tree).
+            bool walk_and_fix_levels(uint64_t start_id, bool repair, bool report);
 
     };
 }

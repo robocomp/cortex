@@ -77,6 +77,10 @@ private:
 
     SyncEngineHost& host_;
     Nodes nodes_;
+    // The FIRST full-graph import (on join) builds the local copy from scratch — there is no change
+    // to notify, so it must emit NO per-node/edge signals. Firing the whole-graph signal cascade from
+    // this (non-Qt) sync thread is the churn heap-corruption crash. Re-syncs (later imports) still emit.
+    bool first_full_graph_ = true;
     std::unordered_multimap<uint64_t, std::tuple<std::string, mvreg<Attribute>, uint64_t>> unprocessed_delta_node_att_;
     std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDT::Edge>, uint64_t>> unprocessed_delta_edge_from_;
     std::unordered_multimap<uint64_t, std::tuple<uint64_t, std::string, mvreg<CRDT::Edge>, uint64_t>> unprocessed_delta_edge_to_;

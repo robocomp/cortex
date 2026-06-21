@@ -84,7 +84,8 @@ CRDTSyncEngine::CRDTSyncEngine(SyncEngineHost& host, const CRDTSyncEngine& other
       unprocessed_delta_node_att_(other.unprocessed_delta_node_att_),
       unprocessed_delta_edge_from_(other.unprocessed_delta_edge_from_),
       unprocessed_delta_edge_to_(other.unprocessed_delta_edge_to_),
-      unprocessed_delta_edge_att_(other.unprocessed_delta_edge_att_)
+      unprocessed_delta_edge_att_(other.unprocessed_delta_edge_att_),
+      first_full_graph_(other.first_full_graph_)
 {
 }
 
@@ -986,6 +987,12 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
         return;
     }
 
+    // The FIRST full-graph import builds the local copy from scratch (join). There is no change to
+    // notify, so emit NO signals — the whole-graph signal cascade from this (non-Qt) sync thread is
+    // the churn heap-corruption crash. Later imports (re-sync) still emit their deltas.
+    const bool emit_signals = !first_full_graph_;
+    first_full_graph_ = false;
+
     std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDT::Node>, std::optional<CRDT::Node>>> updates;
 
     uint64_t id{0}, timestamp{0};
@@ -1099,6 +1106,7 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
     }
     {
         CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph emit phase");
+        if (emit_signals)
         for (auto &[signal, node_id, type, nd, current_nd] : updates) {
             if (signal) {
                 if (!nd.has_value() || nd->attrs != current_nd->attrs) {

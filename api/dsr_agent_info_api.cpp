@@ -8,8 +8,20 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/times.h>
+#include <QMetaObject>
 
 namespace DSR {
+
+// Heartbeat runs on the raw Timer std::thread; bounce the agent-node update onto the DSRGraph's
+// thread (the agent's main/GUI thread) so the graph write + Qt-signal emit happen there, never on a
+// worker thread. QueuedConnection just posts; the timer thread does not block. If the graph thread's
+// event loop isn't running yet the post simply waits — correct and harmless.
+void AgentInfoAPI::heartbeat_tick()
+{
+    if (G == nullptr)
+        return;
+    QMetaObject::invokeMethod(G, [this]() { create_or_update_agent(); }, Qt::QueuedConnection);
+}
 
     namespace {
         struct PipeCloser

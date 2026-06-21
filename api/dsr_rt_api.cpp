@@ -1,5 +1,8 @@
 #include <algorithm>
 #include <cmath>
+#include <deque>
+#include <unordered_map>
+#include <unordered_set>
 #include <dsr/api/dsr_rt_api.h>
 #include <dsr/api/dsr_api.h>
 #include <dsr/api/dsr_crdt_sync_engine.h>
@@ -510,10 +513,12 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
                 "Source node " + std::to_string(n.id()) + " has no level in insert_or_assign_edge_RT() " +
                 __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
     const auto next_level = n_level.value() + 1;
+    bool level_changed = false;
     if (auto x = G->get_attrib_by_name<level_att>(*to_n); !x.has_value() || x.value() != next_level)
     {
         G->add_or_modify_attrib_local<level_att>(*to_n, next_level);
         node_changed = true;
+        level_changed = true;
     }
 
     if (node_changed && !G->update_node(*to_n))
@@ -523,8 +528,121 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
                 __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
     }
 
+    // Re-parent cascade: if the destination's level shifted, every descendant's level shifted too.
+    // Only fires on an actual level change (a structural re-parent), so the per-cycle pose-only RT
+    // updates — which leave level unchanged — never pay for this walk.
+    if (level_changed)
+        walk_and_fix_levels(to, /*repair*/ true, /*report*/ false);
+
     if (!G->insert_or_assign_edge(std::move(edge)))
         throw std::runtime_error(
                 "Could not insert RT edge " + std::to_string(n.id()) + " -> " + std::to_string(to) +
                 " in insert_or_assign_edge_RT() " + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
+}
+
+bool RT_API::walk_and_fix_levels(uint64_t start_id, bool repair, bool report)
+{
+    auto start_n = G->get_node(start_id);
+    if (!start_n.has_value())
+        return false;
+    const auto start_level = G->get_node_level(start_n.value());
+    if (!start_level.has_value())
+    {
+        if (report) qWarning() << "[RT_tree] node" << start_id << "has no level — cannot derive subtree";
+        return false;
+    }
+
+    bool consistent = true;
+    std::unordered_set<uint64_t> visited{start_id};
+    std::deque<uint64_t> q{start_id};
+    while (!q.empty())
+    {
+        const uint64_t cur = q.front();
+        q.pop_front();
+        auto cur_n = G->get_node(cur);
+        if (!cur_n.has_value())
+            continue;
+        const int child_level = G->get_node_level(cur_n.value()).value_or(0) + 1;
+        for (const auto &e : G->get_node_edges_by_type(cur_n.value(), "RT"))
+        {
+            const uint64_t ch = e.to();
+            if (visited.count(ch))   // a tree node reached twice ⇒ cycle or a second RT parent
+            {
+                if (report) qWarning() << "[RT_tree] DEFECT: node" << ch << "reached twice via RT (cycle or multi-parent)";
+                consistent = false;
+                continue;
+            }
+            visited.insert(ch);
+            auto ch_n = G->get_node(ch);
+            if (!ch_n.has_value())
+                continue;
+            const int      jl = G->get_node_level(ch_n.value()).value_or(-1);
+            const uint64_t jp = G->get_attrib_by_name<parent_att>(ch_n.value()).value_or(0);
+            if (jl != child_level || jp != cur)
+            {
+                consistent = false;
+                if (report)
+                    qWarning() << "[RT_tree]" << (repair ? "FIX" : "DEFECT") << ": node" << ch
+                               << QString::fromStdString(ch_n->name())
+                               << "level" << jl << "->" << child_level << "parent" << jp << "->" << cur;
+                if (repair)
+                {
+                    G->add_or_modify_attrib_local<level_att>(ch_n.value(), child_level);
+                    G->add_or_modify_attrib_local<parent_att>(ch_n.value(), cur);
+                    G->update_node(ch_n.value());
+                }
+            }
+            q.push_back(ch);
+        }
+    }
+    return consistent;
+}
+
+bool RT_API::check_RT_tree(bool repair)
+{
+    auto root = G->get_node_root();
+    if (!root.has_value())
+    {
+        qWarning() << "[RT_tree] DEFECT: no 'root' node";
+        return false;
+    }
+    // Root must sit at level 0 with no parent; normalise it so the subtree walk has a valid base.
+    if (G->get_node_level(root.value()).value_or(0) != 0 ||
+        G->get_attrib_by_name<parent_att>(root.value()).value_or(0) != 0)
+    {
+        if (repair)
+        {
+            G->add_or_modify_attrib_local<level_att>(root.value(), 0);
+            G->add_or_modify_attrib_local<parent_att>(root.value(), static_cast<uint64_t>(0));
+            G->update_node(root.value());
+        }
+        else
+            qWarning() << "[RT_tree] DEFECT: root has non-zero level/parent";
+    }
+
+    const bool consistent = walk_and_fix_levels(root->id(), repair, /*report*/ true);
+
+    // Orphan check: any node that declares a parent but was never reached from root is detached.
+    std::unordered_set<uint64_t> reachable{root->id()};
+    {
+        std::deque<uint64_t> q{root->id()};
+        while (!q.empty())
+        {
+            auto cn = G->get_node(q.front()); q.pop_front();
+            if (!cn.has_value()) continue;
+            for (const auto &e : G->get_node_edges_by_type(cn.value(), "RT"))
+                if (reachable.insert(e.to()).second)
+                    q.push_back(e.to());
+        }
+    }
+    bool no_orphans = true;
+    for (const auto &n : G->get_nodes())
+        if (G->get_attrib_by_name<parent_att>(n).value_or(0) != 0 && !reachable.count(n.id()))
+        {
+            qWarning() << "[RT_tree] DEFECT: node" << n.id() << QString::fromStdString(n.name())
+                       << "has a parent but is not reachable from root (detached subtree)";
+            no_orphans = false;
+        }
+
+    return consistent && no_orphans;
 }

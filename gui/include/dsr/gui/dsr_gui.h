@@ -86,6 +86,12 @@ public:
     QWidget* get_widget(view type);
     QWidget* get_widget(const QString& name);
     void add_custom_widget_to_dock(const QString& name, QWidget* view);
+    // Safer alternative to add_custom_widget_to_dock for heavy/QOpenGLWidget custom views: gives the
+    // widget its OWN top-level window (separate QWidgetRepaintManager/backing store) so it is NOT
+    // entangled with the graph view's churn-driven repaint storm (which corrupts the shared backing
+    // store -> stack-address free in paintAndFlush when a peer joins). Non-virtual + no new data
+    // member -> ABI-safe (callers must recompile; non-callers are unaffected).
+    void add_custom_widget_in_own_window(const QString& name, QWidget* view);
     float get_external_hz() const;
     void set_external_hz(float external_hz);
     float get_external_fps() const;
@@ -98,7 +104,9 @@ private:
     QTimer *timer;
     QElapsedTimer alive_timer;
     std::shared_ptr<DSR::DSRGraph> G;
-    QMainWindow *window;
+    QMainWindow *window;  // borrowed: owned by GenericWorker (unique_ptr<QMainWindow>). Do NOT change
+                          // this member's type/layout — DSRViewer is allocated by every agent's
+                          // setupViewer, so an ABI/size change overflows their `new DSRViewer`.
     QMenu *viewMenu;
     QMenu *fileMenu;
     QMenu *forcesMenu;
