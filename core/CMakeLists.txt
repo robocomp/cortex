@@ -69,7 +69,12 @@ set_target_properties(dsr_core PROPERTIES
         CXX_EXTENSIONS ON)
 
 
-target_compile_options(dsr_core PUBLIC -O3 -march=native -fmax-errors=5 -std=c++23)
+# NO -march=native: it promotes Eigen's max-align (→ sizeof(optional<Eigen::Transform>)=160),
+# but the agents link this .so at default alignment (144) — kinova_controller CANNOT use
+# -march=native because Pinocchio's prebuilt .so is at default align. The size mismatch makes
+# get_transformation_matrix overrun the caller's stack slot → the 0x17ff… SIGBUS. Keep cortex
+# at the default alignment so all agents match. (See agent crash notes 2026-06-20/21.)
+target_compile_options(dsr_core PUBLIC -O3 -fmax-errors=5 -std=c++23)
 
 # 'make install' to the correct locations (provided by GNUInstallDirs).
 install(TARGETS dsr_core EXPORT dsr_coreConfig
