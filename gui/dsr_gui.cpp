@@ -411,6 +411,8 @@ QWidget *DSRViewer::create_widget(view type)
         case view::scene:
             widget_view = new DSR::QScene2dViewer(G);
             break;
+        case view::osg:
+            break;
         case view::none:
             break;
     }
@@ -683,4 +685,3 @@ void DSRViewer::set_external_fps(float fps)
 {
     this->external_fps = fps;
 }
-

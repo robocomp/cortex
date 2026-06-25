@@ -41,7 +41,7 @@ GraphEdge::GraphEdge(GraphNode* sourceNode, GraphNode* destNode, const QString& 
     tag->setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
     tag->installEventFilter(this);
     color = QString::fromStdString(GraphColors<DSR::Edge>()[edge_name.toStdString()]);
-    animation = new QPropertyAnimation(this, "edge_pen");
+    animation = new QPropertyAnimation(this, "edge_pen", this);
     animation->setDuration(200);
     animation->setStartValue(4);
     animation->setEndValue(2);

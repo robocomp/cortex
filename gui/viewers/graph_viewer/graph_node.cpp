@@ -45,7 +45,7 @@ GraphNode::GraphNode(const std::shared_ptr<DSR::GraphViewer>&
     connect(table_action, &QAction::triggered, this, [this](){ this->show_node_widget("table");});
 
 
-    animation = new QPropertyAnimation(this, "node_color");
+    animation = new QPropertyAnimation(this, "node_color", this);
 	animation->setDuration(animation_time);
 	animation->setStartValue(plain_color);
 	animation->setEndValue(dark_color);

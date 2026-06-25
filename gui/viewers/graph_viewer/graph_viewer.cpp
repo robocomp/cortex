@@ -263,6 +263,8 @@ void GraphViewer::add_or_assign_edge_SLOT(std::uint64_t from, std::uint64_t to, 
 	catch(const std::exception &e) {
 		std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<<" "<<e.what()<< std::endl;}
 
+    schedule_refit();
+
 }
 
 GraphEdge* GraphViewer::new_visual_edge(GraphNode *sourceNode, GraphNode *destNode, const QString &edge_name)
@@ -319,6 +321,8 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
 		}
 	} catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
 
+    schedule_refit();
+
 }
 
 // remove node from scene
@@ -356,6 +360,8 @@ void GraphViewer::del_node_SLOT(uint64_t id)
             }
         }
     } catch(const std::exception &e) { std::cout << e.what() <<" Error  "<<__FUNCTION__<<":"<<__LINE__<< std::endl;}
+
+    schedule_refit();
 
 }
 
