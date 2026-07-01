@@ -513,11 +513,14 @@ DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_i
             if (sample.id != -1) {
                 qDebug() << " Received Full Graph from " << m_info.source_entity_id
                          << " whith " << full_graph_payload_size(sample) << " elements";
-                tp.spawn_task([this, s = std::move(sample)]() mutable {
+                QMetaObject::invokeMethod(this, [this, s = std::move(sample)]() mutable {
                     CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread apply full graph");
-                    std::unique_lock<std::shared_mutex> lock(_mutex);
-                    engine_->import_full_graph(FullGraphMessage{std::move(s)});
-                });
+                    RemoteApplyScope defer;
+                    {
+                        std::unique_lock<std::shared_mutex> lock(_mutex);
+                        engine_->import_full_graph(FullGraphMessage{std::move(s)});
+                    }
+                }, Qt::QueuedConnection);
                 qDebug() << "Synchronized.";
                 sync = true;
             } else if (!sync && sample.to_id == agent_id) {

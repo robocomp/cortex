@@ -22,8 +22,17 @@ namespace DSR::Test {
 // update_maps_* are no-ops; convergence is verified by querying the engine directly.
 struct FakeSyncHost final : DSR::SyncEngineHost
 {
+    struct EdgeUpdateCall
+    {
+        uint64_t from{};
+        uint64_t to{};
+        std::string type;
+        uint32_t agent_id{};
+    };
+
     uint32_t agent{};
     DSR::SyncMode mode{DSR::SyncMode::LWW};
+    std::vector<EdgeUpdateCall> edge_updates;
 
     FakeSyncHost() = default;
     FakeSyncHost(uint32_t a, DSR::SyncMode m) : agent(a), mode(m) {}
@@ -36,6 +45,11 @@ struct FakeSyncHost final : DSR::SyncEngineHost
     void update_maps_node_delete(uint64_t, std::optional<std::string_view>, const EdgeKeyList&) override {}
     void update_maps_edge_insert(uint64_t, uint64_t, const std::string&) override {}
     void update_maps_edge_delete(uint64_t, uint64_t, const std::string&) override {}
+
+    void on_remote_edge_updated(uint64_t from, uint64_t to, const std::string& type, uint32_t agent_id) override
+    {
+        edge_updates.push_back({from, to, type, agent_id});
+    }
 };
 
 // Envelope for an in-flight delta between agents.

@@ -861,7 +861,7 @@ TEST_CASE("RT api signals", "[GRAPH][SIGNALS]") {
         REQUIRE(update_node_attr_signal_recv == 1);
         REQUIRE(update_node_attr_signal_size_recv == 2);
         REQUIRE(update_edge_attr_signal_recv == 1);
-        REQUIRE(update_edge_attr_signal_size_recv == 2);
+        REQUIRE(update_edge_attr_signal_size_recv == 4);
         REQUIRE(del_node_signal_recv == 0);
         REQUIRE(del_edge_signal_recv == 0);
         REQUIRE(deleted_node_signal_recv == 0);

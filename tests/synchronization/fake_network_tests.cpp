@@ -1011,6 +1011,44 @@ TEST_CASE("FakeNetwork: CRDT edge delta arrives before 'from' node: buffered and
     REQUIRE(B.get_edge(10, 11, std::string(RT_edge_type::attr_name)).has_value());
 }
 
+TEST_CASE("FakeNetwork: CRDT pending edge update signal keeps original direction when 'from' node arrives",
+          "[FAKE_NET][CRDT][REORDER][EDGE][SIGNAL]")
+{
+    FakeNetwork net;
+    auto& A = net.add_agent(1, SyncMode::CRDT);
+    auto& B = net.add_agent(2, SyncMode::CRDT);
+
+    auto e_from = A.insert_node(make_robot(10, 1, "r_from"));
+    auto e_to   = A.insert_node(make_robot(11, 1, "r_to"));
+    auto edge   = Edge::create<RT_edge_type>(10, 11);
+    edge.agent_id(1);
+    auto e_edge = A.insert_edge(std::move(edge));
+    REQUIRE(e_from.applied);
+    REQUIRE(e_to.applied);
+    REQUIRE(e_edge.applied);
+
+    net.post(1, e_to);
+    net.deliver_all();
+    REQUIRE(B.get_node(11).has_value());
+    B.host.edge_updates.clear();
+
+    net.post(1, e_edge);
+    net.post(1, e_from);
+
+    net.deliver_next(1);
+    REQUIRE(B.host.edge_updates.empty());
+    REQUIRE_FALSE(B.get_edge(10, 11, std::string(RT_edge_type::attr_name)).has_value());
+
+    net.deliver_next(1);
+    REQUIRE(B.get_edge(10, 11, std::string(RT_edge_type::attr_name)).has_value());
+    REQUIRE_FALSE(B.host.edge_updates.empty());
+    const auto& update = B.host.edge_updates.back();
+    REQUIRE(update.from == 10);
+    REQUIRE(update.to == 11);
+    REQUIRE(update.type == std::string(RT_edge_type::attr_name));
+    REQUIRE(update.agent_id == 1);
+}
+
 TEST_CASE("FakeNetwork: CRDT node attr batch arrives before node creation: buffered and applied",
           "[FAKE_NET][CRDT][REORDER]")
 {
