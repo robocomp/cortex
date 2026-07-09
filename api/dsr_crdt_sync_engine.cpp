@@ -263,6 +263,11 @@ EdgeMutationEffect CRDTSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     auto from = edge.from();
     auto to = edge.to();
     auto type = edge.type();
+    std::vector<std::string> edge_attr_names;
+    edge_attr_names.reserve(edge.attrs().size());
+    for (const auto& [name, _] : edge.attrs()) {
+        edge_attr_names.emplace_back(name);
+    }
     auto [applied, _edge_delta, attr_deltas] = insert_or_assign_edge_raw(user_edge_to_crdt(std::move(edge)), from, to);
     effect.applied = applied;
     effect.from = from;
@@ -270,6 +275,7 @@ EdgeMutationEffect CRDTSyncEngine::insert_or_assign_edge_local(Edge&& edge)
     effect.type = std::move(type);
     if (_edge_delta.has_value()) {
         effect.edge_delta = EdgeDeltaMessage{*_edge_delta};
+        effect.changed_attributes = std::move(edge_attr_names);
     }
     if (attr_deltas.has_value()) {
         effect.edge_attr_batch = EdgeAttrDeltaBatchMessage{*attr_deltas};
@@ -771,7 +777,7 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
                     }
                 }
                 for (const auto& [to, type] : map_new_to_edges) {
-                    host_.on_remote_edge_updated(to, id, type, mvreg.agent_id);
+                    host_.on_remote_edge_updated(id, to, type, mvreg.agent_id);
                 }
             } else {
                 std::optional<Node> deleted_node_user = maybe_deleted_node.has_value()

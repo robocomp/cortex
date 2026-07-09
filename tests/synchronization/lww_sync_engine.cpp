@@ -1,6 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <memory>
 #include <thread>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QEvent>
+#include <QtCore/QEventLoop>
 
 #include "../utils.h"
 #include "../transport/fake_network.h"
@@ -15,6 +19,43 @@ using namespace DSR::Test;
 using namespace std::chrono_literals;
 
 namespace {
+
+class ScopedQtApplication
+{
+public:
+    ScopedQtApplication()
+    {
+        if (QCoreApplication::instance() == nullptr) {
+            app_ = std::make_unique<QCoreApplication>(argc_, nullptr);
+        }
+    }
+
+    void process_meta_calls()
+    {
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+
+private:
+    int argc_{0};
+    std::unique_ptr<QCoreApplication> app_;
+};
+
+template <typename Predicate>
+bool wait_until_qt(Predicate&& predicate, std::chrono::milliseconds timeout = 3000ms)
+{
+    ScopedQtApplication qt;
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        qt.process_meta_calls();
+        if (predicate())
+            return true;
+        std::this_thread::sleep_for(50ms);
+    }
+    qt.process_meta_calls();
+    return predicate();
+}
 
 Node make_robot(uint64_t id, std::string name, int level)
 {
@@ -209,19 +250,7 @@ TEST_CASE("Same-process LWW agents synchronize over DDS", "[LWW][DDS]")
     DSRGraph loader(loader_settings);
     DSRGraph follower(follower_settings);
 
-    auto wait_until = [](auto&& predicate, std::chrono::milliseconds timeout = 3000ms)
-    {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            if (predicate())
-                return true;
-            std::this_thread::sleep_for(50ms);
-        }
-        return predicate();
-    };
-
-    REQUIRE(wait_until([&] { return follower.size() == loader.size(); }));
+    REQUIRE(wait_until_qt([&] { return follower.size() == loader.size(); }));
 
     auto root_loader = loader.get_node("root");
     REQUIRE(root_loader.has_value());
@@ -229,7 +258,7 @@ TEST_CASE("Same-process LWW agents synchronize over DDS", "[LWW][DDS]")
         Attribute(std::string("loader"), get_unix_timestamp(), loader.get_agent_id());
     REQUIRE(loader.update_node(root_loader.value()));
 
-    REQUIRE(wait_until([&] {
+    REQUIRE(wait_until_qt([&] {
         auto root_follower = follower.get_node("root");
         return root_follower.has_value() &&
                root_follower->attrs().contains("lww_loader_sync");
