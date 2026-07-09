@@ -35,6 +35,11 @@ namespace DSR
     class CameraAPI
     {
         public:
+            /// Projection model of the wrapped camera node. Pinhole (perspective, focal-based) or
+            /// Equirectangular (360 panorama, spherical). Selected from the node's cam_fov attribute
+            /// (fov ≈ 2π ⇒ Equirectangular), so project()/get_ray work for both without a new call.
+            enum class ProjectionModel { Pinhole, Equirectangular };
+
             /// Constructs the API from a graph handle and a camera node.
             explicit CameraAPI(DSRGraph *G_, const DSR::Node &n);
             //explicit CameraAPI(DSRGraph *G_, const std::uint32_t id);
@@ -82,10 +87,16 @@ namespace DSR
             Eigen::Vector3d get_ray(const Eigen::Vector3d & p) const;
             /// Returns image width in pixels.
             inline std::uint32_t get_width() const {return width;};
+            /// Returns the camera's projection model (Pinhole or Equirectangular).
+            inline ProjectionModel get_projection_model() const { return projection_model; };
             /// Converts a polar 3D basis/representation into camera coordinates.
             Eigen::Matrix3d polar_3D_to_camera(const Eigen::Matrix3d& p) const ;
             /// Projects a 3D point into image coordinates using camera intrinsics.
             Eigen::Vector2d project( const Eigen::Vector3d & p, int cx=-1, int cy=-1) const;
+            /// Back-projects an image pixel (u,v) to a UNIT ray in the camera frame — the inverse of
+            /// project() for the active model. Exact for equirectangular; for pinhole it is the
+            /// normalized direction through the pixel (camera Y forward).
+            Eigen::Vector3d ray_from_pixel(double u, double v) const;
             /// Converts a list of RGBD samples (u, v, depth) into camera-frame XYZ points.
             std::vector<Eigen::Vector3d> get_xyz_from_rgbd_points(const std::vector<Eigen::Vector3d> &rgbd_points) const;
             /// Sets a shared focal value for camera intrinsics.
@@ -116,6 +127,12 @@ namespace DSR
             std::uint32_t height;		//!<
             std::uint32_t depth;		//!<
             std::uint32_t cameraID;
+            // Equirectangular (360) projection support. projection_model is picked in the ctor from
+            // cam_fov; azimuth_sign/offset are the panorama column convention (mirror + seam zero),
+            // read from cam_equirect_azimuth_sign/offset (default = textbook +1 / 0).
+            ProjectionModel projection_model = ProjectionModel::Pinhole;
+            float azimuth_sign = 1.f;
+            float azimuth_offset = 0.f;
     };
 }
 

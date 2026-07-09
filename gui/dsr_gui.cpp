@@ -431,6 +431,10 @@ void DSRViewer::create_dock_and_menu(const QString &name, QWidget *view)
     } else
     {
         dock_widget = new QDockWidget(name);
+        // QMainWindow::saveState/restoreState key each dock by its objectName; without it the dock
+        // layout (sizes + the splitter/separator positions between docks) is NOT persisted and Qt
+        // warns "'objectName' not set". The dock name is stable per agent, so use it as the id.
+        dock_widget->setObjectName(name);
         QAction *new_action = new QAction(name, this);
         new_action->setStatusTip(tr("Create a new file"));
         new_action->setCheckable(true);

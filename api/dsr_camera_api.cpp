@@ -2,18 +2,17 @@
 #include <dsr/api/dsr_camera_api.h>
 #include <dsr/api/dsr_api.h>
 
+#include <cmath>
+
 using namespace DSR;
 
 CameraAPI::CameraAPI(DSR::DSRGraph *G_, const DSR::Node &camera)
 {
     G = G_;
     id = camera.id();
-    if( auto o_focal_x = G->get_attrib_by_name<cam_rgb_focalx_att>(camera); o_focal_x.has_value())
-        focal_x = o_focal_x.value();
-    else qFatal("CameraAPI constructor: aborting since no focal_x attr found in camera");
-    if( auto o_focal_y = G->get_attrib_by_name<cam_rgb_focaly_att>(camera); o_focal_y.has_value())
-        focal_y = o_focal_y.value();
-    else qFatal("CameraAPI constructor: aborting since no focal_y attr found in camera");
+
+    // Image size is required for BOTH projection models (equirectangular maps azimuth/elevation onto
+    // the full width/height); read it first so the model branch below can rely on it.
     if( auto o_width = G->get_attrib_by_name<cam_rgb_width_att>(camera); o_width.has_value())
     {
         width = o_width.value();
@@ -26,6 +25,34 @@ CameraAPI::CameraAPI(DSR::DSRGraph *G_, const DSR::Node &camera)
         centre_y = height/2;
     }
     else qFatal("CameraAPI constructor: aborting since no height attr found in camera");
+
+    // Pick the projection model from the field of view: a ~2π fov is a 360/equirectangular panorama
+    // (e.g. the ricoh, cam_fov=6.28). Everything else is a perspective pinhole camera.
+    projection_model = ProjectionModel::Pinhole;
+    if( auto o_fov = G->get_attrib_by_name<cam_fov_att>(camera); o_fov.has_value() and o_fov.value() >= 5.5f)
+        projection_model = ProjectionModel::Equirectangular;
+
+    if( projection_model == ProjectionModel::Equirectangular )
+    {
+        // Equirectangular has no focal length; only the panorama column convention (mirror + seam
+        // zero), stored as camera intrinsics. Defaults = textbook (sign +1, offset 0).
+        if( auto o_sign = G->get_attrib_by_name<cam_equirect_azimuth_sign_att>(camera); o_sign.has_value())
+            azimuth_sign = o_sign.value();
+        if( auto o_off = G->get_attrib_by_name<cam_equirect_azimuth_offset_att>(camera); o_off.has_value())
+            azimuth_offset = o_off.value();
+        focal_x = focal_y = focal = 0.f;
+    }
+    else
+    {
+        // Pinhole: focal length is mandatory.
+        if( auto o_focal_x = G->get_attrib_by_name<cam_rgb_focalx_att>(camera); o_focal_x.has_value())
+            focal_x = o_focal_x.value();
+        else qFatal("CameraAPI constructor: aborting since no focal_x attr found in perspective camera");
+        if( auto o_focal_y = G->get_attrib_by_name<cam_rgb_focaly_att>(camera); o_focal_y.has_value())
+            focal_y = o_focal_y.value();
+        else qFatal("CameraAPI constructor: aborting since no focal_y attr found in perspective camera");
+    }
+
     if( auto o_depth = G->get_attrib_by_name<cam_rgb_depth_att>(camera); o_depth.has_value())
         depth = o_depth.value();
     else qFatal("CameraAPI constructor: aborting since no depth attr found in camera");
@@ -64,12 +91,47 @@ void CameraAPI::set_height( std::uint32_t h)
 Eigen::Vector2d CameraAPI::project(const Eigen::Vector3d & p, int cx, int  cy) const
 {
     Eigen::Vector2d proj;
+
+    if( projection_model == ProjectionModel::Equirectangular )
+    {
+        // Spherical (360) projection onto an equirectangular panorama. Azimuth θ=atan2(x,y) → column
+        // (0 = seam, W/2 = straight ahead), elevation φ=asin(-z/r) → row (top = up). azimuth_sign/offset
+        // encode the panorama's column convention (mirror + seam zero). Column is wrapped to [0,W).
+        const double r = p.norm();
+        if( r < 1e-9 ) { proj << centre_x, centre_y; return proj; }
+        double u = ((azimuth_sign * std::atan2(p.x(), p.y()) + azimuth_offset) / (2.0 * M_PI) + 0.5) * width;
+        u = std::fmod(u, static_cast<double>(width));
+        if( u < 0.0 ) u += width;
+        const double v = (std::asin(-p.z() / r) / M_PI + 0.5) * height;
+        proj << u, v;
+        return proj;
+    }
+
     if(cx==-1) cx=centre_x;
     if(cy==-1) cy=centre_y;
     proj << focal_x * p.x() / p.y() + cx, -focal_y * p.z() / p.y() + cy;  // Y grows dowwards in the image plane
     //proj << focal_x * /*(608/640) */ p.x() / p.y() + cx, -focal_y * (416./480) * p.z() / p.y() + cy;  //FIXXXXX IT
 
     return proj;
+}
+
+// Inverse of project(): image pixel (u,v) → unit ray in the camera frame (Y forward, Z up).
+Eigen::Vector3d CameraAPI::ray_from_pixel(double u, double v) const
+{
+    if( projection_model == ProjectionModel::Equirectangular )
+    {
+        // Undo the panorama column/row mapping, then the sign/offset applied in project():
+        //   project:  az = sign·atan2(x,y) + offset ;  u = (az/2π + 0.5)·W ;  v = (asin(-z/r)/π + 0.5)·H
+        const double az    = (u / static_cast<double>(width)  - 0.5) * 2.0 * M_PI;
+        const double phi   = (v / static_cast<double>(height) - 0.5) * M_PI;
+        const double theta = azimuth_sign * (az - azimuth_offset);   // atan2(x,y); sign ∈ {+1,-1} ⇒ 1/sign == sign
+        const double cphi  = std::cos(phi);
+        return { cphi * std::sin(theta), cphi * std::cos(theta), -std::sin(phi) };
+    }
+    // Pinhole: invert u = fx·x/y + cx, v = -fy·z/y + cy at y=1, then normalize.
+    const double x = (u - centre_x) / focal_x;
+    const double z = (centre_y - v) / focal_y;
+    return Eigen::Vector3d(x, 1.0, z).normalized();
 }
 
 std::vector<Eigen::Vector3d> CameraAPI::get_xyz_from_rgbd_points(const std::vector<Eigen::Vector3d> &rgbd_points) const

@@ -404,6 +404,9 @@ REGISTER_TYPE(cam_is_on, bool, false)
 REGISTER_TYPE(cam_time_stamp, float, false)
 REGISTER_TYPE(cam_sensor_tick, float, false)
 REGISTER_TYPE(cam_fov, float, false)
+// Equirectangular (360) intrinsics: panorama column convention (mirror sign ±1, seam zero offset).
+REGISTER_TYPE(cam_equirect_azimuth_sign, float, false)
+REGISTER_TYPE(cam_equirect_azimuth_offset, float, false)
 
 /*
  * GPS
@@ -546,6 +549,20 @@ REGISTER_TYPE(residual_mass,       int,                                         
 REGISTER_TYPE(explanation_ratio,   float,                                             false)
 REGISTER_TYPE(last_sensing_frame,  int,                                               false)
 REGISTER_TYPE(rfe_pts,             std::reference_wrapper<const std::vector<float>>, false)
+
+// ── residual_concept occupancy-GRID costmap (written by residual_concept on the `grid` node; occupied +
+//    inflated-border cell centres for display; encoded obstacle hulls for the controller's planner) ──────
+REGISTER_TYPE(grid_occupied_cells, std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]×N occupied
+REGISTER_TYPE(grid_border_cells,   std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]×N inflated ring
+REGISTER_TYPE(grid_obstacle_hulls, std::reference_wrapper<const std::vector<float>>, false)  // [P,(V,x,y…)×P] footprints
+REGISTER_TYPE(grid_cell_size,      float,                                            false)  // cell edge (m)
+// ── Beta–Bernoulli BELIEF FIELD (dense, row-major over the grid extent) — the planner plans over belief:
+//    grid_occupancy_prob = mean occupancy P (collision RISK); grid_occupancy_var = Var[P] (EPISTEMIC term).
+//    grid_field_meta = [xmin, ymin, cell_size, width, height] to interpret the row-major arrays. Cells EXPLAINED
+//    by a modelled object are collapsed to (P=0, Var=0) at publish (the object agent owns that region). ──
+REGISTER_TYPE(grid_occupancy_prob, std::reference_wrapper<const std::vector<float>>, false)  // dense P, row-major
+REGISTER_TYPE(grid_occupancy_var,  std::reference_wrapper<const std::vector<float>>, false)  // dense Var[P], row-major
+REGISTER_TYPE(grid_field_meta,     std::reference_wrapper<const std::vector<float>>, false)  // [xmin,ymin,cell,w,h]
 
 
 // ── table-concept inference outputs (written by table-concept) ────────────────────────────────
