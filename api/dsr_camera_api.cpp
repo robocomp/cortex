@@ -26,16 +26,23 @@ CameraAPI::CameraAPI(DSR::DSRGraph *G_, const DSR::Node &camera)
     }
     else qFatal("CameraAPI constructor: aborting since no height attr found in camera");
 
-    // Pick the projection model from the field of view: a ~2π fov is a 360/equirectangular panorama
-    // (e.g. the ricoh, cam_fov=6.28). Everything else is a perspective pinhole camera.
+    // Pick the projection model from the field of view: a ~2π fov is a 360 panorama (e.g. the ricoh,
+    // cam_fov=6.28). Everything else is a perspective pinhole camera. A 360 panorama defaults to spherical
+    // Equirectangular, but the node may declare cam_projection="cylindrical" (the webots camera projection):
+    // azimuth is linear either way, but the ELEVATION map differs (angle vs tan), so honour it.
     projection_model = ProjectionModel::Pinhole;
     if( auto o_fov = G->get_attrib_by_name<cam_fov_att>(camera); o_fov.has_value() and o_fov.value() >= 5.5f)
-        projection_model = ProjectionModel::Equirectangular;
-
-    if( projection_model == ProjectionModel::Equirectangular )
     {
-        // Equirectangular has no focal length; only the panorama column convention (mirror + seam
-        // zero), stored as camera intrinsics. Defaults = textbook (sign +1, offset 0).
+        projection_model = ProjectionModel::Equirectangular;
+        if( auto o_proj = G->get_attrib_by_name<cam_projection_att>(camera);
+            o_proj.has_value() and o_proj.value().get() == "cylindrical")
+            projection_model = ProjectionModel::Cylindrical;
+    }
+
+    if( projection_model == ProjectionModel::Equirectangular or projection_model == ProjectionModel::Cylindrical )
+    {
+        // Both 360 models share the panorama COLUMN convention (mirror + seam zero) and carry no focal
+        // length. Defaults = textbook (sign +1, offset 0). The row/elevation map differs (see project()).
         if( auto o_sign = G->get_attrib_by_name<cam_equirect_azimuth_sign_att>(camera); o_sign.has_value())
             azimuth_sign = o_sign.value();
         if( auto o_off = G->get_attrib_by_name<cam_equirect_azimuth_offset_att>(camera); o_off.has_value())
@@ -107,6 +114,24 @@ Eigen::Vector2d CameraAPI::project(const Eigen::Vector3d & p, int cx, int  cy) c
         return proj;
     }
 
+    if( projection_model == ProjectionModel::Cylindrical )
+    {
+        // Webots "cylindrical" 360 camera: azimuth θ=atan2(x,y) → column (LINEAR, identical to equirect), but
+        // the ELEVATION is a PLANAR projection onto the cylinder — row ∝ tan(elevation), NOT the angle itself.
+        // Vertical focal f_v = width/(2π) (square pixels; the full 360° spans `width` columns), so the vertical
+        // FoV is LIMITED (≈±58° for a 2:1 panorama) — which is exactly why the spherical asin map mis-placed
+        // off-horizon (floor) returns onto the wrong rows. v = H/2 − f_v·(z/√(x²+y²)); straight up/down clamps.
+        const double rho_h = std::hypot(p.x(), p.y());
+        double u = ((azimuth_sign * std::atan2(p.x(), p.y()) + azimuth_offset) / (2.0 * M_PI) + 0.5) * width;
+        u = std::fmod(u, static_cast<double>(width));
+        if( u < 0.0 ) u += width;
+        const double fv = static_cast<double>(width) / (2.0 * M_PI);
+        const double v = (rho_h > 1e-9) ? (0.5 * height - fv * (p.z() / rho_h))
+                                        : (p.z() >= 0.0 ? 0.0 : static_cast<double>(height));
+        proj << u, v;
+        return proj;
+    }
+
     if(cx==-1) cx=centre_x;
     if(cy==-1) cy=centre_y;
     proj << focal_x * p.x() / p.y() + cx, -focal_y * p.z() / p.y() + cy;  // Y grows dowwards in the image plane
@@ -127,6 +152,16 @@ Eigen::Vector3d CameraAPI::ray_from_pixel(double u, double v) const
         const double theta = azimuth_sign * (az - azimuth_offset);   // atan2(x,y); sign ∈ {+1,-1} ⇒ 1/sign == sign
         const double cphi  = std::cos(phi);
         return { cphi * std::sin(theta), cphi * std::cos(theta), -std::sin(phi) };
+    }
+    if( projection_model == ProjectionModel::Cylindrical )
+    {
+        // Inverse of the cylindrical map: azimuth is linear (as equirect), elevation is planar (tan).
+        //   project:  u = (az/2π + 0.5)·W ;  v = H/2 − f_v·(z/√(x²+y²)) ,  f_v = W/2π
+        const double az    = (u / static_cast<double>(width) - 0.5) * 2.0 * M_PI;
+        const double theta = azimuth_sign * (az - azimuth_offset);
+        const double fv    = static_cast<double>(width) / (2.0 * M_PI);
+        const double t     = (0.5 * static_cast<double>(height) - v) / fv;   // tan(elevation) = z/√(x²+y²)
+        return Eigen::Vector3d(std::sin(theta), std::cos(theta), t).normalized();
     }
     // Pinhole: invert u = fx·x/y + cx, v = -fy·z/y + cy at y=1, then normalize.
     const double x = (u - centre_x) / focal_x;

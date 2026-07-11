@@ -61,6 +61,11 @@ namespace DSR
 			void reload(QWidget * widget);
             void remove_node_SLOT(uint64_t id);  // remove node from DSR
 
+        signals:
+            // Re-emitted from a node's GraphNode::view_data_signal. The agent connects
+            // here (Qt::QueuedConnection) to open a media-plane (DDS) viewer for the node.
+            void view_data_signal(uint64_t id, const std::string &type);
+
         protected:
             std::shared_ptr<DSR::DSRGraph> G;
             GraphNode* new_visual_node(uint64_t id, const std::string &type, const std::string &name, bool debug = false);

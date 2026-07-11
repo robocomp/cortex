@@ -59,6 +59,7 @@ private:
     QMenu *contextMenu = nullptr;
     std::unique_ptr<QWidget> node_widget;
     std::set<std::string> cached_edge_types;
+    QPoint press_screen_pos_;   // where the last left press started (click-vs-drag discrimination)
 
 public:
     static constexpr int DEFAULT_DIAMETER = 20;
@@ -97,6 +98,7 @@ public:
 
 protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
     //void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override { qDebug() << "move " << event->pos();};
@@ -106,8 +108,20 @@ public slots:
     void show_node_widget(const std::string &show_type= "table");
     void update_node_attr_slot(std::uint64_t node_id, const std::vector<std::string> &type_);
     void delete_node();
+    // Decides at click time whether the node still carries its raw stream inline
+    // in the graph (open the built-in widget) or the data lives on the media plane
+    // (forward view_data_signal to the agent).
+    void request_view_data();
 signals:
     void del_node_signal(uint64_t id);
+    // Emitted when the user asks to "View data" on a node whose raw stream is NOT
+    // stored inline in the graph. The agent, which owns the media-plane (DDS)
+    // subscriber, connects to this (QueuedConnection) and opens its own viewer.
+    void view_data_signal(uint64_t id, const std::string &type);
+
+private:
+    // True if the node still holds its type's raw payload as a graph attribute.
+    bool has_inline_data() const;
 };
 //Q_DECLARE_METATYPE(DSR::Node);
 #endif // GRAPHNODE_H

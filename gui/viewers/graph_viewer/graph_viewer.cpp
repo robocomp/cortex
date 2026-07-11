@@ -231,6 +231,8 @@ GraphNode* GraphViewer::new_visual_node(uint64_t id, const std::string &type, co
     scene.addItem(gnode);
     // connect delete signal
     QObject::connect(gnode, &GraphNode::del_node_signal, this, &GraphViewer::remove_node_SLOT, Qt::QueuedConnection);
+    // re-emit "view data" requests (media-plane nodes) up to whoever holds the viewer (the agent)
+    QObject::connect(gnode, &GraphNode::view_data_signal, this, &GraphViewer::view_data_signal, Qt::QueuedConnection);
     return gnode;
 }
 

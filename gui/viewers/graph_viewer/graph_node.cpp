@@ -16,6 +16,8 @@
 
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <QFont>
+#include <QPushButton>
+#include <QWidgetAction>
 //#include <dsr/gui/viewers/graph_viewer/node_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_imu_widget.h>
@@ -35,15 +37,30 @@ GraphNode::GraphNode(const std::shared_ptr<DSR::GraphViewer>&
     setZValue(-1);
     node_brush.setStyle(Qt::SolidPattern);
 
-    // context menu
+    // context menu — order: View table, View data, then the destructive "Delete node" LAST, in red.
     contextMenu = new QMenu();
-    QAction *delete_node = new QAction("Delete node");
-    contextMenu->addAction(delete_node);
-    connect(delete_node, &QAction::triggered, this, [this](){ this->delete_node();});
     QAction *table_action = new QAction("View table");
     contextMenu->addAction(table_action);
     connect(table_action, &QAction::triggered, this, [this](){ this->show_node_widget("table");});
-
+    // "View data" is offered for EVERY node. Added ONCE here (not in setType, which is called more
+    // than once per node → would stack duplicate entries). request_view_data() reads the node's
+    // `type` at click time, so the action needs no type info now.
+    QAction *view_data_action = new QAction("View data");
+    contextMenu->addAction(view_data_action);
+    connect(view_data_action, &QAction::triggered, this, [this](){ this->request_view_data();});
+    // Destructive action last + red. QAction has no text-colour API, so wrap a flat red push button
+    // in a QWidgetAction; it still triggers and dismisses the menu like a normal item.
+    contextMenu->addSeparator();
+    auto *delete_btn = new QPushButton("Delete node");
+    delete_btn->setFlat(true);
+    delete_btn->setCursor(Qt::PointingHandCursor);
+    delete_btn->setStyleSheet(
+        "QPushButton { color:#d33; text-align:left; padding:4px 24px; border:none; background:transparent; }"
+        "QPushButton:hover { background:palette(highlight); color:white; }");
+    auto *delete_action = new QWidgetAction(contextMenu);
+    delete_action->setDefaultWidget(delete_btn);
+    contextMenu->addAction(delete_action);
+    connect(delete_btn, &QPushButton::clicked, this, [this](){ contextMenu->close(); this->delete_node(); });
 
     animation = new QPropertyAnimation(this, "node_color", this);
 	animation->setDuration(animation_time);
@@ -64,15 +81,45 @@ void GraphNode::setTag(const std::string &tag_)
 
 void GraphNode::setType(const std::string &type_)
 {
+    // May be called more than once per node — keep it idempotent (no menu building here; the
+    // "View data" action is added once in the constructor).
     type = type_;
-    if(type == "laser" or type == "rgbd" or type == "person" or type == "imu")
-    {
-        QAction *stuff_action = new QAction("View data");
-        contextMenu->addAction(stuff_action);
-        connect(stuff_action, &QAction::triggered, this, [this, type_](){ this->show_node_widget(type_);});
-    }
     auto color = GraphColors<DSR::Node>()[type];
     set_color(color);
+}
+
+bool GraphNode::has_inline_data() const
+{
+    const auto graph = graph_viewer->getGraph();
+    std::optional<Node> n = graph->get_node(id_in_graph);
+    if(not n.has_value())
+        return false;
+    // Probe the representative payload attribute each built-in widget renders from. The stream is
+    // "inline" only if that attribute is present AND non-empty: media-plane nodes keep the attribute
+    // DECLARED (from the graph bootstrap) but never fill it, so presence alone is not enough — a
+    // present-but-empty buffer means the data now flows on the media plane and must be forwarded.
+    // get_attrib_by_name returns optional<reference_wrapper<const vector>> → unwrap with .get().
+    const auto non_empty = [](const auto& opt){ return opt.has_value() and not opt->get().empty(); };
+    if(type == "rgbd")
+        return non_empty(graph->get_attrib_by_name<cam_rgb_att>(n.value()));
+    if(type == "laser")
+        return non_empty(graph->get_attrib_by_name<laser_X_att>(n.value()));
+    if(type == "imu")
+        return non_empty(graph->get_attrib_by_name<imu_accelerometer_att>(n.value()));
+    if(type == "person")
+        return non_empty(graph->get_attrib_by_name<laser_angles_att>(n.value()));
+    return false;   // unknown types never had a built-in widget → always forward
+}
+
+void GraphNode::request_view_data()
+{
+    // Legacy path: raw stream still inlined in the graph → open the matching built-in
+    // widget. Media-plane path: no inline payload → hand the request to the agent,
+    // which owns the DDS subscriber and its own type-specific viewer.
+    if(has_inline_data())
+        show_node_widget(type);
+    else
+        emit view_data_signal(id_in_graph, type);
 }
 
 
@@ -242,10 +289,17 @@ QVariant GraphNode::itemChange(GraphicsItemChange change, const QVariant &value)
     return QGraphicsItem::itemChange(change, value);
 }
 
+void GraphNode::mousePressEvent(QGraphicsSceneMouseEvent* event)
+{
+    // Remember where a left press started so mouseReleaseEvent can tell a plain click (→ menu)
+    // from a click-and-drag (→ move the node).
+    if(event->button() == Qt::LeftButton)
+        press_screen_pos_ = event->screenPos();
+    QGraphicsEllipseItem::mousePressEvent(event);
+}
+
 void GraphNode::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
-    if( event->button()== Qt::RightButton)
-       contextMenu->exec(event->screenPos());
     QGraphicsEllipseItem::mouseDoubleClickEvent(event);
 }
 
@@ -273,15 +327,26 @@ void GraphNode::change_detected()
 
 void GraphNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-     if( event->button()== Qt::LeftButton)
+    if(event->button() == Qt::LeftButton)
     {
-        auto g = graph_viewer->getGraph();
-        qDebug() << __FILE__ <<":"<<__FUNCTION__<< " node id in graphnode: " << id_in_graph ;
-        std::optional<Node> n = g->get_node(id_in_graph);
-        if (n.has_value()) {
-            g->add_or_modify_attrib_local<pos_x_att>(n.value(), (float) this->pos().x());
-            g->add_or_modify_attrib_local<pos_y_att>(n.value(),  (float) this->pos().y());
-            g->update_node(n.value());
+        // Distinguish a plain left-click from a left-drag by how far the pointer travelled since
+        // the press. A small movement is a click → open the node menu (moved here from right-click);
+        // a larger movement is a drag → persist the node's new position.
+        static constexpr int CLICK_DRAG_THRESHOLD = 4;   // screen pixels
+        const int moved = (event->screenPos() - press_screen_pos_).manhattanLength();
+        if(moved <= CLICK_DRAG_THRESHOLD)
+        {
+            contextMenu->exec(event->screenPos());
+        }
+        else
+        {
+            auto g = graph_viewer->getGraph();
+            std::optional<Node> n = g->get_node(id_in_graph);
+            if (n.has_value()) {
+                g->add_or_modify_attrib_local<pos_x_att>(n.value(), (float) this->pos().x());
+                g->add_or_modify_attrib_local<pos_y_att>(n.value(),  (float) this->pos().y());
+                g->update_node(n.value());
+            }
         }
     }
     QGraphicsItem::mouseReleaseEvent(event);

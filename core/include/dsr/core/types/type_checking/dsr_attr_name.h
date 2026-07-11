@@ -407,6 +407,9 @@ REGISTER_TYPE(cam_fov, float, false)
 // Equirectangular (360) intrinsics: panorama column convention (mirror sign ±1, seam zero offset).
 REGISTER_TYPE(cam_equirect_azimuth_sign, float, false)
 REGISTER_TYPE(cam_equirect_azimuth_offset, float, false)
+// 360-panorama projection model: "equirectangular" (spherical, elevation∝angle) or "cylindrical" (webots
+// camera: azimuth linear, ELEVATION planar ∝ tan). Selects CameraAPI's vertical map; azimuth is common.
+REGISTER_TYPE(cam_projection, std::reference_wrapper<const std::string>, false)
 
 /*
  * GPS

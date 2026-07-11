@@ -35,10 +35,12 @@ namespace DSR
     class CameraAPI
     {
         public:
-            /// Projection model of the wrapped camera node. Pinhole (perspective, focal-based) or
-            /// Equirectangular (360 panorama, spherical). Selected from the node's cam_fov attribute
-            /// (fov ≈ 2π ⇒ Equirectangular), so project()/get_ray work for both without a new call.
-            enum class ProjectionModel { Pinhole, Equirectangular };
+            /// Projection model of the wrapped camera node. Pinhole (perspective, focal-based),
+            /// Equirectangular (360 panorama, SPHERICAL: elevation ∝ angle, full ±90°), or Cylindrical
+            /// (360 panorama, azimuth linear like equirect but ELEVATION ∝ tan on a cylinder with a limited
+            /// vertical FoV — the webots camera projection "cylindrical"). A ~2π cam_fov selects a 360 model;
+            /// the cam_projection attribute (when "cylindrical") picks Cylindrical over Equirectangular.
+            enum class ProjectionModel { Pinhole, Equirectangular, Cylindrical };
 
             /// Constructs the API from a graph handle and a camera node.
             explicit CameraAPI(DSRGraph *G_, const DSR::Node &n);
