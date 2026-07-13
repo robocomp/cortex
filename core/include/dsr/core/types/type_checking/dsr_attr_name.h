@@ -228,6 +228,11 @@ REGISTER_TYPE(obj_visible, int, false)
 REGISTER_TYPE(projected_bounding_box, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(unseen_time, int, false)
 REGISTER_TYPE(obj_checked, bool, false)
+// Per-frame ROBOT-frame observation of a modelled object (object-anchor z_o): [x,y] or [x,y,yaw],
+// plus optional diagonal measurement covariance. Written by concept agents (table/chair/…), read by
+// the room localizer to use the object as an SE(2) pose landmark. See common/object_anchor.
+REGISTER_TYPE(obj_obs_robot,     std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(obj_obs_robot_cov, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(average_size, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(is_an_obstacle, bool, false)
 REGISTER_TYPE(room_id, uint64_t, false)
@@ -593,5 +598,14 @@ REGISTER_TYPE(mask_support_points,    std::reference_wrapper<const std::vector<f
 REGISTER_TYPE(mask_centroids_xyz,     std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_bbox_min_xyz,      std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_bbox_max_xyz,      std::reference_wrapper<const std::vector<float>>,  false)
+
+// ── dense semantic segmentation label map (ADE20K-150). Written LOW-FREQUENCY by voxelizer on a
+//    'semantic' node under 'zed'. semantic_labels is CV_8UC1 class ids, row-major, at the ZED IMAGE
+//    resolution (already unletterboxed) → a consumer reads label = semantic_labels[v*width + u] directly.
+REGISTER_TYPE(semantic_labels,        std::reference_wrapper<const std::vector<uint8_t>>, false)
+REGISTER_TYPE(semantic_width,         int,                                                false)
+REGISTER_TYPE(semantic_height,        int,                                                false)
+REGISTER_TYPE(semantic_timestamp_ms,  uint64_t,                                           false)
+REGISTER_TYPE(semantic_frame_id,      int,                                                false)
 
 #endif //DSR_ATTR_NAME_H
