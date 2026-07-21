@@ -33,6 +33,7 @@ set(headers_to_moc
         include/dsr/gui/viewers/graph_viewer/graph_node_laser_widget.h
         include/dsr/gui/viewers/graph_viewer/graph_node_rgbd_widget.h
         include/dsr/gui/viewers/graph_viewer/graph_node_person_widget.h
+        include/dsr/gui/viewers/graph_viewer/graph_node_mind_widget.h
         include/dsr/gui/viewers/graph_viewer/graph_node_widget.h
         include/dsr/gui/viewers/tree_viewer/tree_viewer.h
         include/dsr/gui/viewers/_abstract_graphic_view.h
@@ -83,6 +84,21 @@ set_target_properties(dsr_gui
         CXX_EXTENSIONS ON)
 
 target_compile_options(dsr_gui PUBLIC -O3 -g -fmax-errors=5 -std=c++20 -fno-char8_t )
+
+# Fast DDS Statistics consumer for the mind view (opt-in, dev/debug only). OFF by default so normal
+# and DEPLOYMENT builds contain ZERO statistics code. eProsima installs the statistics *type* headers
+# only as .idl, so enabling this also needs a Fast-DDS SOURCE tree to include the generated types from:
+#   cmake -B build -DRC_DDS_STATS=ON -DRC_DDS_STATS_SRC=/path/to/Fast-DDS/src/cpp
+# At runtime it is still inert unless the env var RC_DDS_STATS=1 is set (a second, no-rebuild gate).
+option(RC_DDS_STATS "Build the Fast DDS Statistics consumer into the mind view (dev only)" OFF)
+if(RC_DDS_STATS)
+  if(NOT RC_DDS_STATS_SRC OR NOT EXISTS "${RC_DDS_STATS_SRC}/statistics/types/typesPubSubTypes.hpp")
+    message(FATAL_ERROR "RC_DDS_STATS=ON requires -DRC_DDS_STATS_SRC=<Fast-DDS>/src/cpp (statistics type headers)")
+  endif()
+  message(STATUS "DDS Statistics consumer ENABLED for dsr_gui (types from ${RC_DDS_STATS_SRC})")
+  target_compile_definitions(dsr_gui PRIVATE RC_DDS_STATS=1)
+  target_include_directories(dsr_gui PRIVATE $<BUILD_INTERFACE:${RC_DDS_STATS_SRC}>)
+endif()
 
 # AddressSanitizer (opt-in): cmake -B build-asan -DENABLE_ASAN=ON
 # Only needed for redzone-precise detection INSIDE the graph viewer. Do NOT `make install`

@@ -17,7 +17,9 @@
 #include <dsr/gui/viewers/graph_viewer/graph_node.h>
 #include <QFont>
 #include <QPushButton>
+#include <algorithm>
 #include <QWidgetAction>
+#include <functional>
 //#include <dsr/gui/viewers/graph_viewer/node_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_colors.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_imu_widget.h>
@@ -25,7 +27,37 @@
 #include <dsr/gui/viewers/graph_viewer/graph_node_widget.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_rgbd_widget.h>
 #include <dsr/gui/viewers/graph_viewer/graph_node_person_widget.h>
+#include <dsr/gui/viewers/graph_viewer/graph_node_mind_widget.h>
 
+
+// "+"/"-" collapse handle, a child item of the node it belongs to.
+//
+// It must consume its own mouse events: a QGraphicsItem that is neither movable nor selectable
+// IGNORES presses, and the scene then hands them to the item underneath — the node — whose
+// mouseReleaseEvent opens the context menu (see GraphNode::mouseReleaseEvent). Accepting the
+// press here is what keeps clicking the badge from also popping that menu.
+class CollapseBadge : public QGraphicsSimpleTextItem
+{
+    public:
+        CollapseBadge(GraphNode *parent, std::function<void()> on_click)
+            : QGraphicsSimpleTextItem(parent), on_click_(std::move(on_click))
+        {
+            QFont f = font(); f.setPointSize(9); f.setBold(true); setFont(f);
+            setZValue(1);
+            setAcceptedMouseButtons(Qt::LeftButton);
+            setCursor(Qt::PointingHandCursor);
+        }
+    protected:
+        void mousePressEvent(QGraphicsSceneMouseEvent *event) override
+        { event->accept(); }
+        void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override
+        {
+            event->accept();
+            if(on_click_) on_click_();
+        }
+    private:
+        std::function<void()> on_click_;
+};
 
 GraphNode::GraphNode(const std::shared_ptr<DSR::GraphViewer>&
         graph_viewer_):QGraphicsEllipseItem(0,0,DEFAULT_DIAMETER,DEFAULT_DIAMETER), graph_viewer(graph_viewer_)
@@ -72,11 +104,19 @@ GraphNode::GraphNode(const std::shared_ptr<DSR::GraphViewer>&
 
 void GraphNode::setTag(const std::string &tag_)
 {
-    QString c = QString::fromStdString(tag_);
-	tag = new QGraphicsSimpleTextItem(c, this);
+    // Idempotent: the label is refreshed whenever a node's live state changes (agent health, see
+    // AgentStatePublisher), so this is called repeatedly on the same node. It used to `new` a fresh
+    // text item every call, leaking the previous one AND stacking overlapping text on the item.
+    const QString c = QString::fromStdString(tag_);
+    if (tag == nullptr)
+    {
+        tag = new QGraphicsSimpleTextItem(c, this);
         QFont f = tag->font(); f.setPointSize(7); tag->setFont(f);
         tag->setX(DEFAULT_DIAMETER);
         tag->setY(-10);
+    }
+    else if (tag->text() != c)
+        tag->setText(c);
 }
 
 void GraphNode::setType(const std::string &type_)
@@ -86,6 +126,24 @@ void GraphNode::setType(const std::string &type_)
     type = type_;
     auto color = GraphColors<DSR::Node>()[type];
     set_color(color);
+}
+
+void GraphNode::set_collapse_indicator(bool has_collapsible_children, bool collapsed)
+{
+    // Nothing to show and nothing built yet → don't create the item at all (most nodes).
+    if(collapse_badge == nullptr)
+    {
+        if(not has_collapsible_children)
+            return;
+        collapse_badge = new CollapseBadge(this, [this](){ emit toggle_children_signal(id_in_graph); });
+        // Left of the circle, opposite the name tag (which sits at +DEFAULT_DIAMETER, see setTag).
+        collapse_badge->setX(-DEFAULT_RADIUS - 12);
+        collapse_badge->setY(-10);
+    }
+    const QString c = collapsed ? "+" : "-";
+    if(collapse_badge->text() != c)
+        collapse_badge->setText(c);
+    collapse_badge->setVisible(has_collapsible_children);
 }
 
 bool GraphNode::has_inline_data() const
@@ -100,6 +158,10 @@ bool GraphNode::has_inline_data() const
     // present-but-empty buffer means the data now flows on the media plane and must be forwarded.
     // get_attrib_by_name returns optional<reference_wrapper<const vector>> → unwrap with .get().
     const auto non_empty = [](const auto& opt){ return opt.has_value() and not opt->get().empty(); };
+    // The mind node is rendered by a local widget that reads the whole mind subtree straight from the
+    // graph — treat it as "inline" so "View data" opens GraphNodeMindWidget here instead of forwarding.
+    if(type == "mind")
+        return true;
     if(type == "rgbd")
         return non_empty(graph->get_attrib_by_name<cam_rgb_att>(n.value()));
     if(type == "laser")
@@ -315,6 +377,8 @@ void GraphNode::show_node_widget(const std::string &show_type)
         node_widget = std::make_unique<GraphNodePersonWidget>(graph, id_in_graph);
     else if(show_type=="imu")
         node_widget = std::make_unique<GraphNodeIMUWidget>(graph, id_in_graph);
+    else if(show_type=="mind")
+        node_widget = std::make_unique<GraphNodeMindWidget>(graph, id_in_graph);
     else
         node_widget = std::make_unique<GraphNodeWidget>(graph, id_in_graph);
 
@@ -364,12 +428,30 @@ void GraphNode::set_node_color(const QColor& c)
 
 void GraphNode::set_color(const std::string &plain)
 {
-    QString c = QString::fromStdString(plain);
+    const QString c = QString::fromStdString(plain);
+    const QColor parsed(c);
+    // QColor yields BLACK for any name it cannot parse (and for an empty string). Node colours come
+    // from a graph attribute now, i.e. from data we do not control, so an unparseable value must
+    // leave the node alone rather than repaint the whole graph black.
+    if (not parsed.isValid())
+    {
+        qWarning() << "GraphNode::set_color: ignoring unparseable colour" << c
+                   << "on node" << id_in_graph;
+        return;
+    }
     plain_color = c;
-    dark_color = "dark" + c;
-    set_node_color(QColor(c));
-    animation->setStartValue(QColor("green").lighter());
-    animation->setEndValue(c);
+    // Derive the pulse-target from the colour itself. This used to be the string "dark" + name,
+    // which is NOT a colour for most names — darkSteelBlue, darkMediumPurple and darkcoral are all
+    // invalid, so it silently produced black. darker() always yields a valid colour.
+    dark_color = parsed.darker().name();
+    set_node_color(parsed);
+    // Pulse around THIS node's colour. The start value used to be hardcoded green, so a red or
+    // orange node (an agent in Emergency/Waiting) flashed green on every change_detected() — i.e.
+    // exactly the wrong signal at exactly the moment you are watching it. Both ends are QColor for
+    // symmetry (QPropertyAnimation does coerce a QString via the property type, so the previous
+    // QColor/QString mix was not itself a bug — measured, not assumed).
+    animation->setStartValue(parsed.lighter());
+    animation->setEndValue(parsed);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////7
@@ -393,15 +475,21 @@ void GraphNode::update_node_attr_slot(std::uint64_t node_id, const std::vector<s
 {
     if (node_id != this->id_in_graph)
         return;
-//    if(std::find(type.begin(), type.end(), "color") != type.end())
-//    {
-//        std::optional<Node> n = graph_viewer->getGraph()->get_node(node_id);
-//        if (n.has_value()) {
-////            auto &attrs = n.value().attrs();
-////            auto value = attrs.find("color");
-////            if (value != attrs.end()) {
-////                this->setColor(value->second.str());
-////            }
-//        }
-//    }
+    // Repaint when the node's `color` attribute changed. Agent nodes report live health by rewriting
+    // `color` without being recreated, and an attribute-only write does not go through
+    // GraphViewer::add_or_assign_node_SLOT — so without this the new colour was never shown.
+    // Queued onto the GUI thread by the connection in the constructor.
+    //
+    // Scoped to type "agent" for the same reason as the viewer slot: other node types carry stale
+    // colour attributes that were dead data until this feature switched them on.
+    if (type != "agent")
+        return;
+    if (std::ranges::find(type_, "color") == type_.end())
+        return;
+    const auto n = graph_viewer->getGraph()->get_node(node_id);
+    if (not n.has_value())
+        return;
+    if (const auto color = graph_viewer->getGraph()->get_attrib_by_name<color_att>(n.value());
+        color.has_value())
+        set_color(color.value().get());
 }

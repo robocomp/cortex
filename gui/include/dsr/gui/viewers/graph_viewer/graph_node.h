@@ -42,6 +42,9 @@ using namespace DSR;
 
 class GraphEdge;
 class QGraphicsSceneMouseEvent;
+// Small "+"/"-" child item drawn beside a node that has collapsible children. Defined in
+// graph_node.cpp — it only needs to handle its own clicks.
+class CollapseBadge;
 
 
 class GraphNode : public QObject, public QGraphicsEllipseItem
@@ -50,7 +53,7 @@ Q_OBJECT
     Q_PROPERTY(QColor node_color READ _node_color WRITE set_node_color)
 private:
     QPointF newPos;
-    QGraphicsSimpleTextItem *tag;
+    QGraphicsSimpleTextItem *tag = nullptr;   // created on first setTag(), reused after (see setTag)
     std::string type;
     std::shared_ptr<DSR::GraphViewer> graph_viewer;
     QBrush node_brush;
@@ -60,6 +63,7 @@ private:
     std::unique_ptr<QWidget> node_widget;
     std::set<std::string> cached_edge_types;
     QPoint press_screen_pos_;   // where the last left press started (click-vs-drag discrimination)
+    CollapseBadge *collapse_badge = nullptr;   // created on first set_collapse_indicator()
 
 public:
     static constexpr int DEFAULT_DIAMETER = 20;
@@ -86,6 +90,9 @@ public:
     std::string getColor() const { return plain_color.toStdString(); };
     void setType(const std::string &type_);
     std::string getType() const { return type;};
+    // Shows/hides the "+"/"-" collapse handle beside the node. The node holds no policy: what
+    // "collapsed" hides is decided by GraphViewer, which owns the parent/child index.
+    void set_collapse_indicator(bool has_collapsible_children, bool collapsed);
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
@@ -118,6 +125,8 @@ signals:
     // stored inline in the graph. The agent, which owns the media-plane (DDS)
     // subscriber, connects to this (QueuedConnection) and opens its own viewer.
     void view_data_signal(uint64_t id, const std::string &type);
+    // The user clicked the "+"/"-" badge. GraphViewer decides which children to hide/show.
+    void toggle_children_signal(uint64_t id);
 
 private:
     // True if the node still holds its type's raw payload as a graph attribute.

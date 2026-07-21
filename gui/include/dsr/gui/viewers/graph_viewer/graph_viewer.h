@@ -55,6 +55,8 @@ namespace DSR
 			void del_edge_SLOT(std::uint64_t from, std::uint64_t to,  const std::string &edge_tag);
 			void del_node_SLOT(uint64_t id);  // remove node from visual graph
 			void hide_show_node_SLOT(uint64_t id, bool visible);
+			// Collapse/expand the RT subtree hanging from a node (the "+"/"-" badge)
+			void toggle_children_SLOT(uint64_t parent_id);
 			// Others
 			void toggle_animation(bool state);
             void compute_layout(const char * alg = "dot");
@@ -79,6 +81,22 @@ namespace DSR
 			QGraphicsEllipseItem *central_point;
 			QMenu *contextMenu, *showMenu;
 			std::map<std::string,std::set<std::uint64_t>> type_id_map;
+
+			// ---- collapsible children (any RT subtree folded away from its parent) ----
+			// Edge type that defines parenthood in DSR (see dsr_rt_api.cpp, which also maintains
+			// parent_att/level_att). Any node with at least one RT child gets a "+"/"-" badge.
+			static constexpr const char *PARENT_EDGE_TYPE = "RT";
+			std::map<std::uint64_t, std::set<std::uint64_t>> collapsible_children;  // parent -> RT children
+			std::set<std::uint64_t> collapsed_parents;   // parents currently folded (purely visual)
+			// Keeps `collapsible_children` in sync with the RT edges arriving/leaving from G
+			void note_parent_edge(std::uint64_t from, std::uint64_t to, const std::string &edge_tag, bool added);
+			// All descendants of `root` reachable through RT edges, root NOT included. With
+			// stop_at_collapsed the walk does not descend past a node the user folded on its own.
+			std::vector<std::uint64_t> subtree_ids(std::uint64_t root, bool stop_at_collapsed) const;
+			void refresh_collapse_badge(std::uint64_t parent_id);
+			// Re-applies the stored collapsed/expanded state (used when new nodes or edges arrive
+			// into an already collapsed parent, and after a full createGraph())
+			void apply_collapse_state(std::uint64_t parent_id);
 			int timerId = 0;
 			// Coalesces the (expensive, full-scene) setSceneRect/fitInView refit so a burst of
 			// high-frequency node/attribute updates triggers it at most a few times per second

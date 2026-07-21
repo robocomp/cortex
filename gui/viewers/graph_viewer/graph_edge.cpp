@@ -194,7 +194,7 @@ void GraphEdge::draw_arc(QPainter* painter) const
 
 void GraphEdge::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
-    if (event->button()==Qt::RightButton) {
+    if (event->button()==Qt::LeftButton) {
         mouse_double_clicked();
     }
     QGraphicsLineItem::mouseDoubleClickEvent(event);
@@ -207,7 +207,7 @@ bool GraphEdge::eventFilter(QObject* object, QEvent* event)
     {
         if(event->type() == QEvent::GraphicsSceneMouseDoubleClick){
             auto mouseEvent = static_cast<QGraphicsSceneMouseEvent*>(event);
-            if (mouseEvent->button()==Qt::RightButton) {
+            if (mouseEvent->button()==Qt::LeftButton) {
                 mouse_double_clicked();
             }
             return true;

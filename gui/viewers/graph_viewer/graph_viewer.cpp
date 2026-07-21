@@ -9,6 +9,7 @@
 #include <graphviz/gvc.h>
 #include <graphviz/types.h>
 #include <qglobal.h>
+#include <deque>
 #include <string>
 
 using namespace DSR ;
@@ -86,6 +87,9 @@ void GraphViewer::createGraph()
 	gmap.clear();
 	gmap_edges.clear();
     type_id_map.clear();
+	// `collapsed_parents` deliberately survives a reload so the user's folded/unfolded choice is
+	// not lost; the index it refers to is rebuilt below from the incoming RT edges.
+	collapsible_children.clear();
 	this->scene.clear();
 	qDebug() << __FUNCTION__ << "Reading graph in Graph Viewer";
     try
@@ -114,6 +118,10 @@ void GraphViewer::createGraph()
 		for(auto &[id, node] : map)
            	for(const auto &[k, edges] : node.fano())
 			   add_or_assign_edge_SLOT(edges.from(), edges.to(), edges.type());
+		// Re-fold whatever the user had folded before the reload. Done once the whole scene exists
+		// so the subtree walk below sees every RT edge.
+		for(const auto &[parent_id, children] : collapsible_children)
+			apply_collapse_state(parent_id);
     }
 	catch(const std::exception &e) { std::cout << e.what() << " Error accessing "<< __FUNCTION__<<":"<<__LINE__<< std::endl;}
 }
@@ -177,10 +185,7 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
             gnode = this->new_visual_node(id, type, name, false);
             gmap.insert(std::pair(id, gnode));
 
-            std::string color("coral");
-            color = G->get_attrib_by_name<color_att>(n.value()).value_or(color);
-			gnode->set_color(color);
-			gnode->setType(type);
+			gnode->setType(type);   // seeds the per-type default colour (node_colors.h)
             auto id_str = std::to_string(id);
             Agnode_t* gvnode = agnode(graphviz_graph, id_str.data(), 1);
             agset(gvnode, (char*)"width", (char*)"1.5");
@@ -193,6 +198,18 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
 			qDebug()<<__FUNCTION__<<"##### Updated node";
             gnode = gmap.at(id);
 		}
+		// Agent nodes report live health by rewriting their `color` attribute (see
+		// rc::AgentStatePublisher), so theirs must be re-read on EVERY update, not just at creation
+		// — an attribute-only change is what repaints them.
+		//
+		// Deliberately scoped to type "agent". Honouring `color` for every node type looks more
+		// principled, but the graphs in this project carry stale/unparseable colour attributes that
+		// had been dead data for years (setType ran last and always overrode them), so switching
+		// them on turned root/mind/Shadow/body black. Node colouring for everything else stays where
+		// it was: node_colors.h, keyed by type.
+		if (type == "agent")
+			if (const auto color = G->get_attrib_by_name<color_att>(n.value()); color.has_value())
+				gnode->set_color(color.value().get());
 		gnode->change_detected();
         float posx, posy;
         if(auto px = G->get_attrib_by_name<pos_x_att>(n.value()); px.has_value())
@@ -233,6 +250,8 @@ GraphNode* GraphViewer::new_visual_node(uint64_t id, const std::string &type, co
     QObject::connect(gnode, &GraphNode::del_node_signal, this, &GraphViewer::remove_node_SLOT, Qt::QueuedConnection);
     // re-emit "view data" requests (media-plane nodes) up to whoever holds the viewer (the agent)
     QObject::connect(gnode, &GraphNode::view_data_signal, this, &GraphViewer::view_data_signal, Qt::QueuedConnection);
+    // "+"/"-" badge: the node only reports the click, the viewer owns the parent/child index
+    QObject::connect(gnode, &GraphNode::toggle_children_signal, this, &GraphViewer::toggle_children_SLOT, Qt::QueuedConnection);
     return gnode;
 }
 
@@ -258,6 +277,9 @@ void GraphViewer::add_or_assign_edge_SLOT(std::uint64_t from, std::uint64_t to, 
                 Agedge_t* gvedge = agedge(graphviz_graph, gvnode_f, gvnode_t, nullptr, 1);
                 agset(gvedge, (char *)"type", (char *)edge_tag.data());
 
+                note_parent_edge(from, to, edge_tag, true);
+                // A child inserted while its parent is folded must come up hidden, not visible
+                apply_collapse_state(from);
             }
             if (gmap_edges[key]) gmap_edges[key]->change_detected();
         }
@@ -301,6 +323,8 @@ void GraphViewer::del_edge_SLOT(std::uint64_t from, std::uint64_t to, const std:
 	try {
         //std::cout << "[SLOT] Delete edge:  "<<from << ", " << to << ", "<< edge_tag<< std::endl;
 		std::tuple<std::uint64_t, std::uint64_t, std::string> key = std::make_tuple(from, to, edge_tag);
+		// Before the endpoints go away: the parent may have just lost its last collapsible child
+		note_parent_edge(from, to, edge_tag, false);
 		while (gmap_edges.count(key) > 0) {
             GraphEdge *edge = gmap_edges.extract(key).mapped();
             if (gmap.find(from) != gmap.end())
@@ -356,6 +380,9 @@ void GraphViewer::del_node_SLOT(uint64_t id)
                 ids.erase(id);
             delete item;
             gmap.erase(id);
+            // the node itself may have been a folding parent
+            collapsible_children.erase(id);
+            collapsed_parents.erase(id);
             auto id_str = std::to_string(id);
             if (Agnode_t *gvnode = agfindnode(graphviz_graph, id_str.data())) {
                 agdelnode(graphviz_graph, gvnode);
@@ -384,6 +411,124 @@ void GraphViewer::hide_show_node_SLOT(uint64_t id, bool visible)
 		}
 	}
 
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+///// Collapsible children (the RT subtree of a node folded away from it)
+/////
+///// Purely visual, like the per-type "Show:" menu — nothing is written back to G.
+///// Note that graphviz still lays out hidden nodes (compute_layout works on the whole
+///// graph), so folding does not compact the layout, it only removes clutter.
+//////////////////////////////////////////////////////////////////////////////////////
+
+void GraphViewer::note_parent_edge(std::uint64_t from, std::uint64_t to, const std::string &edge_tag, bool added)
+{
+	if (edge_tag != PARENT_EDGE_TYPE)
+		return;
+	// The child must still be in gmap when an edge is removed — del_edge_SLOT calls us before
+	// erasing anything, and del_node_SLOT deletes the edges before the node (see its comment).
+	const auto child = gmap.find(to);
+	if (child == gmap.end() or child->second == nullptr)
+		return;
+	if (from == to)   // self RT edge: not a parent/child relation, and folding it would hide the node itself
+		return;
+
+	if (added)
+		collapsible_children[from].insert(to);
+	else
+	{
+		if (const auto it = collapsible_children.find(from); it != collapsible_children.end())
+		{
+			it->second.erase(to);
+			if (it->second.empty())
+			{
+				collapsible_children.erase(it);
+				collapsed_parents.erase(from);   // nothing left to unfold
+			}
+		}
+	}
+	refresh_collapse_badge(from);
+}
+
+std::vector<std::uint64_t> GraphViewer::subtree_ids(std::uint64_t root, bool stop_at_collapsed) const
+{
+	// BFS down the RT edges, `root` excluded. `visited` also guards against cycles, which a
+	// hand-edited or half-updated graph can transiently contain.
+	//
+	// stop_at_collapsed is what makes nested folds survive: when UNfolding, a descendant that the
+	// user had folded on its own must stay folded, so we don't walk past it.
+	std::vector<std::uint64_t> result;
+	std::set<std::uint64_t> visited{root};
+	std::deque<std::uint64_t> pending{root};
+	while (not pending.empty())
+	{
+		const auto current = pending.front();
+		pending.pop_front();
+		for (const auto &[key, edge] : gmap_edges)
+		{
+			const auto &[from, to, tag] = key;
+			if (from != current or tag != PARENT_EDGE_TYPE)
+				continue;
+			if (visited.insert(to).second)
+			{
+				result.push_back(to);
+				if (not (stop_at_collapsed and collapsed_parents.count(to) > 0))
+					pending.push_back(to);
+			}
+		}
+	}
+	return result;
+}
+
+void GraphViewer::refresh_collapse_badge(std::uint64_t parent_id)
+{
+	const auto it = gmap.find(parent_id);
+	if (it == gmap.end() or it->second == nullptr)
+		return;
+	it->second->set_collapse_indicator(collapsible_children.count(parent_id) > 0,
+	                                   collapsed_parents.count(parent_id) > 0);
+}
+
+void GraphViewer::apply_collapse_state(std::uint64_t parent_id)
+{
+	// Only the hiding half is re-applied: unfolding is an explicit user action. Blindly showing
+	// here would fight the per-type "Show:" menu, which hides nodes through the same slot.
+	if (collapsed_parents.count(parent_id) == 0)
+		return;
+	if (const auto it = collapsible_children.find(parent_id); it != collapsible_children.end())
+		for (const auto child : it->second)
+		{
+			hide_show_node_SLOT(child, false);
+			for (const auto id : subtree_ids(child, false))
+				hide_show_node_SLOT(id, false);
+		}
+	refresh_collapse_badge(parent_id);
+}
+
+void GraphViewer::toggle_children_SLOT(std::uint64_t parent_id)
+{
+	const auto it = collapsible_children.find(parent_id);
+	if (it == collapsible_children.end())
+		return;
+	const bool collapse = collapsed_parents.count(parent_id) == 0;
+	if (collapse)
+		collapsed_parents.insert(parent_id);
+	else
+		collapsed_parents.erase(parent_id);
+
+	// Each child goes away with whatever hangs below it, so no orphan nodes float in the scene.
+	// hide_show_node_SLOT already takes care of the edges (it shows one only when both endpoints
+	// are visible), and doing it node by node makes the order irrelevant.
+	for (const auto child : it->second)
+	{
+		hide_show_node_SLOT(child, not collapse);
+		// Folding takes the whole subtree down; unfolding stops at descendants the user folded
+		// themselves, so their own state is not silently undone.
+		for (const auto id : subtree_ids(child, not collapse))
+			hide_show_node_SLOT(id, not collapse);
+	}
+	refresh_collapse_badge(parent_id);
+	schedule_refit();
 }
 
 void GraphViewer::mousePressEvent(QMouseEvent *event)

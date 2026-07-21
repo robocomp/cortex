@@ -29,8 +29,13 @@ public:
         }
         if(colors.count(key)>0)
             return colors[key];
-        else
-            return default_color;
+        // An unlisted NODE type gets a stable, distinct colour derived from its name instead of one
+        // flat default — otherwise every new type in the system renders identically and the graph
+        // stops carrying information (see stable_fallback_color in node_colors.h). Edges keep their
+        // single default: they are thin lines where a colour-per-type would be noise, not signal.
+        if constexpr(std::is_same_v<Ta, DSR::Node>)
+            return stable_fallback_color(key);
+        return default_color;
     };
 };
 
