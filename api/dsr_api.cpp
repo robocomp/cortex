@@ -496,9 +496,12 @@ DSRGraph::SampleCallback<Batch> DSRGraph::make_node_attrs_subscription_functor_i
 }
 
 template <typename GraphSample>
-DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated)
+DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::shared_ptr<std::atomic<bool>> sync, std::shared_ptr<std::atomic<bool>> repeated)
 {
-    return [this, channel, &sync, &repeated](GraphSample&& sample, const DSR::Transport::ReceivedSampleInfo& m_info)
+    // Capture sync/repeated BY VALUE (shared_ptr): this callback is stored in a permanent DDS subscription
+    // and must keep the flags alive — capturing raw refs to fullgraph_request_thread()'s stack was the
+    // dangling-write bug. (Fixed 2026-07-21.)
+    return [this, channel, sync, repeated](GraphSample&& sample, const DSR::Transport::ReceivedSampleInfo& m_info)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("fg_request"); return true; }();
         CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread callback");
@@ -522,9 +525,9 @@ DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_i
                     }
                 }, Qt::QueuedConnection);
                 qDebug() << "Synchronized.";
-                sync = true;
-            } else if (!sync && sample.to_id == agent_id) {
-                repeated = true;
+                *sync = true;
+            } else if (!*sync && sample.to_id == agent_id) {
+                *repeated = true;
             }
         }
     };
@@ -1332,8 +1335,14 @@ void DSRGraph::fullgraph_server_thread()
 std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 {
     CORTEX_PROFILE_MIN_N("DSRGraph::fullgraph_request_thread");
-    std::atomic<bool> sync{false};
-    std::atomic<bool> repeated{false};
+    // sync/repeated are shared_ptr, NOT stack locals: the GRAPH_ANSWER subscription below is PERMANENT and
+    // its callback captures them by value, so they must outlive this function. Previously they were stack
+    // atomics captured by reference — they dangled once this function returned, so a later peer's
+    // GRAPH_ANSWER (on a FastDDS reader thread) ran `*sync = true` through the dangling reference, writing
+    // 1 byte into freed/reused stack memory (the bit-48 wild write that randomly smashed cv::Mat headers
+    // etc. under peer churn). (Fixed 2026-07-21.)
+    auto sync     = std::make_shared<std::atomic<bool>>(false);
+    auto repeated = std::make_shared<std::atomic<bool>>(false);
     if (sync_mode == SyncMode::LWW) {
         dsrparticipant.subscribe_graph_answers<LWWGraphSnapshot>(make_fullgraph_request_functor_impl<LWWGraphSnapshot>("LWW_GRAPH_ANSWER", sync, repeated), mtx_entity_creation);
     } else {
@@ -1360,7 +1369,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 
     bool timeout = false;
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    while (!sync and !timeout and !repeated) {
+    while (!*sync and !timeout and !*repeated) {
         CORTEX_PROFILE_DETAIL_N("DSRGraph::fullgraph_request_thread wait loop");
         std::this_thread::sleep_for(1000ms);
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -1371,7 +1380,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
         dsrparticipant.publish_graph_request(gr);
     }
 
-    return { sync, repeated };
+    return { sync->load(), repeated->load() };
 }
 
 

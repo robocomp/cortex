@@ -7,6 +7,10 @@
 #include <stdexcept>
 #include <thread>
 
+#include <QCoreApplication>
+#include <QObject>
+#include <QThread>
+
 using namespace DSR;
 
 #include "include/silent_output.h"
@@ -149,6 +153,80 @@ Value convert_variant(const attribute_type & e)
 
 PYBIND11_MAKE_OPAQUE(std::map<std::pair<uint64_t, std::string>, Edge>)
 PYBIND11_MAKE_OPAQUE(std::map<std::string, Attribute>)
+
+
+// ── Qt event pump for remote graph applies ───────────────────────────────────────────────────────
+// dsr_api.cpp marshals every REMOTE apply -- the initial full-graph import and the node/edge/attr
+// delta batches -- with QMetaObject::invokeMethod(this, ..., Qt::QueuedConnection). A queued invoke
+// only ever runs if the target object's thread is spinning a Qt event loop. A plain Python script
+// has none, so without this the applies pile up and are NEVER executed: DDS discovery succeeds, the
+// full-graph answer arrives, the constructor reports "Synchronized" -- and the graph then stays
+// permanently empty (get_nodes() -> []), deltas included.
+//
+// Signals do not need this: pydsr builds the graph with SignalMode::Queue, whose QueuedSignalRunner
+// dispatches callbacks on its own ThreadPool.
+//
+// So pydsr owns one dedicated QThread running an event loop, and the DSRGraph lives on it. The graph
+// is both CONSTRUCTED and DESTROYED there, so its thread affinity is correct for its whole lifetime
+// and no posted event is ever delivered to a thread that has no loop or is already gone. Reading the
+// graph from Python stays safe: DSRGraph serialises every accessor with its own shared_mutex.
+class GraphEventPump
+{
+public:
+    static GraphEventPump &instance()
+    {
+        // Intentionally leaked: the pump must outlive every DSRGraph, including graphs still being
+        // torn down at interpreter shutdown, so it must not be a destroyed-at-exit static.
+        static GraphEventPump *pump = new GraphEventPump();
+        return *pump;
+    }
+
+    // Run `fn` on the pump thread, blocking until it has finished.
+    template <typename F>
+    void run_blocking(F &&fn)
+    {
+        QMetaObject::invokeMethod(context_, std::forward<F>(fn), Qt::BlockingQueuedConnection);
+    }
+
+private:
+    GraphEventPump()
+    {
+        ensure_qapp();
+        thread_ = new QThread();
+        thread_->setObjectName("pydsr-events");
+        context_ = new QObject();          // lives on the pump thread; only used as an invoke target
+        context_->moveToThread(thread_);
+        thread_->start();
+    }
+
+    // A QThread only dispatches posted events if a QCoreApplication instance exists, so make sure
+    // there is one. Deliberately lazy (first DSRGraph construction, not module import) and
+    // deliberately conditional: a PySide/PyQt host has already built its own QApplication, and we
+    // must reuse it rather than trip Qt's "instance already exists" fatal. In that case the host's
+    // Qt loop drives the applies and the pump thread is just another loop alongside it.
+    static void ensure_qapp()
+    {
+        if (QCoreApplication::instance() != nullptr) return;
+        static int   argc  = 1;
+        static char  arg0[] = "pydsr";
+        static char *argv[] = {arg0, nullptr};
+        new QCoreApplication(argc, argv);   // leaked on purpose; must outlive the pump thread
+    }
+
+    QThread *thread_{nullptr};
+    QObject *context_{nullptr};
+};
+
+// Deleter that sends the DSRGraph back to the pump thread to be destroyed there.
+struct GraphOnPumpThreadDeleter
+{
+    void operator()(DSRGraph *g) const
+    {
+        if (g == nullptr) return;
+        py::gil_scoped_release release;    // the dtor joins DDS/graph threads; never hold the GIL
+        GraphEventPump::instance().run_blocking([g] { delete g; });
+    }
+};
 
 
 PYBIND11_MODULE(pydsr, m) {
@@ -577,11 +655,12 @@ PYBIND11_MODULE(pydsr, m) {
 
 
     //DSR DSRGraph class
-    py::class_<DSRGraph>(m, "DSRGraph")
+    py::class_<DSRGraph, std::unique_ptr<DSRGraph, GraphOnPumpThreadDeleter>>(m, "DSRGraph")
             .def(py::init([&](int root, const std::string &name, int id,
                               const std::string &dsr_input_file = "",
                               bool all_same_host = true, int8_t domain_id = 0,
-                              SyncMode sync_mode = SyncMode::CRDT) -> std::unique_ptr<DSRGraph> {
+                              SyncMode sync_mode = SyncMode::CRDT)
+                              -> std::unique_ptr<DSRGraph, GraphOnPumpThreadDeleter> {
                      local_agent_id = id;
                      GraphSettings settings;
                      settings.agent_id = id;
@@ -591,7 +670,14 @@ PYBIND11_MODULE(pydsr, m) {
                      settings.domain_id = domain_id;
                      settings.signal_mode = SignalMode::Queue;
                      settings.sync_mode = sync_mode;
-                     auto g = std::make_unique<DSRGraph>(settings);
+                     // Construct ON the pump thread so the graph's Qt affinity is that thread from
+                     // the very first posted event -- the full-graph answer already lands during the
+                     // constructor's own sync wait. (The constructor blocks the pump's event loop
+                     // while it waits; the queued applies simply run as soon as it returns.)
+                     DSRGraph *raw = nullptr;
+                     GraphEventPump::instance().run_blocking(
+                             [&] { raw = new DSRGraph(settings); });
+                     std::unique_ptr<DSRGraph, GraphOnPumpThreadDeleter> g(raw);
                      return g;
                  }), "root"_a, "name"_a, "id"_a, "dsr_input_file"_a = "",
                  "all_same_host"_a = true, "domain_id"_a=0, "sync_mode"_a = SyncMode::CRDT, py::call_guard<py::gil_scoped_release>())

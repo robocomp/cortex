@@ -6,9 +6,14 @@
 #include <dsr/api/dsr_agent_info_api.h>
 #include <dsr/api/dsr_api.h>
 #include <unistd.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/times.h>
 #include <QMetaObject>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
 
 namespace DSR {
 
@@ -32,6 +37,71 @@ void AgentInfoAPI::heartbeat_tick()
                     pclose(pipe);
             }
         };
+
+        // ── Deployment self-report helpers ──────────────────────────────────────────────────────────
+        // Read this process's argv from /proc/self/cmdline (NUL-separated). Empty on failure.
+        std::vector<std::string> proc_argv()
+        {
+            std::vector<std::string> argv;
+            std::ifstream f("/proc/self/cmdline", std::ios::binary);
+            if (!f)
+                return argv;
+            std::string tok;
+            for (char ch; f.get(ch); )
+            {
+                if (ch == '\0') { if (!tok.empty()) argv.push_back(tok); tok.clear(); }
+                else            tok.push_back(ch);
+            }
+            if (!tok.empty()) argv.push_back(tok);
+            return argv;
+        }
+
+        // This process's current working directory via /proc/self/cwd. Empty on failure.
+        std::string proc_cwd()
+        {
+            char buf[PATH_MAX];
+            const ssize_t n = ::readlink("/proc/self/cwd", buf, sizeof(buf) - 1);
+            return n > 0 ? std::string(buf, static_cast<size_t>(n)) : std::string{};
+        }
+
+        // Pick the config path out of argv, mirroring the launcher's topology.py::_config_path:
+        // the last token that looks like a config (under etc/, or ending in config/.toml/.conf),
+        // unwrapping an --Ice.Config= prefix. Relative paths are resolved against cwd.
+        std::string derive_config_path(const std::vector<std::string>& argv, const std::string& cwd)
+        {
+            std::string cand;
+            for (std::string tok : argv)
+            {
+                constexpr const char* kIcePrefix = "--Ice.Config=";
+                if (tok.rfind(kIcePrefix, 0) == 0)
+                    tok = tok.substr(std::string(kIcePrefix).size());
+                const bool looks_config =
+                    tok.find("etc/") != std::string::npos ||
+                    (tok.size() >= 6 && tok.compare(tok.size() - 6, 6, "config") == 0) ||
+                    tok.find(".toml") != std::string::npos ||
+                    tok.find(".conf")  != std::string::npos;
+                if (looks_config)
+                    cand = tok;
+            }
+            if (cand.empty())
+                return cand;
+            if (!cand.empty() && cand.front() != '/' && !cwd.empty())
+                cand = cwd + "/" + cand;
+            return cand;
+        }
+
+        // Slurp a text file whole. Empty on failure.
+        std::string slurp_file(const std::string& path)
+        {
+            if (path.empty())
+                return {};
+            std::ifstream f(path, std::ios::binary);
+            if (!f)
+                return {};
+            std::ostringstream ss;
+            ss << f.rdbuf();
+            return ss.str();
+        }
     }
 
 
@@ -169,6 +239,12 @@ void AgentInfoAPI::heartbeat_tick()
 
             uint64_t times = get_unix_timestamp();
             auto &node_ref = node.value();
+            // Keep the PID fresh across restarts: the node can outlive the process (persisted graph),
+            // so a re-launched agent finds its old node here and must overwrite the stale pid. Only
+            // written when it actually changed, to avoid needless 1 Hz attribute churn/signals.
+            const auto cur_pid = static_cast<std::uint32_t>(getpid());
+            if (const auto p = G->get_attrib_by_name<agent_pid_att>(node_ref); not p.has_value() or p.value() != cur_pid)
+                G->add_or_modify_attrib_local<agent_pid_att>(node_ref, cur_pid);
             G->add_or_modify_attrib_local<timestamp_agent_att>(node_ref, times);
             G->add_or_modify_attrib_local<timestamp_alivetime_att>(node_ref,
                static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::nanoseconds(times - timestamp_start)).count()));
@@ -207,7 +283,22 @@ void AgentInfoAPI::heartbeat_tick()
             G->add_or_modify_attrib_local<pos_x_att>(new_node, (float) 10);
             G->add_or_modify_attrib_local<pos_y_att>(new_node, (float) 10);
             G->add_or_modify_attrib_local<parent_att>(new_node, parent_id);
-            G->add_or_modify_attrib_local<agent_description_att>(new_node, std::string{"TODO"});
+
+            // Deployment self-report (once, at creation): launch command, working dir and the raw
+            // etc/config used to start this agent. Feeds the "mind" node network view. Best-effort:
+            // any field that can't be resolved is simply left empty.
+            const auto argv       = proc_argv();
+            const auto cwd        = proc_cwd();
+            const auto cfg_path   = derive_config_path(argv, cwd);
+            std::string cmd_line;
+            for (const auto& a : argv) { if (!cmd_line.empty()) cmd_line += ' '; cmd_line += a; }
+            G->add_or_modify_attrib_local<agent_cmd_att>(new_node, cmd_line);
+            G->add_or_modify_attrib_local<agent_cwd_att>(new_node, cwd);
+            G->add_or_modify_attrib_local<agent_config_att>(new_node, slurp_file(cfg_path));
+            G->add_or_modify_attrib_local<agent_pid_att>(new_node, static_cast<std::uint32_t>(getpid()));
+            const std::string desc = cfg_path.empty() ? G->get_agent_name()
+                                                      : G->get_agent_name() + " (" + cfg_path + ")";
+            G->add_or_modify_attrib_local<agent_description_att>(new_node, desc);
             //CPU usage
             if (cpu >= 0.0)
             {

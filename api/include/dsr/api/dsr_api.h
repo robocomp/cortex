@@ -796,7 +796,13 @@ namespace DSR
         template <typename Batch>
         SampleCallback<Batch> make_node_attrs_subscription_functor_impl(const char* channel);
         template <typename GraphSample>
-        SampleCallback<GraphSample> make_fullgraph_request_functor_impl(const char* channel, std::atomic<bool>& sync, std::atomic<bool>& repeated);
+        // sync/repeated are shared_ptr (not raw refs) so the returned callback — stored in a PERMANENT DDS
+        // subscription — captures them BY VALUE and keeps them alive. Previously they were refs to stack
+        // locals in fullgraph_request_thread() that dangled after it returned (a later peer's GRAPH_ANSWER
+        // then wrote through them into freed stack memory: the bit-48 wild write). Fixed 2026-07-21.
+        SampleCallback<GraphSample> make_fullgraph_request_functor_impl(const char* channel,
+                                                                        std::shared_ptr<std::atomic<bool>> sync,
+                                                                        std::shared_ptr<std::atomic<bool>> repeated);
 
         //Custom function for each rtps topic
         class ParticipantChangeFn {
