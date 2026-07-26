@@ -613,6 +613,22 @@ REGISTER_TYPE(table_detection_alive,        bool,                               
 REGISTER_TYPE(table_detection_confidence,   float,                                            false)  // last mask confidence
 REGISTER_TYPE(table_frames_since_detection, int,                                              false)  // cycles since fresh mask
 
+// ── Object SUBTYPE (shape model-selection) — generic across concept agents (registered 2026-07-24) ────
+//    A free-form string signalling the fitted object's inferred sub-shape, chosen by free-energy / model
+//    evidence (e.g. table = "round" | "square"). Free-form so finer sub-subtypes are just longer strings
+//    ("round_pedestal", …). Written by the concept agent on its object node; read by the voxelizer to
+//    render the matching mesh (e.g. a disc vs a box) and by any consumer that cares about shape.
+REGISTER_TYPE(object_subtype,               std::string,                                      false)
+
+// ── Display-mesh handoff: a concept agent owns its own appearance and publishes the relative asset path(s)
+//    on its node; the voxelizer's 3D viewer reads them, loads the mesh (cached by path), and renders it
+//    scaled to the node's fitted box — no per-type knowledge in the viewer. Contract for the referenced OBJ:
+//    room-frame Z-up, footprint centred at origin (x,y ∈ [-0.5,0.5]), height z ∈ [0,1], front baked to the
+//    node's yaw-zero. Paths are RELATIVE (resolved by each consumer against its own assets root, e.g. the
+//    voxelizer's meshes/). mesh_texture_path is the optional base-colour image; empty ⇒ flat class colour.
+REGISTER_TYPE(mesh_path,                     std::string,                                      false)
+REGISTER_TYPE(mesh_texture_path,             std::string,                                      false)
+
 // ── chair-concept / cabinet-concept: same voxel-memory + ROI channel as table-concept above ────
 //    These agents are copies of the table_concept pattern and carry the identical interface, so they get
 //    the identical types. Readers are common/affordance_protocol (attr_scalar coerces int/float/bool), and
@@ -657,6 +673,37 @@ REGISTER_TYPE(mask_support_points,    std::reference_wrapper<const std::vector<f
 REGISTER_TYPE(mask_centroids_xyz,     std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_bbox_min_xyz,      std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_bbox_max_xyz,      std::reference_wrapper<const std::vector<float>>,  false)
+// ── mask channel, continued (registered 2026-07-22 so voxelizer/graph_publisher.cpp and common/mask_ingestor
+//    can use the TYPE-ATTRIBUTED API instead of runtime_checked_* string writes / attrs.find()+dec() reads.
+//    ⚠ mask_timestamp_ms is uint64_t — the ingestor reads it with ->uint64(); do NOT copy the mask_frame_id
+//    int pattern for it. The vector<float> ones use reference_wrapper for zero-copy reads, matching the block
+//    above; they are still SET by passing a plain std::vector<float> by value. ──
+REGISTER_TYPE(mask_timestamp_ms,      std::uint64_t,                                     false)
+REGISTER_TYPE(mask_support_points_cam,std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_pixels_xy,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_pixel_offsets,     std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_has_depth,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_source,            std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_azimuth,           std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_depth_var,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_motion_dotd,       std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_motion_bias,       std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_motion_var,        std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_trunc_frac,        std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_centroid_radius,   std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_range,             std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_cam_twist,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_frame_dt_s,        float,                                             false)
+REGISTER_TYPE(mask_rt_lag_s,          float,                                             false)
+REGISTER_TYPE(mask_rt_gap_s,          float,                                             false)
+// ── human skeleton channel (voxelizer → human_concept / robot_concept viewer). skeleton_timestamp_ms is
+//    uint64_t (read via ->uint64()), same trap as mask_timestamp_ms. ──
+REGISTER_TYPE(skeleton_frame_id,      int,                                               false)
+REGISTER_TYPE(skeleton_timestamp_ms,  std::uint64_t,                                     false)
+REGISTER_TYPE(skeleton_count,         int,                                               false)
+REGISTER_TYPE(skeleton_ids,           std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(skeleton_kp_xyz,        std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(skeleton_kp_conf,       std::reference_wrapper<const std::vector<float>>,  false)
 
 // ── dense semantic segmentation label map (ADE20K-150). Written LOW-FREQUENCY by voxelizer on a
 //    'semantic' node under 'zed'. semantic_labels is CV_8UC1 class ids, row-major, at the ZED IMAGE
@@ -666,5 +713,56 @@ REGISTER_TYPE(semantic_width,         int,                                      
 REGISTER_TYPE(semantic_height,        int,                                                false)
 REGISTER_TYPE(semantic_timestamp_ms,  uint64_t,                                           false)
 REGISTER_TYPE(semantic_frame_id,      int,                                                false)
+
+// ── affordance / viewpoint CONTRACT (common/affordance_protocol.h, written by EVERY concept agent) ──
+//    Registered 2026-07-24 so write_contract()/write_viewpoint() use the TYPE-ATTRIBUTED setters instead
+//    of runtime_checked_* string writes (see CLAUDE.md). The read side (read_contract/attr_scalar/
+//    attr_string) does defensive attrs.find() lookups with defaults and coerces int/float/bool alike, so
+//    it is type-agnostic and unaffected by this. Scalars=float, counts=int, names/enum-strings=std::string,
+//    packed lists='|'-joined std::string or std::vector<float>.
+REGISTER_TYPE(aff_policy,               std::string,                                      false)
+REGISTER_TYPE(aff_err_vec_attr,         std::string,                                      false)
+REGISTER_TYPE(aff_scalar_attr,          std::string,                                      false)
+REGISTER_TYPE(aff_scalar_target,        float,                                            false)
+REGISTER_TYPE(aff_valid_attr,           std::string,                                      false)
+REGISTER_TYPE(aff_goal_attrs,           std::string,                                      false)  // '|'-joined names
+REGISTER_TYPE(aff_goal_ops,             std::string,                                      false)  // '|'-joined ops
+REGISTER_TYPE(aff_goal_values,          std::vector<float>,                               false)
+REGISTER_TYPE(aff_goal_stable_n,        int,                                              false)
+REGISTER_TYPE(aff_timeout_ms,           float,                                            false)
+REGISTER_TYPE(aff_on_fail,              std::string,                                      false)
+REGISTER_TYPE(aff_max_vel,              float,                                            false)  // m/s
+REGISTER_TYPE(aff_max_omega,            float,                                            false)  // rad/s
+REGISTER_TYPE(aff_view_object_relative, int,                                              false)  // 0/1 flag
+REGISTER_TYPE(aff_view_faces,           std::string,                                      false)  // '|'-joined faces
+REGISTER_TYPE(aff_view_face_gains,      std::vector<float>,                               false)
+REGISTER_TYPE(aff_view_standoff_min,    float,                                            false)
+REGISTER_TYPE(aff_view_standoff_max,    float,                                            false)
+REGISTER_TYPE(aff_view_framing_fill,    float,                                            false)
+REGISTER_TYPE(aff_view_sigma_star,      std::vector<float>,                               false)
+
+// ── human-concept + bottle-concept detection channel (mirror of table/chair/cabinet above; bool alive per
+//    the WIRE-TYPE note there, read only via attr_scalar/type-attributed getters) ─ registered 2026-07-24 ─
+REGISTER_TYPE(human_detection_alive,       bool,                                          false)
+REGISTER_TYPE(human_detection_confidence,  float,                                         false)
+REGISTER_TYPE(bottle_detection_alive,      bool,                                          false)
+REGISTER_TYPE(bottle_detection_confidence, float,                                         false)
+
+// ── residual-concept footprint hull (written by residual_scene_graph.cpp) ─ registered 2026-07-24 ──────
+REGISTER_TYPE(footprint_hull,           std::reference_wrapper<const std::vector<float>>, false)  // [x,y]×V polygon
+
+// ── kinova arm joint-buffer channel (kinova_controller) ─ registered 2026-07-24 ───────────────────────
+//    ⚠ joint_buffer_base_ms is uint64_t (ring base stamp, ms) — read via ->uint64(), NOT the int pattern.
+REGISTER_TYPE(joint_buffer_base_ms,      std::uint64_t,                                   false)
+REGISTER_TYPE(joint_buffer_stamp_off_ms, std::vector<float>,                              false)  // per-sample ms offset
+REGISTER_TYPE(joint_buffer_q,            std::vector<float>,                              false)  // [dof]×N flattened
+REGISTER_TYPE(joint_buffer_dof,          int,                                             false)
+
+// ── media-plane self-report attrs on sensor nodes (robot_concept) ─ registered 2026-07-24 ─────────────
+//    media_descriptor = per-node stream descriptor JSON; media_ice_port = relayed Ice port (string). Both
+//    read via ->str(). The GENERIC helpers in common/media_transport.h + sensor_media_publisher.h that take
+//    a runtime attr_name PARAM stay runtime_checked (dynamic name → no compile-time alias).
+REGISTER_TYPE(media_descriptor,         std::string,                                      false)
+REGISTER_TYPE(media_ice_port,           std::string,                                      false)
 
 #endif //DSR_ATTR_NAME_H

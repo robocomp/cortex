@@ -74,10 +74,6 @@
 #include <QMouseEvent>
 #include <QPointF>
 
-#include <graphviz/cgraph.h>
-#include <graphviz/gvc.h>
-#include <graphviz/types.h>
-
 #include <dsr/api/dsr_api.h>
 #include "dds_stats_monitor.h"   // optional Fast DDS Statistics consumer (compile-gated by RC_DDS_STATS)
 
@@ -476,7 +472,7 @@ class GraphNodeMindWidget : public QWidget
 
     private:
         struct RpcEdgeVis { QGraphicsLineItem* line; QGraphicsSimpleTextItem* label;
-                            std::string src; int port; QString base; double smooth = 0.0; };
+                            std::string src, dst; int port; QString base; double smooth = 0.0; };
 
         // agent DSR node pid (agent_pid attr) -> agent key (node name). Empty for agents that predate
         // the pid self-report; those connections simply fall back to per-port attribution.
@@ -629,56 +625,17 @@ class GraphNodeMindWidget : public QWidget
             return t;
         }
 
-        // Radial layout via Graphviz twopi, rooted at the mind hub: agents land on the first ring, the
-        // externals/broker they talk to on the next, spaced without overlap. Recomputed on every
-        // rebuild() — i.e. whenever a participant (agent or media producer) joins or leaves. Returns
-        // scene positions keyed by visual node id (agent name / external id / "mind").
-        std::map<std::string, QPointF> twopi_layout(const std::vector<DSR::Node>& agents,
-                                                    const std::vector<std::string>& outer,
-                                                    const std::vector<mind_ui::Edge>& edges)
-        {
-            const auto cc = [](const char* s){ return const_cast<char*>(s); };
-            std::map<std::string, QPointF> out;
-            GVC_t* gvc = gvContext();
-            Agraph_t* g = agopen(cc("mind_net"), Agdirected, nullptr);
-            agsafeset(g, cc("root"), cc("mind"), cc(""));      // twopi centre
-            agsafeset(g, cc("overlap"), cc("false"), cc(""));
-            agsafeset(g, cc("ranksep"), cc("3.8"), cc(""));    // radial gap between rings (inches) — wide
-                                                               // enough for the on-spoke ↓in/↑out labels
-
-            std::map<std::string, Agnode_t*> nmap;
-            auto add_node = [&](const std::string& id, double w_px, double h_px)
-            {
-                Agnode_t* n = agnode(g, const_cast<char*>(id.c_str()), 1);
-                std::string w = std::to_string(w_px / 72.0), h = std::to_string(h_px / 72.0);
-                agsafeset(n, cc("shape"), cc("box"), cc(""));
-                agsafeset(n, cc("fixedsize"), cc("true"), cc(""));
-                agsafeset(n, cc("width"),  w.data(), cc(""));
-                agsafeset(n, cc("height"), h.data(), cc(""));
-                nmap[id] = n;
-            };
-            add_node("mind", 40, 40);
-            // Reserve MORE than the drawn ellipse (210×96): the extra footprint keeps the on-spoke
-            // ↓in/↑out labels and neighbours' labels from overlapping as agents fan out around the bus.
-            for (const auto& a : agents) add_node(a.name(), 320, 190);
-            for (const auto& id : outer) add_node(id, id == "IceStorm" ? 130 : 210, 62);
-
-            auto get = [&](const std::string& id) -> Agnode_t*
-            { auto it = nmap.find(id); return it == nmap.end() ? nullptr : it->second; };
-            for (const auto& a : agents)                       // mind → agent (first ring)
-                agedge(g, nmap["mind"], nmap[a.name()], nullptr, 1);
-            for (const auto& e : edges)                        // ICE topology
-                if (Agnode_t* s = get(e.src)) if (Agnode_t* d = get(e.dst)) if (s != d)
-                    agedge(g, s, d, nullptr, 1);
-
-            gvLayout(gvc, g, "twopi");
-            for (Agnode_t* n = agfstnode(g); n; n = agnxtnode(g, n))
-                out[agnameof(n)] = QPointF(ND_coord(n).x, -ND_coord(n).y);   // flip y → Qt scene coords
-            gvFreeLayout(gvc, g);
-            agclose(g);
-            gvFreeContext(gvc);
-            return out;
-        }
+        // Deterministic 3-row layered layout (replaces the old Graphviz twopi radial view):
+        //   row 1 (top)    — agents, spread horizontally
+        //   row 2 (middle) — the shared buses/brokers as simple figures: domain-0 DSR graph plane
+        //                    (cyan DIAMOND), domain-7 media plane (green SQUARE), IceStorm pub/sub broker
+        //   row 3 (bottom) — sources: media producers (green) + external RPC servers (dashed grey)
+        // Structural connections route THROUGH the middle figures (agent→d0, agent↔IceStorm pub/sub,
+        // source→d7, consumer agent→d7); direct point-to-point RPC edges are kept but drawn only while
+        // they carry traffic, and a standalone external server box is hidden until an RPC edge lights up.
+        static constexpr double Y_AGENTS  = 0.0;
+        static constexpr double Y_HUBS    = 320.0;
+        static constexpr double Y_SOURCES = 640.0;
 
         void rebuild()
         {
@@ -688,32 +645,102 @@ class GraphNodeMindWidget : public QWidget
             rpc_vis.clear();
             media_items_.clear();
             merged_items_.clear();
+            ext_items_.clear();
+            d7_src_edges_.clear();
             agent_list->clear();
 
             const auto agents = current_agents();
 
             // Build the ICE interconnection graph from the self-reported configs.
             std::vector<mind_ui::AgentRef> refs;
-            std::map<std::string, std::uint64_t> key_to_id;   // agent node name -> DSR id
             for (const auto& n : agents)
             {
                 std::string cfg;
                 if (auto c = graph->get_attrib_by_name<agent_config_att>(n); c.has_value()) cfg = c->get();
                 refs.push_back({n.name(), cfg});
-                key_to_id[n.name()] = n.id();
             }
             const mind_ui::Topo topo = mind_ui::build_topo(refs);
             server_ports_ = topo.server_ports;
             bw.set_ports(topo.server_ports);
 
-            // Radial layout (Graphviz twopi), recomputed here on every participant join/leave.
-            std::vector<std::string> outer = topo.externals;
-            if (topo.any_ps) outer.push_back("IceStorm");
-            std::map<std::string, QPointF> pos = twopi_layout(agents, outer, topo.edges);
-            double min_x = 0.0;   // leftmost laid-out x → anchor the unmerged-media column beside it
-            for (const auto& [id, p] : pos) min_x = std::min(min_x, p.x());
+            // Media producers (nodes with a media_descriptor). Each may carry a media_ice_port linking it
+            // to a mediaplanedds:<port> ICE endpoint, so we FUSE that external into the producer's box.
+            std::vector<DSR::Node> producers;
+            for (auto& n : graph->get_nodes())
+                if (n.attrs().find("media_descriptor") != n.attrs().end())
+                    producers.push_back(n);
+            std::sort(producers.begin(), producers.end(),
+                      [](const DSR::Node& a, const DSR::Node& b){ return a.name() < b.name(); });
+            std::map<int, std::size_t> port_to_prod;       // ICE port -> producer index
+            for (std::size_t i = 0; i < producers.size(); ++i)
+                if (const int port = media_ice_port_of(producers[i]); port > 0) port_to_prod[port] = i;
+            auto topics_of = [&](const DSR::Node& n) -> QString
+            {
+                if (auto it = n.attrs().find("media_descriptor"); it != n.attrs().end())
+                    return parse_topics(it->second.str());
+                return {};
+            };
 
-            // Edges first (drawn under the node boxes).
+            // Split externals into (a) those fused into a producer box (mediaplanedds endpoints) and
+            // (b) standalone RPC servers (the sensorimotor layer) that get their own dashed source box.
+            std::map<std::size_t, std::string> prod_ext_id;   // producer idx -> fused external id
+            std::vector<std::string> standalone_ext;
+            for (const auto& ext : topo.externals)
+            {
+                const auto colon = ext.rfind(':');
+                const int port = (ext.rfind("mediaplanedds", 0) == 0 && colon != std::string::npos)
+                                     ? std::atoi(ext.c_str() + colon + 1) : 0;
+                if (auto pi = port_to_prod.find(port); pi != port_to_prod.end())
+                    prod_ext_id[pi->second] = ext;
+                else
+                    standalone_ext.push_back(ext);
+            }
+
+            // ── Positions ─────────────────────────────────────────────────────────────────────────────
+            std::map<std::string, QPointF> pos;   // visual-node id (agent name / external id / hub) -> scene
+            const double AG_PITCH = 300.0;
+            const double ax0 = -((static_cast<int>(agents.size()) - 1) * AG_PITCH) / 2.0;
+            for (std::size_t i = 0; i < agents.size(); ++i)
+                pos[agents[i].name()] = QPointF(ax0 + i * AG_PITCH, Y_AGENTS);
+
+            const double HUB_PITCH = 320.0;         // d0 (left)   d7 (centre)   IceStorm (right)
+            d0_center_  = QPointF(-HUB_PITCH, Y_HUBS);
+            d7_center_  = QPointF(0.0,        Y_HUBS);
+            ice_center_ = QPointF(HUB_PITCH,  Y_HUBS);
+            pos["IceStorm"] = ice_center_;
+
+            const double SRC_PITCH = 300.0;
+            const std::size_t nsrc = producers.size() + standalone_ext.size();
+            double sx = -((static_cast<int>(nsrc) - 1) * SRC_PITCH) / 2.0;
+            std::vector<QPointF> prod_pos(producers.size());
+            for (std::size_t i = 0; i < producers.size(); ++i)
+            {
+                prod_pos[i] = QPointF(sx, Y_SOURCES);
+                pos[producers[i].name()] = prod_pos[i];
+                if (auto it = prod_ext_id.find(i); it != prod_ext_id.end())
+                    pos[it->second] = prod_pos[i];   // fused mediaplanedds RPC edge lands on the producer box
+                sx += SRC_PITCH;
+            }
+            std::map<std::string, QPointF> ext_pos;
+            for (const auto& ext : standalone_ext)
+            {
+                ext_pos[ext] = QPointF(sx, Y_SOURCES);
+                pos[ext] = ext_pos[ext];
+                sx += SRC_PITCH;
+            }
+
+            // ── Structural plane edges (drawn first, under the boxes) ───────────────────────────────────
+            // Source → domain-7 SQUARE (media/SHM plane); thickness tracks media_bps in refresh().
+            for (std::size_t i = 0; i < producers.size(); ++i)
+            {
+                auto* ln = scene.addLine(prod_pos[i].x(), prod_pos[i].y(), d7_center_.x(), d7_center_.y(),
+                                         QPen(QColor("#2f6f3a"), 1.4));
+                ln->setZValue(0);
+                d7_src_edges_.push_back({ln, producers[i].id()});
+            }
+
+            // ICE topology edges: pub/sub route THROUGH the IceStorm figure; RPC stays point-to-point
+            // (kept per design) but hidden until it carries traffic.
             for (const auto& e : topo.edges)
             {
                 const auto a = pos.find(e.src), b = pos.find(e.dst);
@@ -733,7 +760,7 @@ class GraphNodeMindWidget : public QWidget
                                          (a->second.x() + b->second.x()) / 2,
                                          (a->second.y() + b->second.y()) / 2, 1);
                     lbl->setVisible(false);
-                    rpc_vis.push_back({ln, lbl, e.src, e.port, base, 0.0});
+                    rpc_vis.push_back({ln, lbl, e.src, e.dst, e.port, base, 0.0});
                 }
                 else               // pub/sub via IceStorm
                 {
@@ -746,24 +773,32 @@ class GraphNodeMindWidget : public QWidget
                 }
             }
 
-            // The "mind" node stays in the twopi graph as the radial ROOT but is not drawn — it is a
-            // layout anchor, not a participant. We reuse its position as the DOMAIN-0 MULTICAST BUS: a
-            // cyan triangle at the hub that every agent connects to by a spoke (star). Domain 0 (the DSR
-            // graph plane) is multicast, so this shared bus is the honest topology — bytes flow agent→bus
-            // (publish) and bus→agent (receive), NOT point-to-point. It also visually SEPARATES the two
-            // DDS domains: domain 0 = this cyan bus + spokes; domain 7 = the green media/SHM boxes.
-            bus_center_ = pos.count("mind") ? pos["mind"] : QPointF(0, 0);
+            // ── Middle-row hub figures ──────────────────────────────────────────────────────────────────
+            // Domain-0 DSR graph plane: cyan DIAMOND. Every agent joins it by a spoke (multicast bus).
             {
-                const double R = 40;
-                QPolygonF tri;                                    // upward triangle
-                tri << QPointF(bus_center_.x(),           bus_center_.y() - R)
-                    << QPointF(bus_center_.x() - R * 0.92, bus_center_.y() + R * 0.6)
-                    << QPointF(bus_center_.x() + R * 0.92, bus_center_.y() + R * 0.6);
-                auto* poly = scene.addPolygon(tri, QPen(QColor("#38bdf8"), 2.2), QBrush(QColor("#0e2a3a")));
-                poly->setZValue(2);
-                auto* t = add_text("DDS d0\nmulticast bus", QColor("#9fdbf5"),
-                                   bus_center_.x() - 34, bus_center_.y() + R * 0.6 + 4, 3);
-                t->setData(0, QVariant());   // non-selectable decoration
+                const double R = 46;
+                QPolygonF d;
+                d << QPointF(d0_center_.x(),     d0_center_.y() - R) << QPointF(d0_center_.x() + R, d0_center_.y())
+                  << QPointF(d0_center_.x(),     d0_center_.y() + R) << QPointF(d0_center_.x() - R, d0_center_.y());
+                scene.addPolygon(d, QPen(QColor("#38bdf8"), 2.2), QBrush(QColor("#0e2a3a")))->setZValue(2);
+                add_text("DDS d0\ngraph plane", QColor("#9fdbf5"),
+                         d0_center_.x() - 34, d0_center_.y() + R + 4, 3)->setData(0, QVariant());
+            }
+            // Domain-7 media plane: green SQUARE. Sources publish into it; consumer agents read from it.
+            {
+                const double S = 84;
+                scene.addRect(d7_center_.x() - S / 2, d7_center_.y() - S / 2, S, S,
+                              QPen(QColor("#3fb950"), 2.2), QBrush(QColor("#16351c")))->setZValue(2);
+                add_text("DDS d7\nmedia plane", QColor("#9be6a8"),
+                         d7_center_.x() - 34, d7_center_.y() + S / 2 + 4, 3)->setData(0, QVariant());
+            }
+            // IceStorm pub/sub broker: purple circle.
+            {
+                const double R = 42;
+                scene.addEllipse(ice_center_.x() - R, ice_center_.y() - R, 2 * R, 2 * R,
+                                 QPen(QColor("#b072e0"), 2.0), QBrush(QColor("#2b1d3d")))->setZValue(2);
+                add_text("IceStorm\npub/sub", QColor("#c39be6"),
+                         ice_center_.x() - 30, ice_center_.y() + R + 4, 3)->setData(0, QVariant());
             }
 
             // Proxy name(s) referencing each external, so a generic ICE identity shared by several
@@ -772,68 +807,54 @@ class GraphNodeMindWidget : public QWidget
             for (const auto& e : topo.edges)
                 if (e.kind == 0 && !e.name.empty()) ext_names[e.dst].insert(e.name);
 
-            // Media producers (nodes with a media_descriptor). Each may carry a media_ice_port linking
-            // it to its mediaplanedds:<port> ICE endpoint, so we can FUSE the two into one box showing
-            // the SHM topic rate (media_bps) and the small ICE descriptor rate on the same source.
-            std::vector<DSR::Node> producers;
-            for (auto& n : graph->get_nodes())
-                if (n.attrs().find("media_descriptor") != n.attrs().end())
-                    producers.push_back(n);
-            std::sort(producers.begin(), producers.end(),
-                      [](const DSR::Node& a, const DSR::Node& b){ return a.name() < b.name(); });
-            std::map<int, std::size_t> port_to_prod;       // ICE port -> producer index
+            // ── Bottom-row sources: media producers (green, always shown) ───────────────────────────────
             for (std::size_t i = 0; i < producers.size(); ++i)
-                if (const int port = media_ice_port_of(producers[i]); port > 0) port_to_prod[port] = i;
-            std::vector<bool> prod_merged(producers.size(), false);
-            auto topics_of = [&](const DSR::Node& n) -> QString
             {
-                if (auto it = n.attrs().find("media_descriptor"); it != n.attrs().end())
-                    return parse_topics(it->second.str());
-                return {};
-            };
-
-            // External / broker / MERGED-source boxes (outer ring).
-            for (const auto& id : outer)
-            {
-                const auto& p = pos[id];
-                const bool broker = (id == "IceStorm");
-                const auto colon = id.rfind(':');
-                const int  port  = (id.rfind("mediaplanedds", 0) == 0 && colon != std::string::npos)
-                                       ? std::atoi(id.c_str() + colon + 1) : 0;
-
-                if (auto pi = port_to_prod.find(port); pi != port_to_prod.end())
+                const auto& n = producers[i];
+                const auto& p = prod_pos[i];
+                const QString topics = topics_of(n);
+                constexpr double W = 236, H = 74;
+                scene.addRect(p.x() - W / 2, p.y() - H / 2, W, H, QPen(QColor("#3fb950"), 1.6),
+                              QBrush(QColor("#16351c")))->setZValue(3);
+                auto* label = add_text("", QColor("#d7ffe0"), p.x() - W / 2 + 6, p.y() - H / 2 + 6, 4);
+                if (auto it = prod_ext_id.find(i); it != prod_ext_id.end())
                 {
-                    // FUSED media source: green box at the ICE endpoint's ring slot, so the RPC edge
-                    // (carrying the small ICE rate) still lands on it. Content refreshed live.
-                    const auto& prod = producers[pi->second];
-                    const QString topics = topics_of(prod);
-                    constexpr double W = 236, H = 78;
-                    scene.addRect(p.x() - W / 2, p.y() - H / 2, W, H, QPen(QColor("#3fb950"), 1.6),
-                                  QBrush(QColor("#16351c")))->setZValue(3);
-                    auto* label = add_text("", QColor("#d7ffe0"), p.x() - W / 2 + 6, p.y() - H / 2 + 6, 4);
-                    merged_items_.push_back({label, prod.id(), port, QString::fromStdString(prod.name()), topics});
-                    label->setText(merged_label(QString::fromStdString(prod.name()), topics,
-                                                media_bps_of(prod.id()), 0.0));
-                    prod_merged[pi->second] = true;
-                    continue;
+                    // Fused source: SHM topic rate (media_bps) + small ICE descriptor rate on the same box.
+                    const auto colon = it->second.rfind(':');
+                    const int  port  = (colon != std::string::npos) ? std::atoi(it->second.c_str() + colon + 1) : 0;
+                    merged_items_.push_back({label, n.id(), port, QString::fromStdString(n.name()), topics});
+                    label->setText(merged_label(QString::fromStdString(n.name()), topics, media_bps_of(n.id()), 0.0));
                 }
+                else
+                {
+                    media_items_.push_back({n.id(), label, QString::fromStdString(n.name()), topics});
+                    label->setText(media_label(QString::fromStdString(n.name()), topics, media_bps_of(n.id())));
+                }
+            }
 
+            // Standalone external RPC servers (dashed grey): hidden until an RPC edge into them is active.
+            for (const auto& ext : standalone_ext)
+            {
+                const auto& p = ext_pos[ext];
                 constexpr double W = 168, H = 44;
-                QPen pen(broker ? QColor("#b072e0") : QColor("#55606e"), 1.4);
-                if (!broker) pen.setStyle(Qt::DashLine);
-                scene.addRect(p.x() - W / 2, p.y() - H / 2, W, H, pen,
-                              QBrush(broker ? QColor("#2b1d3d") : QColor("#22252b")))->setZValue(3);
-                QString lbl = QString::fromStdString(id);
-                if (auto it = ext_names.find(id); it != ext_names.end() && !it->second.empty())
+                QPen pen(QColor("#55606e"), 1.4);
+                pen.setStyle(Qt::DashLine);
+                auto* box = scene.addRect(p.x() - W / 2, p.y() - H / 2, W, H, pen, QBrush(QColor("#22252b")));
+                box->setZValue(3);
+                box->setVisible(false);
+                QString lbl = QString::fromStdString(ext);
+                if (auto it = ext_names.find(ext); it != ext_names.end() && !it->second.empty())
                 {
                     QStringList names;
                     for (const auto& s : it->second) names << QString::fromStdString(s);
-                    lbl = names.join(" / ") + "\n" + QString::fromStdString(id);   // proxy name over identity:port
+                    lbl = names.join(" / ") + "\n" + QString::fromStdString(ext);   // proxy name over identity:port
                 }
-                add_text(lbl, QColor("#c8ccd2"), p.x() - W / 2 + 6, p.y() - H / 2 + 6, 4);
+                auto* label = add_text(lbl, QColor("#c8ccd2"), p.x() - W / 2 + 6, p.y() - H / 2 + 6, 4);
+                label->setVisible(false);
+                ext_items_.push_back({box, label, ext});
             }
 
-            // Agents: blue ellipses (first ring), selectable, carrying live metrics.
+            // ── Top-row agents: blue ellipses, selectable, carrying live metrics ────────────────────────
             for (const auto& n : agents)
             {
                 const auto& p = pos[n.name()];
@@ -850,16 +871,22 @@ class GraphNodeMindWidget : public QWidget
                 label->setPos(p.x() - br.width() / 2, p.y() - br.height() / 2);
                 label->setZValue(5);
 
-                // Domain-0 multicast spoke: a line from this agent to the central bus triangle. Always
-                // drawn (the star is structural); refresh() thickens/brightens it with live throughput.
-                auto* spoke = scene.addLine(p.x(), p.y(), bus_center_.x(), bus_center_.y(),
+                // Domain-0 spoke: agent → d0 diamond. Always drawn (structural); refresh() thickens/
+                // brightens it with live domain-0 throughput.
+                auto* spoke = scene.addLine(p.x(), p.y(), d0_center_.x(), d0_center_.y(),
                                             QPen(QColor("#25506a"), 1.0));
                 spoke->setZValue(0);   // under the boxes
+                // Domain-7 consumer edge: agent → d7 square. Hidden until this agent RECEIVES media
+                // (measurable only with RC_DDS_STATS); refresh() shows + thickens it with the d7 in-rate.
+                auto* d7e = scene.addLine(p.x(), p.y(), d7_center_.x(), d7_center_.y(),
+                                          QPen(QColor("#2f6f3a"), 1.0));
+                d7e->setZValue(0);
+                d7e->setVisible(false);
 
-                // Domain-0 (DSR graph plane) throughput: two labels that sit ON the spoke (the agent→bus
-                // edge), filled in by refresh() from the DDS statistics monitor. Hidden until they carry
-                // traffic (and only ever visible when built + run with RC_DDS_STATS). Children of the box
-                // so they survive with it; positioned in scene coords along the spoke each tick.
+                // Domain-0 (DSR graph plane) throughput: two labels that sit ON the spoke, filled in by
+                // refresh() from the DDS statistics monitor. Hidden until they carry traffic (and only
+                // ever visible when built + run with RC_DDS_STATS). Children of the box so they survive
+                // with it; positioned in scene coords along the spoke each tick.
                 auto* in_lbl = scene.addSimpleText(QString());
                 in_lbl->setBrush(QColor("#7fd1a0"));   // green = incoming (bus → agent)
                 in_lbl->setParentItem(box);
@@ -871,31 +898,11 @@ class GraphNodeMindWidget : public QWidget
                 out_lbl->setZValue(6);
                 out_lbl->setVisible(false);
 
-                items[n.id()] = {box, label, in_lbl, out_lbl, spoke};
+                items[n.id()] = {box, label, in_lbl, out_lbl, spoke, d7e};
                 drawn_ids.push_back(n.id());
 
                 auto* it = new QListWidgetItem(QString::fromStdString(n.name()), agent_list);
                 it->setData(Qt::UserRole, QVariant::fromValue<qulonglong>(n.id()));
-            }
-
-            // Unmerged media producers (no ICE endpoint to fuse with, e.g. imu): stacked in a left
-            // column beside the laid-out graph, showing the SHM topic rate only.
-            const double mx = min_x - 320.0;
-            int unmerged = 0;
-            for (std::size_t i = 0; i < producers.size(); ++i) unmerged += prod_merged[i] ? 0 : 1;
-            double my = -((std::max(1, unmerged) - 1) * 86) / 2.0;
-            for (std::size_t i = 0; i < producers.size(); ++i)
-            {
-                if (prod_merged[i]) continue;
-                const auto& n = producers[i];
-                const QString topics = topics_of(n);
-                constexpr double W = 236, H = 70;
-                scene.addRect(mx - W / 2, my - H / 2, W, H, QPen(QColor("#3fb950"), 1.5),
-                              QBrush(QColor("#16351c")))->setZValue(3);
-                auto* label = add_text(media_label(QString::fromStdString(n.name()), topics, media_bps_of(n.id())),
-                                       QColor("#d7ffe0"), mx - W / 2 + 8, my - H / 2 + 6, 4);
-                media_items_.push_back({n.id(), label, QString::fromStdString(n.name()), topics});
-                my += 86;
             }
 
             scene.setSceneRect(scene.itemsBoundingRect().adjusted(-60, -60, 60, 60));
@@ -942,6 +949,16 @@ class GraphNodeMindWidget : public QWidget
             if (prod_sig != cur_sig) { rebuild(); return; }
             for (auto& m : media_items_)
                 m.label->setText(media_label(m.name, m.topics, media_bps_of(m.id)));
+
+            // Source → domain-7 plane edges: brighten + thicken with the producer's live SHM rate.
+            for (auto& d : d7_src_edges_)
+            {
+                const double b = media_bps_of(d.producer_id);
+                QPen pn = d.line->pen();
+                pn.setColor(b > 1.0 ? QColor("#3fb950") : QColor("#2f6f3a"));
+                pn.setWidthF(std::min(6.0, 1.0 + std::log2(1.0 + b / 4096.0)));
+                d.line->setPen(pn);
+            }
 
             // ── Per-connection bandwidth attribution ────────────────────────────────────────────────
             // Each sniffed (loport,hiport) pair → its server port (∈ server_ports_) picks the server
@@ -1005,6 +1022,17 @@ class GraphNodeMindWidget : public QWidget
                 m.label->setText(merged_label(m.name, m.topics, media_bps_of(m.producer_id), ice));
             }
 
+            // Standalone external servers: shown only while an RPC edge into them carries traffic
+            // ("do not show the dark-grey elements that are not showing traffic").
+            for (auto& x : ext_items_)
+            {
+                bool active = false;
+                for (const auto& e : rpc_vis)
+                    if (e.dst == x.id and e.smooth > 4.0) { active = true; break; }
+                x.box->setVisible(active);
+                x.label->setVisible(active);
+            }
+
             // DDS Statistics readout (only present/active when built with RC_DDS_STATS and env-enabled):
             // per-participant throughput measured at the writer, so it sees SHM media traffic too.
             if (dds_stats_.enabled())
@@ -1026,8 +1054,14 @@ class GraphNodeMindWidget : public QWidget
                     if (auto it = id_to_node.find(aid); aid >= 0 and it != id_to_node.end())
                         node_io[it->second] = io;
                 }
+                std::map<std::uint64_t, DdsInOut> node_io7;   // domain-7 in/out per agent node (consumers)
                 for (const auto& [pname, io] : dds_stats_.per_participant(7))
-                    { d7_total.in += io.in; d7_total.out += io.out; }
+                {
+                    d7_total.in += io.in; d7_total.out += io.out;
+                    const int aid = mind_ui::participant_agent_id(pname);
+                    if (auto it = id_to_node.find(aid); aid >= 0 and it != id_to_node.end())
+                        node_io7[it->second] = io;
+                }
 
                 // Canvas status line: AGGREGATE bus load only — per-agent detail now lives in the right
                 // panel (agent list). Keeps the multicast bus's total fan-in/out at a glance.
@@ -1079,6 +1113,22 @@ class GraphNodeMindWidget : public QWidget
                         pn.setColor(t > 1.0 ? QColor("#38bdf8") : QColor("#25506a"));
                         pn.setWidthF(std::min(6.0, 1.0 + std::log2(1.0 + t / 512.0)));
                         itm.spoke->setPen(pn);
+                    }
+                }
+
+                // Domain-7 consumer edges: light agent → d7 square for agents receiving media this tick.
+                for (auto& [nid, itm] : items)
+                {
+                    if (not itm.d7_edge) continue;
+                    auto iit = node_io7.find(nid);
+                    const double t = (iit != node_io7.end()) ? (iit->second.in + iit->second.out) : 0.0;
+                    itm.d7_edge->setVisible(t > 1.0);
+                    if (t > 1.0)
+                    {
+                        QPen pn = itm.d7_edge->pen();
+                        pn.setColor(QColor("#3fb950"));
+                        pn.setWidthF(std::min(6.0, 1.0 + std::log2(1.0 + t / 512.0)));
+                        itm.d7_edge->setPen(pn);
                     }
                 }
 
@@ -1172,11 +1222,21 @@ class GraphNodeMindWidget : public QWidget
         struct AgentItem { QGraphicsItem* box; QGraphicsSimpleTextItem* label;
                            QGraphicsSimpleTextItem* in_label = nullptr;    // ↓ domain-0 incoming (subscription)
                            QGraphicsSimpleTextItem* out_label = nullptr;   // ↑ domain-0 outgoing (publication)
-                           QGraphicsLineItem* spoke = nullptr; };          // agent → domain-0 multicast bus
+                           QGraphicsLineItem* spoke = nullptr;             // agent → domain-0 diamond
+                           QGraphicsLineItem* d7_edge = nullptr; };        // agent → domain-7 square (consumer)
         std::map<std::uint64_t, AgentItem> items;
-        QPointF bus_center_;   // scene position of the domain-0 multicast bus triangle (twopi hub)
+        QPointF d0_center_, d7_center_, ice_center_;   // scene positions of the three middle-row hub figures
         std::vector<std::uint64_t> drawn_ids;
         std::vector<RpcEdgeVis> rpc_vis;
+
+        // Standalone external RPC servers (sensorimotor layer) drawn in the bottom source row. Kept
+        // hidden until an RPC edge into them lights up, so idle grey boxes never clutter the view.
+        struct ExtItem { QGraphicsRectItem* box; QGraphicsSimpleTextItem* label; std::string id; };
+        std::vector<ExtItem> ext_items_;
+
+        // Source → domain-7 media-plane edges, thickened live by each producer's media_bps.
+        struct D7Edge { QGraphicsLineItem* line; std::uint64_t producer_id; };
+        std::vector<D7Edge> d7_src_edges_;
 
         // Media producers: nodes carrying a media_descriptor. Their pixels travel over zero-copy DDS
         // shared memory (invisible to the sniffer), so throughput comes from the self-reported
