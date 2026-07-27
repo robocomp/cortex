@@ -411,8 +411,6 @@ QWidget *DSRViewer::create_widget(view type)
         case view::scene:
             widget_view = new DSR::QScene2dViewer(G);
             break;
-        case view::osg:
-            break;
         case view::none:
             break;
     }

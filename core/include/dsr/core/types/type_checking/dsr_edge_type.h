@@ -63,4 +63,12 @@ REGISTER_EDGE_TYPE(current)
 REGISTER_EDGE_TYPE(exit)
 REGISTER_EDGE_TYPE(match)
 
+// ── level-2 meta-concept membership (ring_metaconcept) ─ registered 2026-07-26 ───────────────────
+//    NON-RT edge rig→member (dining_set_* → table_*/chair_*). It is BOTH the structural link and the
+//    top-down message channel: the arrangement's per-member empirical prior rides on this edge's
+//    attributes (rig_yaw_prior / rig_yaw_kappa / …, see dsr_attr_name.h). Non-RT on purpose — the
+//    members are already room→member RT children, and a second RT parent would double-parent them
+//    in the transform tree.
+REGISTER_EDGE_TYPE(group_member)
+
 #endif //DSR_EDGE_TYPE_H

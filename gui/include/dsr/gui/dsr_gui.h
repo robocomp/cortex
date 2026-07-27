@@ -72,7 +72,6 @@ public:
         graph = (1 << 0),
         scene = (1 << 1),
         tree = (1 << 2),
-        osg = (1 << 3),
     };
     struct WidgetContainer
     {

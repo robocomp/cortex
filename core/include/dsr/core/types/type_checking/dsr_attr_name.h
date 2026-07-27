@@ -628,6 +628,15 @@ REGISTER_TYPE(object_subtype,               std::string,                        
 //    voxelizer's meshes/). mesh_texture_path is the optional base-colour image; empty ⇒ flat class colour.
 REGISTER_TYPE(mesh_path,                     std::string,                                      false)
 REGISTER_TYPE(mesh_texture_path,             std::string,                                      false)
+// mesh_color_rgb: [r,g,b] CHROMATICITY (each in [0,1], summing to ~1), the MAP of the concept agent's
+//    per-instance appearance belief (common/appearance_belief). DISPLAY ONLY — it never enters any
+//    geometric fit. Chromaticity, not raw RGB, because the viewer applies its own ambient+diffuse
+//    shading; handing it observed RGB would bake the room's lighting in and then shade it again.
+//    The viewer applies it as a NORMALISED MULTIPLICATIVE tint against the asset's own mean
+//    chromaticity, so authored inter-material contrast survives and an absent/unconfident belief is
+//    the identity. Absent ⇒ render the asset's authored .mtl colours unchanged. Only 3 floats, so a
+//    plain vector (no reference_wrapper) — the zero-copy form is for the big per-slice blobs.
+REGISTER_TYPE(mesh_color_rgb,                std::vector<float>,                               false)
 
 // ── chair-concept / cabinet-concept: same voxel-memory + ROI channel as table-concept above ────
 //    These agents are copies of the table_concept pattern and carry the identical interface, so they get
@@ -640,6 +649,13 @@ REGISTER_TYPE(chair_roi_valid,                bool,                             
 REGISTER_TYPE(chair_detection_alive,          bool,                                             false)
 REGISTER_TYPE(chair_detection_confidence,     float,                                            false)
 REGISTER_TYPE(chair_frames_since_detection,   int,                                              false)
+REGISTER_TYPE(door_voxel_bank_pts,            std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]xN
+REGISTER_TYPE(door_roi_offset,                std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
+REGISTER_TYPE(door_roi_fill,                  float,                                            false)
+REGISTER_TYPE(door_roi_valid,                 bool,                                             false)
+REGISTER_TYPE(door_detection_alive,           bool,                                             false)
+REGISTER_TYPE(door_detection_confidence,      float,                                            false)
+REGISTER_TYPE(door_frames_since_detection,    int,                                              false)
 REGISTER_TYPE(cabinet_voxel_bank_pts,         std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]xN
 REGISTER_TYPE(cabinet_roi_offset,             std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
 REGISTER_TYPE(cabinet_roi_fill,               float,                                            false)
@@ -693,6 +709,23 @@ REGISTER_TYPE(mask_trunc_frac,        std::reference_wrapper<const std::vector<f
 REGISTER_TYPE(mask_centroid_radius,   std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_range,             std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_cam_twist,         std::reference_wrapper<const std::vector<float>>,  false)
+// ── per-mask APPEARANCE channel (registered 2026-07-27; written by voxelizer/graph_publisher.cpp, read by
+//    common/mask_ingestor → the concept agents' appearance belief). One summary per slice, NOT per pixel:
+//    mask_color_rgb  — 3 per slice: median CHROMATICITY (R,G,B)/(R+G+B) over the slice's interior grid cells.
+//                      Chromaticity because it is invariant to the per-frame illumination gain by
+//                      construction, which is the dominant nuisance in observed pixel colour.
+//    mask_color_var  — 3 per slice: BETWEEN-CELL variance of that chromaticity. This is the honest
+//                      uncertainty: neighbouring pixels on one surface are massively correlated, so a
+//                      per-pixel variance would collapse σ like 1/√N and make the channel absurdly
+//                      overconfident. Aggregating per grid cell handles the correlation by construction.
+//    mask_color_neff — 1 per slice: count of contributing INTERIOR cells (a cell counts only if its
+//                      4-neighbours are also occupied, which erodes the silhouette boundary for free and
+//                      so keeps background bleed out). 0 ⇒ no colour information this frame; consumers
+//                      simply gain nothing, no branch needed. A far/small object yields few cells and
+//                      therefore little information — a range gate falls out of the model, not an if.
+REGISTER_TYPE(mask_color_rgb,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_color_var,         std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(mask_color_neff,        std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_frame_dt_s,        float,                                             false)
 REGISTER_TYPE(mask_rt_lag_s,          float,                                             false)
 REGISTER_TYPE(mask_rt_gap_s,          float,                                             false)
@@ -764,5 +797,32 @@ REGISTER_TYPE(joint_buffer_dof,          int,                                   
 //    a runtime attr_name PARAM stay runtime_checked (dynamic name → no compile-time alias).
 REGISTER_TYPE(media_descriptor,         std::string,                                      false)
 REGISTER_TYPE(media_ice_port,           std::string,                                      false)
+
+// ── level-2 arrangement channel (ring_metaconcept) ─ registered 2026-07-26 ───────────────────────
+// The TOP-DOWN message from a meta-concept to its constituent objects: the arrangement's empirical
+// prior on each member's pose. Written ONLY by the rig agent, onto the non-RT `group_member` edge
+// rig→member; the member agents READ it and fuse it precision-weighted (they never write it).
+//
+// ★It rides an EDGE, not the member node, and that is a correctness requirement rather than taste.
+// CRDTSyncEngine::update_node_raw resets every attribute present in the local registry but ABSENT
+// from the submitted node — so a member agent doing get_node → modify → update_node with a copy
+// fetched before the rig's delta arrived would silently DELETE the prior from its own node. The rig
+// is the sole writer of the edge, so on an edge the message cannot be clobbered.
+REGISTER_TYPE(rig_id,                   std::uint64_t,                                    false)  // authoring rig node (staleness / multi-rig)
+REGISTER_TYPE(rig_stamp_ms,             std::uint64_t,                                    false)  // wall-clock ms the message was written
+REGISTER_TYPE(rig_slot_index,           int,                                              false)  // which slot this member occupies
+REGISTER_TYPE(rig_yaw_prior,            float,                                            false)  // cavity facing yaw, in the MEMBER's own yaw convention (rad)
+REGISTER_TYPE(rig_yaw_kappa,            float,                                            false)  // its precision = p_ring / facing_var (rad⁻²); 0 ⇒ inert
+REGISTER_TYPE(rig_slot_x,               float,                                            false)  // predicted slot position — radial prior (Phase 2)
+REGISTER_TYPE(rig_slot_y,               float,                                            false)
+REGISTER_TYPE(rig_slot_info_xx,         float,                                            false)  // its precision (Phase 2)
+REGISTER_TYPE(rig_slot_info_yy,         float,                                            false)
+
+// ── the rig node's own latent (viewers, and the table's round-vs-square prior) ────────────────────
+REGISTER_TYPE(rig_schema,               std::string,                                      false)  // arrangement schema, e.g. "ring"
+REGISTER_TYPE(rig_radius,               float,                                            false)  // fitted ring radius (m)
+REGISTER_TYPE(rig_n_slots,              int,                                              false)  // evidence-selected slot count
+REGISTER_TYPE(rig_logodds,              float,                                            false)  // ring vs independent-objects log-Bayes factor
+REGISTER_TYPE(rig_shape_round_logodds,  float,                                            false)  // → table round-vs-square prior (Phase 2)
 
 #endif //DSR_ATTR_NAME_H
