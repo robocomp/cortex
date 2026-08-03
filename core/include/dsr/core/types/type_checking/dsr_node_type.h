@@ -136,6 +136,13 @@ REGISTER_NODE_TYPE(compressed)
 //Agent
 REGISTER_NODE_TYPE(agent)
 
+// A concept OVER concepts (level-2): an arrangement/grouping that BELIEVES in a relation among
+// other nodes rather than in a solid body of its own — e.g. ring_metaconcept's dining_set, a
+// row/grid of cabinets. Deliberately NOT `object`: every consumer in the fleet gathers furniture
+// with get_nodes_by_type("object") and would otherwise draw/carve/associate the grouping's
+// footprint as if it were a physical box. The class still goes in object_subtype.
+REGISTER_NODE_TYPE(metaconcept)
+
 
 //pioneer
 REGISTER_NODE_TYPE(wayp)
