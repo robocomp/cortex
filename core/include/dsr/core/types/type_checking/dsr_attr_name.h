@@ -678,6 +678,20 @@ REGISTER_TYPE(epistemic_target_yaw_rad,float,                                   
 REGISTER_TYPE(epistemic_gain,          float,                                             false)
 REGISTER_TYPE(epistemic_pending,       bool,                                              false)
 
+// ── affordance REFUSAL (written by the consumer, read by the producer) ───────────────────────
+// "I could not get there." Distinct from a completion in the one way that matters: Completed means
+// OBSERVED — update the belief, reset the neglect clock; Refused means NOT ATTEMPTED — change nothing
+// that is believed, only where to stand. Conflating them makes an agent confident about something it
+// never saw. The refusal retires the current offer; the producer publishes a different standpoint when
+// it has one, and publish_target already declines to re-arm an unchanged target, so an unchanged
+// proposal is simply not news and the exchange terminates without a handshake.
+// The POSE is carried so the producer can exclude that viewpoint from its next ranking instead of
+// re-deriving the same best answer and being refused again. It is the pose AS PUBLISHED, before any
+// consumer-side repair moved it.
+REGISTER_TYPE(epistemic_refused,       bool,                                              false)
+REGISTER_TYPE(epistemic_refused_x_m,   float,                                             false)
+REGISTER_TYPE(epistemic_refused_y_m,   float,                                             false)
+
 // ── semantic labeling attributes (written by voxelizer, read by table-concept) ───────────────
 REGISTER_TYPE(mask_frame_id,          int,                                               false)
 REGISTER_TYPE(mask_count,             int,                                               false)
@@ -824,5 +838,20 @@ REGISTER_TYPE(rig_radius,               float,                                  
 REGISTER_TYPE(rig_n_slots,              int,                                              false)  // evidence-selected slot count
 REGISTER_TYPE(rig_logodds,              float,                                            false)  // ring vs independent-objects log-Bayes factor
 REGISTER_TYPE(rig_shape_round_logodds,  float,                                            false)  // → table round-vs-square prior (Phase 2)
+
+// ── node PROVENANCE: when was this node born? ─ registered 2026-08-06 ────────────────────────────
+// Every node an active_inference agent inserts is stamped at creation with BOTH forms, by
+// common/graph_provenance/creation_stamp.h (rc::provenance::stamp_creation), called immediately
+// before insert_node:
+//   timestamp_creation  (already registered above, in the Agents block) — ms since the Unix epoch.
+//                       The machine-readable one: an age or a lifetime is then a subtraction.
+//   creation_datetime   — the SAME instant as local civil time, ISO-8601 with UTC offset, e.g.
+//                       "2026-08-06T14:32:07.512+0200". The human-readable one: this is what the
+//                       DSR graph viewer's attribute table shows, where a bare epoch count tells
+//                       nobody anything.
+// Written ONCE, before the node exists in the graph, and never touched again. A re-acquired object
+// (died, then seen again) legitimately gets a NEW stamp — it is a new node with a new id, and the
+// name is the only thing that carries over. Do not refresh either on update_node.
+REGISTER_TYPE(creation_datetime,        std::string,                                      false)
 
 #endif //DSR_ATTR_NAME_H
