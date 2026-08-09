@@ -8,6 +8,7 @@ Reimplementation from https://github.com/CBaquero/delta-enabled-crdts
 #include <iostream>
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <set>
 #include <type_traits>
@@ -65,43 +66,74 @@ public:
     [[nodiscard]] bool dotin(const std::pair<key_type, int> &d) const {
         const auto itm = cc.find(d.first);
         if (itm != cc.end() && d.second <= itm->second) return true;
+        // ⚠DO NOT REMOVE THE NEXT LINE. It is not a correct CRDT predicate — dc is ordered by the PAIR, so
+        // rbegin() is the highest-numbered ACTOR's newest dot and its counter has nothing to do with d's
+        // actor — but it is LOAD-BEARING. Removing it (tried 2026-08-08) makes dotin() answer "not seen" far
+        // more often, so join_replace_conflict() both keeps local dots it should drop and imports remote ones
+        // it should not; ds then holds more than one value and `assert(dk.ds.size() <= 1)` in mvreg::join
+        // aborts every agent at startup (residual, controller, door). It is masking a genuinely broken causal
+        // context: with a healthy cc the FIRST test would already answer true, and this one would never be
+        // reached. Fix the context (the gap that strands the dot cloud), not this line.
         if (not dc.empty() and d.second < dc.rbegin()->second) return true;
         if (dc.count(d) != 0) return true;
         return false;
     }
 
-    //TODO: debug this
+    // Compact DC into CC.
+    //
+    // ★This is a COMPLEXITY fix, not a semantic one: it produces exactly the same (cc, dc) as the previous
+    // full scan, but visits only the dots that can possibly change instead of the entire cloud.
+    //
+    // WHY IT MATTERS. A dot (a,k) folds into cc only when k == cc[a]+1, and is pruned only when k <= cc[a].
+    // Anything else stays in dc. So ONE missing sequence number is permanent damage: every later dot from
+    // that actor is stranded for the lifetime of the process, dc grows by one on every incoming delta, and
+    // the old scan walked ALL of it on EVERY join — quadratic in the number of deltas received.
+    //
+    // Measured on a live door_concept, 2026-08-08: cc = { 0 : 228479 }, dc.size() = 317998, main thread
+    // pegged at 99% of a core inside this function for 4.5 h. The agent could not be stopped: its Qt event
+    // loop never returned, so the SIGINT self-pipe notifier was never serviced and Ctrl-C/SIGTERM were both
+    // inert (only SIGKILL, which leaks the agent's owned nodes into the shared graph). Undrained posted
+    // events had reached 21 GB, growing 368 MB/min.
+    //
+    // HOW. dc is ordered by (actor, counter), so one actor's dots are contiguous AND ascending. That lets us
+    // jump to each actor's frontier with lower_bound/upper_bound rather than scanning. Cost falls from
+    // O(|dc|) per join to O(#actors · log|dc| + #dots actually compacted); #actors is the number of agents.
+    //
+    // One pass suffices — compacting actor X can never enable compacting actor Y, because cc[X] does not
+    // appear in Y's test — which is why the old `do { } while(flag)` outer loop is gone rather than kept.
     void compact() {
         CORTEX_PROFILE_ZONE_N("dot_context::compact");
-        // Compact DC to CC if possible
-        //typename map<K,int>::iterator mit;
-        //typename set<pair<K,int> >::iterator sit;
-        bool flag; // may need to compact several times if ordering not best
-        do {
-            flag = false;
-            for (auto sit = dc.begin(); sit != dc.end();) {
+        constexpr int kMinCounter = std::numeric_limits<int>::min();
+        constexpr int kMaxCounter = std::numeric_limits<int>::max();
 
-                auto mit = cc.find(sit->first);
-                if (mit == cc.end()) // No CC entry
-                    if (sit->second == 1) // Can compact
-                    {
-                        cc.insert(*sit);
-                        dc.erase(sit++);
-                        flag = true;
-                    } else ++sit;
-                else // there is a CC entry already
-                if (sit->second == cc.at(sit->first) + 1) // Contiguous, can compact
-                {
-                    cc.at(sit->first)++;
-                    dc.erase(sit++);
-                    flag = true;
-                } else if (sit->second <= cc.at(sit->first)) // dominated, so prune
-                {
-                    dc.erase(sit++);
-                    // no extra compaction oportunities so flag untouched
-                } else ++sit;
+        auto it = dc.begin();
+        while (it != dc.end()) {
+            const key_type actor = it->first;
+            // One past this actor's last dot. std::set iterators stay valid across erases of OTHER elements,
+            // so this remains a good bound while we erase within the actor's range.
+            const auto actor_end = dc.upper_bound({actor, kMaxCounter});
+
+            auto mit = cc.find(actor);
+            if (mit == cc.end()) {
+                // No CC entry yet: only counter 1 can seed the run.
+                if (it->second != 1) {
+                    it = actor_end;   // stranded above a gap; nothing here can ever compact on its own
+                    continue;
+                }
+                mit = cc.emplace(actor, 1).first;
+                it = dc.erase(it);
+            } else {
+                // Prune every dominated dot (k <= cc[actor]) in a single range erase.
+                it = dc.erase(dc.lower_bound({actor, kMinCounter}), dc.upper_bound({actor, mit->second}));
             }
-        } while (flag == true);
+
+            // Absorb the contiguous run starting at cc[actor]+1.
+            while (it != actor_end && it->second == mit->second + 1) {
+                ++(mit->second);
+                it = dc.erase(it);
+            }
+            it = actor_end;   // anything still here for this actor sits above a gap
+        }
     }
 
     std::pair<key_type, int> makedot(const key_type &id) {
