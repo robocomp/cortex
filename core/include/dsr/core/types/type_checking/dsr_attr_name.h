@@ -839,6 +839,28 @@ REGISTER_TYPE(rig_n_slots,              int,                                    
 REGISTER_TYPE(rig_logodds,              float,                                            false)  // ring vs independent-objects log-Bayes factor
 REGISTER_TYPE(rig_shape_round_logodds,  float,                                            false)  // → table round-vs-square prior (Phase 2)
 
+// ── OBJECT SIZE UNCERTAINTY ─ registered 2026-08-10 ──────────────────────────────────────────────
+// The missing half of what a concept agent publishes about its instance. Every agent already writes
+// width_m/depth_m/height_m, and an rt_covariance for the POSE — but nothing at all for the SIZE. So a
+// consumer had no way to tell a 2.2 m well-observed run from a 0.4 m glimpse, and had to treat every
+// producer's dimensions as equally certain.
+//
+// [var_width, var_depth, var_height], m² — the diagonal of the producer's own posterior over the
+// three attributes of the SAME name on that node. Cross-terms are deliberately omitted: no current
+// consumer uses them, and a covariance we do not populate is worse than one we do not claim.
+//
+// ★Why it matters concretely (kitchen_metaconcept, 2026-08-10): fitting a kitchen's shared worktop
+// plane, two runs of the SAME kitchen reported tops 14 cm apart. With no per-member variance the fit
+// had to weight them by RUN LENGTH as a proxy for fit quality — and length is a poor proxy, since a
+// long run can still be badly fitted. The consensus plane was consequently dragged ~5 cm below the
+// majority by one bad member. Publishing this fixes the weighting, lets an outlier be recognised as
+// one, and supplies the own-precision term a level-2 agent needs to DOWN-DATE its own message before
+// reading a member's reply (the self-confirmation guard — SCHEMA_GENERALITY_TODO.md §2.5).
+//
+// Producers must publish the BELIEF's own marginal variances, never a constant. Absent ⇒ the consumer
+// falls back to its own (wide) assumption, so this is backward compatible.
+REGISTER_TYPE(object_size_variance,     std::reference_wrapper<const std::vector<float>>,  false)
+
 // ── node PROVENANCE: when was this node born? ─ registered 2026-08-06 ────────────────────────────
 // Every node an active_inference agent inserts is stamped at creation with BOTH forms, by
 // common/graph_provenance/creation_stamp.h (rc::provenance::stamp_creation), called immediately
