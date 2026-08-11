@@ -839,6 +839,32 @@ REGISTER_TYPE(rig_n_slots,              int,                                    
 REGISTER_TYPE(rig_logodds,              float,                                            false)  // ring vs independent-objects log-Bayes factor
 REGISTER_TYPE(rig_shape_round_logodds,  float,                                            false)  // → table round-vs-square prior (Phase 2)
 
+// ── ARRANGEMENT END PRIORS ─ registered 2026-08-11 ───────────────────────────────────────────────
+// Where a member's two ENDS should be, so that a chain of members forms one continuous shape with no
+// gap and no overlap at the joints. Room-frame target points; the member projects each onto its own
+// chart, which keeps the message free of any assumption about the member's internal parameterisation.
+//
+// ★Why the ENDS and not the sizes. A run of kitchen carcasses presents one continuous front surface —
+// where one cabinet ends and the next begins has no gap, no edge and no depth step, so the seams are
+// not faint in the sensor data, they are ABSENT. That split cannot be recovered from a single member
+// at any quality of sensing; only something seeing the whole arrangement can supply it. And the ends
+// are exactly where a member has no opinion of its own: cabinet_concept declares t0/t1 FREE, with no
+// prior at all, while depth is already over-determined by mask data (a standing depth prior was
+// measured to be worth 1.3% against it). So this channel speaks where nothing else is speaking —
+// and it corrects the sizes as a side effect, since moving an end hands a neighbour's points back to
+// the neighbour and the fit follows.
+//
+// info is 1/σ² in m⁻². 0 (or absent) ⇒ inert, and the consumer ignores that end. Scaled by the
+// arrangement's own existence probability, so a frame that is unsure pushes softly.
+// ★The producer must DOWN-DATE its outstanding message before reading a member's reply, or the pair
+// will converge on the frame's own echo (FACTORIZATION_ANCHORS.tex §5.1-5.2).
+REGISTER_TYPE(rig_end_lo_x,             float,                                            false)
+REGISTER_TYPE(rig_end_lo_y,             float,                                            false)
+REGISTER_TYPE(rig_end_lo_info,          float,                                            false)
+REGISTER_TYPE(rig_end_hi_x,             float,                                            false)
+REGISTER_TYPE(rig_end_hi_y,             float,                                            false)
+REGISTER_TYPE(rig_end_hi_info,          float,                                            false)
+
 // ── OBJECT SIZE UNCERTAINTY ─ registered 2026-08-10 ──────────────────────────────────────────────
 // The missing half of what a concept agent publishes about its instance. Every agent already writes
 // width_m/depth_m/height_m, and an rt_covariance for the POSE — but nothing at all for the SIZE. So a
