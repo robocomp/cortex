@@ -594,10 +594,16 @@ REGISTER_TYPE(grid_occupancy_var,  std::reference_wrapper<const std::vector<floa
 REGISTER_TYPE(grid_field_meta,     std::reference_wrapper<const std::vector<float>>, false)  // [xmin,ymin,cell,w,h]
 
 
-// ── table-concept VOXEL MEMORY + active-perception ROI channel (written by table_concept) ──────
+// ── REMOVED 2026-08-14: the four *_voxel_bank_pts registrations (table_/chair_/door_/cabinet_).
+//    They were never voxels — the points are the 3-D support of a segmentation mask, split by the
+//    owning model's own SDF. Six agents wrote up to 4000 points x 3 floats per object per publish into
+//    the CRDT graph and NOTHING in the whole components tree read them (audited 2026-08-14). The
+//    accumulated bank stays, in-process, where the round-vs-square shape decision reads it.
+
+// ── table-concept active-perception ROI channel (written by table_concept) ─────────────────────
 //    Registered 2026-07-21 so table_scene_graph.cpp can use the TYPE-ATTRIBUTED setters instead of the
-//    runtime_checked_* string form (see CLAUDE.md). table_voxel_bank_pts / table_roi_offset are [x,y,z]-
-//    and [ox,oy]-packed float arrays; the ROI + detection scalars drive the controller's lock-on search
+//    runtime_checked_* string form (see CLAUDE.md). table_roi_offset is an [ox,oy]-packed float
+//    array; the ROI + detection scalars drive the controller's lock-on search
 //    via common/affordance_protocol (its attr_scalar() coerces int/float/bool alike).
 //    WIRE-TYPE WARNING for whoever edits these next: an attribute's registered type is part of its CONTRACT
 //    with every consumer. table_detection_alive was int 0/1 until 2026-07-21; flipping it to bool without
@@ -605,7 +611,6 @@ REGISTER_TYPE(grid_field_meta,     std::reference_wrapper<const std::vector<floa
 //    because it read the raw attrs map with Attribute::dec(). Both readers now use the TYPE-ATTRIBUTED
 //    getter (get_attrib_by_name<table_detection_alive_att>), so a future type change is a COMPILE error
 //    there instead of a runtime throw. Never change a registered type without migrating every reader.
-REGISTER_TYPE(table_voxel_bank_pts,         std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]×N
 REGISTER_TYPE(table_roi_offset,             std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy] ∈[-1,1]
 REGISTER_TYPE(table_roi_fill,               float,                                            false)  // projected extent frac
 REGISTER_TYPE(table_roi_valid,              bool,                                             false)  // projects in front of cam
@@ -642,21 +647,18 @@ REGISTER_TYPE(mesh_color_rgb,                std::vector<float>,                
 //    These agents are copies of the table_concept pattern and carry the identical interface, so they get
 //    the identical types. Readers are common/affordance_protocol (attr_scalar coerces int/float/bool), and
 //    no consumer reads them with a raw Attribute accessor — verified 2026-07-21 before choosing bool.
-REGISTER_TYPE(chair_voxel_bank_pts,           std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]xN
 REGISTER_TYPE(chair_roi_offset,               std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
 REGISTER_TYPE(chair_roi_fill,                 float,                                            false)
 REGISTER_TYPE(chair_roi_valid,                bool,                                             false)
 REGISTER_TYPE(chair_detection_alive,          bool,                                             false)
 REGISTER_TYPE(chair_detection_confidence,     float,                                            false)
 REGISTER_TYPE(chair_frames_since_detection,   int,                                              false)
-REGISTER_TYPE(door_voxel_bank_pts,            std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]xN
 REGISTER_TYPE(door_roi_offset,                std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
 REGISTER_TYPE(door_roi_fill,                  float,                                            false)
 REGISTER_TYPE(door_roi_valid,                 bool,                                             false)
 REGISTER_TYPE(door_detection_alive,           bool,                                             false)
 REGISTER_TYPE(door_detection_confidence,      float,                                            false)
 REGISTER_TYPE(door_frames_since_detection,    int,                                              false)
-REGISTER_TYPE(cabinet_voxel_bank_pts,         std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]xN
 REGISTER_TYPE(cabinet_roi_offset,             std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
 REGISTER_TYPE(cabinet_roi_fill,               float,                                            false)
 REGISTER_TYPE(cabinet_roi_valid,              bool,                                             false)
