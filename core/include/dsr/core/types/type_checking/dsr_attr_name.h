@@ -577,7 +577,9 @@ REGISTER_TYPE(residual_pts,        std::reference_wrapper<const std::vector<floa
 REGISTER_TYPE(residual_mass,       int,                                               false)
 REGISTER_TYPE(explanation_ratio,   float,                                             false)
 REGISTER_TYPE(last_sensing_frame,  int,                                               false)
-REGISTER_TYPE(rfe_pts,             std::reference_wrapper<const std::vector<float>>, false)
+// REMOVED 2026-08-14: rfe_pts. bottle_concept's copy of the *_voxel_bank_pts dead write — the accumulated
+//   mask-support bank, up to 4000 points x 3 floats per publish, with no reader anywhere in the tree and
+//   (unlike its five siblings) no gate either. Writer removed in active_inference.
 
 // ── residual_concept occupancy-GRID costmap (written by residual_concept on the `grid` node; occupied +
 //    inflated-border cell centres for display; encoded obstacle hulls for the controller's planner) ──────
