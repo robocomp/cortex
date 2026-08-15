@@ -276,7 +276,14 @@ REGISTER_TYPE(viriato_head_pan_tilt_nose_speed_ref, std::reference_wrapper<const
 REGISTER_TYPE(robot_current_advance_speed, float, true) // robot frame m/s
 REGISTER_TYPE(robot_current_angular_speed, float, true)     // robot frame rad/s
 REGISTER_TYPE(robot_current_side_speed, float, true)    // robot frame m/s
-REGISTER_TYPE(robot_current_speed_timestamp, uint64_t, true)
+REGISTER_TYPE(robot_current_speed_timestamp, uint64_t, true)  // wall clock, epoch ms
+// Simulation clock, ms since world load, for the sample robot_current_*_speed came from; 0 when
+// robot_current_speed_simulated is false. A simulator's velocities are per SIMULATION second, so
+// anything integrating them (a high-rate propagation between optimized poses, say) must integrate
+// over THIS clock or it over-counts by the sim/wall ratio. The wall stamp above stays authoritative
+// for latency and staleness, in simulation too.
+REGISTER_TYPE(robot_current_speed_sim_timestamp, uint64_t, true)
+REGISTER_TYPE(robot_current_speed_simulated, bool, true)
 REGISTER_TYPE(robot_local_linear_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_local_angular_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_ref_adv_speed, float, true) // robot frame m/s
@@ -440,7 +447,13 @@ REGISTER_TYPE(imu_id, int, false)
 REGISTER_TYPE(imu_accelerometer, std::reference_wrapper<const std::vector<float>>, false)
 REGISTER_TYPE(imu_gyroscope, std::reference_wrapper<const std::vector<float>>, false)
 REGISTER_TYPE(imu_compass, float, false)
-REGISTER_TYPE(imu_time_stamp, uint64_t, false)
+REGISTER_TYPE(imu_time_stamp, uint64_t, false)                // wall clock, epoch ms
+// Simulation clock, ms since world load, for the sample the imu_* attributes above came from; 0 when
+// imu_simulated is false. A simulated gyro reports rad per SIMULATION second, so a consumer
+// integrating it must integrate over THIS clock or it over-counts by however far the sim is running
+// behind real time. imu_time_stamp stays authoritative for latency and staleness.
+REGISTER_TYPE(imu_sim_time_stamp, uint64_t, false)
+REGISTER_TYPE(imu_simulated, bool, false)
 REGISTER_TYPE(imu_sensor_tick, uint64_t, false)
 
 REGISTER_TYPE(imu_linear_pose, std::reference_wrapper<const std::vector<float>>, false)
