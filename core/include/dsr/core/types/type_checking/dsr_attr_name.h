@@ -143,15 +143,6 @@ REGISTER_TYPE(rt_covariance_acceleration, std::reference_wrapper<const std::vect
 REGISTER_TYPE(rt_head_index, int, false)
 
 /*
- * Legacy names kept for backward compatibility.
- */
-REGISTER_TYPE(rt_se2_covariance, std::reference_wrapper<const std::vector<float>>, true)
-REGISTER_TYPE(rt_se2_covariance_velocity, std::reference_wrapper<const std::vector<float>>, true)
-REGISTER_TYPE(rt_se2_covariance_acceleration, std::reference_wrapper<const std::vector<float>>, true)
-
-
-
-/*
  * looking-at
  * */
 REGISTER_TYPE(looking_at_rotation_euler_xyz, std::reference_wrapper<const std::vector<float>>, true)

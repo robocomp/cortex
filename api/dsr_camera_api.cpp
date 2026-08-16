@@ -169,6 +169,30 @@ Eigen::Vector3d CameraAPI::ray_from_pixel(double u, double v) const
     return Eigen::Vector3d(x, 1.0, z).normalized();
 }
 
+Eigen::Vector3d CameraAPI::get_ray(const Eigen::Vector3d & p) const
+{
+    // DECLARED IN THE HEADER SINCE FOREVER, NEVER DEFINED — any caller failed at LINK time with an
+    // undefined reference to CameraAPI::get_ray, which reads as a build-system problem rather than a
+    // missing implementation. Both entry points delegate to ray_from_pixel() instead of repeating the
+    // maths: that is the only place which dispatches on the projection model (Equirectangular uses
+    // asin for elevation, Cylindrical uses tan, Pinhole is a third case), so a second copy would
+    // drift and be silently wrong on whichever model its author did not have in mind.
+    //
+    // `p` is an image/sample coordinate (u, v, ·); the third component is IGNORED. Use
+    // get_ray_homogeneous() when it carries a homogeneous scale.
+    return ray_from_pixel(p.x(), p.y());
+}
+
+Eigen::Vector3d CameraAPI::get_ray_homogeneous( const Eigen::Vector3d & p) const
+{
+    // Homogeneous image coordinate (u·w, v·w, w) → (u, v). A zero or degenerate w cannot be divided
+    // through; treat the input as already affine rather than handing back a NaN ray.
+    const double w = p.z();
+    if( std::abs(w) < 1e-12 )
+        return ray_from_pixel(p.x(), p.y());
+    return ray_from_pixel(p.x() / w, p.y() / w);
+}
+
 std::vector<Eigen::Vector3d> CameraAPI::get_xyz_from_rgbd_points(const std::vector<Eigen::Vector3d> &rgbd_points) const
 {
     std::vector<Eigen::Vector3d> xyz_points;

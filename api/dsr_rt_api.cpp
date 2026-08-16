@@ -234,9 +234,15 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
     }
 }
 
-std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query)
+std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query, CovarianceKind kind)
 {
-    auto covariance_o = G->get_attrib_by_name<rt_covariance_att>(edge);
+    std::optional<std::reference_wrapper<const std::vector<float>>> covariance_o;
+    switch (kind)
+    {
+        case CovarianceKind::Pose:         covariance_o = G->get_attrib_by_name<rt_covariance_att>(edge); break;
+        case CovarianceKind::Velocity:     covariance_o = G->get_attrib_by_name<rt_covariance_velocity_att>(edge); break;
+        case CovarianceKind::Acceleration: covariance_o = G->get_attrib_by_name<rt_covariance_acceleration_att>(edge); break;
+    }
     auto head_o = G->get_attrib_by_name<rt_head_index_att>(edge);
     auto tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(edge);
 
@@ -350,18 +356,105 @@ std::optional<Eigen::Vector3d> RT_API::get_translation(uint64_t node_id, uint64_
         return {};
 }
 
-std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(const Node &n, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
+std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(const Node &n, uint64_t to, std::uint64_t timestamp, TimeQuery time_query, CovarianceKind kind)
 {
     if (auto edge = get_edge_RT(n, to); edge.has_value())
-        return get_edge_RT_covariance(edge.value(), timestamp, time_query);
+        return get_edge_RT_covariance(edge.value(), timestamp, time_query, kind);
     return {};
 }
 
-std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(uint64_t node_id, uint64_t to, std::uint64_t timestamp, TimeQuery time_query)
+std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_covariance_matrix(uint64_t node_id, uint64_t to, std::uint64_t timestamp, TimeQuery time_query, CovarianceKind kind)
 {
     if (const auto node = G->get_node(node_id); node.has_value())
-        return get_covariance_matrix(node.value(), to, timestamp, time_query);
+        return get_covariance_matrix(node.value(), to, timestamp, time_query, kind);
     return {};
+}
+
+bool RT_API::insert_or_assign_edge_RT_covariance(const Node &n, uint64_t to, CovarianceKind kind,
+                                                 const std::vector<float> &covariance, std::optional<uint64_t> timestamp)
+{
+    CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT_covariance");
+    if (covariance.size() != RT_COVARIANCE_BLOCK_SIZE)
+        throw std::runtime_error("RT covariance must contain exactly 36 float values");
+
+    auto edge_o = G->get_edge(n.id(), to, "RT");
+    if (not edge_o.has_value())
+    {
+        qWarning() << __FUNCTION__ << "NO RT edge found from node" << QString::fromStdString(n.name()) << "to:" << to;
+        return false;
+    }
+    auto edge = std::move(edge_o.value());
+
+    std::optional<std::vector<float>> pack_o;
+    switch (kind)
+    {
+        case CovarianceKind::Pose:         pack_o = G->get_attrib_by_name<rt_covariance_att>(edge); break;
+        case CovarianceKind::Velocity:     pack_o = G->get_attrib_by_name<rt_covariance_velocity_att>(edge); break;
+        case CovarianceKind::Acceleration: pack_o = G->get_attrib_by_name<rt_covariance_acceleration_att>(edge); break;
+    }
+
+    const auto head_o = G->get_attrib_by_name<rt_head_index_att>(edge);
+    std::vector<float> pack;
+    if (HISTORY_SIZE > 0 and head_o.has_value())
+    {
+        // The edge keeps a history ring: land the block on the slot the pose payload is using,
+        // so a later timestamped read pairs this covariance with the transform it belongs to.
+        pack = pack_o.value_or(std::vector<float>(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE, 0.f));
+        if (pack.size() < RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE)
+            pack.resize(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE);
+
+        auto slot = latest_slot_from_head(static_cast<std::size_t>(head_o.value()), HISTORY_SIZE);
+        if (timestamp.has_value())
+        {
+            if (const auto tstamps_o = G->get_attrib_by_name<rt_timestamps_att>(edge); tstamps_o.has_value())
+            {
+                const auto &tstamps = tstamps_o.value().get();
+                const auto blocks = valid_blocks(tstamps, std::min<std::size_t>(tstamps.size(), HISTORY_SIZE));
+                if (const auto block_index = nearest_block_index(blocks, timestamp.value()); block_index.has_value())
+                    slot = block_index.value();
+            }
+        }
+        std::copy(covariance.begin(), covariance.end(), pack.begin() + slot * RT_COVARIANCE_BLOCK_SIZE);
+    }
+    else
+        pack = covariance;   // no history on this edge: a single flat 6x6 block
+
+    switch (kind)
+    {
+        case CovarianceKind::Pose:         G->add_or_modify_attrib_local<rt_covariance_att>(edge, std::move(pack)); break;
+        case CovarianceKind::Velocity:     G->add_or_modify_attrib_local<rt_covariance_velocity_att>(edge, std::move(pack)); break;
+        case CovarianceKind::Acceleration: G->add_or_modify_attrib_local<rt_covariance_acceleration_att>(edge, std::move(pack)); break;
+    }
+
+    return G->insert_or_assign_edge(std::move(edge));
+}
+
+bool RT_API::insert_or_assign_edge_RT_covariance(const Node &n, uint64_t to, CovarianceKind kind,
+                                                 const Eigen::Matrix<double, 6, 6> &covariance, std::optional<uint64_t> timestamp)
+{
+    std::vector<float> packed(RT_COVARIANCE_BLOCK_SIZE);
+    for (std::size_t row = 0; row < 6; ++row)
+        for (std::size_t col = 0; col < 6; ++col)
+            packed[row * 6 + col] = static_cast<float>(covariance(static_cast<Eigen::Index>(row), static_cast<Eigen::Index>(col)));
+    return insert_or_assign_edge_RT_covariance(n, to, kind, packed, timestamp);
+}
+
+bool RT_API::insert_or_assign_edge_RT_covariance(uint64_t node_id, uint64_t to, CovarianceKind kind,
+                                                 const std::vector<float> &covariance, std::optional<uint64_t> timestamp)
+{
+    if (const auto node = G->get_node(node_id); node.has_value())
+        return insert_or_assign_edge_RT_covariance(node.value(), to, kind, covariance, timestamp);
+    qWarning() << __FUNCTION__ << "NO node found with id" << node_id;
+    return false;
+}
+
+bool RT_API::insert_or_assign_edge_RT_covariance(uint64_t node_id, uint64_t to, CovarianceKind kind,
+                                                 const Eigen::Matrix<double, 6, 6> &covariance, std::optional<uint64_t> timestamp)
+{
+    if (const auto node = G->get_node(node_id); node.has_value())
+        return insert_or_assign_edge_RT_covariance(node.value(), to, kind, covariance, timestamp);
+    qWarning() << __FUNCTION__ << "NO node found with id" << node_id;
+    return false;
 }
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler, std::optional<uint64_t> timestamp)

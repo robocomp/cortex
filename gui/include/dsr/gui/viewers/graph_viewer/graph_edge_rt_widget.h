@@ -32,6 +32,7 @@ public:
         connect(graph.get(), &DSR::DSRGraph::update_edge_attr_signal, this, &GraphEdgeRTWidget::add_or_assign_edge_attr_slot, Qt::QueuedConnection);
         //Inner Api
         inner_eigen = graph->get_inner_eigen_api();
+        rt = graph->get_rt_api();
 
         std::optional<DSR::Node> from_node = graph->get_node(from);
         std::optional<DSR::Node> to_node = graph->get_node(to);
@@ -238,10 +239,16 @@ public slots:
                     std::optional<const std::vector<float>>translation_vel = graph->get_attrib_by_name<rt_translation_velocity_att>(edge.value());
                     std::optional<const std::vector<float>>rotation_acc = graph->get_attrib_by_name<rt_rotation_euler_xyz_acceleration_att>(edge.value());
                     std::optional<const std::vector<float>>translation_acc = graph->get_attrib_by_name<rt_translation_acceleration_att>(edge.value());
-                    std::optional<const std::vector<float>>se2_covariance = graph->get_attrib_by_name<rt_covariance_att>(edge.value());
-                    std::optional<const std::vector<float>>se2_covariance_velocity = graph->get_attrib_by_name<rt_se2_covariance_velocity_att>(edge.value());
-                    std::optional<const std::vector<float>>se2_covariance_acceleration = graph->get_attrib_by_name<rt_se2_covariance_acceleration_att>(edge.value());
-                    
+                    // Read through RT_API so the history ring is decoded (the raw attribute may hold
+                    // HISTORY_SIZE stacked 6x6 blocks, of which only the head slot is current).
+                    auto covariance = rt->get_edge_RT_covariance(edge.value(), 0, DSR::RT_API::TimeQuery::Nearest,
+                                                                 DSR::RT_API::CovarianceKind::Pose);
+                    auto covariance_velocity = rt->get_edge_RT_covariance(edge.value(), 0, DSR::RT_API::TimeQuery::Nearest,
+                                                                          DSR::RT_API::CovarianceKind::Velocity);
+                    auto covariance_acceleration = rt->get_edge_RT_covariance(edge.value(), 0, DSR::RT_API::TimeQuery::Nearest,
+                                                                              DSR::RT_API::CovarianceKind::Acceleration);
+
+
                     if(translation_vel.has_value())
                         for(int pos = 0;pos < 3;pos++)
                             this->ui.tableWidget_Robot->item(4, pos)->setText(QString::number(translation_vel.value()[pos], 'g', precision)); //Lineal Vel
@@ -258,20 +265,20 @@ public slots:
                         for(int pos = 0;pos < 3;pos++)
                             this->ui.tableWidget_Robot->item(7, pos)->setText(QString::number(rotation_acc.value()[pos], 'g', precision)); //Rot ACC
 
-                    if (se2_covariance.has_value())
+                    if (covariance.has_value())
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
-                                this->ui.tableWidget_covariance_pose_matrix->item(posy, posx)->setText(QString::number(se2_covariance.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
+                                this->ui.tableWidget_covariance_pose_matrix->item(posy, posx)->setText(QString::number(covariance.value()(posy, posx), 'g', precision)); //Covariance Matrix
 
-                    if (se2_covariance_velocity.has_value())
+                    if (covariance_velocity.has_value())
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
-                                this->ui.tableWidget_covariance_velocity_matrix->item(posy, posx)->setText(QString::number(se2_covariance_velocity.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
+                                this->ui.tableWidget_covariance_velocity_matrix->item(posy, posx)->setText(QString::number(covariance_velocity.value()(posy, posx), 'g', precision)); //Covariance Matrix
 
-                    if (se2_covariance_acceleration.has_value())
+                    if (covariance_acceleration.has_value())
                         for(int posx = 0; posx < 6; posx++)
                             for(int posy = 0; posy < 6; posy++)
-                                this->ui.tableWidget_covariance_acceleration_matrix->item(posy, posx)->setText(QString::number(se2_covariance_acceleration.value()[posy*6 + posx], 'g', precision)); //Covariance Matrix
+                                this->ui.tableWidget_covariance_acceleration_matrix->item(posy, posx)->setText(QString::number(covariance_acceleration.value()(posy, posx), 'g', precision)); //Covariance Matrix
                 }
                 else 
                     std::cerr<<__FUNCTION__<<" Error retriving RT data"<<std::endl;
@@ -318,6 +325,7 @@ public slots:
 private:
     std::shared_ptr<DSR::DSRGraph> graph;
     std::shared_ptr<DSR::InnerEigenAPI> inner_eigen;
+    std::shared_ptr<DSR::RT_API> rt;
     uint64_t from, to;
     std::string edge_type;
     std::string from_string;

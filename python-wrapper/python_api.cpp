@@ -733,6 +733,10 @@ PYBIND11_MODULE(pydsr, m) {
         py::enum_<RT_API::TimeQuery>(rt_api, "time_query")
             .value("nearest", RT_API::TimeQuery::Nearest)
             .value("interpolated", RT_API::TimeQuery::Interpolated);
+        py::enum_<RT_API::CovarianceKind>(rt_api, "covariance_kind")
+            .value("pose", RT_API::CovarianceKind::Pose)
+            .value("velocity", RT_API::CovarianceKind::Velocity)
+            .value("acceleration", RT_API::CovarianceKind::Acceleration);
 
         rt_api
             .def(py::init([](DSRGraph &g) -> std::unique_ptr<RT_API> {
@@ -773,7 +777,24 @@ PYBIND11_MODULE(pydsr, m) {
             .def("get_translation", [](RT_API &self, std::uint64_t node_id, std::uint64_t to, std::uint64_t timestamp, RT_API::TimeQuery time_query)
             {
                 return self.get_translation(node_id, to, timestamp, time_query);
-            }, "node_id"_a, "to"_a, "timestamp"_a=0, "time_query"_a=RT_API::TimeQuery::Nearest);
+            }, "node_id"_a, "to"_a, "timestamp"_a=0, "time_query"_a=RT_API::TimeQuery::Nearest)
+            // Covariance is stored as a 6x6 row-major SE(3) block over [x,y,z,rx,ry,rz], possibly
+            // inside a history ring — read it through here rather than reshaping the raw attribute,
+            // which would hand back HISTORY_SIZE stacked blocks.
+            .def("get_covariance_matrix", [](RT_API &self, std::uint64_t node_id, std::uint64_t to,
+                                             std::uint64_t timestamp, RT_API::TimeQuery time_query,
+                                             RT_API::CovarianceKind kind)
+            {
+                return self.get_covariance_matrix(node_id, to, timestamp, time_query, kind);
+            }, "node_id"_a, "to"_a, "timestamp"_a=0, "time_query"_a=RT_API::TimeQuery::Nearest,
+               "kind"_a=RT_API::CovarianceKind::Pose)
+            .def("insert_or_assign_edge_RT_covariance", [](RT_API &self, std::uint64_t node_id, std::uint64_t to,
+                                                           RT_API::CovarianceKind kind,
+                                                           const std::vector<float> &covariance,
+                                                           std::optional<uint64_t> timestamp)
+            {
+                return self.insert_or_assign_edge_RT_covariance(node_id, to, kind, covariance, timestamp);
+            }, "node_id"_a, "to"_a, "kind"_a, "covariance"_a, "timestamp"_a=std::nullopt);
 
     py::class_<InnerEigenAPI>(m, "inner_api")
             .def(py::init([](DSRGraph &g) -> std::unique_ptr<InnerEigenAPI> {

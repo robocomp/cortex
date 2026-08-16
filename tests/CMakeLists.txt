@@ -32,6 +32,7 @@ add_executable(tests test.cpp
                      graph/convenience_operations.cpp
                      graph/inner_gaussian.cpp
                      graph/rt_timestamp.cpp
+                     graph/rt_covariance.cpp
                      crdt/crdt_operations.cpp
                      synchronization/graph_synchronization.cpp
                      synchronization/type_translation.cpp
