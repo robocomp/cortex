@@ -472,37 +472,105 @@ These methods provide specialized access to RT edges.
 The api has to be instantiated with: `auto rt = G->get_rt_api()`;
 
 &nbsp;
-```c++
-void insert_or_assign_edge_RT(Node& n, int to, const std::vector<float>& trans, const std::vector<float>& rot_euler);
-```
- - Inserts or replaces an edge of type RT going from node n to node with id to. The translation vector is passed as a vector of floats. The three euler angles are passed as a vector of floats.
+
+#### Timestamped history
+
+An RT edge does not store one pose: it stores a **ring buffer** of `HISTORY_SIZE` blocks, tracked by
+the `rt_timestamps` and `rt_head_index` attributes. `rt_translation` and `rt_rotation_euler_xyz` are
+therefore `3 * HISTORY_SIZE` floats, and `rt_covariance` is `36 * HISTORY_SIZE`.
+
+**Never index the raw attribute.** Reading `rt_translation[0..2]` returns slot 0 — wherever the ring
+last wrapped to — which can be up to `HISTORY_SIZE` publishes stale. Always go through the getters
+below; they resolve the head slot, and every one of them takes an optional `timestamp` plus a
+`TimeQuery` (`Nearest` or `Interpolated`) to address a specific instant instead.
 
 &nbsp;
 ```c++
-void insert_or_assign_edge_RT(Node& n, int to, std::vector<float>&& trans, std::vector<float>&& rot_euler);
+void insert_or_assign_edge_RT(Node& n, uint64_t to, const std::vector<float>& trans, const std::vector<float>& rot_euler,
+                              std::optional<uint64_t> timestamp = std::nullopt);
+```
+ - Inserts or replaces an edge of type RT going from node n to node with id to. The translation vector is passed as a vector of floats. The three euler angles are passed as a vector of floats. Advances the history ring, stamping the new block with `timestamp` (wall clock now if omitted).
+
+&nbsp;
+```c++
+void insert_or_assign_edge_RT(Node& n, uint64_t to, std::vector<float>&& trans, std::vector<float>&& rot_euler,
+                              std::optional<uint64_t> timestamp = std::nullopt);
 ```
 
 &nbsp;
 #### Overloaded method using move semantics.
+
+&nbsp;
 ```c++
-Edge get_edge_RT(const Node &n, int to);
+void insert_or_assign_edge_RT(Node& n, uint64_t to, const std::vector<float>& trans, const std::vector<float>& rot_euler,
+                              const std::vector<float>& covariance, std::optional<uint64_t> timestamp = std::nullopt);
+```
+- Same as above, additionally storing the pose covariance in the block being written, so pose and uncertainty stay index-aligned. `covariance` must be exactly 36 floats (throws otherwise). A move-semantics overload also exists.
+
+&nbsp;
+```c++
+Edge get_edge_RT(const Node &n, uint64_t to, const std::string &edge_type = "RT");
 ```
 - Returns an edge of type RT going from node n to node with id to
+
+&nbsp;
 ```c++
-RTMat get_edge_RT_as_RTMat(const Edge &edge);
+std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0,
+                                               TimeQuery time_query = TimeQuery::Nearest);
 ```
-- Returns the rotation and translation attributes of edge converted to an RTMat.
+- Returns the rotation and translation attributes of edge converted to an RTMat, taken from the head block (or the block selected by `timestamp`). Both come from the *same* block, so they can never disagree — prefer this over reading the two attributes separately.
+
+&nbsp;
+```c++
+std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0,
+                                               TimeQuery time_query = TimeQuery::Nearest);
+std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0,
+                                               TimeQuery time_query = TimeQuery::Nearest);
+```
+- Returns just the translation of the RT edge from n to to.
 
 &nbsp;
 
-  
-```c++
-RTMat get_edge_RT_as_RTMat(Edge &&edge);
-```
-- Overloaded method with move semantics.
+#### Covariance
+
+RT edges carry up to three 6x6 covariance blocks, selected by `CovarianceKind`:
+
+| `CovarianceKind` | attribute |
+|---|---|
+| `Pose` | `rt_covariance` |
+| `Velocity` | `rt_covariance_velocity` |
+| `Acceleration` | `rt_covariance_acceleration` |
+
+Each is **36 floats, row-major, over `[x, y, z, rx, ry, rz]`**. An agent that reasons in SE(2) over
+`[x, y, theta]` embeds its 3x3 matrix at indices `x->0, y->1, theta->rz->5`, leaving z/roll/pitch
+zero — so the yaw variance lands at flat index `[35]`.
 
 &nbsp;
-  
+```c++
+std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0,
+                                                                  TimeQuery time_query = TimeQuery::Nearest,
+                                                                  CovarianceKind kind = CovarianceKind::Pose);
+std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(const Node &n, uint64_t to, std::uint64_t timestamp = 0,
+                                                                 TimeQuery time_query = TimeQuery::Nearest,
+                                                                 CovarianceKind kind = CovarianceKind::Pose);
+std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0,
+                                                                 TimeQuery time_query = TimeQuery::Nearest,
+                                                                 CovarianceKind kind = CovarianceKind::Pose);
+```
+- Return the requested covariance block, decoding the history ring. `kind` is last so existing pose-only call sites keep compiling.
+
+&nbsp;
+```c++
+bool insert_or_assign_edge_RT_covariance(const Node &n, uint64_t to, CovarianceKind kind,
+                                         const Eigen::Matrix<double, 6, 6> &covariance,
+                                         std::optional<uint64_t> timestamp = std::nullopt);
+```
+- Writes one covariance block on an **existing** RT edge without touching the pose payload. Use it when the covariance is produced separately from the transform — velocity/acceleration uncertainty, or a pose covariance refined after the fact — instead of writing the attribute raw.
+- Overloads accept a flat `std::vector<float>` of 36 (throws otherwise) and a `uint64_t node_id` in place of the node.
+- On an edge with a history ring the block lands on the slot of the most recent pose, or on the slot nearest `timestamp` when one is given; `rt_head_index` and `rt_timestamps` are left untouched, so it cannot desync the ring. Returns `false` if the RT edge does not exist (it never creates one).
+- If you are already batching several attribute writes into one `get_edge`/`insert_or_assign_edge` round trip on a hot path, writing the attribute directly avoids a second edge publish per cycle.
+
+&nbsp;
 
 ### IO sub-API
 

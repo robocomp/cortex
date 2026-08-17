@@ -632,6 +632,73 @@ Get the translation vector.
 **Returns:**
 - 3D vector or None
 
+#### get_covariance_matrix
+
+```python
+rt.get_covariance_matrix(node_id, to, timestamp=0,
+                         time_query=rt_api.time_query.nearest,
+                         kind=rt_api.covariance_kind.pose)
+```
+
+Get one of the RT edge's covariance blocks, decoding the history ring.
+
+**Parameters:**
+- `node_id`: uint64_t - Origin node ID
+- `to`: uint64_t - Destination node ID
+- `timestamp`: uint64_t - Timestamp (optional, default=0 → most recent block)
+- `time_query`: rt_api.time_query - `nearest` or `interpolated` (optional)
+- `kind`: rt_api.covariance_kind - `pose`, `velocity` or `acceleration` (optional, default=`pose`)
+
+**Returns:**
+- 6x6 numpy array or None
+
+#### insert_or_assign_edge_RT_covariance
+
+```python
+rt.insert_or_assign_edge_RT_covariance(node_id, to, kind, covariance, timestamp=None)
+```
+
+Write one covariance block on an **existing** RT edge, without touching the pose payload. On an
+edge with a history ring the block lands on the slot of the most recent pose (or the slot nearest
+`timestamp`); `rt_head_index` and `rt_timestamps` are left alone.
+
+**Parameters:**
+- `node_id`: uint64_t - Origin node ID
+- `to`: uint64_t - Destination node ID
+- `kind`: rt_api.covariance_kind - `pose`, `velocity` or `acceleration`
+- `covariance`: List[float] - exactly 36 floats, row-major 6x6 over `[x, y, z, rx, ry, rz]` (raises otherwise)
+- `timestamp`: uint64_t - Timestamp (optional)
+
+**Returns:**
+- bool - False if the RT edge does not exist (it is never created)
+
+### A note on the history ring
+
+`rt_translation`, `rt_rotation_euler_xyz` and `rt_covariance` are **ring buffers** of
+`HISTORY_SIZE` blocks, not single values. Indexing the raw attribute —
+`edge.attrs["rt_translation"].value[0:3]` — reads slot 0, wherever the ring last wrapped to, which
+can be several publishes stale. Use `get_edge_RT_as_rtmat`, `get_translation` or
+`get_covariance_matrix`, which resolve the head slot.
+
+An SE(2) agent working in `[x, y, theta]` embeds its 3x3 covariance into the 6x6 block at
+`x->0, y->1, theta->rz->5` (yaw variance at flat index `[35]`), leaving z/roll/pitch zero:
+
+```python
+import numpy as np
+
+idx = np.array([0, 1, 5])
+
+def se2_to_se3(sigma):                       # 3x3 -> flat 36
+    flat = [0.0] * 36
+    for i, row in enumerate(idx):
+        for j, col in enumerate(idx):
+            flat[row * 6 + col] = float(sigma[i, j])
+    return flat
+
+def se3_to_se2(cov6):                        # 6x6 -> 3x3
+    return np.asarray(cov6)[np.ix_(idx, idx)]
+```
+
 ## Class: inner_api
 
 Inner Eigen API for the DSR graph.

@@ -216,6 +216,29 @@ pydsr.rt_api.time_query.nearest
 pydsr.rt_api.time_query.interpolated
 ```
 
+RT edges also carry up to three 6x6 covariance blocks, selected by `CovarianceKind`:
+
+```cpp
+enum class CovarianceKind
+{
+    Pose,          // rt_covariance
+    Velocity,      // rt_covariance_velocity
+    Acceleration   // rt_covariance_acceleration
+};
+```
+
+Python enum:
+
+```python
+pydsr.rt_api.covariance_kind.pose
+pydsr.rt_api.covariance_kind.velocity
+pydsr.rt_api.covariance_kind.acceleration
+```
+
+Each block is **36 floats, row-major, over `[x, y, z, rx, ry, rz]`**. An agent working in SE(2)
+over `[x, y, theta]` embeds its 3x3 matrix at `x->0, y->1, theta->rz->5` (yaw variance at flat
+index `[35]`), leaving z/roll/pitch zero.
+
 ### Main C++ Methods
 
 ```cpp
@@ -243,6 +266,21 @@ std::optional<Eigen::Vector3d> get_translation(uint64_t node_id,
                                                uint64_t to,
                                                std::uint64_t timestamp = 0,
                                                TimeQuery time_query = TimeQuery::Nearest);
+
+std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge,
+                                               std::uint64_t timestamp = 0,
+                                               TimeQuery time_query = TimeQuery::Nearest,
+                                               CovarianceKind kind = CovarianceKind::Pose);
+
+std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(uint64_t node_id,
+                                               uint64_t to,
+                                               std::uint64_t timestamp = 0,
+                                               TimeQuery time_query = TimeQuery::Nearest,
+                                               CovarianceKind kind = CovarianceKind::Pose);
+
+bool insert_or_assign_edge_RT_covariance(const Node &n, uint64_t to, CovarianceKind kind,
+                                               const Eigen::Matrix<double, 6, 6> &covariance,
+                                               std::optional<uint64_t> timestamp = std::nullopt);
 ```
 
 ### Main Python Methods
@@ -253,7 +291,15 @@ rt_api.get_edge_RT(node, to, type_edge="RT")
 rt.get_RT_pose_from_parent(node, type_edge="RT")
 rt.get_edge_RT_as_rtmat(edge, timestamp=0, time_query=pydsr.rt_api.time_query.nearest)
 rt.get_translation(node_id, to, timestamp=0, time_query=pydsr.rt_api.time_query.nearest)
+rt.get_covariance_matrix(node_id, to, timestamp=0, time_query=pydsr.rt_api.time_query.nearest,
+                         kind=pydsr.rt_api.covariance_kind.pose)   # -> 6x6 numpy array or None
+rt.insert_or_assign_edge_RT_covariance(node_id, to, kind, covariance, timestamp=None)  # -> bool
 ```
+
+> **Do not index the raw RT attributes.** `rt_translation`, `rt_rotation_euler_xyz` and
+> `rt_covariance` are history RINGS (`3 * HISTORY_SIZE` and `36 * HISTORY_SIZE` floats). Reading
+> `edge.attrs["rt_translation"].value[0:3]` returns slot 0 — wherever the ring last wrapped to —
+> which can be several publishes stale. The getters above resolve the head slot for you.
 
 ### C++ Example: Add History and Query It
 
