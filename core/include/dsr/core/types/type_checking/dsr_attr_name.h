@@ -796,6 +796,19 @@ REGISTER_TYPE(aff_view_standoff_max,    float,                                  
 REGISTER_TYPE(aff_view_framing_fill,    float,                                            false)
 REGISTER_TYPE(aff_view_sigma_star,      std::vector<float>,                               false)
 
+// WHY the affordance ended, stamped by the EXECUTOR at the terminal transition and read by the
+// producer. "" / absent = not terminal yet.
+//   satisfied — the completion predicate held for stable_n cycles: an OBSERVATION happened, so the
+//               producer may update its belief and reset the neglect clock
+//   timeout   — the predicate never held within aff_timeout_ms: nothing was observed
+//   refused   — the consumer could not get there (see epistemic_refused_*): not attempted at all
+//   abandoned — the operator or a higher-priority interrupt ended it
+// ★ Completed is NOT NEUTRAL, and this attribute is the whole point: without it a producer cannot
+// distinguish "I looked and saw" from "I gave up", so it books an observation it never got and
+// retires the very affordance that would have gone back for it. Three agents currently make exactly
+// that conflation because the wire carries no way to tell them apart.
+REGISTER_TYPE(aff_outcome,              std::string,                                      false)
+
 // ── human-concept + bottle-concept detection channel (mirror of table/chair/cabinet above; bool alive per
 //    the WIRE-TYPE note there, read only via attr_scalar/type-attributed getters) ─ registered 2026-07-24 ─
 REGISTER_TYPE(human_detection_alive,       bool,                                          false)
