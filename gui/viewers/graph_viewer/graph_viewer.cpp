@@ -29,6 +29,8 @@ GraphViewer::GraphViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  
 
     contextMenu = new QMenu(this);
     showMenu = contextMenu->addMenu(tr("&Show:"));
+    // The way back after a manual zoom/pan: refit everything and re-arm automatic refitting.
+    contextMenu->addAction(tr("&Fit graph to view"), this, [this]() { fit_graph_to_view(); });
 
     createGraph();
 
@@ -55,8 +57,50 @@ GraphViewer::GraphViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  
 
 void GraphViewer::schedule_refit()
 {
+	// Once the user has zoomed or panned, the view is THEIRS: never refit behind their back. A DSR
+	// graph is under constant attribute churn (agent heartbeats, robot pose, FSM state), so this is
+	// called several times a second for ever — each refit snapped the viewport back to the whole
+	// scene, which made zooming impossible. fit_graph_to_view() is the explicit way back.
+	if (user_framed_)
+		return;
 	if (not refit_timer_.isActive())
 		refit_timer_.start(150);   // ≤ ~6-7 refits/s regardless of graph update rate
+}
+
+// Zooming or panning by hand hands the viewport to the user. Both defer to the base class for the
+// actual transform; all we add is the latch.
+void GraphViewer::wheelEvent(QWheelEvent *event)
+{
+	user_framed_ = true;
+	AbstractGraphicViewer::wheelEvent(event);
+}
+
+void GraphViewer::showEvent(QShowEvent *event)
+{
+	// THIS is the path that made the earlier gates look ineffective: the base class refits on every
+	// show, and a docked/tabbed graph view is shown far more often than "once at startup" suggests —
+	// enough that a zoom was undone immediately. Skip straight to QGraphicsView (the base-of-base) so
+	// the widget is shown without any refit.
+	if (user_framed_)
+	{
+		QGraphicsView::showEvent(event);
+		return;
+	}
+	AbstractGraphicViewer::showEvent(event);
+}
+
+void GraphViewer::mouseMoveEvent(QMouseEvent *event)
+{
+	if (_pan)                 // a drag in progress, not just the pointer crossing the view
+		user_framed_ = true;
+	AbstractGraphicViewer::mouseMoveEvent(event);
+}
+
+void GraphViewer::fit_graph_to_view()
+{
+	user_framed_ = false;
+	this->scene.setSceneRect(scene.itemsBoundingRect());
+	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio);
 }
 
 
@@ -592,9 +636,18 @@ void GraphViewer::compute_layout(const char * alg) {
         }
     }
 
-    centerOn(root_x, root_y);
-	this->scene.setSceneRect(scene.itemsBoundingRect());
-	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
+    // The node POSITIONS above are the point of a relayout and always apply. Recentring and refitting
+    // the VIEWPORT is a different thing, and agents re-run compute_layout on every structural change
+    // (a peer joining, a concept node being born), so doing it unconditionally would yank a zoomed-in
+    // user back out mid-inspection. Respect a hand-framed view here exactly as schedule_refit() does.
+    if (not user_framed_)
+    {
+        centerOn(root_x, root_y);
+        this->scene.setSceneRect(scene.itemsBoundingRect());
+        this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
+    }
+    else
+        this->scene.setSceneRect(scene.itemsBoundingRect());   // keep the scrollable area honest
 
     gvFreeLayout(graphviz_context, graphviz_graph);
 }

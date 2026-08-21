@@ -103,6 +103,12 @@ namespace DSR
 			// instead of once per update — avoids the GUI-thread repaint storm under fast graphs.
 			QTimer refit_timer_;
 			void schedule_refit();
+			// True once the user has zoomed or panned this view by hand. While set, the automatic
+			// refits stop: a DSR graph is under CONSTANT attribute churn (heartbeats, poses, agent
+			// state), so schedule_refit() fires every ~150 ms for ever, and each fitInView threw the
+			// user straight back out of the zoom they had just made — the zoom was unusable. The
+			// layout itself still runs; only the viewport is left alone. Cleared by fit_graph_to_view().
+			bool user_framed_ = false;
             void showContextMenu(QMouseEvent *event);
             
             // Graphviz layout
@@ -114,6 +120,19 @@ namespace DSR
             void createGraph();
 			virtual void timerEvent(QTimerEvent *event);
 			virtual void mousePressEvent(QMouseEvent *event);
+			// Both mark the view as user-framed, then defer to the base class for the actual
+			// zoom/pan. mouseMoveEvent only counts while a pan is in progress (_pan), so merely
+			// moving the pointer across the view does not disable auto-fit.
+			virtual void wheelEvent(QWheelEvent *event) override;
+			virtual void mouseMoveEvent(QMouseEvent *event) override;
+			// The base class refits on every show. A dock being raised or re-shown must not undo a
+			// hand-framed view either, so this is gated the same way as the other refit paths.
+			virtual void showEvent(QShowEvent *event) override;
+
+		public:
+			// Refit the whole graph into the viewport and re-enable automatic refitting. This is the
+			// way back after a manual zoom/pan — offered in the right-click menu as "Fit graph to view".
+			void fit_graph_to_view();
 
 
     };
