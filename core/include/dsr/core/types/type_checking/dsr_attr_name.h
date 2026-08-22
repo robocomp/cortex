@@ -275,6 +275,19 @@ REGISTER_TYPE(robot_current_speed_timestamp, uint64_t, true)  // wall clock, epo
 // for latency and staleness, in simulation too.
 REGISTER_TYPE(robot_current_speed_sim_timestamp, uint64_t, true)
 REGISTER_TYPE(robot_current_speed_simulated, bool, true)
+
+// ── Ground truth, SIMULATION ONLY ────────────────────────────────────────────────────────────────
+// The robot's TRUE pose, straight off the Webots supervisor node, for testing and validation only.
+// A localiser cannot be graded against its own residual -- a wrong pose fitted well scores as well
+// as a right one (measured 2026-08-22: SDF 0.009 with the yaw 0.35 rad out) -- so validation needs
+// a witness from outside the estimator. This is it.
+// ⚠ WRITTEN ONLY WHEN THE PRODUCER SAYS simulated==true. On real hardware these attributes are
+// simply ABSENT, so a consumer that reads them gets nothing rather than something plausible and
+// wrong. Absence is the gate; there is no flag to misconfigure. NEVER feed these to an estimator.
+REGISTER_TYPE(robot_gt_x, float, true)      // world frame, metres
+REGISTER_TYPE(robot_gt_y, float, true)      // world frame, metres
+REGISTER_TYPE(robot_gt_angle, float, true)  // world frame yaw, radians
+REGISTER_TYPE(robot_gt_timestamp, uint64_t, true)
 REGISTER_TYPE(robot_local_linear_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_local_angular_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(robot_ref_adv_speed, float, true) // robot frame m/s

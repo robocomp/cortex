@@ -9,6 +9,7 @@
 #include <graphviz/gvc.h>
 #include <graphviz/types.h>
 #include <qglobal.h>
+#include <cmath>
 #include <deque>
 #include <string>
 
@@ -34,7 +35,7 @@ GraphViewer::GraphViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  
 
     createGraph();
 
-	this->scene.setSceneRect(scene.itemsBoundingRect());
+	update_scene_rect();
 
 	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
 
@@ -50,9 +51,33 @@ GraphViewer::GraphViewer(std::shared_ptr<DSR::DSRGraph> G_, QWidget *parent) :  
 	refit_timer_.setSingleShot(true);
 	connect(&refit_timer_, &QTimer::timeout, this, [this]()
 	{
-		this->scene.setSceneRect(scene.itemsBoundingRect());
+		update_scene_rect();
 		this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio);
 	});
+}
+
+// The scrollable area. QGraphicsView clamps the scrollbars to sceneRect, and AbstractGraphicViewer
+// pans by driving those scrollbars -- so sceneRect IS the pan limit. Setting it to
+// itemsBoundingRect() (what this class used to do everywhere) makes the drag stop dead as soon as
+// the graph's own bounding box reaches the viewport edge: the scene slides a little and then
+// refuses, which is not a pan.
+//
+// Pad by a full viewport on every side, floored at the graph's own size, so there is always
+// somewhere left to scroll and a node can be dragged right off-screen if that is what the user
+// wants. The padding is derived from the viewport size and the ZOOM only -- never from the current
+// scroll position -- because feeding the visible rect back in would let sceneRect and the scrollbar
+// range chase each other. fitInView() keeps using the TIGHT rect, so framing still frames the graph
+// and not the padding.
+void GraphViewer::update_scene_rect()
+{
+	const QRectF items = scene.itemsBoundingRect();
+	if (items.isNull())
+		return;
+	const qreal sx = std::abs(transform().m11()) > 1e-9 ? std::abs(transform().m11()) : 1.0;
+	const qreal sy = std::abs(transform().m22()) > 1e-9 ? std::abs(transform().m22()) : 1.0;
+	const qreal pad_x = std::max(items.width(),  viewport()->width()  / sx);
+	const qreal pad_y = std::max(items.height(), viewport()->height() / sy);
+	scene.setSceneRect(items.adjusted(-pad_x, -pad_y, pad_x, pad_y));
 }
 
 void GraphViewer::schedule_refit()
@@ -99,7 +124,7 @@ void GraphViewer::mouseMoveEvent(QMouseEvent *event)
 void GraphViewer::fit_graph_to_view()
 {
 	user_framed_ = false;
-	this->scene.setSceneRect(scene.itemsBoundingRect());
+	update_scene_rect();
 	this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio);
 }
 
@@ -643,11 +668,11 @@ void GraphViewer::compute_layout(const char * alg) {
     if (not user_framed_)
     {
         centerOn(root_x, root_y);
-        this->scene.setSceneRect(scene.itemsBoundingRect());
+        update_scene_rect();
         this->fitInView(scene.itemsBoundingRect(), Qt::KeepAspectRatio );
     }
     else
-        this->scene.setSceneRect(scene.itemsBoundingRect());   // keep the scrollable area honest
+        update_scene_rect();   // keep the scrollable area honest
 
     gvFreeLayout(graphviz_context, graphviz_graph);
 }

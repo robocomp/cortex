@@ -103,6 +103,11 @@ namespace DSR
 			// instead of once per update — avoids the GUI-thread repaint storm under fast graphs.
 			QTimer refit_timer_;
 			void schedule_refit();
+			// Sets the scrollable area: the items' bounding box PADDED. Panning is implemented by
+			// moving the scrollbars, and scrollbars cannot go outside sceneRect -- so pinning
+			// sceneRect to itemsBoundingRect() made a drag dead-stop at the edge of the graph
+			// instead of panning. The padding is what turns that back into a real pan.
+			void update_scene_rect();
 			// True once the user has zoomed or panned this view by hand. While set, the automatic
 			// refits stop: a DSR graph is under CONSTANT attribute churn (heartbeats, poses, agent
 			// state), so schedule_refit() fires every ~150 ms for ever, and each fitInView threw the
