@@ -30,6 +30,8 @@ struct EdgeType {
 inline std::unordered_set<std::string_view> edge_types::set_type_;
 
 REGISTER_EDGE_TYPE(RT)
+// Consumer -> affordance: "I am executing this, and here is which proposal and which pose."
+REGISTER_EDGE_TYPE(executing)
 REGISTER_EDGE_TYPE(VRT)
 REGISTER_EDGE_TYPE(reachable)
 REGISTER_EDGE_TYPE(in)

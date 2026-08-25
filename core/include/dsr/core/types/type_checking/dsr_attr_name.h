@@ -601,6 +601,11 @@ REGISTER_TYPE(last_sensing_frame,  int,                                         
 // ── residual_concept occupancy-GRID costmap (written by residual_concept on the `grid` node; occupied +
 //    inflated-border cell centres for display; encoded obstacle hulls for the controller's planner) ──────
 REGISTER_TYPE(grid_occupied_cells, std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]×N occupied
+// Added 2026-08-23 for the residual COLUMN display: the band BOTTOM of each occupied cell, one float per
+// entry of grid_occupied_cells and in the SAME order (grid_occupied_cells carries only the TOP). Without
+// it every residual column has to be drawn standing on the floor, which claims the volume under a table
+// is blocked when the evidence is an unknown object ON the table. Source: OccupancyGrid::readout_zband().
+REGISTER_TYPE(grid_occupied_zlow,  std::reference_wrapper<const std::vector<float>>, false)  // [zlow]×N, pairs with ↑
 REGISTER_TYPE(grid_border_cells,   std::reference_wrapper<const std::vector<float>>, false)  // [x,y,z]×N inflated ring
 REGISTER_TYPE(grid_obstacle_hulls, std::reference_wrapper<const std::vector<float>>, false)  // [P,(V,x,y…)×P] footprints
 REGISTER_TYPE(grid_cell_size,      float,                                            false)  // cell edge (m)
@@ -698,6 +703,18 @@ REGISTER_TYPE(epistemic_target_y_m,   float,                                    
 REGISTER_TYPE(epistemic_target_yaw_rad,float,                                            false)
 REGISTER_TYPE(epistemic_gain,          float,                                             false)
 REGISTER_TYPE(epistemic_pending,       bool,                                              false)
+// ── THE AFFORDANCE PROTOCOL'S RETURN CHANNEL (2026-08-23) ────────────────────────────────────────
+// The producer proposes; the consumer accepted a PARTICULAR proposal and drives to a PARTICULAR pose.
+// Before these, what came back was `active` — a boolean — so the consumer could say THAT it was
+// executing and never WHAT, and the two agents held different targets with no term able to reveal it.
+// epistemic_target_epoch is written ONLY by the producer, and ONLY when (x,y,yaw) content changes.
+// The executing_* trio is written ONLY by the consumer, and ONLY on an `executing` EDGE it owns —
+// never on the affordance node, because update_node is a whole-node replace on both sync engines.
+REGISTER_TYPE(epistemic_target_epoch,   int,                                              false)
+REGISTER_TYPE(executing_epoch,          int,                                              false)
+REGISTER_TYPE(executing_target_x_m,     float,                                            false)
+REGISTER_TYPE(executing_target_y_m,     float,                                            false)
+REGISTER_TYPE(executing_target_yaw_rad, float,                                            false)
 
 // ── affordance REFUSAL (written by the consumer, read by the producer) ───────────────────────
 // "I could not get there." Distinct from a completion in the one way that matters: Completed means
@@ -801,6 +818,15 @@ REGISTER_TYPE(aff_timeout_ms,           float,                                  
 REGISTER_TYPE(aff_on_fail,              std::string,                                      false)
 REGISTER_TYPE(aff_max_vel,              float,                                            false)  // m/s
 REGISTER_TYPE(aff_max_omega,            float,                                            false)  // rad/s
+// The rate the manoeuvre itself should be executed at, rad/s. 0 = the consumer's own default.
+// ★DISTINCT FROM aff_max_omega, which is an OBSERVATION precondition ("hold below this while the
+// look is taken"). This one governs the motion, and it exists because the producer knows what the
+// manoeuvre is FOR and the consumer does not. The calibration pivot turns to excite a gyro and
+// observes nothing while it turns, so slow is pure cost; the LockOn servo creeps because every
+// centimetre degrades the masks it is collecting. Both were sharing Controller.LockOnMaxYawRps, so
+// the pivot inherited a cap tuned for the opposite need -- and its producer priced a 50 s detour
+// that actually took 7 minutes, an offer advertising a cost it could not deliver.
+REGISTER_TYPE(aff_max_yaw_rate,         float,                                            false)  // rad/s
 REGISTER_TYPE(aff_view_object_relative, int,                                              false)  // 0/1 flag
 REGISTER_TYPE(aff_view_faces,           std::string,                                      false)  // '|'-joined faces
 REGISTER_TYPE(aff_view_face_gains,      std::vector<float>,                               false)
