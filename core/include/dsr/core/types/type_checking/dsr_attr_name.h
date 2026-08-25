@@ -276,6 +276,32 @@ REGISTER_TYPE(robot_current_speed_timestamp, uint64_t, true)  // wall clock, epo
 REGISTER_TYPE(robot_current_speed_sim_timestamp, uint64_t, true)
 REGISTER_TYPE(robot_current_speed_simulated, bool, true)
 
+// Per-sample VARIANCE of the three velocities above, as the PRODUCER states it, in the ROBOT frame:
+// [var_adv, var_side, var_rot], units (m/s)^2, (m/s)^2, (rad/s)^2. Forwarded from the FullPoseEuler
+// velCov block, which already carries exactly this and was previously dropped at the graph boundary.
+//
+// ROBOT FRAME IS NOT A CHOICE HERE. The producer is a base driver with no notion of a room or a
+// world, so a body-frame variance is the only thing it can state. A consumer that needs it in the
+// world frame must rotate it itself, with the heading AND the heading's own uncertainty -- which is
+// exactly the conflation keeping it body-frame avoids.
+//
+// ⚠ THIS IS A PER-SAMPLE VARIANCE, NOT A NOISE DENSITY. A consumer wanting a density (sigma^2 per
+// second, so the variance over an interval T is sigma^2*T) multiplies by the SAMPLING INTERVAL:
+// sigma = sqrt(var_sample * dt_sample). Handing a raw per-sample variance to a preintegrator
+// over-states the noise by dt_sample/dt whenever a segment spans several samples. The two stamps
+// above make dt_sample exactly knowable, which is why this attribute is worth having rather than a
+// config constant.
+//
+// A NEGATIVE entry means "the producer does not know" for THAT channel, matching the FullPoseEuler
+// convention (m00 = -1) and ImuFrame's gyro_var/acc_var. The attribute is ABSENT ENTIRELY when the
+// producer states nothing at all, so "never published" and "published as unknown" stay distinct --
+// a zero would read downstream as infinite confidence, which is the failure this guards.
+//
+// ★ A consumer must treat this as something that can only LOOSEN its own model: the model constants
+// it is combined with are lumped MODEL error (slip, timing, unmodelled dynamics), a different
+// quantity from sensor noise, so the two add in quadrature rather than one replacing the other.
+REGISTER_TYPE(robot_current_speed_variance, std::reference_wrapper<const std::vector<float>>, true)
+
 // ── Ground truth, SIMULATION ONLY ────────────────────────────────────────────────────────────────
 // The robot's TRUE pose, straight off the Webots supervisor node, for testing and validation only.
 // A localiser cannot be graded against its own residual -- a wrong pose fitted well scores as well
