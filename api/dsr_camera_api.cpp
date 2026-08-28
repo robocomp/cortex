@@ -3,6 +3,7 @@
 #include <dsr/api/dsr_api.h>
 
 #include <cmath>
+#include <limits>
 
 using namespace DSR;
 
@@ -193,21 +194,42 @@ Eigen::Vector3d CameraAPI::get_ray_homogeneous( const Eigen::Vector3d & p) const
     return ray_from_pixel(p.x() / w, p.y() / w);
 }
 
-std::vector<Eigen::Vector3d> CameraAPI::get_xyz_from_rgbd_points(const std::vector<Eigen::Vector3d> &rgbd_points) const
+std::vector<Eigen::Vector3d> CameraAPI::get_xyz_from_rgbd_points(
+    const std::vector<Eigen::Vector3d> &rgbd_points, DepthConvention convention) const
 {
+    // See the header for why this delegates to ray_from_pixel() rather than repeating the pinhole
+    // intrinsics: that is the only function which dispatches on the projection model, and this used
+    // to be the copy that did not. Pinhole output is algebraically identical to the old form —
+    // ray_from_pixel returns normalize((u-cx)/fx, 1, (cy-v)/fy), so scaling it to Y = depth gives
+    // exactly ((u-cx)d/fx, d, (cy-v)d/fy).
+    const bool radial = (convention == DepthConvention::Radial)
+                     or (convention == DepthConvention::Native
+                         and projection_model != ProjectionModel::Pinhole);
+
+    const double nan_d = std::numeric_limits<double>::quiet_NaN();
+    const Eigen::Vector3d bad(nan_d, nan_d, nan_d);
+
     std::vector<Eigen::Vector3d> xyz_points;
     xyz_points.reserve(rgbd_points.size());
 
     for (const auto &point : rgbd_points)
     {
-        const double u = point.x();
-        const double v = point.y();
         const double depth_value = point.z();
+        // A depth of 0 is what a sensor publishes for NO RETURN, and a negative or NaN one is a
+        // fault. The old code turned all three into a point at or behind the camera centre, which a
+        // caller cannot distinguish from a real measurement. NaN propagates visibly instead, and the
+        // output stays 1:1 with the input so parallel indexing still holds.
+        if (not std::isfinite(depth_value) or depth_value <= 0.0) { xyz_points.push_back(bad); continue; }
 
-        const double X = (u - static_cast<double>(centre_x)) * depth_value / focal_x;
-        const double Y = depth_value;
-        const double Z = (static_cast<double>(centre_y) - v) * depth_value / focal_y;
-        xyz_points.emplace_back(X, Y, Z);
+        const Eigen::Vector3d ray = ray_from_pixel(point.x(), point.y());
+        if (radial) { xyz_points.push_back(ray * depth_value); continue; }
+
+        // Forward: scale the unit ray so its Y component equals the depth. Y -> 0 is a ray in the
+        // image plane, where a forward-referenced depth has no finite point on it — that is a real
+        // singularity of the convention, not of this code, and it cannot arise for a pinhole camera
+        // with a sane FoV. It CAN arise if a caller asserts Forward on a panorama.
+        if (std::abs(ray.y()) < 1e-12) { xyz_points.push_back(bad); continue; }
+        xyz_points.push_back(ray * (depth_value / ray.y()));
     }
 
     return xyz_points;

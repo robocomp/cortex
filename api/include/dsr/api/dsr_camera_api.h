@@ -99,8 +99,35 @@ namespace DSR
             /// project() for the active model. Exact for equirectangular; for pinhole it is the
             /// normalized direction through the pixel (camera Y forward).
             Eigen::Vector3d ray_from_pixel(double u, double v) const;
-            /// Converts a list of RGBD samples (u, v, depth) into camera-frame XYZ points.
-            std::vector<Eigen::Vector3d> get_xyz_from_rgbd_points(const std::vector<Eigen::Vector3d> &rgbd_points) const;
+            /// What the third component of an RGBD sample MEANS. The two are not interchangeable and
+            /// the difference grows with angle off axis: a point 30 deg off axis has a radial range
+            /// 15% larger than its forward distance. Nothing in a depth image says which it carries,
+            /// so a caller that knows should say so.
+            ///   Forward — perpendicular distance to the image plane (the ZED SDK's convention, and
+            ///             the only one that makes sense for a pinhole camera).
+            ///   Radial  — distance along the ray through the pixel (the only one that makes sense
+            ///             for a panorama, where there is no single forward axis).
+            ///   Native  — whichever of the two suits this camera's projection model.
+            enum class DepthConvention { Native, Forward, Radial };
+
+            /// Converts a list of RGBD samples (u, v, depth) into camera-frame XYZ points
+            /// (X right, Y forward, Z up).
+            ///
+            /// ★ MODEL-AWARE since 2026-08-28. It previously applied the pinhole intrinsics
+            ///   unconditionally — X=(u-cx)d/fx, Y=d, Z=(cy-v)d/fy — with no reference to
+            ///   projection_model, so on an Equirectangular or Cylindrical camera it returned
+            ///   confident nonsense while project() and ray_from_pixel() in this same class both
+            ///   dispatched correctly. It is now expressed through ray_from_pixel() for the reason
+            ///   get_ray() already records: that function is the ONLY place which dispatches on the
+            ///   projection model, and a second copy of the maths drifts and ends up silently wrong
+            ///   on whichever model its author did not have in mind. This WAS that second copy.
+            ///   Pinhole output is unchanged — algebraically identical, not merely similar.
+            ///
+            /// A non-finite or non-positive depth yields a NaN point rather than a plausible one, so
+            /// it cannot be mistaken for a measurement, and the output stays 1:1 with the input.
+            std::vector<Eigen::Vector3d> get_xyz_from_rgbd_points(
+                const std::vector<Eigen::Vector3d> &rgbd_points,
+                DepthConvention convention = DepthConvention::Native) const;
             /// Sets a shared focal value for camera intrinsics.
             void set_focal( float f);
             /// Sets horizontal focal length in pixels.
