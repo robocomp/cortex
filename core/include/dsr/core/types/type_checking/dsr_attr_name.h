@@ -212,6 +212,20 @@ REGISTER_TYPE_DEPRECATED(obj_depth, int, false, "Use obj_depth_m_att instead; le
 REGISTER_TYPE(obj_width_m, float, false)
 REGISTER_TYPE(obj_height_m, float, false)
 REGISTER_TYPE(obj_depth_m, float, false)
+// ── Existence belief, generic across concept agents ──────────────────────────────────────────────
+// P(this object is really there), in [0,1]. Cortex already carries per-TYPE detection confidences
+// (table_detection_confidence, chair_, cabinet_, door_), but a generic consumer must not reach for a
+// type-specific one — it would work for the four types that have it and silently return nothing for
+// every other, which reads downstream as "certainly present" rather than "not stated".
+// ★ First consumer: room_concept's RGB edge term, which explains away wall samples that an object
+// stands in front of. A hard geometric mask there would discard real wall evidence on the strength
+// of an object that may not exist, so the occlusion claim is SCALED by this — a marginal detection
+// only partly explains away what is behind it, and the term degrades correctly when the belief is
+// wrong instead of failing silently.
+// ★ ABSENT means "not stated", and a consumer should treat that as 1.0 only where that is the safe
+// reading. It is NOT a synonym for zero: an object whose agent has never published a belief is not
+// an object believed absent.
+REGISTER_TYPE(obj_exist_prob, float, false)   // [0,1]
 REGISTER_TYPE(obj_interaction_angle, float, false)
 REGISTER_TYPE(obj_interaction_space, float, false)
 REGISTER_TYPE(obj_interaction_shape, std::reference_wrapper<const std::string>, false)
@@ -349,6 +363,16 @@ REGISTER_TYPE(OuterRegionLeft, int, false)
 REGISTER_TYPE(OuterRegionRight, int, false)
 REGISTER_TYPE(OuterRegionBottom, int, false)
 REGISTER_TYPE(OuterRegionTop, int, false)
+// ── Which SCENARIO the robot is in ───────────────────────────────────────────────────────────────
+// A robot is not a place. The same P3Bot runs in the WAF room and in the apartment, and the same
+// apartment hosts P3Bot and Shadow — so ROBOT identity (which mount, which noise floor) and SCENARIO
+// identity (which floor plan, which ceiling height) are independent, and a config keyed on one
+// cannot express the other. Published by robot_concept, which is the component that exists in both
+// simulation and reality; the bridge knows the world too but only in simulation.
+// Consumed by room_concept to select its layout, and available to anything else that needs to know
+// where it is rather than what it is.
+REGISTER_TYPE(scenario_name, std::reference_wrapper<const std::string>, false)
+
 REGISTER_TYPE(world_outline_x, std::reference_wrapper<const std::vector<float>>, false)
 REGISTER_TYPE(world_outline_y, std::reference_wrapper<const std::vector<float>>, false)
 
