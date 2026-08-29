@@ -324,6 +324,29 @@ REGISTER_TYPE(robot_current_speed_variance, std::reference_wrapper<const std::ve
 // ⚠ WRITTEN ONLY WHEN THE PRODUCER SAYS simulated==true. On real hardware these attributes are
 // simply ABSENT, so a consumer that reads them gets nothing rather than something plausible and
 // wrong. Absence is the gate; there is no flag to misconfigure. NEVER feed these to an estimator.
+// Can the base command an INSTANTANEOUS lateral velocity in its own frame? A mecanum/omni
+// base can; a differential one cannot, and for it robot_current_side_speed is identically 0.
+// Declared per robot in robot_concept's config and published here, because no consumer can
+// tell from the graph otherwise: the controller issues setSpeedBase(side, adv, rot)
+// unconditionally and room_concept's odometry carries a dx_local = side*dt term, so on a
+// differential base both are describing motion the robot cannot make. ABSENT means unknown —
+// keep whatever you do today; it is not a licence to assume either value.
+REGISTER_TYPE(robot_holonomic, bool, false)
+
+// ── BASE CAPABILITY AND GEOMETRY, from the base component's own config ───────────────────────
+// These are what the HARDWARE can do, not what any agent chooses to do. Keep that distinction:
+// a controller's MaxAdvSpeed/MaxRotSpeed are a POLICY (how fast we drive), and merging the two
+// is what let room_concept's pose clamp bound real motion by a comfort preference. A consumer
+// should assert its policy <= these, never substitute one for the other.
+// Source of truth is SVD48VBase's etc/config_*.toml — the same file on the real robot — read by
+// robot_concept via Agent.base_config_file. SI units here; that file is in mm and mm/s.
+REGISTER_TYPE(robot_max_linear_speed, float, false)   // m/s   (bounds x AND lateral on an omni base)
+REGISTER_TYPE(robot_max_rot_speed, float, false)      // rad/s
+REGISTER_TYPE(robot_max_linear_accel, float, false)   // m/s^2
+REGISTER_TYPE(robot_max_linear_decel, float, false)   // m/s^2
+REGISTER_TYPE(robot_wheel_radius, float, false)       // m
+REGISTER_TYPE(robot_axes_length, float, false)        // m, track width between drive wheels
+
 REGISTER_TYPE(robot_gt_x, float, true)      // world frame, metres
 REGISTER_TYPE(robot_gt_y, float, true)      // world frame, metres
 REGISTER_TYPE(robot_gt_angle, float, true)  // world frame yaw, radians
