@@ -101,6 +101,10 @@ REGISTER_TYPE(level, int, false)
 REGISTER_TYPE(pos_x, float, false)
 REGISTER_TYPE(pos_y, float, false)
 REGISTER_TYPE(parent, std::uint64_t, false)
+// Initial fold state of this node's RT subtree in the graph viewer's "+"/"-" badge. An agent that
+// creates a fan of structural children (a floor and its walls) sets it true so they do not flood the
+// view. It is a DEFAULT, applied once per node: the badge is the user's from the first click on.
+REGISTER_TYPE(collapsed, bool, false)
 REGISTER_TYPE(color, std::reference_wrapper<const std::string>, false)
 REGISTER_TYPE(texture, std::reference_wrapper<const std::string>, false)
 // Legacy dimensions were historically stored as integers, commonly interpreted as millimeters.

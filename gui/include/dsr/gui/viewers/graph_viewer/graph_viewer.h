@@ -88,6 +88,12 @@ namespace DSR
 			static constexpr const char *PARENT_EDGE_TYPE = "RT";
 			std::map<std::uint64_t, std::set<std::uint64_t>> collapsible_children;  // parent -> RT children
 			std::set<std::uint64_t> collapsed_parents;   // parents currently folded (purely visual)
+			// Nodes whose graph-declared `collapsed` default has already been honoured. The attribute
+			// seeds the fold ONCE; after that the badge belongs to the user, so an agent rewriting the
+			// node cannot keep re-folding a subtree the user has just opened.
+			std::set<std::uint64_t> collapse_default_applied;
+			// Reads `collapsed_att` off the node and, the first time only, folds its RT subtree.
+			void seed_collapse_default(std::uint64_t id, const Node &n);
 			// Keeps `collapsible_children` in sync with the RT edges arriving/leaving from G
 			void note_parent_edge(std::uint64_t from, std::uint64_t to, const std::string &edge_tag, bool added);
 			// All descendants of `root` reachable through RT edges, root NOT included. With

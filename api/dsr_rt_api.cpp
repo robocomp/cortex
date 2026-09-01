@@ -481,6 +481,24 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &
     insert_or_assign_edge_RT_impl(n, to, std::move(trans), std::move(rot_euler), std::move(covariance), timestamp);
 }
 
+void RT_API::insert_or_assign_edge_RT_identity(Node &n, uint64_t to, std::optional<uint64_t> timestamp)
+{
+    CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT_identity");
+    insert_or_assign_edge_RT_impl(n, to, std::vector<float>{0.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f},
+                                  std::nullopt, timestamp);
+}
+
+bool RT_API::insert_or_assign_edge_RT_identity(uint64_t node_id, uint64_t to, std::optional<uint64_t> timestamp)
+{
+    if (auto node = G->get_node(node_id); node.has_value())
+    {
+        insert_or_assign_edge_RT_identity(node.value(), to, timestamp);
+        return true;
+    }
+    qWarning() << __FUNCTION__ << "NO node found with id" << node_id;
+    return false;
+}
+
 void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<float> trans, std::vector<float> rot_euler,
                                            std::optional<std::vector<float>> covariance, std::optional<uint64_t> timestamp)
 {

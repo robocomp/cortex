@@ -43,6 +43,16 @@ namespace DSR
             void insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler,
                                           std::vector<float> &&covariance, std::optional<uint64_t> timestamp = std::nullopt);
 
+            // Hang `to` from `n` with the IDENTITY transform: zero translation, zero euler rotation.
+            // The child's frame then coincides with the parent's, so a node inserted purely to give a
+            // subtree a semantic parent (a floor the walls hang from, a rig the parts hang from) costs
+            // no geometry: every descendant keeps the pose it had relative to the grandparent.
+            // Like every insert_or_assign_edge_RT it also fixes the child's parent/level attributes and
+            // cascades the level fix down the subtree, so it is the correct way to RE-PARENT as well.
+            void insert_or_assign_edge_RT_identity(Node &n, uint64_t to, std::optional<uint64_t> timestamp = std::nullopt);
+            // Same, addressing the parent by id. Returns false (and warns) if that node is not in G.
+            bool insert_or_assign_edge_RT_identity(uint64_t node_id, uint64_t to, std::optional<uint64_t> timestamp = std::nullopt);
+
             // Write one 6x6 covariance block on an existing RT edge, without touching the pose payload.
             // Use this when the covariance is produced separately from the transform (velocity/acceleration
             // uncertainty, or a pose covariance refined after the fact) instead of writing the attribute raw.

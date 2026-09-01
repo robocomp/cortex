@@ -279,6 +279,11 @@ void GraphViewer::add_or_assign_node_SLOT(uint64_t id, const std::string &type)
 		if (type == "agent")
 			if (const auto color = G->get_attrib_by_name<color_att>(n.value()); color.has_value())
 				gnode->set_color(color.value().get());
+		// A node may declare that its RT subtree comes up folded. Honoured here rather than in
+		// new_visual_node because the attribute can also be authored later, and because the children
+		// usually arrive AFTER their parent: seeding `collapsed_parents` now is enough, since
+		// add_or_assign_edge_SLOT re-applies the state to every child edge as it lands.
+		seed_collapse_default(id, n.value());
 		gnode->change_detected();
         float posx, posy;
         if(auto px = G->get_attrib_by_name<pos_x_att>(n.value()); px.has_value())
@@ -452,6 +457,8 @@ void GraphViewer::del_node_SLOT(uint64_t id)
             // the node itself may have been a folding parent
             collapsible_children.erase(id);
             collapsed_parents.erase(id);
+            // A node re-created under the same id is a new node: let it declare its default again.
+            collapse_default_applied.erase(id);
             auto id_str = std::to_string(id);
             if (Agnode_t *gvnode = agfindnode(graphviz_graph, id_str.data())) {
                 agdelnode(graphviz_graph, gvnode);
@@ -489,6 +496,22 @@ void GraphViewer::hide_show_node_SLOT(uint64_t id, bool visible)
 ///// Note that graphviz still lays out hidden nodes (compute_layout works on the whole
 ///// graph), so folding does not compact the layout, it only removes clutter.
 //////////////////////////////////////////////////////////////////////////////////////
+
+void GraphViewer::seed_collapse_default(std::uint64_t id, const Node &n)
+{
+	if (collapse_default_applied.count(id) > 0)
+		return;
+	const auto declared = G->get_attrib_by_name<collapsed_att>(n);
+	if (not declared.has_value())
+		return;   // no declaration: leave the node expanded, and keep listening in case one arrives
+	collapse_default_applied.insert(id);
+	if (not declared.value())
+		return;
+	collapsed_parents.insert(id);
+	// Children already present must be folded now; ones still to arrive are folded by
+	// add_or_assign_edge_SLOT, which calls apply_collapse_state on their parent.
+	apply_collapse_state(id);
+}
 
 void GraphViewer::note_parent_edge(std::uint64_t from, std::uint64_t to, const std::string &edge_tag, bool added)
 {
