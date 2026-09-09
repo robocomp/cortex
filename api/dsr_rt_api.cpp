@@ -213,10 +213,10 @@ std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n, const s
 }
 
 std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query,
-                                                        std::int64_t *applied_dt_ms)
+                                                        TimeQueryInfo *info)
 {
     CORTEX_PROFILE_ZONE_N("RT_API::get_edge_RT_as_rtmat");
-    if (applied_dt_ms != nullptr) *applied_dt_ms = 0;
+    if (info != nullptr) *info = TimeQueryInfo{};
     auto r_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge);
     auto t_o =  G->get_attrib_by_name<rt_translation_att>(edge);
     auto head_o = G->get_attrib_by_name<rt_head_index_att>(edge);
@@ -246,6 +246,9 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                     if (time_query == TimeQuery::Interpolated or time_query == TimeQuery::Extrapolated)
                     {
                         const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
+                        const std::int64_t ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
+                                                        - static_cast<std::int64_t>(blocks.front().first);
+                        if (info != nullptr) info->ring_span_ms = ring_span_ms;
                         if (lower.second == upper.second)
                         {
                             // ── THE CLAMP, AND THE ONLY PLACE Extrapolated DIFFERS ──────────────
@@ -255,6 +258,16 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                             // pose from the wrong instant; Extrapolated walks it onto the instant
                             // that was asked for, using the twist stored WITH this block.
                             const auto base = rtmat_at(t, r, lower.second);
+                            // Landing exactly ON a block is not a clamp — it is the best possible
+                            // answer, and it must not be reported as a defect.
+                            const std::int64_t gap_ms = static_cast<std::int64_t>(timestamp)
+                                                      - static_cast<std::int64_t>(lower.first);
+                            if (info != nullptr)
+                            {
+                                info->gap_ms = gap_ms;
+                                info->outcome = (gap_ms == 0) ? TimeQueryInfo::Outcome::Exact
+                                                              : TimeQueryInfo::Outcome::Clamped;
+                            }
                             if (time_query != TimeQuery::Extrapolated)
                                 return base;
                             std::optional<std::vector<float>> twl = G->get_attrib_by_name<rt_twist_linear_att>(edge);
@@ -264,11 +277,10 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                             // down a whole chain and have only the moving edge respond to it.
                             if (not twl.has_value() or not twa.has_value()
                                 or twl->size() <= lower.second + 2 or twa->size() <= lower.second + 2)
-                                return base;
-                            const std::int64_t dt_ms = static_cast<std::int64_t>(timestamp)
-                                                     - static_cast<std::int64_t>(lower.first);
+                                return base;   // no twist here: stays Clamped, and now says so
+                            const std::int64_t dt_ms = gap_ms;
                             if (dt_ms == 0)
-                                return base;
+                                return base;   // Exact, set above
                             // ── HOW FAR MAY A TWIST BE ASKED TO PREDICT? THE RING ANSWERS. ──────
                             // ★MEASURED BUG, 2026-09-09, and it is why this is not left to the caller.
                             // On this robot the chain is root -> Shadow -> room. room_concept
@@ -291,15 +303,24 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                             // refusal returns the clamped block rather than a partially-walked pose.
                             // Staleness is a different question with a different instrument: read the
                             // ring bounds if that is what you want to know.
-                            const std::int64_t ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
-                                                            - static_cast<std::int64_t>(blocks.front().first);
                             if (ring_span_ms <= 0 or std::llabs(dt_ms) > ring_span_ms)
+                            {
+                                // Too far outside for the twist to be evidence. The end block is
+                                // still the best available answer, so it is returned — but as Stale,
+                                // never as a silent success.
+                                if (info != nullptr) info->outcome = TimeQueryInfo::Outcome::Stale;
                                 return base;
-                            if (applied_dt_ms != nullptr) *applied_dt_ms = dt_ms;
+                            }
+                            if (info != nullptr)
+                            {
+                                info->outcome = TimeQueryInfo::Outcome::Extrapolated;
+                                info->applied_dt_ms = dt_ms;
+                            }
                             return extrapolate_along_twist(base, twl.value(), twa.value(), lower.second,
                                                            static_cast<double>(dt_ms) * 1e-3);
                         }
 
+                        if (info != nullptr) info->outcome = TimeQueryInfo::Outcome::Interpolated;
                         const auto alpha = interpolation_factor(lower, upper, timestamp);
                         auto lower_rotation = rotation_at(r, lower.second);
                         auto upper_rotation = rotation_at(r, upper.second);

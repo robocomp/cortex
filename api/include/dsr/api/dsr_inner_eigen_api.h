@@ -36,14 +36,18 @@ namespace DSR
             ////////////////////////////////////////////////
             /// Transformation matrix retrieval methods
             ////////////////////////////////////////////////
-            // `applied_dt_ms` (optional, TimeQuery::Extrapolated only) reports the LARGEST-MAGNITUDE
-            // signed dt any single edge in the chain was walked by. 0 means every edge was bracketed
-            // inside its ring and the result is pure interpolation. The maximum rather than a sum,
-            // because the edges are composed, not travelled in series: one moving edge extrapolated by
-            // 30 ms and four static mounts contributing nothing is a 30 ms prediction, not 30 ms of
-            // accumulated error. In practice exactly one edge in a chain carries a twist.
+            // `info` (optional) reports what the composition did — above all whether ANY edge in the
+            // chain clamped, which is the failure the returned matrix cannot express. See
+            // RT_API::TimeQueryInfo.
+            // ★AGGREGATED AS THE WORST OUTCOME, NOT THE LAST ONE. A chain is only as trustworthy as
+            // its least trustworthy edge: one stale edge among five healthy ones still means the
+            // composed pose is partly asserted rather than measured, and reporting the last edge
+            // visited would make that depend on tree order. `applied_dt_ms`, `gap_ms` and
+            // `ring_span_ms` carry the largest magnitude seen, for the same reason — the edges are
+            // composed, not travelled in series, so one edge walked 30 ms is a 30 ms prediction, not
+            // 30 ms of accumulated error. In practice exactly one edge in a chain carries a twist.
             std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest,
-                                                                std::int64_t *applied_dt_ms = nullptr);
+                                                                RT_API::TimeQueryInfo *info = nullptr);
             std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
             std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
             std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);

@@ -43,6 +43,43 @@ namespace DSR
                 Extrapolated
             };
 
+            // ── WHAT THE QUERY ACTUALLY DID, BECAUSE THE POSE CANNOT SAY ────────────────────────
+            // ★A TIMESTAMPED RT QUERY THAT FALLS OUTSIDE THE RING RETURNS THE END BLOCK AND LOOKS
+            // EXACTLY LIKE A SUCCESSFUL ONE. That silent clamp is the defect this whole channel has
+            // been working around: a consumer asks for the pose at its capture stamp, gets a
+            // confident matrix from a different instant, and registers a cloud or a mask against it.
+            // It shows up downstream as a bulk omega*dt rotation that appears when the robot turns
+            // and vanishes at rest -- which reads as a sensor or calibration fault, and has been
+            // chased as one more than once.
+            // Nothing in an RTMat can carry that. So the query reports it, and a caller that passes
+            // this struct can no longer be lied to by omission.
+            struct TimeQueryInfo
+            {
+                enum class Outcome
+                {
+                    Exact,          // the query landed on a block
+                    Interpolated,   // bracketed between two blocks -- the healthy case
+                    Extrapolated,   // past an end of the ring, walked along that block's twist
+                    Clamped,        // past an end, returned the end block AS-IS. ★THE SILENT ONE.
+                    Stale           // past an end by more than the ring's own span: too far for the
+                                    // twist to be evidence, so the end block was returned unwalked
+                };
+                Outcome outcome = Outcome::Exact;
+                // Signed ms the pose was actually walked. NON-ZERO ONLY for Extrapolated -- it is
+                // "how far did this move", not "how far was it asked to move".
+                std::int64_t applied_dt_ms = 0;
+                // Signed ms the query fell OUTSIDE the ring (+ past the newest block, - before the
+                // oldest); 0 when it was inside. This is the number a clamp hides, and it is
+                // reported for Clamped and Stale as well as Extrapolated.
+                std::int64_t gap_ms = 0;
+                // newest - oldest valid block on the edge: the timescale that channel itself says it
+                // works on, and the bound on how far its twist may be asked to predict.
+                std::int64_t ring_span_ms = 0;
+                // Convenience: did this pose come from an instant nobody measured?
+                [[nodiscard]] bool clamped() const
+                { return outcome == Outcome::Clamped or outcome == Outcome::Stale; }
+            };
+
             // Which of the three 6x6 covariance blocks stored on an RT edge is addressed.
             // Pose  -> rt_covariance, Velocity -> rt_covariance_velocity, Acceleration -> rt_covariance_acceleration.
             enum class CovarianceKind
@@ -127,12 +164,11 @@ namespace DSR
 
             static std::optional<Edge> get_edge_RT(const Node &n, uint64_t to, const std::string &edge_type = "RT");
             std::optional<Mat::RTMat> get_RT_pose_from_parent(const Node &n, const std::string &edge_type = "RT");
-            // `applied_dt_ms` (optional) reports the signed milliseconds the pose was walked along its twist:
-            // 0 means the query was inside the ring and nothing was extrapolated, so a caller can tell
-            // "bracketed exactly" from "clamped and predicted" — a distinction the returned pose cannot
-            // carry. Always 0 for Nearest/Interpolated.
+            // Pass `info` to learn what the query did — above all whether it CLAMPED (see TimeQueryInfo).
+            // Optional so every existing call site is unchanged; a caller that omits it gets exactly the
+            // behaviour it had, including the silent clamp.
             std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest,
-                                                           std::int64_t *applied_dt_ms = nullptr);
+                                                           TimeQueryInfo *info = nullptr);
             // `kind` is last so existing pose-covariance call sites keep compiling unchanged.
             std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
             std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
