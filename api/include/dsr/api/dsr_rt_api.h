@@ -1,6 +1,49 @@
 #ifndef RTAPI
 #define RTAPI
 
+/* =================================================================================================
+ * RT_API — the RT (rigid transform) edges of the graph, and how to ask them for a POSE AT A TIME.
+ *
+ * An RT edge is not one transform. It carries a HISTORY RING of HISTORY_SIZE blocks: rt_translation
+ * and rt_rotation_euler_xyz hold 3 floats per block, rt_timestamps the instant each block is valid
+ * for, and rt_head_index which slot is written next. insert_or_assign_edge_RT advances that ring;
+ * get_edge_RT_as_rtmat reads it back at a requested timestamp.
+ *
+ * WHY A HISTORY AT ALL. A consumer's data has its own capture stamp — a LiDAR sweep, a camera frame —
+ * and the pose that belongs with it is the pose the robot held AT THAT INSTANT, not the newest one.
+ * Registering a cloud against "the latest pose" smears it by (pose age x speed), which is invisible
+ * standing still and becomes a bulk omega*dt rotation the moment the robot turns.
+ *
+ * ── THE TWIST RING (rt_twist_linear / rt_twist_angular) ─────────────────────────────────────────
+ * Each block may also carry the CHILD'S VELOCITY as measured at that block, in the same slot, so it
+ * inherits that block's timestamp. Write it through the RTBlock overload of insert_or_assign_edge_RT,
+ * never as loose attributes: a twist with no slot and no stamp cannot be paired with a transform, and
+ * a reader cannot tell a fresh one from a dead producer's last.
+ * ★AXIS ORDER, in the CHILD frame's own axes — [vx,vy,vz], [wx,wy,wz]. This is the whole reason for
+ * the name: the older rt_translation_velocity is ARRAY order in a producer-specific body convention
+ * ([adv, side, _] on a robot whose +Y is forward) sitting beside rt_translation in true axis order on
+ * the SAME EDGE, and re-encoding that convention per consumer produced the identical 90-degree bug in
+ * three of them. With axis order, dp = R*v*dt is correct without knowing whose robot this is.
+ *
+ * ── ASKING FOR A TIME: TimeQuery, AND THE CLAMP ─────────────────────────────────────────────────
+ * Nearest / Interpolated / Extrapolated, below. The one thing to understand before using any of them:
+ *
+ *   ★A TIMESTAMPED QUERY THAT FALLS OUTSIDE THE RING RETURNS THE END BLOCK AND LOOKS LIKE A SUCCESS.
+ *
+ * That is not an edge case. It is the NORMAL case for a consumer whose data is fresher than the pose
+ * feed — a pose derived FROM a scan can only arrive after it — so the freshest scan routinely outruns
+ * the freshest block. The returned RTMat cannot express "this is from a different instant", which is
+ * why the same defect has been re-diagnosed downstream as a sensor fault, a calibration error and a
+ * localiser problem in turn.
+ * Two facilities exist for it, and they answer different questions:
+ *   - TimeQuery::Extrapolated walks the end block along its own twist onto the instant asked for,
+ *     bounded by the ring's own span (a twist is evidence on the timescale it was sampled at).
+ *   - TimeQueryInfo reports what actually happened — above all Clamped and Stale. Pass it whenever
+ *     the answer matters; a caller that omits it keeps the old silent behaviour by construction.
+ *
+ * Both are OPT-IN and additive: every call site written before them behaves exactly as it did.
+ * ================================================================================================= */
+
 #include <cassert>
 #include <QtCore>
 #include <dsr/core/types/internal_types.h>
