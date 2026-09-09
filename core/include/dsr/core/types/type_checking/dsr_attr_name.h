@@ -876,6 +876,22 @@ REGISTER_TYPE(semantic_height,        int,                                      
 REGISTER_TYPE(semantic_timestamp_ms,  uint64_t,                                           false)
 REGISTER_TYPE(semantic_frame_id,      int,                                                false)
 
+// ── graded semantic POSTERIOR, alongside the argmax label map above. Written by retina from the
+//    YOLO26-sem "-probs" export, which exposes a `class_probs` output for a SUBSET of ADE20K classes
+//    (the model's own `prob_class_ids` metadata names them: wall, cabinet, door, shelf, hood).
+//    Purpose: an absence has to cost something. A concept agent that sees no mask on a frame samples
+//    max P(class) over its own projected silhouette and weights the absence by it, instead of treating
+//    "no detection" as "not there" — a hard classifier's silence is not evidence of absence.
+//    Layout: semantic_class_probs is K planes of prob_height x prob_width, row-major, plane-major
+//    (plane k at offset k*h*w), each in [0,1]. Normalised image coords: a plane maps onto the SAME
+//    frame as semantic_labels, so a consumer samples at (u/width, v/height) and scales into w x h.
+//    It is COARSE on purpose (80x80x5 = 128 kB at ~2 Hz, ~14x under the dense label blob).
+//    class ids go as FLOAT: cortex registers no int-vector type (mask_label_ids sets the precedent).
+REGISTER_TYPE(semantic_class_probs,   std::reference_wrapper<const std::vector<float>>,   false)
+REGISTER_TYPE(semantic_prob_class_ids,std::reference_wrapper<const std::vector<float>>,   false)
+REGISTER_TYPE(semantic_prob_width,    int,                                                false)
+REGISTER_TYPE(semantic_prob_height,   int,                                                false)
+
 // ── affordance / viewpoint CONTRACT (common/affordance_protocol.h, written by EVERY concept agent) ──
 //    Registered 2026-07-24 so write_contract()/write_viewpoint() use the TYPE-ATTRIBUTED setters instead
 //    of runtime_checked_* string writes (see CLAUDE.md). The read side (read_contract/attr_scalar/
