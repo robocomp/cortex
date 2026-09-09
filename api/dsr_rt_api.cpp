@@ -39,6 +39,47 @@ namespace
         return make_rtmat(translation_at(translation_pack, block_index), rotation_at(rotation_pack, block_index));
     }
 
+    // ── WALK A BLOCK ALONG ITS OWN TWIST ────────────────────────────────────────────────────────
+    // Exp(xi*dt) for the twist stored WITH that block, composed on the RIGHT of the block's pose:
+    //
+    //     parent<-child(t) = parent<-child(t_block) . child(t_block)<-child(t)
+    //
+    // Right-multiplication is not a detail, it is what makes this frame-agnostic. The twist is
+    // expressed in the CHILD's own axes (see rt_twist_linear in dsr_attr_name.h), so the increment is
+    // built entirely in the child frame and needs NOTHING from the base pose — no yaw extraction, no
+    // assumption that the parent is level. A version that rotates the displacement into the parent
+    // frame first has to dig a heading out of the base matrix, which is only meaningful for a planar
+    // chain; this one is correct for any parent.
+    //
+    // ★PLANAR BY CONSTRUCTION. Only vx, vy and wz are used: the producers of this channel measure a
+    // ground robot's odometry, and inventing a z/roll/pitch prediction from a twist nobody measures
+    // would be worse than leaving those components alone. dt may be NEGATIVE (walk back before the
+    // oldest block); the algebra is identical.
+    Mat::RTMat extrapolate_along_twist(const Mat::RTMat &base,
+                                       const std::vector<float> &twist_linear,
+                                       const std::vector<float> &twist_angular,
+                                       std::size_t block_index, double dt_s)
+    {
+        const double vx = twist_linear[block_index] * dt_s;      // displacement over dt, child axes
+        const double vy = twist_linear[block_index + 1] * dt_s;
+        const double phi = twist_angular[block_index + 2] * dt_s; // yaw swept over dt
+        // SE(2) exponential. The left Jacobian turns the body velocity into the CHORD of the arc the
+        // child actually drove; v*dt alone follows the tangent and cuts the corner by phi^2/24 -- at
+        // phi = 0.1 rad that is already ~0.2% of the displacement, and free to do right. The limit as
+        // phi -> 0 is the straight step, which is why the guard returns v*dt rather than dividing.
+        double dx = vx, dy = vy;
+        if (std::abs(phi) > 1e-9)
+        {
+            const double sn = std::sin(phi), cs = std::cos(phi);
+            dx = ( sn * vx - (1.0 - cs) * vy) / phi;
+            dy = ((1.0 - cs) * vx +  sn   * vy) / phi;
+        }
+        Mat::RTMat delta(Mat::RTMat::Identity());
+        delta.linear() = Eigen::AngleAxisd(phi, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+        delta.translation() = Eigen::Vector3d(dx, dy, 0.0);
+        return Mat::RTMat(base * delta);
+    }
+
     CovarianceMatrix covariance_at(const std::vector<float> &covariance_pack, std::size_t block_index)
     {
         CovarianceMatrix covariance = CovarianceMatrix::Zero();
@@ -171,9 +212,11 @@ std::optional<Mat::RTMat> RT_API::get_RT_pose_from_parent(const Node &n, const s
     return {};
 }
 
-std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query)
+std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp, TimeQuery time_query,
+                                                        std::int64_t *applied_dt_ms)
 {
     CORTEX_PROFILE_ZONE_N("RT_API::get_edge_RT_as_rtmat");
+    if (applied_dt_ms != nullptr) *applied_dt_ms = 0;
     auto r_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge);
     auto t_o =  G->get_attrib_by_name<rt_translation_att>(edge);
     auto head_o = G->get_attrib_by_name<rt_head_index_att>(edge);
@@ -200,11 +243,62 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                 const auto blocks = valid_blocks(tstamps, t, &r);
                 if (not blocks.empty())
                 {
-                    if (time_query == TimeQuery::Interpolated)
+                    if (time_query == TimeQuery::Interpolated or time_query == TimeQuery::Extrapolated)
                     {
                         const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
                         if (lower.second == upper.second)
-                            return rtmat_at(t, r, lower.second);
+                        {
+                            // ── THE CLAMP, AND THE ONLY PLACE Extrapolated DIFFERS ──────────────
+                            // bracketing_blocks returns the same block twice when the query fell
+                            // outside the ring (or landed exactly on a block, where there is nothing
+                            // to predict because dt is 0). Interpolated stops here and hands back a
+                            // pose from the wrong instant; Extrapolated walks it onto the instant
+                            // that was asked for, using the twist stored WITH this block.
+                            const auto base = rtmat_at(t, r, lower.second);
+                            if (time_query != TimeQuery::Extrapolated)
+                                return base;
+                            std::optional<std::vector<float>> twl = G->get_attrib_by_name<rt_twist_linear_att>(edge);
+                            std::optional<std::vector<float>> twa = G->get_attrib_by_name<rt_twist_angular_att>(edge);
+                            // No twist on this edge -> behave exactly as Interpolated. Every static
+                            // mount takes this path, which is what lets a caller pass Extrapolated
+                            // down a whole chain and have only the moving edge respond to it.
+                            if (not twl.has_value() or not twa.has_value()
+                                or twl->size() <= lower.second + 2 or twa->size() <= lower.second + 2)
+                                return base;
+                            const std::int64_t dt_ms = static_cast<std::int64_t>(timestamp)
+                                                     - static_cast<std::int64_t>(lower.first);
+                            if (dt_ms == 0)
+                                return base;
+                            // ── HOW FAR MAY A TWIST BE ASKED TO PREDICT? THE RING ANSWERS. ──────
+                            // ★MEASURED BUG, 2026-09-09, and it is why this is not left to the caller.
+                            // On this robot the chain is root -> Shadow -> room. room_concept
+                            // publishes the live twist on Shadow->room, but root->Shadow ALSO carries
+                            // twist attributes, written once and then never again. Asked for a pose
+                            // 60 ms ahead, this walked that stale edge 1,939,575 ms — 32 minutes —
+                            // and reported it. The pose damage was ~0 only because that particular
+                            // twist is ~0; the REPORTED dt was not, and since a chain reports the
+                            // largest dt of any edge, every caller's horizon cap would have fired and
+                            // silently disabled extrapolation fleet-wide while appearing to work.
+                            // ★THE BOUND IS THE EDGE'S OWN RING SPAN, not a constant. A twist is
+                            // evidence about motion on the timescale it was sampled at; predicting one
+                            // ring-span ahead is an extrapolation, predicting ten thousand of them is
+                            // not a less accurate answer but an unjustified one. The span is what that
+                            // channel itself says its timescale is (~204 ms measured on the live
+                            // Shadow->room edge), it costs no configuration, and it adapts to a
+                            // producer that speeds up or slows down.
+                            // ★REFUSING IS REPORTED AS applied_dt_ms == 0, i.e. "this pose was not
+                            // walked" — which is exactly what a caller needs to know, and is why the
+                            // refusal returns the clamped block rather than a partially-walked pose.
+                            // Staleness is a different question with a different instrument: read the
+                            // ring bounds if that is what you want to know.
+                            const std::int64_t ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
+                                                            - static_cast<std::int64_t>(blocks.front().first);
+                            if (ring_span_ms <= 0 or std::llabs(dt_ms) > ring_span_ms)
+                                return base;
+                            if (applied_dt_ms != nullptr) *applied_dt_ms = dt_ms;
+                            return extrapolate_along_twist(base, twl.value(), twa.value(), lower.second,
+                                                           static_cast<double>(dt_ms) * 1e-3);
+                        }
 
                         const auto alpha = interpolation_factor(lower, upper, timestamp);
                         auto lower_rotation = rotation_at(r, lower.second);
@@ -460,32 +554,42 @@ bool RT_API::insert_or_assign_edge_RT_covariance(uint64_t node_id, uint64_t to, 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler, std::optional<uint64_t> timestamp)
 {
     CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT(copy)");
-    insert_or_assign_edge_RT_impl(n, to, trans, rot_euler, std::nullopt, timestamp);
+    insert_or_assign_edge_RT_impl(n, to, RTBlock{.translation = trans, .rotation_euler = rot_euler}, timestamp);
 }
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler, std::optional<uint64_t> timestamp)
 {
     CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT(move)");
-    insert_or_assign_edge_RT_impl(n, to, std::move(trans), std::move(rot_euler), std::nullopt, timestamp);
+    insert_or_assign_edge_RT_impl(n, to, RTBlock{.translation = std::move(trans),
+                                                 .rotation_euler = std::move(rot_euler)}, timestamp);
 }
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, const std::vector<float> &trans, const std::vector<float> &rot_euler,
                                       const std::vector<float> &covariance, std::optional<uint64_t> timestamp)
 {
-    insert_or_assign_edge_RT_impl(n, to, trans, rot_euler, covariance, timestamp);
+    insert_or_assign_edge_RT_impl(n, to, RTBlock{.translation = trans, .rotation_euler = rot_euler,
+                                                 .covariance = covariance}, timestamp);
 }
 
 void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler,
                                       std::vector<float> &&covariance, std::optional<uint64_t> timestamp)
 {
-    insert_or_assign_edge_RT_impl(n, to, std::move(trans), std::move(rot_euler), std::move(covariance), timestamp);
+    insert_or_assign_edge_RT_impl(n, to, RTBlock{.translation = std::move(trans),
+                                                 .rotation_euler = std::move(rot_euler),
+                                                 .covariance = std::move(covariance)}, timestamp);
+}
+
+void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, RTBlock block, std::optional<uint64_t> timestamp)
+{
+    CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT(block)");
+    insert_or_assign_edge_RT_impl(n, to, std::move(block), timestamp);
 }
 
 void RT_API::insert_or_assign_edge_RT_identity(Node &n, uint64_t to, std::optional<uint64_t> timestamp)
 {
     CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT_identity");
-    insert_or_assign_edge_RT_impl(n, to, std::vector<float>{0.f, 0.f, 0.f}, std::vector<float>{0.f, 0.f, 0.f},
-                                  std::nullopt, timestamp);
+    insert_or_assign_edge_RT_impl(n, to, RTBlock{.translation = std::vector<float>{0.f, 0.f, 0.f},
+                                                 .rotation_euler = std::vector<float>{0.f, 0.f, 0.f}}, timestamp);
 }
 
 bool RT_API::insert_or_assign_edge_RT_identity(uint64_t node_id, uint64_t to, std::optional<uint64_t> timestamp)
@@ -499,13 +603,33 @@ bool RT_API::insert_or_assign_edge_RT_identity(uint64_t node_id, uint64_t to, st
     return false;
 }
 
-void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<float> trans, std::vector<float> rot_euler,
-                                           std::optional<std::vector<float>> covariance, std::optional<uint64_t> timestamp)
+void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, RTBlock block, std::optional<uint64_t> timestamp)
 {
-    if (covariance.has_value() && covariance->size() != RT_COVARIANCE_BLOCK_SIZE)
-        throw std::runtime_error("RT covariance must contain exactly 36 float values");
+    auto &trans = block.translation;
+    auto &rot_euler = block.rotation_euler;
+    auto &covariance = block.covariance;
+
+    // Reject a short payload rather than packing it: a block silently written 2-of-3 wide reads back
+    // as a plausible pose with someone else's third component, and nothing downstream can detect it.
+    const auto require = [](const std::optional<std::vector<float>> &v, std::size_t want, const char *what)
+    {
+        if (v.has_value() and v->size() != want)
+            throw std::runtime_error(std::string("RT ") + what + " must contain exactly "
+                                     + std::to_string(want) + " float values");
+    };
+    require(covariance, RT_COVARIANCE_BLOCK_SIZE, "covariance");
+    require(block.twist_covariance, RT_COVARIANCE_BLOCK_SIZE, "twist covariance");
+    require(block.twist_linear, static_cast<std::size_t>(BLOCK_SIZE), "linear twist");
+    require(block.twist_angular, static_cast<std::size_t>(BLOCK_SIZE), "angular twist");
 
     const bool with_covariance = covariance.has_value();
+    // ★THE TWIST PAIR IS ALL-OR-NOTHING. Half a twist is not a conservative subset of one — a reader
+    // that finds a linear rate and no angular rate cannot tell "the child is not rotating" from "the
+    // producer did not measure rotation", and the first reading turns a pivot into a straight line.
+    const bool with_twist = block.twist_linear.has_value() and block.twist_angular.has_value();
+    if (block.twist_linear.has_value() != block.twist_angular.has_value())
+        throw std::runtime_error("RT twist must supply BOTH twist_linear and twist_angular, or neither");
+    const bool with_twist_cov = with_twist and block.twist_covariance.has_value();
 
     auto edge = G->get_edge(n.id(), to, "RT").value_or(Edge::create<RT_edge_type>(n.id(), to));
     if (HISTORY_SIZE <= 0)
@@ -514,6 +638,13 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
         G->add_or_modify_attrib_local<rt_rotation_euler_xyz_att>(edge, std::move(rot_euler));
         if (with_covariance)
             G->add_or_modify_attrib_local<rt_covariance_att>(edge, std::move(covariance.value()));
+        if (with_twist)
+        {
+            G->add_or_modify_attrib_local<rt_twist_linear_att>(edge, std::move(block.twist_linear.value()));
+            G->add_or_modify_attrib_local<rt_twist_angular_att>(edge, std::move(block.twist_angular.value()));
+            if (with_twist_cov)
+                G->add_or_modify_attrib_local<rt_covariance_velocity_att>(edge, std::move(block.twist_covariance.value()));
+        }
     }
     else
     {
@@ -537,6 +668,41 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             cov_pack = cov_pack_o.value_or(std::vector<float>(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE, 0.f));
             if (cov_pack.size() < RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE)
                 cov_pack.resize(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE);
+        }
+        // ── THE TWIST RING, SLOTTED BY THE SAME HEAD INDEX AS THE POSE ─────────────────────────
+        // Which is the whole reason it lives in here rather than beside the call: block i of the twist
+        // is then the twist AT block i of the pose, and it inherits block i's timestamp. A twist
+        // written through a separate edge round trip has no slot and no stamp, so a reader cannot pair
+        // it with a transform, cannot tell whether it is fresh, and cannot integrate across an
+        // interval. An edge that was carrying pose-only history starts its twist packs at zero and
+        // fills them going forward; a reader must therefore treat an all-zero block as "no twist
+        // recorded for this slot", which is what a stationary child looks like too — harmless, since
+        // both mean "predict no motion".
+        std::vector<float> twl_pack, twa_pack, twcov_pack;
+        if (with_twist)
+        {
+            // The two-step through a value optional is not a style choice: get_attrib_by_name returns
+            // optional<reference_wrapper<const vector>>, which cannot value_or a vector. Same shape as
+            // tr_pack_o/rot_pack_o above.
+            std::optional<std::vector<float>> twl_pack_o = G->get_attrib_by_name<rt_twist_linear_att>(edge);
+            std::optional<std::vector<float>> twa_pack_o = G->get_attrib_by_name<rt_twist_angular_att>(edge);
+            twl_pack = twl_pack_o.value_or(std::vector<float>(BLOCK_SIZE * HISTORY_SIZE, 0.f));
+            twa_pack = twa_pack_o.value_or(std::vector<float>(BLOCK_SIZE * HISTORY_SIZE, 0.f));
+            if (twl_pack.size() < BLOCK_SIZE * HISTORY_SIZE) twl_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+            if (twa_pack.size() < BLOCK_SIZE * HISTORY_SIZE) twa_pack.resize(BLOCK_SIZE * HISTORY_SIZE);
+            if (with_twist_cov)
+            {
+                std::optional<std::vector<float>> twcov_pack_o =
+                    G->get_attrib_by_name<rt_covariance_velocity_att>(edge);
+                twcov_pack = twcov_pack_o.value_or(
+                    std::vector<float>(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE, 0.f));
+                // A pre-existing FLAT 36-float velocity covariance (the layout producers wrote before
+                // this overload existed) is not a short ring — resizing would leave its single block in
+                // slot 0 and zeros elsewhere, which reads as "slot 0 is certain, the rest are perfect".
+                // Start the ring clean instead.
+                if (twcov_pack.size() < RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE)
+                    twcov_pack.assign(RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE, 0.f);
+            }
         }
 
         bool update_index = true;
@@ -563,6 +729,12 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             if (pos == timestamp_index && timestamp_v < time_stamps[pos]) return;
             if (pos >= timestamp_index) update_index = false;
 
+            // ★EVERY PACK MOVES TOGETHER OR NONE OF THEM DOES. This branch re-sorts the ring by
+            // erasing one slot and re-inserting it at its correct chronological position; a pack left
+            // out of that shuffle stays indexed by the OLD slot order while the timestamps use the new
+            // one. Nothing detects that: the block is well-formed, it is simply attached to a
+            // different instant than the pose beside it, so a consumer confidently extrapolates with
+            // the wrong twist. Add any future per-block pack here as well as below.
             time_stamps.erase(time_stamps.begin() + timestamp_index);
             tr_pack.erase(tr_pack.begin() + index, tr_pack.begin() + index + BLOCK_SIZE);
             rot_pack.erase(rot_pack.begin() + index, rot_pack.begin() + index + BLOCK_SIZE);
@@ -570,6 +742,17 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             {
                 const auto covariance_index = timestamp_index * RT_COVARIANCE_BLOCK_SIZE;
                 cov_pack.erase(cov_pack.begin() + covariance_index, cov_pack.begin() + covariance_index + RT_COVARIANCE_BLOCK_SIZE);
+            }
+            if (with_twist)
+            {
+                twl_pack.erase(twl_pack.begin() + index, twl_pack.begin() + index + BLOCK_SIZE);
+                twa_pack.erase(twa_pack.begin() + index, twa_pack.begin() + index + BLOCK_SIZE);
+                if (with_twist_cov)
+                {
+                    const auto tcov_index = timestamp_index * RT_COVARIANCE_BLOCK_SIZE;
+                    twcov_pack.erase(twcov_pack.begin() + tcov_index,
+                                     twcov_pack.begin() + tcov_index + RT_COVARIANCE_BLOCK_SIZE);
+                }
             }
 
             const auto insert_index = pos * BLOCK_SIZE;
@@ -581,6 +764,16 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             rot_pack.insert(rot_pack.begin() + insert_index + 2, rot_euler[2]);
             if (with_covariance)
                 cov_pack.insert(cov_pack.begin() + pos * RT_COVARIANCE_BLOCK_SIZE, covariance->begin(), covariance->end());
+            if (with_twist)
+            {
+                twl_pack.insert(twl_pack.begin() + insert_index,
+                                block.twist_linear->begin(), block.twist_linear->end());
+                twa_pack.insert(twa_pack.begin() + insert_index,
+                                block.twist_angular->begin(), block.twist_angular->end());
+                if (with_twist_cov)
+                    twcov_pack.insert(twcov_pack.begin() + pos * RT_COVARIANCE_BLOCK_SIZE,
+                                      block.twist_covariance->begin(), block.twist_covariance->end());
+            }
             time_stamps.insert(time_stamps.begin() + pos, timestamp_v);
         }
         else
@@ -593,6 +786,14 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
             rot_pack[index + 2] = rot_euler[2];
             if (with_covariance)
                 std::copy(covariance->begin(), covariance->end(), cov_pack.begin() + timestamp_index * RT_COVARIANCE_BLOCK_SIZE);
+            if (with_twist)
+            {
+                std::copy(block.twist_linear->begin(), block.twist_linear->end(), twl_pack.begin() + index);
+                std::copy(block.twist_angular->begin(), block.twist_angular->end(), twa_pack.begin() + index);
+                if (with_twist_cov)
+                    std::copy(block.twist_covariance->begin(), block.twist_covariance->end(),
+                              twcov_pack.begin() + timestamp_index * RT_COVARIANCE_BLOCK_SIZE);
+            }
             time_stamps[timestamp_index] = timestamp_v;
         }
 
@@ -600,6 +801,13 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<flo
         G->add_or_modify_attrib_local<rt_translation_att>(edge, std::move(tr_pack));
         if (with_covariance)
             G->add_or_modify_attrib_local<rt_covariance_att>(edge, std::move(cov_pack));
+        if (with_twist)
+        {
+            G->add_or_modify_attrib_local<rt_twist_linear_att>(edge, std::move(twl_pack));
+            G->add_or_modify_attrib_local<rt_twist_angular_att>(edge, std::move(twa_pack));
+            if (with_twist_cov)
+                G->add_or_modify_attrib_local<rt_covariance_velocity_att>(edge, std::move(twcov_pack));
+        }
         if (update_index)
             G->add_or_modify_attrib_local<rt_head_index_att>(edge, index + BLOCK_SIZE);
         G->add_or_modify_attrib_local<rt_timestamps_att>(edge, std::move(time_stamps));

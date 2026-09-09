@@ -136,8 +136,25 @@ REGISTER_TYPE(creation_timestamp, float, true)
 REGISTER_TYPE(rt_rotation_euler_xyz, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_translation, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_quaternion, std::reference_wrapper<const std::vector<float>>, true)
+// ── DEPRECATED (2026-09-09), kept until every consumer moves to rt_twist_* below ────────────────
+// These two are a bare 3-vector each, overwritten on every publish: no ring slot, no head index and
+// NO TIMESTAMP OF THEIR OWN, so a reader cannot tell which pose block a value belongs to, nor that
+// it went stale when a producer died. Worse, their layout is ARRAY order in a producer-specific body
+// convention ([adv, side, 0] on a robot whose +Y is forward) while rt_translation on the SAME EDGE is
+// true axis order — a mismatch that has cost the same 90-degree bug in three separate consumers.
 REGISTER_TYPE(rt_translation_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_rotation_euler_xyz_velocity, std::reference_wrapper<const std::vector<float>>, true)
+// ── THE TWIST OF THE CHILD FRAME, RING-PACKED IN LOCKSTEP WITH THE POSE ─────────────────────────
+// BLOCK_SIZE(3) x HISTORY_SIZE floats each, slotted by the SAME rt_head_index as rt_translation, so
+// block i of the twist is the twist AT block i of the pose and carries block i's timestamp.
+// ★AXIS ORDER, NOT ARRAY ORDER, AND THAT IS THE WHOLE POINT OF THE NEW NAME.
+//   rt_twist_linear  = [vx, vy, vz]  m/s     expressed in the CHILD frame's own axes
+//   rt_twist_angular = [wx, wy, wz]  rad/s   expressed in the CHILD frame's own axes
+// So a forward-driving robot whose body frame is +Y forward writes its advance rate in SLOT 1, not
+// slot 0. A consumer never needs to know that convention: dp = R * v * dt is correct as written,
+// which is what lets the extrapolation live in RT_API instead of being re-derived per agent.
+REGISTER_TYPE(rt_twist_linear, std::reference_wrapper<const std::vector<float>>, true)
+REGISTER_TYPE(rt_twist_angular, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_translation_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_rotation_euler_xyz_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_timestamps, std::reference_wrapper<const std::vector<uint64_t>> , false)

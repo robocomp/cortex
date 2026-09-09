@@ -19,10 +19,19 @@ InnerEigenAPI::InnerEigenAPI(DSR::DSRGraph *G_)
 ////// TRANSFORMATION MATRIX
 ////////////////////////////////////////////////////////////////////////////////////////
 
-std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp, const std::string &edge_type, RT_API::TimeQuery time_query)
+std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp, const std::string &edge_type, RT_API::TimeQuery time_query,
+                                                                  std::int64_t *applied_dt_ms)
 {
     if( not DSR::DSRGraph::is_valid_edge_type(edge_type)) 
         return {};
+    if (applied_dt_ms != nullptr) *applied_dt_ms = 0;
+    // Keep the largest-magnitude edge dt seen while composing (see the header). Signed, so a caller
+    // can still tell a forward prediction from a backward one.
+    std::int64_t edge_dt = 0;
+    const auto note_dt = [&](std::int64_t dt)
+    {
+        if (applied_dt_ms != nullptr and std::llabs(dt) > std::llabs(*applied_dt_ms)) *applied_dt_ms = dt;
+    };
     const bool use_cache = (timestamp == 0);
     KeyTransform key = std::make_tuple(dest, orig, edge_type);
     if(use_cache)
@@ -58,8 +67,9 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                 qWarning() << __FUNCTION__ << ":"<<__LINE__<< " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
                 return {};
             }
-            if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query); rtmat.has_value())
+            if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query, &edge_dt); rtmat.has_value())
             {
+                note_dt(edge_dt);
                 atotal = rtmat.value() * atotal;
                 if(use_cache)
                     node_map[p_node.value().id()].push_back(key); // update node cache reference
@@ -79,8 +89,9 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                 qWarning() << __FUNCTION__ << ":"<<__LINE__ << " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
                 return {};
             }
-            if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query); rtmat.has_value())
+            if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query, &edge_dt); rtmat.has_value())
             {
+                note_dt(edge_dt);
                 btotal = rtmat.value() * btotal;
                 if(use_cache)
                     node_map[p_node.value().id()].push_back(key); // update node cache reference
@@ -109,8 +120,10 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                     qWarning() << __FUNCTION__ << ":"<<__LINE__ << " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
                     return {};
                 }
-                auto a_rtmat = rt->get_edge_RT_as_rtmat(a_edge_rt.value(), timestamp, time_query);
-                auto b_rtmat = rt->get_edge_RT_as_rtmat(b_edge_rt.value(), timestamp, time_query);
+                std::int64_t a_dt = 0, b_dt = 0;
+                auto a_rtmat = rt->get_edge_RT_as_rtmat(a_edge_rt.value(), timestamp, time_query, &a_dt);
+                auto b_rtmat = rt->get_edge_RT_as_rtmat(b_edge_rt.value(), timestamp, time_query, &b_dt);
+                note_dt(a_dt); note_dt(b_dt);
                 if(a_rtmat.has_value() and b_rtmat.has_value())
                 {
                     atotal = a_rtmat.value() * atotal;

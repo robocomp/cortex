@@ -36,7 +36,14 @@ namespace DSR
             ////////////////////////////////////////////////
             /// Transformation matrix retrieval methods
             ////////////////////////////////////////////////
-            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            // `applied_dt_ms` (optional, TimeQuery::Extrapolated only) reports the LARGEST-MAGNITUDE
+            // signed dt any single edge in the chain was walked by. 0 means every edge was bracketed
+            // inside its ring and the result is pure interpolation. The maximum rather than a sum,
+            // because the edges are composed, not travelled in series: one moving edge extrapolated by
+            // 30 ms and four static mounts contributing nothing is a 30 ms prediction, not 30 ms of
+            // accumulated error. In practice exactly one edge in a chain carries a twist.
+            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest,
+                                                                std::int64_t *applied_dt_ms = nullptr);
             std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
             std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
             std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);

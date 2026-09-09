@@ -19,7 +19,28 @@ namespace DSR
             enum class TimeQuery
             {
                 Nearest,
-                Interpolated
+                // Between two blocks, lerp the translation and slerp the rotation. OUTSIDE the ring
+                // it CLAMPS to the end block and says nothing about having done so — the caller gets
+                // a confident pose from the wrong instant. That clamp is the normal case for a
+                // consumer whose data is fresher than the pose feed (a pose derived FROM a scan can
+                // only arrive after it), and it registers a whole cloud with a pose |dt| ms old,
+                // which is invisible at rest and turns into a bulk omega*dt rotation the moment the
+                // robot turns.
+                Interpolated,
+                // Interpolated INSIDE the ring, and past its ends walk the pose along the twist
+                // stored with the end block (rt_twist_linear / rt_twist_angular). Opt-in, because it
+                // changes what every existing caller would receive.
+                // ★NO HORIZON CAP, DELIBERATELY, AND THE CALLER MUST SUPPLY ONE. Skipping the walk is
+                // not the neutral choice it looks like — it is the same extrapolation with the
+                // velocity assumed to be ZERO, which is strictly worse than integrating a twist that
+                // was actually measured. But nor may this run unbounded across a dead producer, and
+                // cortex cannot know a caller's tolerance (measured policies in this fleet differ by
+                // design, from 0.2 s to none at all). So it always reports how far it walked through
+                // `applied_dt_ms`: bound it there, or watch it and say so.
+                // Requires a twist on the edge; an edge without one (every static mount) falls
+                // through to the Interpolated behaviour, which is what makes this safe to pass down
+                // a whole chain.
+                Extrapolated
             };
 
             // Which of the three 6x6 covariance blocks stored on an RT edge is addressed.
@@ -42,6 +63,35 @@ namespace DSR
                                           const std::vector<float> &covariance, std::optional<uint64_t> timestamp = std::nullopt);
             void insert_or_assign_edge_RT(Node &n, uint64_t to, std::vector<float> &&trans, std::vector<float> &&rot_euler,
                                           std::vector<float> &&covariance, std::optional<uint64_t> timestamp = std::nullopt);
+
+            // ── EVERYTHING THAT BELONGS TO ONE RING BLOCK, IN ONE EDGE ROUND TRIP ───────────────
+            // The overloads above write the pose (and optionally its covariance) into a history slot.
+            // A producer that also measures the child's VELOCITY had no way to put it in the same slot:
+            // it had to fetch the edge, add the twist attributes and insert_or_assign_edge it, then call
+            // one of the above — two round trips, and the first one re-publishes the ring state as of
+            // its own fetch. The documented workaround was to order the two writes so the ring advance
+            // lands last. This overload removes the need for that rule: one fetch, one slot, one publish.
+            //
+            // ★TWIST AXIS ORDER. twist_linear/twist_angular are [x,y,z] in the CHILD frame's OWN AXES,
+            // not the [adv, side, _] array order of the deprecated rt_translation_velocity. See the note
+            // on rt_twist_linear in dsr_attr_name.h — a consumer must be able to write dp = R*v*dt
+            // without knowing the producer's body convention, or the convention has to be re-encoded
+            // (and mis-encoded) in every consumer, which is exactly what happened.
+            //
+            // Any optional left empty is simply not written, so this overload can carry a pose alone.
+            // Sizes are checked: translation/rotation/twists must be 3, covariances 36 (row-major SE(3),
+            // [x,y,z,rx,ry,rz]), or it throws rather than silently packing a short block.
+            struct RTBlock
+            {
+                std::vector<float> translation;                     // [x,y,z] in the PARENT frame
+                std::vector<float> rotation_euler;                  // [rx,ry,rz]
+                std::optional<std::vector<float>> covariance;       // 36, pose
+                std::optional<std::vector<float>> twist_linear;     // [vx,vy,vz] m/s,   CHILD axes
+                std::optional<std::vector<float>> twist_angular;    // [wx,wy,wz] rad/s, CHILD axes
+                std::optional<std::vector<float>> twist_covariance; // 36, velocity
+            };
+            void insert_or_assign_edge_RT(Node &n, uint64_t to, RTBlock block,
+                                          std::optional<uint64_t> timestamp = std::nullopt);
 
             // Hang `to` from `n` with the IDENTITY transform: zero translation, zero euler rotation.
             // The child's frame then coincides with the parent's, so a node inserted purely to give a
@@ -77,7 +127,12 @@ namespace DSR
 
             static std::optional<Edge> get_edge_RT(const Node &n, uint64_t to, const std::string &edge_type = "RT");
             std::optional<Mat::RTMat> get_RT_pose_from_parent(const Node &n, const std::string &edge_type = "RT");
-            std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
+            // `applied_dt_ms` (optional) reports the signed milliseconds the pose was walked along its twist:
+            // 0 means the query was inside the ring and nothing was extrapolated, so a caller can tell
+            // "bracketed exactly" from "clamped and predicted" — a distinction the returned pose cannot
+            // carry. Always 0 for Nearest/Interpolated.
+            std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest,
+                                                           std::int64_t *applied_dt_ms = nullptr);
             // `kind` is last so existing pose-covariance call sites keep compiling unchanged.
             std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
             std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
@@ -96,8 +151,7 @@ namespace DSR
             DSR::DSRGraph *G;
             static constexpr auto next = [](auto v, int size, int decr = 1) { return (v + decr) % size; };
             static constexpr auto prev = [](auto v, int size, int inc = 1) { return (v > 0) ? v - inc : size - inc; };
-            void insert_or_assign_edge_RT_impl(Node &n, uint64_t to, std::vector<float> trans, std::vector<float> rot_euler,
-                                               std::optional<std::vector<float>> covariance, std::optional<uint64_t> timestamp);
+            void insert_or_assign_edge_RT_impl(Node &n, uint64_t to, RTBlock block, std::optional<uint64_t> timestamp);
 
             // Shared BFS over the RT subtree rooted at start_id, re-deriving level = parent.level+1
             // and parent = RT source for every descendant. With repair=true it writes corrections;
