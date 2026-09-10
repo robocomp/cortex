@@ -171,6 +171,22 @@ namespace DSR
             // without knowing the producer's body convention, or the convention has to be re-encoded
             // (and mis-encoded) in every consumer, which is exactly what happened.
             //
+            // ★AND THE TWO COVARIANCES ARE IN DIFFERENT FRAMES, ON PURPOSE. This was undocumented
+            // until 2026-09-10 — the frame was stated for the translation and for the twists and left
+            // to be inferred for the blocks describing their uncertainty, which is the same shape of
+            // omission that let one axis convention be re-encoded, and mis-encoded, in three consumers.
+            // A covariance lives in the coordinates of the quantity it describes: the pose is written
+            // in the PARENT frame, so its covariance is too; the twist is in CHILD axes, so its
+            // covariance is CHILD axes. They are not meant to match.
+            // ★THE PHYSICS IS WHY, NOT JUST THE BOOKKEEPING. A wheeled base's velocity uncertainty is
+            // anisotropic and BODY-FIXED — a differential drive knows its lateral rate far better than
+            // its forward one — so in child axes that block is a near-constant the producer can state
+            // once, while in the parent frame the very same physical claim becomes R*Sigma*R^T, a
+            // different 36 floats every publish and no longer sparse. Rotating once, inside the one
+            // function that combines the two (get_edge_RT_covariance under TimeQuery::Extrapolated,
+            // J = R*dt), is strictly cheaper and puts the frame conversion in a single auditable place
+            // instead of in every producer.
+            //
             // Any optional left empty is simply not written, so this overload can carry a pose alone.
             // Sizes are checked: translation/rotation/twists must be 3, covariances 36 (row-major SE(3),
             // [x,y,z,rx,ry,rz]), or it throws rather than silently packing a short block.
@@ -178,10 +194,10 @@ namespace DSR
             {
                 std::vector<float> translation;                     // [x,y,z] in the PARENT frame
                 std::vector<float> rotation_euler;                  // [rx,ry,rz]
-                std::optional<std::vector<float>> covariance;       // 36, pose
+                std::optional<std::vector<float>> covariance;       // 36, pose,  PARENT frame
                 std::optional<std::vector<float>> twist_linear;     // [vx,vy,vz] m/s,   CHILD axes
                 std::optional<std::vector<float>> twist_angular;    // [wx,wy,wz] rad/s, CHILD axes
-                std::optional<std::vector<float>> twist_covariance; // 36, velocity
+                std::optional<std::vector<float>> twist_covariance; // 36, twist, CHILD axes
             };
             void insert_or_assign_edge_RT(Node &n, uint64_t to, RTBlock block,
                                           std::optional<uint64_t> timestamp = std::nullopt);
