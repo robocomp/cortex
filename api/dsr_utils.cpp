@@ -262,8 +262,27 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
                     if (auto rt = G->get_rt_api(); rt != nullptr)
                         if (auto src = G->get_node(srcn); src.has_value())
                         {
-                            if (dynamic) rt->insert_or_assign_edge_RT(src.value(), dstn, tr.value(), rot.value());
-                            else         rt->insert_or_assign_edge_RT_static(src.value(), dstn, tr.value(), rot.value());
+                            // ★The RT API THROWS on a link into a node that is not in the file (and on a
+                            // source with no level). A bootstrap must not die of one bad line — the whole
+                            // point of loading it is to see what is there — so report it exactly as the
+                            // generic path below would and carry on to the next link. Without this catch
+                            // the RT route either aborts startup or, as it did before the writer was made
+                            // strict, swallows the fault entirely.
+                            try
+                            {
+                                if (dynamic) rt->insert_or_assign_edge_RT(src.value(), dstn, tr.value(), rot.value());
+                                else         rt->insert_or_assign_edge_RT_static(src.value(), dstn, tr.value(), rot.value());
+                            }
+                            catch (const std::exception &e)
+                            {
+                                if (not G->get_name_from_id(dstn).has_value())
+                                    qWarning() << "WARNING: " << __FILE__ << " " << __FUNCTION__
+                                               << " Dest Node " << dstn << " does not exist — RT link from "
+                                               << srcn << " dropped";
+                                else
+                                    qWarning() << "WARNING: " << __FILE__ << " " << __FUNCTION__
+                                               << " RT link " << srcn << " -> " << dstn << " rejected: " << e.what();
+                            }
                             continue;   // the RT API owns this edge; do not also insert the raw copy
                         }
             }

@@ -636,21 +636,55 @@ void RT_API::insert_or_assign_edge_RT_static(Node &n, uint64_t to, const std::ve
     G->add_or_modify_attrib_local<rt_translation_att>(edge, std::vector<float>(trans.begin(), trans.begin() + 3));
     G->add_or_modify_attrib_local<rt_rotation_euler_xyz_att>(edge, std::vector<float>(rot_euler.begin(), rot_euler.begin() + 3));
     G->add_or_modify_attrib_local<rt_static_att>(edge, true);
-    G->insert_or_assign_edge(edge);
 
-    // The parent/level bookkeeping every RT write owes the tree. Shared with the timestamped path so
-    // a static edge is not a second-class citizen in the hierarchy.
-    if (auto to_n = G->get_node(to); to_n.has_value())
+    // ★The parent/level bookkeeping every RT write owes the tree, and — just as importantly — the same
+    // FOUR failure checks the timestamped sibling makes. A static edge is not a second-class citizen:
+    // it must be as loud on a bad write as a dynamic one, or a link into nothing lands in silence.
+    // (It did: while this returned void and discarded every result, a dangling RT link in a bootstrap
+    //  JSON was absorbed without a word, because the loader routes RT links here and skips the generic
+    //  path's "Dest Node N does not exist" warning. Two months of a dangling body->210 link in
+    //  shadow.json went unreported that way.)
+    auto to_n = G->get_node(to);
+    if (!to_n.has_value())
+        throw std::runtime_error(
+                "Destination node " + std::to_string(to) + " not found in G in insert_or_assign_edge_RT_static() " +
+                __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
+
+    bool node_changed = false;
+    if (auto x = G->get_attrib_by_name<parent_att>(*to_n); !x.has_value() or x.value() != n.id())
     {
-        bool changed = false;
-        if (auto x = G->get_attrib_by_name<parent_att>(*to_n); not x.has_value() or x.value() != n.id())
-        { G->add_or_modify_attrib_local<parent_att>(*to_n, n.id()); changed = true; }
-        if (const auto lvl = G->get_node_level(n); lvl.has_value())
-            if (auto l = G->get_attrib_by_name<level_att>(*to_n); not l.has_value() or l.value() != lvl.value() + 1)
-            { G->add_or_modify_attrib_local<level_att>(*to_n, lvl.value() + 1); changed = true; }
-        if (changed) G->update_node(to_n.value());
+        G->add_or_modify_attrib_local<parent_att>(*to_n, n.id());
+        node_changed = true;
     }
-    walk_and_fix_levels(to, /*repair*/ true, /*report*/ false);
+
+    const auto n_level = G->get_node_level(n);
+    if (!n_level.has_value())
+        throw std::runtime_error(
+                "Source node " + std::to_string(n.id()) + " has no level in insert_or_assign_edge_RT_static() " +
+                __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
+    const auto next_level = n_level.value() + 1;
+    bool level_changed = false;
+    if (auto l = G->get_attrib_by_name<level_att>(*to_n); !l.has_value() or l.value() != next_level)
+    {
+        G->add_or_modify_attrib_local<level_att>(*to_n, next_level);
+        node_changed = true;
+        level_changed = true;
+    }
+
+    if (node_changed and !G->update_node(*to_n))
+        throw std::runtime_error(
+                "Could not update destination node " + std::to_string(to) + " in insert_or_assign_edge_RT_static() " +
+                __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
+
+    // Only on an actual re-parent, matching the timestamped path: a value-only rewrite of a mount
+    // leaves every level alone and must not pay for a subtree walk.
+    if (level_changed)
+        walk_and_fix_levels(to, /*repair*/ true, /*report*/ false);
+
+    if (!G->insert_or_assign_edge(std::move(edge)))
+        throw std::runtime_error(
+                "Could not insert RT edge " + std::to_string(n.id()) + " -> " + std::to_string(to) +
+                " in insert_or_assign_edge_RT_static() " + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
 }
 
 bool RT_API::insert_or_assign_edge_RT_static(uint64_t node_id, uint64_t to, const std::vector<float> &trans,
