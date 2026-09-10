@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <tuple>
 #include <map>
+#include <mutex>
 
 namespace DSR
 {
@@ -61,6 +62,29 @@ namespace DSR
         private:
             DSR::DSRGraph *G;
             std::unique_ptr<DSR::RT_API> rt;
+            // ── THE ts==0 CACHE, AND THE LOCK THAT MAKES IT SHAREABLE ────────────────────────────
+            // get_transformation_matrix(timestamp == 0) both READS and WRITES these two maps, and the
+            // invalidation slots below ERASE from them. Those slots are Qt::QueuedConnection, so they
+            // run on the thread that OWNS this object — which means that until this mutex existed the
+            // pair was only safe if every ts==0 read happened on that same thread too.
+            // It was not a theoretical race. The failure modes, in order of nastiness:
+            //   - cache[key] = ret rotates a red-black tree while a concurrent find() walks it;
+            //   - cache.erase() frees a node a reader is still holding a pointer into;
+            //   - remove_cache_entry ITERATES node_map[id] while a reader push_back()s to that same
+            //     vector — a reallocation leaves the loop walking a freed buffer.
+            // All three surface later, somewhere else, as an unrelated crash.
+            // ★THE LOCK IS TAKEN IN TWO SHORT SECTIONS, NEVER ACROSS THE TREE WALK. The walk calls
+            // into DSRGraph, which takes its own shared_mutex; holding this one across that would
+            // establish cache->graph ordering and deadlock against any path that goes graph->cache.
+            // ★CONSEQUENCE, AND IT IS DELIBERATE: two threads can both miss and both compute the same
+            // transform, then both insert it. Same key, same value — duplicated work, no corruption.
+            // That is the right trade; the thing being prevented is memory corruption, not redundancy.
+            // ★WHAT THIS UNBLOCKS: consumers gave each worker thread its OWN InnerEigenAPI instance to
+            // dodge the race (retina still does). A per-thread instance created on a raw std::thread
+            // has no Qt event loop, so its queued invalidation slots NEVER FIRE and its cache goes
+            // silently stale — trading corruption for a correctness bug. With this lock a single
+            // instance owned by the main thread can be shared, and its slots do fire.
+            mutable std::mutex cache_mutex;
             TransformCache cache;
             NodeReference node_map;
             void remove_cache_entry(const uint64_t id);

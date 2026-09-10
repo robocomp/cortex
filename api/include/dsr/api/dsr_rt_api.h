@@ -107,6 +107,9 @@ namespace DSR
                     Stale           // past an end by more than the ring's own span: too far for the
                                     // twist to be evidence, so the end block was returned unwalked
                 };
+                // ★SEVERITY IS NOT THE DECLARATION ORDER. A chain reports its worst edge, and ranking
+                // runs Exact < Stale < Interpolated < Extrapolated < Clamped — see the note on
+                // stale_edges for why Stale sits near the bottom rather than the top.
                 Outcome outcome = Outcome::Exact;
                 // Signed ms the pose was actually walked. NON-ZERO ONLY for Extrapolated -- it is
                 // "how far did this move", not "how far was it asked to move".
@@ -118,6 +121,16 @@ namespace DSR
                 // newest - oldest valid block on the edge: the timescale that channel itself says it
                 // works on, and the bound on how far its twist may be asked to predict.
                 std::int64_t ring_span_ms = 0;
+                // How many edges in the chain came back Stale. ★THIS EXISTS BECAUSE THE SCALAR CANNOT
+                // CARRY IT. Stale is ambiguous by nature: on a static mount it is simply what static
+                // looks like (root->Shadow here is written once at bootstrap, so every timestamped
+                // query is minutes past its ring, for ever), but on an edge whose producer has DIED it
+                // is the only warning you get. Ranking it worst made every chain on this robot read
+                // Stale and the field carried no information; ranking it mild lets a dead producer
+                // hide behind healthier edges. So the ranking answers "how well was my instant
+                // matched" and this counts the edges that opted out of time altogether — expected to
+                // be a small constant for a given tree, and a CHANGE in it is the signal.
+                int stale_edges = 0;
                 // Convenience: did this pose come from an instant nobody measured?
                 [[nodiscard]] bool clamped() const
                 { return outcome == Outcome::Clamped or outcome == Outcome::Stale; }

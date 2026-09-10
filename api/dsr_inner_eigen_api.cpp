@@ -27,21 +27,30 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
     if (info != nullptr) *info = RT_API::TimeQueryInfo{};
     RT_API::TimeQueryInfo edge_info;
     // Severity order, worst last: a chain is as trustworthy as its least trustworthy edge.
+    // ★STALE RANKS LOW, AND THAT IS THE WHOLE POINT OF THIS ORDER. It was highest, which made every
+    // chain on a tree containing ONE bootstrap-written mount report Stale for ever — measured
+    // 632/632 rows on the controller's room<-robot query, a field that could not vary and therefore
+    // said nothing. Stale means the edge is not participating in time at all, which for a static
+    // mount is correct behaviour, not a defect; Clamped is the serious one, because it means a LIVE
+    // ring failed to bracket the query and the pose came from a nearby but wrong instant with nothing
+    // to correct it. The ambiguous half of Stale — an edge whose producer DIED — is not lost by this:
+    // it is counted in stale_edges, which is what to watch for a change in.
     const auto severity = [](RT_API::TimeQueryInfo::Outcome o)
     {
         switch (o)
         {
             case RT_API::TimeQueryInfo::Outcome::Exact:        return 0;
-            case RT_API::TimeQueryInfo::Outcome::Interpolated: return 1;
-            case RT_API::TimeQueryInfo::Outcome::Extrapolated: return 2;
-            case RT_API::TimeQueryInfo::Outcome::Clamped:      return 3;
-            case RT_API::TimeQueryInfo::Outcome::Stale:        return 4;
+            case RT_API::TimeQueryInfo::Outcome::Stale:        return 1;
+            case RT_API::TimeQueryInfo::Outcome::Interpolated: return 2;
+            case RT_API::TimeQueryInfo::Outcome::Extrapolated: return 3;
+            case RT_API::TimeQueryInfo::Outcome::Clamped:      return 4;
         }
         return 0;
     };
     const auto note = [&](const RT_API::TimeQueryInfo &e)
     {
         if (info == nullptr) return;
+        if (e.outcome == RT_API::TimeQueryInfo::Outcome::Stale) info->stale_edges += 1;
         if (severity(e.outcome) > severity(info->outcome)) info->outcome = e.outcome;
         if (std::llabs(e.applied_dt_ms) > std::llabs(info->applied_dt_ms)) info->applied_dt_ms = e.applied_dt_ms;
         if (std::llabs(e.gap_ms)        > std::llabs(info->gap_ms))        info->gap_ms        = e.gap_ms;
@@ -50,8 +59,18 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
     const bool use_cache = (timestamp == 0);
     KeyTransform key = std::make_tuple(dest, orig, edge_type);
     if(use_cache)
+    {
+        // Section 1 of 2: the lookup. Copy the value OUT under the lock — returning it->second would
+        // hand back a reference into a map another thread may erase from a moment later.
+        std::scoped_lock lk(cache_mutex);
         if( auto it = cache.find(key) ; it != cache.end())
             return it->second;
+    }
+    // The tree walk below runs with NO lock held: it calls into DSRGraph, which takes its own
+    // shared_mutex, and nesting this one inside that would fix a cache->graph lock order that any
+    // graph->cache path would deadlock against. The node ids touched are accumulated here and
+    // committed in one short section at the end.
+    std::vector<uint64_t> touched;
     {
         Mat::RTMat atotal(Mat::RTMat::Identity());
         Mat::RTMat btotal(Mat::RTMat::Identity());
@@ -87,7 +106,7 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                 note(edge_info);
                 atotal = rtmat.value() * atotal;
                 if(use_cache)
-                    node_map[p_node.value().id()].push_back(key); // update node cache reference
+                    touched.push_back(p_node.value().id());   // committed under the lock at the end
                 a = p_node.value();
             }
             else return {};
@@ -109,7 +128,7 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                 note(edge_info);
                 btotal = rtmat.value() * btotal;
                 if(use_cache)
-                    node_map[p_node.value().id()].push_back(key); // update node cache reference
+                    touched.push_back(p_node.value().id());   // committed under the lock at the end
                 b = p_node.value();
             }
             else
@@ -145,8 +164,8 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
                     btotal = b_rtmat.value() * btotal;
                     if(use_cache)
                     {
-                        node_map[p_node.value().id()].push_back(key); // update node cache reference
-                        node_map[q_node.value().id()].push_back(key); // update node cache reference
+                        touched.push_back(p_node.value().id());
+                        touched.push_back(q_node.value().id());
                     }
                     a = p_node.value();
                     b = q_node.value();
@@ -162,13 +181,20 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
         // update node cache reference
         if(use_cache)
         {
-            node_map[bn.value().id()].push_back(key);
-            node_map[an.value().id()].push_back(key);
+            touched.push_back(bn.value().id());
+            touched.push_back(an.value().id());
         }
 
         auto ret = btotal.inverse() * atotal;
         if(use_cache)
+        {
+            // Section 2 of 2: commit. Another thread may have inserted the same key meanwhile — same
+            // inputs, same value, so last write wins and the duplicated work is the accepted cost.
+            std::scoped_lock lk(cache_mutex);
+            for(const auto id : touched)
+                node_map[id].push_back(key);
             cache[key] = ret;
+        }
         return ret;
     }
 }
@@ -300,6 +326,9 @@ void InnerEigenAPI::del_edge_slot(uint64_t from, uint64_t to, const std::string 
 }
 void InnerEigenAPI::remove_cache_entry(uint64_t id)
 {
+    // The erase side of the same pair. Without this lock the loop below iterates node_map[id] while a
+    // reader may push_back to that very vector — a reallocation leaves this walking a freed buffer.
+    std::scoped_lock lk(cache_mutex);
     auto it = node_map.find(id);
     if(it != node_map.end())
     {
