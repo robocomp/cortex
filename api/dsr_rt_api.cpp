@@ -399,13 +399,63 @@ std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_edge_RT_covariance(const 
         const auto blocks = valid_blocks(timestamps, covariance_pack.size() / RT_COVARIANCE_BLOCK_SIZE);
         if (not blocks.empty())
         {
-            if (time_query == TimeQuery::Interpolated)
+            if (time_query == TimeQuery::Interpolated or time_query == TimeQuery::Extrapolated)
             {
                 const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
                 const auto lower_index = lower.second * RT_COVARIANCE_BLOCK_SIZE;
                 const auto upper_index = upper.second * RT_COVARIANCE_BLOCK_SIZE;
                 if (lower.second == upper.second)
-                    return covariance_at(covariance_pack, lower_index);
+                {
+                    auto base = covariance_at(covariance_pack, lower_index);
+                    if (time_query != TimeQuery::Extrapolated or kind != CovarianceKind::Pose)
+                        return base;
+                    // ── A WALKED POSE IS LESS CERTAIN THAN A MEASURED ONE, AND MUST SAY SO ───────
+                    // get_edge_RT_as_rtmat walks the end block along its twist onto the instant asked
+                    // for. Until now this function handed back that block's covariance UNCHANGED, so
+                    // an extrapolated pose claimed exactly the confidence of the measurement it was
+                    // predicted from -- position the query invented, reported as if observed. A caller
+                    // weighting a sensor reading against that pose is then overconfident by construction,
+                    // and nothing in the data can reveal it.
+                    // ★THIS IS ALSO THE RIGHT ANSWER TO "THE CONSTANT-TWIST MODEL IS IMPERFECT". The
+                    // tempting fix is a higher-order term, but the acceleration would have to be
+                    // differenced out of the twist ring, and measured on 834 moving samples that
+                    // estimate is dominated by noise: lag-1 correlation -0.41 (a real acceleration is
+                    // POSITIVELY correlated; differentiated white noise tends to -0.5) with 61% sign
+                    // flips. Correcting with it would add variance. Growing the covariance with dt is
+                    // the honest form of the same knowledge.
+                    // ★FRAME. The twist covariance is in the CHILD's own axes; the pose covariance is
+                    // in the PARENT's. Because the walk right-composes -- T = T_base * exp(xi*dt) -- a
+                    // twist perturbation is a BODY perturbation of the result, so mapping it onto the
+                    // pose parameters is the base block's rotation and nothing else. There is no
+                    // [t]x R adjoint term here: we perturb the pose, not a spatial twist about the
+                    // parent origin.
+                    const std::int64_t gap_ms = static_cast<std::int64_t>(timestamp)
+                                              - static_cast<std::int64_t>(lower.first);
+                    const std::int64_t ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
+                                                    - static_cast<std::int64_t>(blocks.front().first);
+                    // Exactly the bound the pose walk uses, and it must stay exactly that: a refused
+                    // walk returns the end block unwalked, so inflating it would charge the caller for
+                    // a prediction it never received. Landing ON a block is not a walk either.
+                    if (gap_ms == 0 or ring_span_ms <= 0 or std::llabs(gap_ms) > ring_span_ms)
+                        return base;
+
+                    const auto twcov_o = G->get_attrib_by_name<rt_covariance_velocity_att>(edge);
+                    if (not twcov_o.has_value()
+                        or twcov_o->get().size() < lower_index + RT_COVARIANCE_BLOCK_SIZE)
+                        return base;   // no twist covariance here (every static mount): report what was measured
+                    const auto twist_covariance = covariance_at(twcov_o->get(), lower_index);
+
+                    Eigen::Matrix3d child_to_parent = Eigen::Matrix3d::Identity();
+                    if (const auto rot_o = G->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge);
+                        rot_o.has_value() and rot_o->get().size() >= lower.second * RT_BLOCK_SIZE + RT_BLOCK_SIZE)
+                        child_to_parent = rotation_at(rot_o->get(), lower.second * RT_BLOCK_SIZE).toRotationMatrix();
+
+                    const double dt_s = static_cast<double>(gap_ms) * 1e-3;
+                    Eigen::Matrix<double, 6, 6> jacobian = Eigen::Matrix<double, 6, 6>::Zero();
+                    jacobian.topLeftCorner<3, 3>()     = child_to_parent * dt_s;
+                    jacobian.bottomRightCorner<3, 3>() = child_to_parent * dt_s;
+                    return CovarianceMatrix(base + jacobian * twist_covariance * jacobian.transpose());
+                }
 
                 const auto alpha = interpolation_factor(lower, upper, timestamp);
                 const auto lower_covariance = covariance_at(covariance_pack, lower_index);
