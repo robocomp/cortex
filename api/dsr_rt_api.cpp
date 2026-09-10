@@ -246,9 +246,9 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                     if (time_query == TimeQuery::Interpolated or time_query == TimeQuery::Extrapolated)
                     {
                         const auto [lower, upper] = bracketing_blocks(blocks, timestamp);
-                        const std::int64_t ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
-                                                        - static_cast<std::int64_t>(blocks.front().first);
-                        if (info != nullptr) info->ring_span_ms = ring_span_ms;
+                        if (info != nullptr)
+                            info->ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
+                                               - static_cast<std::int64_t>(blocks.front().first);
                         if (lower.second == upper.second)
                         {
                             // ── THE CLAMP, AND THE ONLY PLACE Extrapolated DIFFERS ──────────────
@@ -262,11 +262,28 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                             // answer, and it must not be reported as a defect.
                             const std::int64_t gap_ms = static_cast<std::int64_t>(timestamp)
                                                       - static_cast<std::int64_t>(lower.first);
+                            // ── CLASSIFY BEFORE DECIDING WHETHER TO ACT ─────────────────────────
+                            // ★MEASURED DEFECT, 2026-09-10: Stale used to be assigned only inside the
+                            // Extrapolated branch below, so EVERY Interpolated caller — which is every
+                            // object fitter and room_concept's camera path — reported Clamped whether
+                            // the edge was a live ring that missed by 40 ms or a mount frozen for four
+                            // minutes. room_concept's probe read clamped=100% with max|gap| climbing
+                            // 177 s -> 237 s at exactly 1 s per second (a frozen root->Shadow mount
+                            // dominating the chain's worst edge) while stale_edges stayed 0, because
+                            // nothing on that path could ever set it. A field that cannot vary is not
+                            // evidence, and the distinction was missing precisely where it was needed.
+                            // So the CLASSIFICATION is unconditional; only the ACTION stays gated on
+                            // the enum. A caller asking for Interpolated now learns which of the two
+                            // it got, and can ignore the structural one.
+                            const std::int64_t ring_span_ms = static_cast<std::int64_t>(blocks.back().first)
+                                                            - static_cast<std::int64_t>(blocks.front().first);
+                            const bool beyond_span = (ring_span_ms <= 0) or (std::llabs(gap_ms) > ring_span_ms);
                             if (info != nullptr)
                             {
                                 info->gap_ms = gap_ms;
-                                info->outcome = (gap_ms == 0) ? TimeQueryInfo::Outcome::Exact
-                                                              : TimeQueryInfo::Outcome::Clamped;
+                                info->outcome = (gap_ms == 0)  ? TimeQueryInfo::Outcome::Exact
+                                              : beyond_span    ? TimeQueryInfo::Outcome::Stale
+                                                               : TimeQueryInfo::Outcome::Clamped;
                             }
                             if (time_query != TimeQuery::Extrapolated)
                                 return base;
@@ -303,12 +320,11 @@ std::optional<Mat::RTMat>  RT_API::get_edge_RT_as_rtmat(const Edge &edge, std::u
                             // refusal returns the clamped block rather than a partially-walked pose.
                             // Staleness is a different question with a different instrument: read the
                             // ring bounds if that is what you want to know.
-                            if (ring_span_ms <= 0 or std::llabs(dt_ms) > ring_span_ms)
+                            if (beyond_span)
                             {
                                 // Too far outside for the twist to be evidence. The end block is
-                                // still the best available answer, so it is returned — but as Stale,
-                                // never as a silent success.
-                                if (info != nullptr) info->outcome = TimeQueryInfo::Outcome::Stale;
+                                // still the best available answer, so it is returned — already
+                                // labelled Stale above, never as a silent success.
                                 return base;
                             }
                             if (info != nullptr)
