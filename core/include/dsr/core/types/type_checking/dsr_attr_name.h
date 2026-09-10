@@ -162,6 +162,20 @@ REGISTER_TYPE(rt_covariance, std::reference_wrapper<const std::vector<float>>, t
 REGISTER_TYPE(rt_covariance_velocity, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_covariance_acceleration, std::reference_wrapper<const std::vector<float>>, true)
 REGISTER_TYPE(rt_head_index, int, false)
+// ── IS THIS EDGE A PARAMETER OR A STATE? ────────────────────────────────────────────────────────
+// true  = the transform is a FIXED physical quantity (a sensor mount, a body offset). It has no
+//         validity interval, so it is stored as ONE block with NO rt_timestamps, and every
+//         timestamped query returns it unchanged. Re-estimating it (self-calibration refining a
+//         camera extrinsic) OVERWRITES that block: successive estimates of one constant, where the
+//         newest is the best answer for every frame including ones captured earlier.
+// absent/false = the transform is a STATE that varies with time, stored as a timestamped ring.
+// ★WHY IT IS A STORED ATTRIBUTE AND NOT A CONVENTION. A static edge that acquires timestamps starts
+// reporting a clamp on EVERY timestamped query, for ever, growing by one second per second — and it
+// poisons every chain it sits in, because a chain reports its worst edge. Measured on this robot:
+// one creation-stamped mount produced a 64% Stale share and stale_edges=2 in room_concept's camera
+// path. A comment cannot prevent an agent from calling the timestamped overload on such an edge;
+// this flag lets RT_API refuse to promote it.
+REGISTER_TYPE(rt_static, bool, false)
 
 /*
  * looking-at

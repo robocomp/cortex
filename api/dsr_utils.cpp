@@ -229,6 +229,45 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
             }
             qDebug() << __FILE__ << " " << __FUNCTION__ << "Edge from " << srcn << " to " << dstn << " label "  << QString::fromStdString(edgeName);
             //edge.attrs(attrs);
+
+            // ── RT EDGES GO THROUGH RT_API, NOT THROUGH A GENERIC ATTRIBUTE DUMP ──────────────────
+            // ★A BOOTSTRAP FILE DESCRIBES A RIG AT REST, so its RT edges are PARAMETERS unless the
+            // file says otherwise: sensor mounts and body offsets, fixed geometry that does not vary
+            // with time. Anything that DOES vary is a state and is written at runtime by the agent
+            // that measures it, through the timestamped overloads.
+            // Until now every edge here — RT included — was built by setting attributes generically
+            // and inserting once, so RT_API's invariants (parent/level cascade, ring/head-index
+            // consistency, the parameter-vs-state distinction) simply did not apply to anything the
+            // bootstrap created. That produced the right SHAPE for mounts by accident, because the
+            // file happens to carry no rt_timestamps key — and the wrong one the moment an agent
+            // rewrote such an edge through the timestamped API.
+            // ★OVERRIDE: a link carrying "rt_dynamic": true is treated as a state and keeps the ring.
+            // ★An RT link missing translation or rotation falls through to the generic path rather
+            // than being dropped: a malformed bootstrap should still load and be visible, not vanish.
+            if (edgeName == "RT")
+            {
+                const auto vec3 = [&](const char *key) -> std::optional<std::vector<float>>
+                {
+                    const auto it = linkAttributesMap.find(QString::fromUtf8(key));
+                    if (it == linkAttributesMap.end()) return {};
+                    const QVariantList l = it.value().toMap()["value"].toList();
+                    if (l.size() < 3) return {};
+                    return std::vector<float>{ l[0].toFloat(), l[1].toFloat(), l[2].toFloat() };
+                };
+                const auto tr  = vec3("rt_translation");
+                const auto rot = vec3("rt_rotation_euler_xyz");
+                const bool dynamic = linkAttributesMap.contains("rt_dynamic")
+                                  and linkAttributesMap["rt_dynamic"].toMap()["value"].toBool();
+                if (tr.has_value() and rot.has_value())
+                    if (auto rt = G->get_rt_api(); rt != nullptr)
+                        if (auto src = G->get_node(srcn); src.has_value())
+                        {
+                            if (dynamic) rt->insert_or_assign_edge_RT(src.value(), dstn, tr.value(), rot.value());
+                            else         rt->insert_or_assign_edge_RT_static(src.value(), dstn, tr.value(), rot.value());
+                            continue;   // the RT API owns this edge; do not also insert the raw copy
+                        }
+            }
+
             if (!G->insert_or_assign_edge(edge)) {
                 auto esrc = G->get_name_from_id(srcn);
                 auto edstn = G->get_name_from_id(dstn);

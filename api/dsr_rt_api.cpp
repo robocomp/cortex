@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <mutex>
 #include <cmath>
 #include <deque>
 #include <unordered_map>
@@ -622,6 +623,48 @@ void RT_API::insert_or_assign_edge_RT(Node &n, uint64_t to, RTBlock block, std::
     insert_or_assign_edge_RT_impl(n, to, std::move(block), timestamp);
 }
 
+void RT_API::insert_or_assign_edge_RT_static(Node &n, uint64_t to, const std::vector<float> &trans,
+                                             const std::vector<float> &rot_euler)
+{
+    CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT_static");
+    if (trans.size() < 3 or rot_euler.size() < 3)
+        throw std::runtime_error("RT static edge needs 3-vectors for translation and rotation");
+
+    auto edge = G->get_edge(n.id(), to, "RT").value_or(Edge::create<RT_edge_type>(n.id(), to));
+    // ONE block, overwritten. No rt_timestamps and no rt_head_index: their ABSENCE is what makes
+    // get_edge_RT_as_rtmat return this block for any timestamp and report Exact rather than a clamp.
+    G->add_or_modify_attrib_local<rt_translation_att>(edge, std::vector<float>(trans.begin(), trans.begin() + 3));
+    G->add_or_modify_attrib_local<rt_rotation_euler_xyz_att>(edge, std::vector<float>(rot_euler.begin(), rot_euler.begin() + 3));
+    G->add_or_modify_attrib_local<rt_static_att>(edge, true);
+    G->insert_or_assign_edge(edge);
+
+    // The parent/level bookkeeping every RT write owes the tree. Shared with the timestamped path so
+    // a static edge is not a second-class citizen in the hierarchy.
+    if (auto to_n = G->get_node(to); to_n.has_value())
+    {
+        bool changed = false;
+        if (auto x = G->get_attrib_by_name<parent_att>(*to_n); not x.has_value() or x.value() != n.id())
+        { G->add_or_modify_attrib_local<parent_att>(*to_n, n.id()); changed = true; }
+        if (const auto lvl = G->get_node_level(n); lvl.has_value())
+            if (auto l = G->get_attrib_by_name<level_att>(*to_n); not l.has_value() or l.value() != lvl.value() + 1)
+            { G->add_or_modify_attrib_local<level_att>(*to_n, lvl.value() + 1); changed = true; }
+        if (changed) G->update_node(to_n.value());
+    }
+    walk_and_fix_levels(to, /*repair*/ true, /*report*/ false);
+}
+
+bool RT_API::insert_or_assign_edge_RT_static(uint64_t node_id, uint64_t to, const std::vector<float> &trans,
+                                             const std::vector<float> &rot_euler)
+{
+    if (auto node = G->get_node(node_id); node.has_value())
+    {
+        insert_or_assign_edge_RT_static(node.value(), to, trans, rot_euler);
+        return true;
+    }
+    qWarning() << __FUNCTION__ << "NO node found with id" << node_id;
+    return false;
+}
+
 void RT_API::insert_or_assign_edge_RT_identity(Node &n, uint64_t to, std::optional<uint64_t> timestamp)
 {
     CORTEX_PROFILE_ZONE_N("RT_API::insert_or_assign_edge_RT_identity");
@@ -669,6 +712,21 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, RTBlock block, 
     const bool with_twist_cov = with_twist and block.twist_covariance.has_value();
 
     auto edge = G->get_edge(n.id(), to, "RT").value_or(Edge::create<RT_edge_type>(n.id(), to));
+    // ★A STATIC EDGE IS NOT PROMOTED TO A RING, EVER. Someone calling the timestamped overload on a
+    // sensor mount is almost certainly refreshing a re-estimated extrinsic, not recording a state —
+    // and giving that edge timestamps makes every timestamped query through it report a clamp for the
+    // life of the process, growing one second per second, poisoning every chain it sits in. So the
+    // edge's declared nature wins over the call site's choice of overload, and it says so once.
+    if (G->get_attrib_by_name<rt_static_att>(edge).value_or(false))
+    {
+        static std::once_flag warned;
+        std::call_once(warned, [&]{ qWarning() << "RT_API: timestamped write on an rt_static edge"
+                                               << n.id() << "->" << to
+                                               << "— storing as a single block. Use "
+                                                  "insert_or_assign_edge_RT_static() for parameters."; });
+        insert_or_assign_edge_RT_static(n, to, block.translation, block.rotation_euler);
+        return;
+    }
     if (HISTORY_SIZE <= 0)
     {
         G->add_or_modify_attrib_local<rt_translation_att>(edge, std::move(trans));

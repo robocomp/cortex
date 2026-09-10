@@ -186,6 +186,24 @@ namespace DSR
             void insert_or_assign_edge_RT(Node &n, uint64_t to, RTBlock block,
                                           std::optional<uint64_t> timestamp = std::nullopt);
 
+            // ── A PARAMETER, NOT A STATE: one block, NO timestamps, overwritten in place ───────
+            // For a transform that does not vary with time — a sensor mount, a body offset, a camera
+            // extrinsic being refined by self-calibration. It marks the edge rt_static, so the
+            // timestamped overloads above will not silently promote it to a ring.
+            // ★WHY UNTIMESTAMPED IS THE CORRECT STORAGE, not merely a cheaper one. A parameter has no
+            // validity interval. Give it one and every timestamped query falls outside it — for ever,
+            // and by a margin that grows one second per second — so the edge reports a clamp it did
+            // not earn and drags down every chain it sits in. Untimestamped, get_edge_RT_as_rtmat
+            // returns the single block for any timestamp and reports Exact, which is the truth.
+            // ★RE-ESTIMATION OVERWRITES. Self-calibration produces successively better estimates of
+            // ONE constant, so the newest is the best answer for every frame, including ones captured
+            // before it was computed. Keeping a history here would let an old frame fetch a WORSE
+            // estimate, which is the opposite of what the caller wants.
+            void insert_or_assign_edge_RT_static(Node &n, uint64_t to, const std::vector<float> &trans,
+                                                 const std::vector<float> &rot_euler);
+            bool insert_or_assign_edge_RT_static(uint64_t node_id, uint64_t to, const std::vector<float> &trans,
+                                                 const std::vector<float> &rot_euler);
+
             // Hang `to` from `n` with the IDENTITY transform: zero translation, zero euler rotation.
             // The child's frame then coincides with the parent's, so a node inserted purely to give a
             // subtree a semantic parent (a floor the walls hang from, a rig the parts hang from) costs
