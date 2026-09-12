@@ -471,6 +471,16 @@ REGISTER_TYPE(ultrasound_y_pos, std::reference_wrapper<const std::vector<float>>
 REGISTER_TYPE(delimiting_polygon_x, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(delimiting_polygon_y, std::reference_wrapper<const std::vector<float>>, false);
 REGISTER_TYPE(room_height, float, false);
+/* The ceiling height's own uncertainty, metres, beside the value it qualifies. Written by
+ * room_concept from the LiDAR's ceiling plane; it is the PLANE'S SPREAD and not a standard error,
+ * because the histogram behind it is leaky and its count is the same ceiling seen again on every
+ * scan (LidarIngestor::update_ceiling_cap says so at the point of measurement).
+ * ★ It exists so the height can be RE-MEASURED rather than only displayed. A camera's mount fit
+ *   reads the ceiling directly -- solve the mount from floor corners alone and from ceiling corners
+ *   alone and the two differ by exactly the ceiling's error -- so a camera can refine this number,
+ *   and a refinement needs a prior WITH A WIDTH. A value alone cannot say how far it may move.
+ * ⚠ 0 means never measured, which is not the same as "measured and perfectly known". */
+REGISTER_TYPE(room_height_sigma, float, false);
 REGISTER_TYPE(room_is_oriented, bool, false);
 REGISTER_TYPE(center_x, float, false);
 REGISTER_TYPE(center_y, float, false);
