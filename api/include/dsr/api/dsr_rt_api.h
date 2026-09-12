@@ -260,6 +260,31 @@ namespace DSR
             std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest,
                                                            TimeQueryInfo *info = nullptr);
             // `kind` is last so existing pose-covariance call sites keep compiling unchanged.
+            // ── ASK WITH THE SAME timestamp AND TimeQuery YOU ASKED THE POSE WITH ──────────────────
+            // The default (newest block, Nearest) pairs a pose pinned to one instant with an
+            // uncertainty from another. Both values are well-formed, so the mismatch shows up only as
+            // a consumer reacting to the wrong covariance -- which reads as something needing tuning
+            // rather than something wrong. Two call sites in this fleet had exactly that (2026-09-10).
+            //
+            // ★UNDER TimeQuery::Extrapolated THIS WIDENS THE POSE COVARIANCE for the walk, by
+            // J*Sigma_twist*J^T with J = R*dt. Whether that is worth asking for depends entirely on the
+            // gap, and the numbers are not intuitive -- MEASURED 2026-09-12 through InnerGaussianAPI on
+            // a point 3 m out, chain contribution only, with the live pose covariance and the
+            // configured twist covariance of a Shadow-class base:
+            //
+            //     gap      sigma_x Nearest   sigma_x Extrapolated   growth
+            //       0 ms        35.2 mm             35.2 mm           0.0%
+            //      40 ms        35.2 mm             37.3 mm           3.0%
+            //     100 ms        35.2 mm             47.1 mm          17.6%
+            //     150 ms        35.2 mm             58.8 mm          36.5%
+            //
+            // So: negligible below ~50 ms, a third of the answer above 100 ms, growing as dt^2. Nothing
+            // at all at dt == 0, because nothing was walked.
+            // ★THE GROWTH IS ALMOST ALL IN X AND IT SCALES WITH RANGE: sigma_y moved 37.42 -> 38.21 mm
+            // over the same span. That is the YAW-RATE uncertainty acting through the lever arm, so the
+            // 3 m figures above are not a worst case -- double the range and roughly double the growth.
+            // A consumer fitting distant objects from a walked pose is where this matters; one working
+            // at arm's length can ignore it.
             std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
             std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
             std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
