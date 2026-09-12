@@ -280,11 +280,26 @@ namespace DSR
             //
             // So: negligible below ~50 ms, a third of the answer above 100 ms, growing as dt^2. Nothing
             // at all at dt == 0, because nothing was walked.
+            // ★THE dt^2 IS CONFIRMED FROM THE NUMBERS, not just asserted from the formula: squaring the
+            // sigmas and subtracting the base gives 152.3 / 979.4 / 2218.4 mm^2 of added variance, and
+            // dividing each by dt^2 gives 0.0952 / 0.0979 / 0.0986 -- flat to ~3.5% across a fourteen-
+            // fold span of dt^2, inside the rounding of three-significant-figure sigmas. J = R*dt does
+            // what it should and nothing quadratic in something else is hiding in it.
             // ★THE GROWTH IS ALMOST ALL IN X AND IT SCALES WITH RANGE: sigma_y moved 37.42 -> 38.21 mm
             // over the same span. That is the YAW-RATE uncertainty acting through the lever arm, so the
             // 3 m figures above are not a worst case -- double the range and roughly double the growth.
             // A consumer fitting distant objects from a walked pose is where this matters; one working
             // at arm's length can ignore it.
+            // ★★THE SAME LEVER ARM APPEARS TWICE IN THIS API, IN TWO MOMENTS OF ONE DISTRIBUTION, and
+            // meeting one makes the other obvious. In the MEAN it converts a parent's angular rate into
+            // a linear velocity on the child edge -- the w*(t_y, -t_x) term of the SE(2) adjoint, which
+            // room_concept must apply to write a child-frame twist at all, and which measured two
+            // orders of magnitude on a near-parked robot (2.27 m/s in the ring against 0.24 m/s of body
+            // speed). Here, in the COVARIANCE, it converts yaw-rate UNCERTAINTY into position
+            // uncertainty at range -- which is why the growth above is almost all in x and why it
+            // doubles with a doubling of range while sigma_y barely moves. Same geometry, same arm,
+            // mean and second moment. Together they are the argument that which way an RT edge is
+            // anchored is a GEOMETRIC decision with measurable consequences, not bookkeeping.
             std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
             std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
             std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
