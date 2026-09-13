@@ -801,6 +801,109 @@ REGISTER_TYPE(door_roi_valid,                 bool,                             
 REGISTER_TYPE(door_detection_alive,           bool,                                             false)
 REGISTER_TYPE(door_detection_confidence,      float,                                            false)
 REGISTER_TYPE(door_frames_since_detection,    int,                                              false)
+
+// ── door INTERACTION channel (written by door_concept, read by the affordance contracts) ─────────
+//    The three pragmatic door affordances — approach / open / cross — need a completion predicate, and a
+//    predicate can only be written against a quantity that is ON THE GRAPH. These four are that quantity.
+//    ★THEY ARE PROBABILITIES AND ANGLES, NOT PROTOCOL FLAGS. The affordance work already established that
+//    a protocol event is not evidence: `Delivered` from a door provider means the provider did what it was
+//    asked, never that the door moved. So "is it open?" stays a PERCEPTUAL question and the answer that
+//    crosses the wire is a probability the consumer can hold a predicate against.
+//    ★door_open_prob is MARGINALISED over the leaf-angle posterior, never read off its argmax. Measured
+//    2026-09-10 the phi support curve is nearly FLAT (peak 0.007-0.245), so the argmax is noise — and a
+//    parameter the data does not identify must not be allowed to drive a decision. See DoorInstance::phi_curve.
+// ⚠ALL FOUR CARRY AN OUT-OF-RANGE "NOT MEASURED" SENTINEL: -1 for the probabilities and the angle, -2
+// for the signed crossing progress (where -1 is a legitimate reading). ZERO IS A REAL ANSWER for every
+// one of them — a shut door, a distant robot, a crossing not begun — so publishing 0 for "we could not
+// tell" would make a measurement and its absence the same number, in a channel whose whole purpose is
+// telling those apart, and in rows that are copied into a durable CSV and read back months later.
+REGISTER_TYPE(door_phi_rad,                   float,                                            false)  // leaf opening angle estimate (rad); 0 = flush in the aperture, -1 = NOT MEASURED
+REGISTER_TYPE(door_open_prob,                 float,                                            false)  // P(clear width >= robot passage width), marginalised over the phi posterior
+REGISTER_TYPE(door_reach_prob,                float,                                            false)  // P(the robot is inside this door's actuation zone), under the pose covariance
+REGISTER_TYPE(door_crossing_progress,         float,                                            false)  // -1..+1 along the aperture normal, signed against the side held when the cross claim was made
+
+// ── PASSAGE HISTORY: the crossing record (door_concept writes) and the belief over it (ltsm_agent) ──
+//    A doorway is crossed many times over a robot's life, and what is learned by crossing it — was it
+//    passable without asking anyone, did an open request work — is a property of the DOORWAY, not of
+//    either room it joins. ltsm_agent's abstract passage node (`metaconcept` / object_subtype
+//    "passage", frameless, `match`-linked to the per-room door faces) is what owns it.
+//
+//    ★TWO WRITERS, TWO DISJOINT SETS, AND THAT IS THE DESIGN. The `passage_*` block below is written
+//    ONLY by door_concept, on its own live door node, one record per completed crossing attempt; the
+//    `passage_pass_*` / `passage_open_*` block is written ONLY by ltsm_agent, on its memory-side
+//    passage node, after harvesting. Neither agent writes the other's attributes. That is what makes
+//    both safe against `update_node` being a whole-node replace: nobody read-modify-writes a counter
+//    that somebody else also increments.
+//
+//    ★THE BELIEF IS A CONJUGATE POSTERIOR, NOT A TALLY — MODEL_HISTORY.md §4 already prescribes this
+//    shape (a constant false-alarm rate became an inferred p_FA(place × bearing): counts plus a
+//    conjugate posterior, no event log). Two Betas are what an honest pragmatic price needs: a
+//    probability WITH its uncertainty. Three crossings that all worked and thirty that all worked are
+//    the same number and very different confidence, and a price computed from the first as if it were
+//    the second is exactly the over-valuation that made a standing offer win contests it did not
+//    deserve (see aff_max_yaw_rate's note). The per-crossing detail lives in an append-only CSV.
+//
+//    ★passage_seq IS NOT DECORATION. Harvest happens once per room departure, so a crossing that does
+//    not lead to a new room would otherwise be silently uncounted. A GAP in the sequence says crossings
+//    were missed, which is a different fact from "there were fewer crossings" — and a counter that
+//    conflates the two is not a null result (see residual-marking-vs-clearing for that lesson in full).
+REGISTER_TYPE(passage_seq,              int,                                              false)  // monotonic per door node, one per completed crossing attempt
+REGISTER_TYPE(passage_datetime,         std::string,                                      false)  // ISO-8601 local (rc::provenance creation_datetime format)
+REGISTER_TYPE(passage_passable,         bool,                                             false)  // the aperture was judged passable
+// ★DID THE ROBOT ACTUALLY GO THROUGH — ITS OWN BOOL, NEVER A WORD INSIDE passage_outcome.
+// The record is keyed on the JUDGEMENT (the doorway was assessed), not on the crossing, and that is
+// what makes the belief a measurement instead of an artefact: a record written only when a passage
+// HAPPENED has passable == true by construction, so β never moves and the posterior converges to
+// "this doorway is always passable" — most confidently for a door that is usually SHUT, because the
+// rare times it was open are the only times it is ever sampled. A door approached and found shut,
+// not opened and not crossed, is the only evidence β will ever get. Same defect as a gate audited by
+// its own statistic, and as a counter that conflates "refused" with "never asked".
+// It is a separate attribute because a boolean smuggled into a free string is precisely the return
+// channel the affordance protocol deadlocked on (see aff_outcome above): the consumer could say THAT
+// it was executing and never WHAT, and no term in either agent's state could reveal the disagreement.
+REGISTER_TYPE(passage_crossed,          bool,                                             false)  // the robot went through during this judgement episode
+REGISTER_TYPE(passage_open_prob,        float,                                            false)  // marginalised over the leaf-angle posterior, never its argmax
+REGISTER_TYPE(passage_clear_span_m,     float,                                            false)
+REGISTER_TYPE(passage_body_width_m,     float,                                            false)  // what the span was judged against
+REGISTER_TYPE(passage_open_requested,   bool,                                             false)
+REGISTER_TYPE(passage_open_answer,      std::string,                                      false)  // what the provider answered — NOT whether the door moved
+REGISTER_TYPE(passage_outcome,          std::string,                                      false)  // the cross affordance's aff_outcome, one of the 7 protocol words
+REGISTER_TYPE(passage_duration_s,       float,                                            false)
+// ★THE EVIDENCE, IN NATS — log p(what we saw | passable) − log p(what we saw | blocked). THIS, and not
+// passage_open_prob, is what a belief over the doorway must be updated from.
+// A marginal probability folded as soft counts (α += p, β += 1−p) adds one count of mass per visit
+// however little the visit discriminated, so the variance shrinks at the same rate whether or not
+// anything was learnt: 100 uninformative visits at p=0.5 give Beta(51,51), i.e. "50/50 to ±5%", which
+// nobody measured. The exact update is a mixture of Beta(α+1,β) and Beta(α,β+1) weighted by the
+// likelihoods; with llr == 0 it is an EXACT no-op (Beta(1,1) after those same 100 visits, sd 0.289),
+// and with llr large it is a full count. The posterior MEAN is identical either way — only the
+// variance differs, and the variance is the half a pragmatic price needs.
+// ★LOG, AND SATURATED, because that is already the fleet's convention rather than a new estimator:
+// common/existence_belief accumulates in log-odds with explicit llr_occ/llr_free and a tanh saturate()
+// (existence_belief.h:103,127-128,187), and scales by P(detect) instead of gating on it. An unbounded
+// ratio from one freak frame is the obvious way this goes wrong, so the same saturation applies here.
+// ⚠IT MUST BE NORMALISED PER LEAF-ANGLE HYPOTHESIS BY THE VISIBLE SAMPLE COUNT. Raw silhouette support
+// is NOT comparable across phi: an opened leaf swings OUT of the camera's view, and this agent measured
+// exactly that (occ 207 → 0, free_eff 0 → 33, as the leaf was projected out into the room). Un-normalised,
+// a genuinely OPEN door yields low support at large phi for visibility reasons alone, the ratio inverts,
+// and the belief learns the opposite of the truth — confidently. n_detectable per hypothesis is already
+// tracked by the silhouette channel; divide by it.
+REGISTER_TYPE(passage_llr,              float,                                            false)  // nats: log p(obs|passable) − log p(obs|blocked); 0 = this visit discriminated nothing
+// ★WAS THE EPISODE CLOSED, OR CUT? A visit ends by leaving the assessment zone or by crossing. A robot
+// that parks inside the zone and never leaves would hold one open for ever and emit nothing — a failure
+// that looks like "no data" rather than "bad data", and which a contiguous passage_seq cannot reveal. So
+// an open episode is flushed on shutdown and on instance retirement, and says so here.
+// Its own bool, NOT a word inside passage_outcome: a flag smuggled into a free string is the return
+// channel the affordance protocol deadlocked on, and re-inventing that in the same week would be careless.
+REGISTER_TYPE(passage_episode_cut,      bool,                                             false)  // true ⇒ flushed early, the judgement is partial
+// ltsm_agent's side: the belief derived from the records above, on the memory passage node.
+REGISTER_TYPE(passage_pass_alpha,       float,                                            false)  // Beta over p(passable without intervention)
+REGISTER_TYPE(passage_pass_beta,        float,                                            false)
+REGISTER_TYPE(passage_open_alpha,       float,                                            false)  // Beta over p(an open request succeeds | requested)
+REGISTER_TYPE(passage_open_beta,        float,                                            false)
+REGISTER_TYPE(passage_crossings,        int,                                              false)
+REGISTER_TYPE(passage_last_datetime,    std::string,                                      false)
+REGISTER_TYPE(passage_seq_last,         int,                                              false)  // last sequence harvested, so gaps stay visible
 REGISTER_TYPE(cabinet_roi_offset,             std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
 REGISTER_TYPE(cabinet_roi_fill,               float,                                            false)
 REGISTER_TYPE(cabinet_roi_valid,              bool,                                             false)
@@ -981,6 +1084,14 @@ REGISTER_TYPE(aff_view_sigma_star,      std::vector<float>,                     
 // retires the very affordance that would have gone back for it. Three agents currently make exactly
 // that conflation because the wire carries no way to tell them apart.
 REGISTER_TYPE(aff_outcome,              std::string,                                      false)
+
+// WHICH AFFORDANCE THIS IS, in the producer's own vocabulary: "approach", "open", "cross", … and
+// "epistemic" for the one-per-object look-at-it offer every concept agent has always published.
+// ★IT IS A LABEL, NEVER A DISPATCH KEY. The executor stays generic — it runs the Contract, and the
+// contract says everything it needs. This exists so a human reading the graph, a dashboard, and the
+// producer's own logs can tell four sibling nodes under one door apart without parsing node names,
+// which is the thing DSR is allowed to rename on a restart collision.
+REGISTER_TYPE(aff_kind,                 std::string,                                      false)
 
 // ── human-concept + bottle-concept detection channel (mirror of table/chair/cabinet above; bool alive per
 //    the WIRE-TYPE note there, read only via attr_scalar/type-attributed getters) ─ registered 2026-07-24 ─

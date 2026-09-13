@@ -177,7 +177,16 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
                     }
 
                     case 7: {
-                        G->runtime_checked_add_attrib_local(edge,  attr_key,  static_cast<std::uint64_t>(attr_value.toUInt()));
+                        // ★THROUGH A STRING, NOT toUInt(). QVariant::toUInt is 32-BIT: an epoch-ms
+                        // stamp like 1789200000000 comes back as 0, silently, with no error anywhere —
+                        // and every uint64 attribute here is a timestamp or an id (timestamp_creation,
+                        // mask_timestamp_ms, room_id, parent, …), i.e. exactly the values that cannot
+                        // survive being truncated. af03fe6 ("Save and load 64 bits numbers as String in
+                        // JSON documents") fixed the NODE copy of this switch twenty lines up and
+                        // missed this EDGE copy, so a node's timestamp round-tripped correctly while
+                        // the same attribute on an edge was zeroed. Two copies of one switch, one of
+                        // them fixed, is the whole bug.
+                        G->runtime_checked_add_attrib_local(edge,  attr_key,  static_cast<std::uint64_t>(attr_value.toString().toULongLong()));
                         break;
                     }
 
