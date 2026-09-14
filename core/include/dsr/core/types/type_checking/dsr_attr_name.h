@@ -381,6 +381,7 @@ REGISTER_TYPE(robot_max_linear_accel, float, false)   // m/s^2
 REGISTER_TYPE(robot_max_linear_decel, float, false)   // m/s^2
 REGISTER_TYPE(robot_wheel_radius, float, false)       // m
 REGISTER_TYPE(robot_axes_length, float, false)        // m, track width between drive wheels
+REGISTER_TYPE(robot_wheel_base, float, false)         // m, longitudinal distance between axles (distAxes; omni base only)
 
 REGISTER_TYPE(robot_gt_x, float, true)      // world frame, metres
 REGISTER_TYPE(robot_gt_y, float, true)      // world frame, metres
