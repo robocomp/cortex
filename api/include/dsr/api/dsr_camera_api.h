@@ -35,11 +35,25 @@ namespace DSR
     class CameraAPI
     {
         public:
-            /// Projection model of the wrapped camera node. Pinhole (perspective, focal-based),
-            /// Equirectangular (360 panorama, SPHERICAL: elevation ∝ angle, full ±90°), or Cylindrical
-            /// (360 panorama, azimuth linear like equirect but ELEVATION ∝ tan on a cylinder with a limited
-            /// vertical FoV — the webots camera projection "cylindrical"). A ~2π cam_fov selects a 360 model;
-            /// the cam_projection attribute (when "cylindrical") picks Cylindrical over Equirectangular.
+            /// Projection model of the wrapped camera node.
+            ///   Pinhole          — perspective, focal-based.
+            ///   Equirectangular  — 360 panorama, lat-long: elevation ∝ ANGLE, full ±90°.
+            ///   Cylindrical      — 360 panorama, azimuth linear as equirect, but elevation ∝ TAN,
+            ///                      projected onto a cylinder, so the vertical FoV is limited
+            ///                      (≈±58° for a 2:1 panorama).
+            /// Both are real, distinct projections and both are implemented exactly; see project().
+            ///
+            /// ⚠ WEBOTS' `projection "cylindrical"` IS NOT THIS Cylindrical MODEL. Webots' own
+            ///   documentation states that "the cylindrical projection generates equirectangular
+            ///   images", and its merge_spherical.frag builds a unit-sphere direction whose polar
+            ///   angle is linear in the row. Webots' name is a misnomer for a lat-long map. A node
+            ///   fed by a Webots camera must therefore declare cam_projection="equirectangular"
+            ///   (as robot_concept/shadow.json's `ricoh` correctly does). Measured on that stream:
+            ///   the lat-long map fits lidar ground truth to 0.036 m RMS over 2-4.4 m, the tan map
+            ///   to 0.203 m, and only the former implies the true camera height.
+            ///
+            /// A ~2π cam_fov selects a 360 model; cam_projection=="cylindrical" then selects
+            /// Cylindrical over the Equirectangular default, taken LITERALLY — see the ctor.
             enum class ProjectionModel { Pinhole, Equirectangular, Cylindrical };
 
             /// Constructs the API from a graph handle and a camera node.

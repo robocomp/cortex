@@ -28,9 +28,18 @@ CameraAPI::CameraAPI(DSR::DSRGraph *G_, const DSR::Node &camera)
     else qFatal("CameraAPI constructor: aborting since no height attr found in camera");
 
     // Pick the projection model from the field of view: a ~2π fov is a 360 panorama (e.g. the ricoh,
-    // cam_fov=6.28). Everything else is a perspective pinhole camera. A 360 panorama defaults to spherical
-    // Equirectangular, but the node may declare cam_projection="cylindrical" (the webots camera projection):
-    // azimuth is linear either way, but the ELEVATION map differs (angle vs tan), so honour it.
+    // cam_fov=6.28). Everything else is a perspective pinhole camera. A 360 panorama defaults to
+    // lat-long Equirectangular; cam_projection=="cylindrical" selects the tan-elevation model
+    // instead. Azimuth is linear either way, but the ELEVATION map differs (angle vs tan).
+    //
+    // ⚠ THE STRING IS HONOURED LITERALLY, AND A WEBOTS-FED NODE MUST NOT SET IT. Webots calls its
+    //   lat-long output `projection "cylindrical"`, which is a misnomer -- its docs say that
+    //   projection "generates equirectangular images". A node that copies that word across from a
+    //   Webots proto therefore selects the WRONG branch here, and off-horizon rows land wrong:
+    //   at 220 px below the horizon the two models differ by 5.5 deg, which is a 22% range error
+    //   for anything estimated from the ground plane. Declare "equirectangular" for Webots
+    //   cameras. The literal mapping is kept because Cylindrical is a genuine projection that a
+    //   genuine cylindrical source should still be able to ask for by name.
     projection_model = ProjectionModel::Pinhole;
     if( auto o_fov = G->get_attrib_by_name<cam_fov_att>(camera); o_fov.has_value() and o_fov.value() >= 5.5f)
     {
@@ -117,11 +126,12 @@ Eigen::Vector2d CameraAPI::project(const Eigen::Vector3d & p, int cx, int  cy) c
 
     if( projection_model == ProjectionModel::Cylindrical )
     {
-        // Webots "cylindrical" 360 camera: azimuth θ=atan2(x,y) → column (LINEAR, identical to equirect), but
-        // the ELEVATION is a PLANAR projection onto the cylinder — row ∝ tan(elevation), NOT the angle itself.
-        // Vertical focal f_v = width/(2π) (square pixels; the full 360° spans `width` columns), so the vertical
-        // FoV is LIMITED (≈±58° for a 2:1 panorama) — which is exactly why the spherical asin map mis-placed
-        // off-horizon (floor) returns onto the wrong rows. v = H/2 − f_v·(z/√(x²+y²)); straight up/down clamps.
+        // TRUE cylindrical 360 camera (NOT Webots' misnamed one — see the note in the ctor): azimuth
+        // θ=atan2(x,y) → column (LINEAR, identical to equirect), but the ELEVATION is a PLANAR
+        // projection onto the cylinder — row ∝ tan(elevation), NOT the angle itself. Vertical focal
+        // f_v = width/(2π) (square pixels; the full 360° spans `width` columns), so the vertical FoV
+        // is LIMITED (≈±58° for a 2:1 panorama) and the poles are unreachable.
+        // v = H/2 − f_v·(z/√(x²+y²)); straight up/down clamps to the frame edge.
         const double rho_h = std::hypot(p.x(), p.y());
         double u = ((azimuth_sign * std::atan2(p.x(), p.y()) + azimuth_offset) / (2.0 * M_PI) + 0.5) * width;
         u = std::fmod(u, static_cast<double>(width));
@@ -156,7 +166,7 @@ Eigen::Vector3d CameraAPI::ray_from_pixel(double u, double v) const
     }
     if( projection_model == ProjectionModel::Cylindrical )
     {
-        // Inverse of the cylindrical map: azimuth is linear (as equirect), elevation is planar (tan).
+        // Inverse of the TRUE cylindrical map: azimuth linear (as equirect), elevation planar (tan).
         //   project:  u = (az/2π + 0.5)·W ;  v = H/2 − f_v·(z/√(x²+y²)) ,  f_v = W/2π
         const double az    = (u / static_cast<double>(width) - 0.5) * 2.0 * M_PI;
         const double theta = azimuth_sign * (az - azimuth_offset);
