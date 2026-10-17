@@ -4,6 +4,7 @@
 
 #include "dsr/core/types/type_checking/dsr_edge_type.h"
 #include <dsr/api/dsr_agent_info_api.h>
+#include <dsr/api/dsr_proc_metrics.h>
 #include <dsr/api/dsr_api.h>
 #include <unistd.h>
 #include <limits.h>
@@ -11,6 +12,8 @@
 #include <sys/times.h>
 #include <QMetaObject>
 #include <fstream>
+#include <mutex>
+#include <optional>
 #include <sstream>
 #include <vector>
 #include <string>
@@ -158,39 +161,25 @@ void AgentInfoAPI::heartbeat_tick()
             str.erase(0, str.find_first_not_of(w));
         };
 
-        struct stat sts;
-        if (stat(std::string("/proc/"+ std::to_string(pid) ).c_str(), &sts) == -1 && errno == ENOENT) {
-            std::cout << __FILE__ << ":" << __LINE__ << " PROCESS DOES NOT EXIST" << std::endl;
-        }
-
-        try {
-            std::string memory_kb_and_cpu = exec(
-                    ("top -p " + std::to_string(pid) +" -b -c -n1 | grep  "+ std::to_string(pid) + " | awk '{print $6 \";\" $9}'").c_str());
-
-            trim(memory_kb_and_cpu);
-            const char delimiter = ';';
-            const auto pos = memory_kb_and_cpu.find(delimiter);
-            if (pos != std::string::npos) {
-                try {
-                    memory_kb = std::stoi(memory_kb_and_cpu.substr(0, pos));
-                    memory_kb_and_cpu.erase(0, pos + 1);
-                    std::replace(memory_kb_and_cpu.begin(), memory_kb_and_cpu.end(), ',', '.');
-                    try {
-                        cpu = std::stof(memory_kb_and_cpu);
-                    } catch (...)
-                    {
-                        std::cerr << "Error in stof (parsing value "<< memory_kb_and_cpu << ")." << __FILE__ << ":" << __LINE__  << std::endl;
-                    }
-                } catch (...)
-                {
-                    std::cerr << "Error in stoi (parsing value "<< memory_kb_and_cpu.substr(0, pos) << ")." << __FILE__ << ":" << __LINE__  << std::endl;
-                }
-            } else {
-                std::cerr << "Error parsing top output. " << __FILE__ << ":" << __LINE__  << std::endl;
-            }
-        } catch (const std::runtime_error &e)
+        // CPU and memory straight from /proc/self (dsr_proc_metrics.h): no subprocess, locale-independent, and CPU %
+        // measured since the previous refresh. The old `top | awk` + stof read "12,5" as 12 under es_ES and a large
+        // RES like "1,2g" as 1 kB. The first refresh has no previous sample, so its CPU stays unknown (-1).
+        // The previous sample is PROCESS-wide (static), not a member: /proc/self is per process anyway, and a new
+        // member would change sizeof(AgentInfoAPI), which every agent bakes in (make_unique in its own code) — an
+        // agent not rebuilt against the new header would then corrupt memory.
+        static std::mutex prev_mutex;
+        static std::optional<DSR::proc::Sample> prev_sample;
+        if (const auto now = DSR::proc::read_self(); now.has_value())
         {
-            std::cerr << "Error in popen. " << __FILE__ << ":" << __LINE__  << std::endl;
+            memory_kb = now->rss_kb;
+            const std::lock_guard lock(prev_mutex);
+            if (prev_sample.has_value() and now->cpu_ticks >= prev_sample->cpu_ticks)
+                cpu = DSR::proc::cpu_percent(now->cpu_ticks - prev_sample->cpu_ticks,
+                                             std::chrono::duration<double>(now->when - prev_sample->when).count(),
+                                             sysconf(_SC_CLK_TCK));
+            prev_sample = now;
+        } else {
+            std::cerr << "Error reading /proc/self/stat or /proc/self/status. " << __FILE__ << ":" << __LINE__ << std::endl;
         }
 
         std::string number_of_process;
