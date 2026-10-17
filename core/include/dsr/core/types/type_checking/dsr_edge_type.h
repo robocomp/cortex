@@ -73,4 +73,27 @@ REGISTER_EDGE_TYPE(match)
 //    in the transform tree.
 REGISTER_EDGE_TYPE(group_member)
 
+// ── PROVISIONAL ROOM ─ registered 2026-09-14 ────────────────────────────────────────────────────
+//    SELF-EDGE room->room, written by room_concept while a room is still being estimated and removed
+//    when the layout is committed. Presence means "this room node exists so that something can be
+//    planned against it, but its boundary is a lower bound and its walls are not yet walls".
+//
+//    An edge rather than an attribute, for two reasons. update_edge_signal carries the edge TYPE, so
+//    a consumer filters on it directly, where update_node_signal fires for every attribute a node
+//    has. And update_node DELETES attributes absent from the copy it is handed, which has bitten this
+//    codebase before; an edge cannot be erased by an unrelated writer's partial update.
+//
+//    ⚠ THIS EDGE IS A SIGNAL, NOT A SAFETY MECHANISM. controller_world_model.cpp takes
+//    get_nodes_by_type("room").front() with no filter, so the controller will plan against a
+//    provisional room exactly as if it were surveyed, and will keep doing so until someone adds the
+//    check. The provisional room must therefore be safe BY CONSTRUCTION -- sized from confirmed free
+//    space, never from sensor range plus an outward margin -- and the robot's own footprint test
+//    against the live grid stays the authority on collision.
+//
+//    ⚠ PROMOTION REMOVES THE EDGE AND KEEPS THE NODE. The node id is load-bearing: residual_concept
+//    binds its field to it (ResidualFitter::ensure_instance stores room_node_id_) and the controller
+//    latches room_name until the node disappears. Deleting and recreating the room to "publish the
+//    real one" would silently break both.
+REGISTER_EDGE_TYPE(proto)
+
 #endif //DSR_EDGE_TYPE_H

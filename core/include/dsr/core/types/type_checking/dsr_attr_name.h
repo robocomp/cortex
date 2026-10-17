@@ -383,6 +383,21 @@ REGISTER_TYPE(robot_wheel_radius, float, false)       // m
 REGISTER_TYPE(robot_axes_length, float, false)        // m, track width between drive wheels
 REGISTER_TYPE(robot_wheel_base, float, false)         // m, longitudinal distance between axles (distAxes; omni base only)
 
+// ── THE LEARNT BODY: room_concept's online motion calibrator, on the robot node ─────────────────────
+// CORRECTIONS RELATIVE TO the nominal body above (robot_concept's, from shadow.json), never replacements
+// for it: k_v = +0.01 means the wheels report 1% too far. Fractional scales, eps_yaw in rad, b_omega in
+// rad/s (physical sign: the gyro reads omega + b). The vectors are in the order of body_calib_names
+// (comma-separated), so a consumer reads by name and the estimator may append parameters.
+// Written by room_concept whenever the estimator re-solves; not streamed. Nothing writes them back to
+// shadow.json -- that is a separate, deliberate step.
+REGISTER_TYPE(body_calib_names, std::string, false)
+REGISTER_TYPE(body_calib_values, std::reference_wrapper<const std::vector<float>>, false)
+REGISTER_TYPE(body_calib_sigmas, std::reference_wrapper<const std::vector<float>>, false)   // posterior sd
+REGISTER_TYPE(body_calib_informed, int, false)   // bitmask, bit i: the data has shrunk parameter i's sd
+REGISTER_TYPE(body_calib_applied, int, false)    // bitmask, bit i: parameter i is correcting the odometry
+REGISTER_TYPE(body_calib_episodes, int, false)   // motion episodes behind the estimate
+REGISTER_TYPE(body_calib_timestamp, uint64_t, false)   // ms, the localiser cycle of the last re-solve
+
 REGISTER_TYPE(robot_gt_x, float, true)      // world frame, metres
 REGISTER_TYPE(robot_gt_y, float, true)      // world frame, metres
 REGISTER_TYPE(robot_gt_angle, float, true)  // world frame yaw, radians
@@ -1207,5 +1222,26 @@ REGISTER_TYPE(object_size_variance,     std::reference_wrapper<const std::vector
 // (died, then seen again) legitimately gets a NEW stamp — it is a new node with a new id, and the
 // name is the only thing that carries over. Do not refresh either on update_node.
 REGISTER_TYPE(creation_datetime,        std::string,                                      false)
+
+
+// ── THE CONTROLLER'S MISSION NODE — registered 2026-10-17 ─────────────────────────────────────
+// active_inference: chat_agent/docs/mission_language_2026-10-13.md §3.6 and
+// the chat's plan window. The controller owns one node,
+// `controller_mission` (type intention, Shadow --has--> it), describing the mission it runs, whatever its
+// source (chat, remote_cmd.txt, panel). Reused there: current_intention = the mission IR (JSON),
+// state = in_progress · completed · failed|<step>|<outcome> · aborted|<outcome>, bt_state = the current
+// step line, timestamp_agent = the mission's start time. Written ONLY on change. (The episodic memory's
+// controller journal is a separate attribute, em_journal.)
+REGISTER_TYPE(mission_serial,       int,                                              false)  // +1 per mission the controller starts
+REGISTER_TYPE(mission_source,       std::string,                                      false)  // chat · remote · panel
+REGISTER_TYPE(mission_progress,     std::reference_wrapper<const std::string>,        false)  // JSON: every step's state/outcome/attempt/iteration/t0/t1
+
+// ── EPISODIC MEMORY — registered 2026-10-17 ───────────────────────────────────────────────────
+// active_inference: docs/superpowers/specs/2026-10-17-episodic-memory-design.md. The controller publishes
+// its journal (missions, step attempts, claims, drive mode) on its own agent node; episodic_agent owns
+// the domain-4 graph: one node per today's commitment record, one per all-time statistics key.
+REGISTER_TYPE(em_journal,           std::string,                                      false)  // controller agent node: journal wire (common/episodic/em_journal.h)
+REGISTER_TYPE(em_record,            std::string,                                      false)  // domain-4 episode node: one Record as JSON (common/episodic/em_schema.h)
+REGISTER_TYPE(em_stats,             std::string,                                      false)  // domain-4 stats node: one Stats as JSON (common/episodic/em_consolidate.h)
 
 #endif //DSR_ATTR_NAME_H
