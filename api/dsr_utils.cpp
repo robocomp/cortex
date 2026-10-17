@@ -6,8 +6,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonParseError>
 #include <dsr/api/dsr_utils.h>
 #include <dsr/api/dsr_api.h>
+#include <dsr/api/dsr_exceptions.h>
 
 using namespace DSR;
 
@@ -15,18 +17,56 @@ Utilities::Utilities(DSR::DSRGraph *G_)
 { G = G_; }
 
 
+// A MALFORMED BOOTSTRAP FILE USED TO BE SILENT, AND THAT IS WORSE THAN A CRASH.
+//
+// fromJson() was called with no QJsonParseError*, so a syntax error produced a null document. Then
+// doc.object() was empty, dsrobject.value("DSRModel") was empty, symbolMap had no keys, the loop
+// below ran ZERO times and read_from_json_file RETURNED NORMALLY. DSRGraph's ctor printed its usual
+// "Warning, graph read from file ..." and the agent carried on with an EMPTY GRAPH: no exception,
+// no error line, nothing. Every downstream symptom then looks like a DDS or discovery problem, and
+// the frame tree is simply absent — which is how a one-character typo in shadow.json costs an
+// afternoon in the wrong subsystem.
+//
+// It also threw std::runtime_error for a missing file, while the only caller
+// (dsr_api.cpp, DSRGraph ctor) catches DSR::DSRException — so that throw escaped the catch and
+// terminated instead of reaching its qFatal. Both failures now raise the exception the caller is
+// actually waiting for.
+//
+// ⚠ Qt's JSON parser accepts STRICT JSON ONLY: no // or /* */ comments, no trailing commas. That is
+// deliberate here, not an oversight — shadow.json is also read by the lidar3d_dds driver in a
+// different repository, so a relaxed dialect would be valid for one reader and empty for the other.
+// Document the numbers in ROBOT_GEOMETRY.md, or in a "_comment" key (a sibling of "DSRModel" or of a
+// node's "id" — NEVER inside "attribute"/"linkAttribute", where the type checker auto-registers the
+// name and it becomes a real DSR attribute published to every peer).
 QJsonDocument Utilities::file_to_QJsonDocument(const std::string &json_file_path)
 {
 	// Open file and make initial checks
 	QFile file;
 	file.setFileName(QString::fromStdString(json_file_path));
 	if (not file.open(QIODevice::ReadOnly | QIODevice::Text))
-		throw std::runtime_error("File " + json_file_path + " not found. Cannot continue.");
+		throw DSR::DSRException("File " + json_file_path + " not found. Cannot continue.");
 
-	QString val = file.readAll();
+	const QByteArray raw = file.readAll();
 	file.close();
 
-	QJsonDocument doc = QJsonDocument::fromJson(val.toUtf8());
+	QJsonParseError parse_error{};
+	QJsonDocument doc = QJsonDocument::fromJson(raw, &parse_error);
+	if (parse_error.error != QJsonParseError::NoError)
+	{
+		// Qt reports a byte offset; a line and column is what a human can act on.
+		int line = 1, column = 1;
+		for (int i = 0; i < parse_error.offset and i < raw.size(); ++i)
+			if (raw[i] == '\n') { ++line; column = 1; } else { ++column; }
+		throw DSR::DSRException(
+			"Cannot parse '" + json_file_path + "': " + parse_error.errorString().toStdString() +
+			" at line " + std::to_string(line) + ", column " + std::to_string(column) +
+			" (byte offset " + std::to_string(parse_error.offset) + ")." +
+			" NOTE: this parser accepts strict JSON only - no // or /* */ comments and no trailing"
+			" commas. Use a \"_comment\" key instead.");
+	}
+	if (not doc.isObject())
+		throw DSR::DSRException("File '" + json_file_path + "' parsed, but its top level is not a"
+		                        " JSON object, so it declares no DSRModel. Cannot continue.");
 	return doc;
 }
 
@@ -39,6 +79,17 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
 
     QJsonObject dsrobject = jObject.value("DSRModel").toObject();
 	QJsonObject symbolMap = dsrobject.value("symbols").toObject();
+
+	// The second way to seed NOTHING while looking healthy: the file parses, but it is not a DSR
+	// model. The loop below would run zero times and this function would return normally, exactly as
+	// the unchecked parse used to. A file was named as input_file, so producing no node is never the
+	// intent - say which of the two keys is missing rather than leaving an empty graph behind.
+	if (jObject.value("DSRModel").isUndefined() or symbolMap.isEmpty())
+		throw DSR::DSRException(
+			"File '" + json_file_path + "' is valid JSON but yields no nodes: " +
+			(jObject.value("DSRModel").isUndefined() ? "it has no top-level \"DSRModel\" object."
+			                                         : "its DSRModel has no \"symbols\".") +
+			" The graph would have started EMPTY.");
     QJsonArray linksArray;
     // Read symbols (just symbols, then links in other loop)
     for (const QString &key : symbolMap.keys())
