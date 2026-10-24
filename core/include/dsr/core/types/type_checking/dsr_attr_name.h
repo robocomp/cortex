@@ -382,6 +382,11 @@ REGISTER_TYPE(robot_max_linear_decel, float, false)   // m/s^2
 REGISTER_TYPE(robot_wheel_radius, float, false)       // m
 REGISTER_TYPE(robot_axes_length, float, false)        // m, track width between drive wheels
 REGISTER_TYPE(robot_wheel_base, float, false)         // m, longitudinal distance between axles (distAxes; omni base only)
+// The base's DEADBAND (registered 2026-10-20, local-motion policy Task 7): the smallest |v| / |w| the base actually
+// executes. MEASURED (controller/tools/measure_deadband.py), not in SVD48VBase's file, so robot_concept publishes it
+// from its own config (Agent.base_min_linear_speed / base_min_rot_speed). ABSENT = unknown, never 0.
+REGISTER_TYPE(robot_min_linear_speed, float, false)   // m/s
+REGISTER_TYPE(robot_min_rot_speed, float, false)      // rad/s
 
 // ── THE LEARNT BODY: room_concept's online motion calibrator, on the robot node ─────────────────────
 // CORRECTIONS RELATIVE TO the nominal body above (robot_concept's, from shadow.json), never replacements
@@ -498,6 +503,12 @@ REGISTER_TYPE(room_height, float, false);
  * ⚠ 0 means never measured, which is not the same as "measured and perfectly known". */
 REGISTER_TYPE(room_height_sigma, float, false);
 REGISTER_TYPE(room_is_oriented, bool, false);
+/* P(this room is explored), registered 2026-10-21 (active_inference local-policy plan, Task 5). Written by
+ * room_concept on the room node: a BELIEF, not a coverage threshold -- from the boundary actually seen and the
+ * expected information still left in its afford_room vs that offer's time cost. An LTSM-recalled room starts
+ * from what memory restored. Read by the controller's mission predicate `until explored(room)`.
+ * ABSENT means never assessed, not "unexplored". */
+REGISTER_TYPE(room_explored_p, float, false);   // [0,1]
 REGISTER_TYPE(center_x, float, false);
 REGISTER_TYPE(center_y, float, false);
 REGISTER_TYPE(corner1, std::reference_wrapper<const std::vector<float>>, false);
@@ -557,6 +568,7 @@ REGISTER_TYPE(cam_fov, float, false)
 // Equirectangular (360) intrinsics: panorama column convention (mirror sign ±1, seam zero offset).
 REGISTER_TYPE(cam_equirect_azimuth_sign, float, false)
 REGISTER_TYPE(cam_equirect_azimuth_offset, float, false)
+REGISTER_TYPE(mask_azimuth_windows, std::reference_wrapper<const std::vector<float>>, false)  // masks_ricoh: [from,to] x K camera-frame azimuth intervals (rad, CCW) of the strips the detector ran on this frame; absent/empty = unknown
 // 360-panorama projection model: "equirectangular" (spherical, elevation∝angle) or "cylindrical" (webots
 // camera: azimuth linear, ELEVATION planar ∝ tan). Selects CameraAPI's vertical map; azimuth is common.
 REGISTER_TYPE(cam_projection, std::reference_wrapper<const std::string>, false)
@@ -783,6 +795,14 @@ REGISTER_TYPE(table_frames_since_detection, int,                                
 //    render the matching mesh (e.g. a disc vs a box) and by any consumer that cares about shape.
 REGISTER_TYPE(object_subtype,               std::string,                                      false)
 
+// ── Object SHAPE qualifier — generic across concept agents (registered 2026-10-18) ──────────────────────
+//    object_subtype now carries the object's CLASS ("table"), so the inferred shape needs its own slot.
+//    obj_shape: the winning shape model (e.g. table top = "round" | "square"). obj_shape_prob: the posterior
+//    probability of that winner, in [0.5,1] — near 0.5 means the views so far cannot tell the models apart.
+//    ABSENT means the agent has not stated a shape, not that the object has none.
+REGISTER_TYPE(obj_shape,                    std::string,                                      false)
+REGISTER_TYPE(obj_shape_prob,               float,                                            false)  // [0.5,1]
+
 // ── Display-mesh handoff: a concept agent owns its own appearance and publishes the relative asset path(s)
 //    on its node; the voxelizer's 3D viewer reads them, loads the mesh (cached by path), and renders it
 //    scaled to the node's fitted box — no per-type knowledge in the viewer. Contract for the referenced OBJ:
@@ -837,6 +857,8 @@ REGISTER_TYPE(door_phi_rad,                   float,                            
 REGISTER_TYPE(door_open_prob,                 float,                                            false)  // P(clear width >= robot passage width), marginalised over the phi posterior
 REGISTER_TYPE(door_reach_prob,                float,                                            false)  // P(the robot is inside this door's actuation zone), under the pose covariance
 REGISTER_TYPE(door_crossing_progress,         float,                                            false)  // -1..+1 along the aperture normal, signed against the side held when the cross claim was made
+REGISTER_TYPE(door_cross_exec_prob,         float,                                            false)  // P(the cross is EXECUTABLE from the robot's current pose) = P(at the door) x P(swept corridor clear of the leaf) x P(passable); the cross contract's pre: clause. -1 = NOT MEASURED
+REGISTER_TYPE(interaction_node_id,            std::uint64_t,                                    false)  // affordance → the node defining the robot-object pose (an interaction anchor hanging from the robot)
 
 // ── PASSAGE HISTORY: the crossing record (door_concept writes) and the belief over it (ltsm_agent) ──
 //    A doorway is crossed many times over a robot's life, and what is learned by crossing it — was it
@@ -918,6 +940,7 @@ REGISTER_TYPE(passage_pass_beta,        float,                                  
 REGISTER_TYPE(passage_open_alpha,       float,                                            false)  // Beta over p(an open request succeeds | requested)
 REGISTER_TYPE(passage_open_beta,        float,                                            false)
 REGISTER_TYPE(passage_crossings,        int,                                              false)
+REGISTER_TYPE(ltsm_topology,           std::string,                                      false)  // JSON summary of remembered rooms + passages, on ltsm's `ltsm_topology` node
 REGISTER_TYPE(passage_last_datetime,    std::string,                                      false)
 REGISTER_TYPE(passage_seq_last,         int,                                              false)  // last sequence harvested, so gaps stay visible
 REGISTER_TYPE(cabinet_roi_offset,             std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
@@ -1109,6 +1132,21 @@ REGISTER_TYPE(aff_outcome,              std::string,                            
 // which is the thing DSR is allowed to rename on a restart collision.
 REGISTER_TYPE(aff_kind,                 std::string,                                      false)
 
+// ── PARAMETERISED AFFORDANCES: the options a producer offers inside ONE node (2026-10-18) ────────
+// "Approach the table from the right" is one action with a parameter, not a node per side. The
+// producer lists the options it CAN serve — only those — each with its own pose; the node's
+// epistemic_target_* stays the DEFAULT option, so a consumer that knows nothing of options still
+// drives somewhere valid. The four vectors are parallel: names[i] is served at (x[i], y[i], yaw[i]),
+// and names[0] IS the default (the same pose as epistemic_target_*).
+// The consumer picks one by writing executing_option on its `executing` edge, and drives to that
+// option's pose (written, as always, in executing_target_*). Absent / "" = the default.
+// ★Still "the object proposes": a consumer may only choose a name the producer listed.
+REGISTER_TYPE(aff_option_names,         std::string,                                      false)  // comma-separated
+REGISTER_TYPE(aff_option_x_m,           std::reference_wrapper<const std::vector<float>>,  true)
+REGISTER_TYPE(aff_option_y_m,           std::reference_wrapper<const std::vector<float>>,  true)
+REGISTER_TYPE(aff_option_yaw_rad,       std::reference_wrapper<const std::vector<float>>,  true)
+REGISTER_TYPE(executing_option,         std::string,                                      false)  // on the executing EDGE
+
 // ── human-concept + bottle-concept detection channel (mirror of table/chair/cabinet above; bool alive per
 //    the WIRE-TYPE note there, read only via attr_scalar/type-attributed getters) ─ registered 2026-07-24 ─
 REGISTER_TYPE(human_detection_alive,       bool,                                          false)
@@ -1238,10 +1276,27 @@ REGISTER_TYPE(mission_progress,     std::reference_wrapper<const std::string>,  
 
 // ── EPISODIC MEMORY — registered 2026-10-17 ───────────────────────────────────────────────────
 // active_inference: docs/superpowers/specs/2026-10-17-episodic-memory-design.md. The controller publishes
-// its journal (missions, step attempts, claims, drive mode) on its own agent node; episodic_agent owns
-// the domain-4 graph: one node per today's commitment record, one per all-time statistics key.
-REGISTER_TYPE(em_journal,           std::string,                                      false)  // controller agent node: journal wire (common/episodic/em_journal.h)
+// its journal (missions, step attempts, claims, drive mode) on its own `em_journal` node (type intention,
+// Shadow --has--> it); episodic_agent owns the domain-4 graph: one node per today's commitment record,
+// one per all-time statistics key.
+REGISTER_TYPE(em_journal,           std::string,                                      false)  // controller's em_journal node: journal wire (common/episodic/em_journal.h)
 REGISTER_TYPE(em_record,            std::string,                                      false)  // domain-4 episode node: one Record as JSON (common/episodic/em_schema.h)
 REGISTER_TYPE(em_stats,             std::string,                                      false)  // domain-4 stats node: one Stats as JSON (common/episodic/em_consolidate.h)
+
+// Self calibration
+// active_inference: docs/superpowers/plans/2026-10-23-sensor-calibration-agent.md. The sensor_calibration agent
+// PROPOSES head-sensor mount corrections on its own node; robot_concept (sole writer of body->sensor RT edges)
+// commits them. Correction convention = BODY-aligned axes (R = R_corr*R_nom, t = t_nom + t_corr).
+REGISTER_TYPE(mount_proposal,         std::vector<float>,                             false)  // per sensor (helios,bpearl,zed,ricoh): 6 deltas (x y z roll pitch yaw) + 6x6 covariance row-major = 42 floats each
+REGISTER_TYPE(mount_proposal_version, int,                                            false)  // bumps on every new proposal
+REGISTER_TYPE(mount_proposal_ready,   bool,                                           false)  // proposal is ready for robot_concept to commit
+REGISTER_TYPE(place_map_file,        std::reference_wrapper<const std::string>,          false)  // room recognition: path of the place map file the recogniser matches against
+REGISTER_TYPE(recog_room_ids,        std::reference_wrapper<const std::vector<uint64_t>>, false)  // room recognition: candidate room ids, one per recogniser hypothesis
+REGISTER_TYPE(recog_loglr,           std::reference_wrapper<const std::vector<float>>,    false)  // room recognition: per-candidate log likelihood ratio
+REGISTER_TYPE(recog_mix,             std::reference_wrapper<const std::vector<float>>,    false)  // room recognition: per-candidate mixture weight
+REGISTER_TYPE(recog_mix_n,           std::reference_wrapper<const std::vector<uint64_t>>, false)  // room recognition: per-candidate mixture sample count
+REGISTER_TYPE(recog_posterior,       std::reference_wrapper<const std::vector<float>>,    false)  // room recognition: per-candidate posterior probability
+REGISTER_TYPE(recall_pose_prior,     std::reference_wrapper<const std::vector<float>>,    false)  // room recognition: pose prior recalled from memory for the matched room
+REGISTER_TYPE(recall_late,           bool,                                                false)  // room recognition: recall arrived after the recogniser had already committed
 
 #endif //DSR_ATTR_NAME_H
