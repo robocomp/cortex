@@ -382,3 +382,90 @@ TEST_CASE("InnerEigen interpolation mode on RT chain", "[GRAPH][RT][INNER]") {
     REQUIRE(nearest_transform.has_value());
     CHECK(std::abs(nearest_transform->x() + 11.0) < 1e-9);
 }
+
+// rewrite_edge_RT_since: a late correction replaces the predictions written after its stamp, in one publish.
+// Own nodes (like "RT api timestamp"): the root/room tests above depend on the shipped test graph.
+TEST_CASE("RT api rewrite since", "[GRAPH][RT]") {
+    auto ctx = make_edge_config_file();
+    DSRGraph G(make_test_graph_settings(random_string(10), rand() % 1000, ctx, true, 0, SignalMode::QT, SyncMode::CRDT));
+    auto a = Node::create<testtype_node_type>(random_string());
+    G.add_attrib_local<level_att>(a, 0);
+    const auto ida = G.insert_node(a);
+    REQUIRE(ida.has_value());
+    auto b = Node::create<testtype_node_type>(random_string());
+    const auto idb = G.insert_node(b);
+    REQUIRE(idb.has_value());
+    auto rt = G.get_rt_api();
+    REQUIRE(rt);
+    rt->HISTORY_SIZE = 5;
+
+    const auto parent = [&] { auto n = G.get_node(*ida); REQUIRE(n.has_value()); return n.value(); };
+    const auto edge = [&] { auto e = G.get_edge(*ida, *idb, "RT"); REQUIRE(e.has_value()); return e.value(); };
+    const auto block = [](float x, float vx) {
+        return RT_API::RTBlock{.translation = {x, 0.f, 0.f}, .rotation_euler = {0.f, 0.f, 0.f},
+                               .twist_linear = std::vector<float>{vx, 0.f, 0.f},
+                               .twist_angular = std::vector<float>{0.f, 0.f, 0.f}};
+    };
+    const auto write = [&](float x, std::uint64_t ts) { auto n = parent(); rt->insert_or_assign_edge_RT(n, *idb, block(x, 0.f), ts); };
+    const auto rewrite = [&](std::vector<std::pair<std::uint64_t, RT_API::RTBlock>> v) { auto n = parent(); rt->rewrite_edge_RT_since(n, *idb, std::move(v)); };
+    const auto x_at = [&](std::uint64_t ts) {
+        auto m = rt->get_edge_RT_as_rtmat(edge(), ts, RT_API::TimeQuery::Interpolated);
+        REQUIRE(m.has_value());
+        return m->translation().x();
+    };
+    const auto stamps = [&] {
+        const auto e = edge();   // get_attrib_by_name returns a reference into it: keep it alive
+        const auto ts = G.get_attrib_by_name<rt_timestamps_att>(e);
+        REQUIRE(ts.has_value());
+        std::vector<std::uint64_t> v(ts->get().begin(), ts->get().end());
+        std::erase(v, 0);
+        std::ranges::sort(v);
+        return v;
+    };
+
+    // predictions at 1000..1300 (x = 0, 1, 2, 3)
+    for (int k = 0; k < 4; ++k)
+        write(static_cast<float>(k), 1000 + 100 * k);
+    REQUIRE(stamps() == std::vector<std::uint64_t>{1000, 1100, 1200, 1300});
+    CHECK(std::abs(x_at(1250) - 2.5) < 1e-6);
+
+    // the correction for 1100 arrives late, with the re-propagated newest (1300); 1200 is superseded
+    rewrite({{1300, block(30.f, 3.f)}, {1100, block(10.f, 1.f)}});
+    CHECK(stamps() == std::vector<std::uint64_t>{1000, 1100, 1300});
+    CHECK(std::abs(x_at(1200) - 20.0) < 1e-6);   // between the correction and the re-propagated pose
+    CHECK(std::abs(x_at(1050) - 5.0) < 1e-6);    // the block before `since` is kept
+    CHECK(std::abs(x_at(0) - 30.0) < 1e-6);      // timestamp 0 = the newest, not the last written
+    {
+        const auto e = edge();
+        const auto ts = G.get_attrib_by_name<rt_timestamps_att>(e);
+        const auto tw = G.get_attrib_by_name<rt_twist_linear_att>(e);
+        REQUIRE((ts.has_value() and tw.has_value()));
+        const auto i = std::ranges::find(ts->get(), std::uint64_t{1300}) - ts->get().begin();
+        CHECK(std::abs(tw->get()[3 * i] - 3.f) < 1e-6);   // the twist moved with its pose
+    }
+
+    // ordinary writes continue after the newest, and the ring evicts oldest first
+    write(40.f, 1400);
+    CHECK(std::abs(x_at(0) - 40.0) < 1e-6);
+    write(50.f, 1500);
+    write(60.f, 1600);
+    CHECK(stamps() == std::vector<std::uint64_t>{1100, 1300, 1400, 1500, 1600});
+    CHECK(std::abs(x_at(0) - 60.0) < 1e-6);
+
+    // a repeated stamp keeps the last one given; a rewrite longer than the ring keeps the newest H
+    rewrite({{1500, block(55.f, 0.f)}, {1500, block(56.f, 0.f)}});
+    CHECK(stamps() == std::vector<std::uint64_t>{1100, 1300, 1400, 1500});
+    CHECK(std::abs(x_at(1500) - 56.0) < 1e-6);
+    std::vector<std::pair<std::uint64_t, RT_API::RTBlock>> many;
+    for (int k = 0; k < 7; ++k)
+        many.emplace_back(2000 + 10 * k, block(static_cast<float>(k), 0.f));
+    rewrite(many);
+    CHECK(stamps() == std::vector<std::uint64_t>{2020, 2030, 2040, 2050, 2060});
+    CHECK(std::abs(x_at(0) - 6.0) < 1e-6);
+    write(7.f, 2070);                                     // full ring: evicts 2020
+    CHECK(stamps() == std::vector<std::uint64_t>{2030, 2040, 2050, 2060, 2070});
+
+    // a malformed block is refused before anything is written
+    CHECK_THROWS(rewrite({{2080, RT_API::RTBlock{.translation = {1.f, 2.f}, .rotation_euler = {0.f, 0.f, 0.f}}}}));
+    CHECK(stamps() == std::vector<std::uint64_t>{2030, 2040, 2050, 2060, 2070});
+}
