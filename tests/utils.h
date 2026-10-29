@@ -72,13 +72,13 @@ inline auto make_empty_config_file() -> std::string {
                     "level": {
                         "type": 1,
                         "value": 0
-                    },
+                    }
                 },
                 "id": "100",
                 "links": [],
                 "name": "root",
                 "type": "root"
-            },
+            }
         }
     }
 })EOF" << std::endl;
