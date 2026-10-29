@@ -221,6 +221,8 @@ NodeMutationEffect CRDTSyncEngine::update_node_local(Node&& node)
 {
     CORTEX_PROFILE_ZONE_CS("CRDTSyncEngine::update_node_local");
     NodeMutationEffect effect;
+    const uint64_t id = node.id();
+    std::string new_name = node.name();
     auto [applied, deltas] = update_node_raw(user_node_to_crdt(std::move(node)));
     effect.applied = applied;
     if (applied && deltas.has_value()) {
@@ -228,6 +230,22 @@ NodeMutationEffect CRDTSyncEngine::update_node_local(Node&& node)
         effect.changed_attributes.reserve(deltas->vec.size());
         for (const auto& item : deltas->vec) {
             effect.changed_attributes.emplace_back(item.attr_name);
+        }
+    }
+    // Rename (same id, new name). The name lives in the node register itself, not in a
+    // per-attribute register, so update_node_raw cannot carry it: write the whole
+    // register (as insert_node_raw does) and ship it as a node delta. The remote
+    // join_delta_node replaces the register and refreshes name_map/id_map.
+    // DSRGraph::update_node has already checked the new name is not used by another id.
+    if (applied) {
+        if (auto nit = nodes_.find(id); nit != nodes_.end() and not nit->second.empty()
+                                        and nit->second.read_reg().name != new_name) {
+            CRDT::Node renamed = nit->second.read_reg();
+            renamed.name = std::move(new_name);
+            host_.update_maps_node_insert(id, renamed.name, renamed.type, collect_outgoing_edge_keys(renamed.fano));
+            auto delta = nit->second.write(std::move(renamed));
+            nit->second.join(mvreg<CRDT::Node>(delta));
+            effect.node_delta = NodeDeltaMessage{crdt_node_to_msg(host_.local_agent_id(), id, std::move(delta))};
         }
     }
     return effect;

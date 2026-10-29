@@ -39,6 +39,7 @@ add_executable(tests test.cpp
                      synchronization/lww_sync_engine.cpp
                      synchronization/graph_signals.cpp
                      synchronization/fake_network_tests.cpp
+                     synchronization/rename_node.cpp
                      transport/fake_network.h
                      utils.h)
 

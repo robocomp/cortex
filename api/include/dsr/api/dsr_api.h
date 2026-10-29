@@ -734,6 +734,12 @@ namespace DSR
             // Re-inserting the node must clear any stale tombstone marker so future
             // local updates are not rejected as "node is deleted".
             deleted.erase(id);
+            // A rename (same id, new name) arrives here without a preceding delete on the
+            // CRDT paths: drop the old name so get_node(old_name) stops resolving.
+            if (auto id_it = id_map.find(id); id_it != id_map.end() and id_it->second != name) {
+                if (auto old_it = name_map.find(id_it->second); old_it != name_map.end() and old_it->second == id)
+                    name_map.erase(old_it);
+            }
             name_map[name] = id;
             id_map[id] = std::move(name);
             nodeType[type].emplace(id);

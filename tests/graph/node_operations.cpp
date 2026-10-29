@@ -86,7 +86,7 @@ TEST_CASE("Graph node operations", "[NODE]") {
         REQUIRE(G.get_attrib_by_name<level_att>(*updated) == 3);
     }
 
-    SECTION("Can't update an existent node with different id") {
+    SECTION("Can't update an existent node with different id (its name belongs to another id)") {
         auto node_name = random_string();
         auto n = Node::create<testtype_node_type>(node_name);
         std::optional<uint64_t> r  = G.insert_node(n);
@@ -94,18 +94,27 @@ TEST_CASE("Graph node operations", "[NODE]") {
 
         n.id(random_number());
 
-        REQUIRE_THROWS(G.update_node(n));
+        bool ok = true;
+        REQUIRE_NOTHROW(ok = G.update_node(n));
+        REQUIRE_FALSE(ok);
+        REQUIRE(G.get_node(node_name)->id() == r.value());
     }
 
-    SECTION("Can't update an existent node with different name") {
+    SECTION("Update an existent node with a different, free name renames it (same id)") {
         auto node_name = random_string();
         auto n = Node::create<testtype_node_type>(node_name);
         std::optional<uint64_t> r  = G.insert_node(n);
         REQUIRE(r.has_value());
 
-        n.name(random_string());
+        auto stored = G.get_node(r.value());
+        REQUIRE(stored.has_value());
+        const auto new_name = random_string(12);
+        stored->name(new_name);
 
-        REQUIRE_THROWS(G.update_node(n));
+        REQUIRE(G.update_node(stored.value()));
+        REQUIRE(G.get_node(new_name)->id() == r.value());
+        REQUIRE_FALSE(G.get_node(node_name).has_value());
+        REQUIRE(G.get_name_from_id(r.value()) == std::optional<std::string>{new_name});
     }
 
     SECTION("Delete existing node by id") {

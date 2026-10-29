@@ -662,11 +662,10 @@ requires (std::is_same_v<std::remove_cvref_t<No>, DSR::Node>)
                      " " + __FUNCTION__ + " " + std::to_string(__LINE__)).data());
         const auto id_it = id_map.find(node.id());
         const auto name_it = name_map.find(node.name());
-        if ((id_it != id_map.end() && id_it->second != node.name()) ||
-            (name_it != name_map.end() && name_it->second != node.id()))
-            throw std::runtime_error(
-                    (std::string("Cannot update node in G, id and name must be unique") + __FILE__ + " " +
-                     __FUNCTION__ + " " + std::to_string(__LINE__)).data());
+        // A new name for an existing id is a RENAME and is allowed; the engine refreshes
+        // name_map/id_map and propagates it. A name already held by a DIFFERENT id is refused.
+        if (name_it != name_map.end() && name_it->second != node.id())
+            return false;
         else if (id_it != id_map.end()) {
             lck_cache.unlock();
             // Perfect-forward into the engine: rvalue callers move (no deep blob
