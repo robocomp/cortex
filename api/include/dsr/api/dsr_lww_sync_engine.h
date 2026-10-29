@@ -69,6 +69,10 @@ private:
     using TypeIndex = LWW::TypeIndex;
 
     const LWW::NodeState* get_node_ptr(uint64_t id) const;
+    // from_snapshot: a full-graph import, whose node message is authoritative for attrs.
+    // A live node delta for an EXISTING node is a metadata change (rename/type) and keeps
+    // the local, individually versioned attrs.
+    void apply_remote_node_delta_impl(NodeDeltaMessage&& delta, bool from_snapshot);
 
     uint64_t current_time_ms() const;
     uint64_t next_timestamp();

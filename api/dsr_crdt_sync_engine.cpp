@@ -223,9 +223,12 @@ NodeMutationEffect CRDTSyncEngine::update_node_local(Node&& node)
     NodeMutationEffect effect;
     const uint64_t id = node.id();
     std::string new_name = node.name();
+    std::string current_name;
+    if (auto cit = nodes_.find(id); cit != nodes_.end() and not cit->second.empty())
+        current_name = cit->second.read_reg().name;
     auto [applied, deltas] = update_node_raw(user_node_to_crdt(std::move(node)));
     effect.applied = applied;
-    if (applied && deltas.has_value()) {
+    if (applied && deltas.has_value() && (not deltas->vec.empty() || new_name == current_name)) {
         effect.node_attr_batch = NodeAttrDeltaBatchMessage{*deltas};
         effect.changed_attributes.reserve(deltas->vec.size());
         for (const auto& item : deltas->vec) {
@@ -775,7 +778,19 @@ void CRDTSyncEngine::join_delta_node(MvregNodeMsg&& mvreg)
                     delete_unprocessed_deltas();
                     nodes_.erase(id);
                 } else {
-                    const auto& reg = nodes_.at(id).read_reg();
+                    auto& reg = nodes_.at(id).read_reg();
+                    // The node existed here already, so this register write can only be a rename
+                    // (or a duplicate insert): node ids are never reused by insert. Its fano/attrs
+                    // are the WRITER's snapshot, which can miss edge/attribute edits the writer had
+                    // not received yet. Those nested registers travel in their own deltas and are
+                    // already merged here, so keep the LOCAL nested state and take only the scalar
+                    // fields (name/type) from the write — otherwise a concurrent edge add is wiped,
+                    // a concurrent edge delete is resurrected, and an attribute reverts.
+                    if (maybe_deleted_node.has_value()) {
+                        reg.fano = std::move(maybe_deleted_node->fano);
+                        reg.attrs = std::move(maybe_deleted_node->attrs);
+                        maybe_deleted_node.reset();
+                    }
                     current_type = reg.type;
                     host_.update_maps_node_insert(reg.id, reg.name, reg.type, collect_outgoing_edge_keys(reg.fano));
                     consume_unprocessed_deltas();

@@ -307,6 +307,14 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
     auto old_outgoing_edges = collect_outgoing_edge_keys(from_idx_, node.id());
     auto version = version_of(now, host_.local_agent_id());
     auto next_attrs = LWW::to_attr_state_map(node.attrs(), version);
+    // An attribute whose VALUE did not change keeps its old version. Re-stamping it with
+    // this write's version would make a concurrent (not yet received) remote write to that
+    // attribute look stale here and be rejected, so the graphs would diverge.
+    for (auto& [name, state] : next_attrs) {
+        if (auto old_it = it->second.attrs.find(name); old_it != it->second.attrs.end()
+                                                     and old_it->second.value == state.value)
+            state.version = old_it->second.version;
+    }
     auto attr_deltas = LWW::to_node_attr_delta_batch(node.id(), it->second.attrs, next_attrs);
     effect.changed_attributes.reserve(attr_deltas.vec.size());
     for (const auto& item : attr_deltas.vec) {
@@ -316,8 +324,14 @@ NodeMutationEffect LWWSyncEngine::update_node_local(Node&& node)
     const bool metadata_changed = it->second.type != node.type() || it->second.name != node.name();
     it->second.type = node.type();
     it->second.name = node.name();
-    it->second.version = version;
-    it->second.agent_id = host_.local_agent_id();
+    // The node-level version stamps the METADATA (name/type) only, and only a metadata change
+    // publishes it. Bumping it on an attr-only write (attrs carry their own versions) moved it
+    // here but never on peers, so a concurrent remote rename could be judged stale on THIS
+    // graph alone and the graphs diverged for good.
+    if (metadata_changed) {
+        it->second.version = version;
+        it->second.agent_id = host_.local_agent_id();
+    }
     it->second.attrs = std::move(next_attrs);
 
     host_.update_maps_node_delete(node.id(), old_type, old_outgoing_edges);
@@ -457,6 +471,11 @@ EdgeMutationEffect LWWSyncEngine::delete_edge_local(uint64_t from, uint64_t to, 
 
 void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
 {
+    apply_remote_node_delta_impl(std::move(delta), false);
+}
+
+void LWWSyncEngine::apply_remote_node_delta_impl(NodeDeltaMessage&& delta, bool from_snapshot)
+{
     CORTEX_PROFILE_ZONE_CS("LWWSyncEngine::apply_remote_node_delta");
     auto* payload = std::get_if<LWWNodeMsg>(&delta);
     if (payload == nullptr) {
@@ -494,6 +513,11 @@ void LWWSyncEngine::apply_remote_node_delta(NodeDeltaMessage&& delta)
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::apply_remote_node_delta upsert");
         if (const auto* current = get_node_ptr(payload->id); current != nullptr) {
             host_.update_maps_node_delete(payload->id, current->type, collect_outgoing_edge_keys(from_idx_, payload->id));
+            // Live delta for a node that exists here = a metadata change (rename/type): attribute
+            // changes always travel in their own versioned attr batches. The message's attrs
+            // are the writer's snapshot stamped with the WRITE's version, which would wrongly
+            // override concurrent attribute writes it had not received — keep the local ones.
+            if (not from_snapshot) state.attrs = current->attrs;
         }
         nodes_[payload->id] = std::move(state);
         node_tombstones_.erase(payload->id);
@@ -689,7 +713,7 @@ void LWWSyncEngine::import_full_graph(FullGraphMessage&& full_graph)
     {
         CORTEX_PROFILE_DETAIL_N("LWWSyncEngine::import_full_graph nodes");
         for (const auto& node : payload->nodes) {
-            apply_remote_node_delta(NodeDeltaMessage{node});
+            apply_remote_node_delta_impl(NodeDeltaMessage{node}, true);
         }
     }
     {

@@ -60,30 +60,7 @@ bool wait_until_qt(Predicate&& predicate, std::chrono::milliseconds timeout = 20
 
 }
 
-namespace DSR
-{
-class DSRGraphTestAccess
-{
-public:
-    static std::map<uint64_t, DSR::MvregNodeMsg> export_crdt_map(DSRGraph& graph)
-    {
-        auto full_graph = graph.engine_->export_full_graph();
-        auto* payload = std::get_if<DSR::OrMap>(&full_graph);
-        REQUIRE(payload != nullptr);
-        return payload->m;
-    }
-
-    static void apply_node_delta(DSRGraph& graph, DSR::MvregNodeMsg&& delta)
-    {
-        graph.engine_->apply_remote_node_delta(DSR::NodeDeltaMessage{std::move(delta)});
-    }
-
-    static void import_full_graph(DSRGraph& graph, DSR::OrMap&& full_graph)
-    {
-        graph.engine_->import_full_graph(DSR::FullGraphMessage{std::move(full_graph)});
-    }
-};
-}
+#include "graph_test_access.h"
 
 TEST_CASE("Connect and receive the graph from other agent", "[SYNCHRONIZATION][GRAPH]"){
     ScopedQtApplication qt;
