@@ -62,6 +62,13 @@ REGISTER_EDGE_TYPE(collision)
 REGISTER_EDGE_TYPE(TARGET)
 REGISTER_EDGE_TYPE(testtype_e)
 REGISTER_EDGE_TYPE(current)
+// ── `exit`: THE CROSSING FACT of the room-transition protocol (active_inference, spec 2026-10-29 Revision 2, R1) ─────
+//    Unused 2024–2026-10 (its earlier use, the TFM door agent's "exit door", was retired); claimed 2026-10-30 for:
+//      OLD_FACE → NEW_ROOM   written by room_concept when it decides the robot crossed the hole OLD_FACE (a door node
+//                            of the room LEFT) into NEW_ROOM (provisional or remembered). Opens the transition phase.
+//      NEW_FACE → OLD_FACE   written by door_concept on the edge above: NEW_FACE is the same hole's face in NEW_ROOM.
+//                            ltsm pairs a passage's two faces from this pair only; `cross new` excludes a door with it.
+//    No attributes. Each edge is deleted with its source node, by that node's owner. NON-RT.
 REGISTER_EDGE_TYPE(exit)
 REGISTER_EDGE_TYPE(match)
 
