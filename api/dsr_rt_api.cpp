@@ -992,6 +992,11 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, RTBlock block, 
         G->add_or_modify_attrib_local<rt_timestamps_att>(edge, std::move(time_stamps));
     }
 
+    commit_RT_edge(n, to, std::move(edge));
+}
+
+void RT_API::commit_RT_edge(Node &n, uint64_t to, Edge edge)
+{
     auto to_n = G->get_node(to);
     if (!to_n.has_value())
         throw std::runtime_error(
@@ -1036,6 +1041,132 @@ void RT_API::insert_or_assign_edge_RT_impl(Node &n, uint64_t to, RTBlock block, 
         throw std::runtime_error(
                 "Could not insert RT edge " + std::to_string(n.id()) + " -> " + std::to_string(to) +
                 " in insert_or_assign_edge_RT() " + __FILE__ + " " + __FUNCTION__ + " " + std::to_string(__LINE__));
+}
+
+void RT_API::rewrite_edge_RT_since(Node &n, uint64_t to, std::vector<std::pair<uint64_t, RTBlock>> blocks)
+{
+    CORTEX_PROFILE_ZONE_N("RT_API::rewrite_edge_RT_since");
+    if (blocks.empty())
+        return;
+    std::ranges::stable_sort(blocks, {}, [](const auto &b) { return b.first; });
+    auto edge_o = G->get_edge(n.id(), to, "RT");
+    std::optional<std::vector<uint64_t>> ts_o;
+    if (edge_o.has_value())
+        ts_o = G->get_attrib_by_name<rt_timestamps_att>(edge_o.value());
+    if (HISTORY_SIZE <= 0 or blocks.front().first == 0 or not edge_o.has_value() or not ts_o.has_value()
+        or G->get_attrib_by_name<rt_static_att>(edge_o.value()).value_or(false))
+    {
+        for (auto &[ts, b] : blocks)
+            insert_or_assign_edge_RT_impl(n, to, std::move(b), ts);
+        return;
+    }
+
+    // Same payload rules as insert_or_assign_edge_RT_impl.
+    const auto require = [](const std::optional<std::vector<float>> &v, std::size_t want, const char *what)
+    {
+        if (v.has_value() and v->size() != want)
+            throw std::runtime_error(std::string("RT ") + what + " must contain exactly "
+                                     + std::to_string(want) + " float values");
+    };
+    for (const auto &[ts, b] : blocks)
+    {
+        if (b.translation.size() != static_cast<std::size_t>(BLOCK_SIZE) or b.rotation_euler.size() != static_cast<std::size_t>(BLOCK_SIZE))
+            throw std::runtime_error("RT translation and rotation must contain exactly 3 float values");
+        require(b.covariance, RT_COVARIANCE_BLOCK_SIZE, "covariance");
+        require(b.twist_covariance, RT_COVARIANCE_BLOCK_SIZE, "twist covariance");
+        require(b.twist_linear, static_cast<std::size_t>(BLOCK_SIZE), "linear twist");
+        require(b.twist_angular, static_cast<std::size_t>(BLOCK_SIZE), "angular twist");
+        if (b.twist_linear.has_value() != b.twist_angular.has_value())
+            throw std::runtime_error("RT twist must supply BOTH twist_linear and twist_angular, or neither");
+    }
+
+    auto edge = edge_o.value();
+    const std::size_t H = HISTORY_SIZE;
+    const uint64_t since = blocks.front().first;
+    const auto &old_ts = ts_o.value();
+
+    // One pack per per-block attribute, written only if the edge already has it or a new block carries it.
+    struct Pack
+    {
+        std::optional<std::vector<float>> old;
+        std::size_t width;
+        std::optional<std::vector<float>> RTBlock::*field;   // null for translation/rotation
+        const std::vector<float> RTBlock::*required;          // translation/rotation
+        std::vector<float> out;
+    };
+    Pack packs[] = {
+        {G->get_attrib_by_name<rt_translation_att>(edge),         3,  nullptr,                      &RTBlock::translation, {}},
+        {G->get_attrib_by_name<rt_rotation_euler_xyz_att>(edge),  3,  nullptr,                      &RTBlock::rotation_euler, {}},
+        {G->get_attrib_by_name<rt_covariance_att>(edge),          36, &RTBlock::covariance,         nullptr, {}},
+        {G->get_attrib_by_name<rt_twist_linear_att>(edge),        3,  &RTBlock::twist_linear,       nullptr, {}},
+        {G->get_attrib_by_name<rt_twist_angular_att>(edge),       3,  &RTBlock::twist_angular,      nullptr, {}},
+        {G->get_attrib_by_name<rt_covariance_velocity_att>(edge), 36, &RTBlock::twist_covariance,   nullptr, {}},
+    };
+    const auto carried = [&](const Pack &p)
+    {
+        return p.required != nullptr or p.old.has_value()
+               or std::ranges::any_of(blocks, [&](const auto &b) { return (b.second.*p.field).has_value(); });
+    };
+
+    // The ring as it should be: the blocks before `since`, then the new ones; the newest H, oldest first.
+    // An entry is (stamp, old slot) or (stamp, index into blocks + H).
+    std::vector<std::pair<uint64_t, std::size_t>> ring;
+    for (std::size_t i = 0; i < std::min(old_ts.size(), H); ++i)
+        if (old_ts[i] != 0 and old_ts[i] < since)
+            ring.emplace_back(old_ts[i], i);
+    std::ranges::sort(ring);
+    for (std::size_t j = 0; j < blocks.size(); ++j)
+    {
+        if (j + 1 < blocks.size() and blocks[j + 1].first == blocks[j].first)
+            continue;                                        // a repeated stamp: the last one given wins
+        ring.emplace_back(blocks[j].first, H + j);
+    }
+    if (ring.size() > H)
+        ring.erase(ring.begin(), ring.end() - static_cast<std::ptrdiff_t>(H));
+
+    std::vector<uint64_t> new_ts(H, 0);
+    for (auto &p : packs)
+        if (carried(p))
+            p.out.assign(H * p.width, 0.f);
+    for (std::size_t k = 0; k < ring.size(); ++k)
+    {
+        const auto [ts, src] = ring[k];
+        new_ts[k] = ts;
+        for (auto &p : packs)
+        {
+            if (p.out.empty())
+                continue;
+            const auto dst = p.out.begin() + static_cast<std::ptrdiff_t>(k * p.width);
+            if (src < H)
+            {
+                if (p.old.has_value() and p.old->size() >= (src + 1) * p.width)
+                    std::copy_n(p.old->begin() + static_cast<std::ptrdiff_t>(src * p.width), p.width, dst);
+            }
+            else
+            {
+                const RTBlock &b = blocks[src - H].second;
+                if (p.required != nullptr)
+                    std::ranges::copy(b.*p.required, dst);
+                else if ((b.*p.field).has_value())
+                    std::ranges::copy(*(b.*p.field), dst);
+            }
+        }
+    }
+
+    G->add_or_modify_attrib_local<rt_translation_att>(edge, std::move(packs[0].out));
+    G->add_or_modify_attrib_local<rt_rotation_euler_xyz_att>(edge, std::move(packs[1].out));
+    if (not packs[2].out.empty())
+        G->add_or_modify_attrib_local<rt_covariance_att>(edge, std::move(packs[2].out));
+    if (not packs[3].out.empty())
+        G->add_or_modify_attrib_local<rt_twist_linear_att>(edge, std::move(packs[3].out));
+    if (not packs[4].out.empty())
+        G->add_or_modify_attrib_local<rt_twist_angular_att>(edge, std::move(packs[4].out));
+    if (not packs[5].out.empty())
+        G->add_or_modify_attrib_local<rt_covariance_velocity_att>(edge, std::move(packs[5].out));
+    // Next slot to write = right after the newest; a full ring wraps to slot 0, its oldest block.
+    G->add_or_modify_attrib_local<rt_head_index_att>(edge, static_cast<int>((ring.size() % H) * BLOCK_SIZE));
+    G->add_or_modify_attrib_local<rt_timestamps_att>(edge, std::move(new_ts));
+    commit_RT_edge(n, to, std::move(edge));
 }
 
 bool RT_API::walk_and_fix_levels(uint64_t start_id, bool repair, bool report)

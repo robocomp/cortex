@@ -202,6 +202,28 @@ namespace DSR
             void insert_or_assign_edge_RT(Node &n, uint64_t to, RTBlock block,
                                           std::optional<uint64_t> timestamp = std::nullopt);
 
+            // ── REWRITE THE TAIL OF THE HISTORY: a late measurement supersedes what was predicted after it ──
+            // A producer that publishes a fast PREDICTION between slow CORRECTIONS writes the correction for
+            // t_c after predictions stamped t > t_c are already in the ring (room_concept: ~43 ms late, 5-6
+            // predictions at 125 Hz). insert_or_assign_edge_RT slots the correction in and KEEPS them, so a
+            // reader interpolating anywhere in (t_c, newest] mixes two estimates: the new posterior and
+            // predictions made from the previous one. Measured on Shadow 2026-10-26: 0.12 deg p90 of step
+            // between them while turning > 0.7 rad/s; replayed offline, writing the correction and the
+            // re-propagated newest pose through this call halves the heading error every consumer gets
+            // while turning and cuts position error ~3x (room_concept_pose_imu.md).
+            // Only the producer knows its predictions are superseded, so only it can say so:
+            //   - every block stamped at or after the EARLIEST of `blocks` is dropped;
+            //   - `blocks` are written (any order; a repeated stamp keeps the last one given);
+            //   - the ring is laid out oldest first with the head after the newest block, so eviction stays
+            //     oldest-first and a timestamp-0 query returns the newest block (insert_or_assign_edge_RT
+            //     returns the last WRITTEN, which after a late correction is that stale correction);
+            //   - pose, covariance and twist packs move together; a pack a new block does not carry is
+            //     zero in its slot, as for a first write;
+            //   - ONE edge publish, so no reader ever sees the tail half rewritten.
+            // Readers need no change: they already sort by stamp and skip empty (stamp 0) slots. On an edge
+            // with no ring yet, a static edge, or HISTORY_SIZE <= 0, it is insert_or_assign_edge_RT per block.
+            void rewrite_edge_RT_since(Node &n, uint64_t to, std::vector<std::pair<uint64_t, RTBlock>> blocks);
+
             // ── A PARAMETER, NOT A STATE: one block, NO timestamps, overwritten in place ───────
             // For a transform that does not vary with time — a sensor mount, a body offset, a camera
             // extrinsic being refined by self-calibration. It marks the edge rt_static, so the
@@ -318,6 +340,9 @@ namespace DSR
             static constexpr auto next = [](auto v, int size, int decr = 1) { return (v + decr) % size; };
             static constexpr auto prev = [](auto v, int size, int inc = 1) { return (v > 0) ? v - inc : size - inc; };
             void insert_or_assign_edge_RT_impl(Node &n, uint64_t to, RTBlock block, std::optional<uint64_t> timestamp);
+            // The end of every timestamped write: fix the child's parent/level (cascading a re-parent) and
+            // publish the edge.
+            void commit_RT_edge(Node &n, uint64_t to, Edge edge);
 
             // Shared BFS over the RT subtree rooted at start_id, re-deriving level = parent.level+1
             // and parent = RT source for every descendant. With repair=true it writes corrections;
