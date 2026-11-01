@@ -133,6 +133,11 @@ namespace DSR
         std::optional<std::int32_t> get_node_level(const Node &n);
         std::optional<uint64_t> get_parent_id(const Node &n);
         std::optional<Node> get_parent_node(const Node &n);
+        // Tree position of a node WITHOUT materialising a Node copy (no fano, no attribute map copy):
+        // returns nullopt iff the node does not exist; otherwise its level / parent attributes (each
+        // may be absent). One shared_lock. Used by the RT-tree walk in InnerEigenAPI.
+        struct NodeTreeInfo { std::optional<std::int32_t> level; std::optional<uint64_t> parent; };
+        std::optional<NodeTreeInfo> get_node_tree_info(uint64_t id);
         [[deprecated("Use node.type() instead")]]static std::string get_node_type(Node &n);
 
         // Edges

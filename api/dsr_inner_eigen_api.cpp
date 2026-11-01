@@ -1,5 +1,6 @@
 #include <dsr/api/dsr_inner_eigen_api.h>
 #include <dsr/api/dsr_api.h>
+#include <limits>
 
 using namespace DSR;
 
@@ -75,115 +76,123 @@ std::optional<Mat::RTMat> InnerEigenAPI::get_transformation_matrix(const std::st
         Mat::RTMat atotal(Mat::RTMat::Identity());
         Mat::RTMat btotal(Mat::RTMat::Identity());
 
-        auto an = G->get_node(orig);
-        auto bn = G->get_node(dest);
-        if ( not an.has_value() or  not bn.has_value())
+        // ★ NO Node COPIES IN THIS WALK. Measured on a live controller: 82.7% of the control thread was
+        // spent here, and almost all of it inside G->get_node()/get_parent_node() copying whole user
+        // nodes (every fano edge, every attribute) just to read a parent id and one RT edge — O(#objects
+        // in the room) per hop. The walk now works on ids: tree position (level/parent) comes from
+        // DSRGraph::get_node_tree_info (attribute visitor under one shared_lock, no copy) and the single
+        // parent->child RT edge from DSRGraph::get_edge(id,id,type) (one Edge copy). Semantics identical.
+        const auto name_of = [&](uint64_t id) { return QString::fromStdString(G->get_name_from_id(id).value_or("?")); };
+        const auto no_edge = [&](uint64_t parent, uint64_t son)
+        {
+            qWarning() << __FUNCTION__ << ":"<<__LINE__<< " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << name_of(parent) << ", " << parent <<") and son (" << name_of(son) << ", " << son <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
+        };
+
+        const auto a_id_o = G->get_id_from_name(orig);
+        const auto b_id_o = G->get_id_from_name(dest);
+        std::optional<DSR::DSRGraph::NodeTreeInfo> a_info_o, b_info_o;
+        if (a_id_o.has_value()) a_info_o = G->get_node_tree_info(a_id_o.value());
+        if (b_id_o.has_value()) b_info_o = G->get_node_tree_info(b_id_o.value());
+        if (not a_info_o.has_value() or not b_info_o.has_value())
         {
             qWarning() << __FUNCTION__ << ":"<<__LINE__<< " origen or dest nodes do not exist: " << QString::fromStdString(orig) << QString::fromStdString(dest);
             return {};
         }
-        auto a = an.value(); auto b = bn.value();
-        int minLevel = std::min(G->get_node_level(a).value_or(-1), G->get_node_level(b).value_or(-1));
+        const uint64_t an_id = a_id_o.value(), bn_id = b_id_o.value();
+        uint64_t a = an_id, b = bn_id;
+        auto a_info = a_info_o.value();
+        auto b_info = b_info_o.value();
+        int minLevel = std::min(a_info.level.value_or(-1), b_info.level.value_or(-1));
         if (minLevel == -1)
         {
             qWarning() << __FUNCTION__ << ":"<<__LINE__ << " Incorrect level in one origin or dest nodes: " << QString::fromStdString(orig) << QString::fromStdString(dest) << ". The nodes may not have RT edges";
             return {};
         }
-        while (G->get_node_level(a).value_or(-1) >= minLevel)
+        // One climb step shared by the A and B loops: parent must exist (else the loop just stops),
+        // the RT edge must exist and yield a matrix (else the whole query fails).
+        enum class Step { Stop, Fail, Ok };
+        const auto climb = [&](uint64_t &cur, DSR::DSRGraph::NodeTreeInfo &cur_info, Mat::RTMat &total) -> Step
         {
-            //qDebug() << "listaA" << a.id() << G->get_node_level(a).value() << G->get_parent_id(a).value();
-            auto p_node = G->get_parent_node(a);
-            if( not p_node.has_value())
-                break;
-            auto edge_rt = rt->get_edge_RT(p_node.value(), a.id(), edge_type);
-            if (not edge_rt.has_value())
-            {
-                qWarning() << __FUNCTION__ << ":"<<__LINE__<< " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
-                return {};
-            }
-            if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query, &edge_info); rtmat.has_value())
-            {
-                note(edge_info);
-                atotal = rtmat.value() * atotal;
-                if(use_cache)
-                    touched.push_back(p_node.value().id());   // committed under the lock at the end
-                a = p_node.value();
-            }
-            else return {};
+            if (not cur_info.parent.has_value()) return Step::Stop;
+            const uint64_t pid = cur_info.parent.value();
+            auto p_info = G->get_node_tree_info(pid);
+            if (not p_info.has_value()) return Step::Stop;
+            auto edge_rt = G->get_edge(pid, cur, edge_type);
+            if (not edge_rt.has_value()) { no_edge(pid, cur); return Step::Fail; }
+            auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query, &edge_info);
+            if (not rtmat.has_value()) return Step::Fail;
+            note(edge_info);
+            total = rtmat.value() * total;
+            if (use_cache) touched.push_back(pid);   // committed under the lock at the end
+            cur = pid;
+            cur_info = p_info.value();
+            return Step::Ok;
+        };
+        while (a_info.level.value_or(-1) >= minLevel)
+        {
+            const auto s = climb(a, a_info, atotal);
+            if (s == Step::Stop) break;
+            if (s == Step::Fail) return {};
         }
-        while (G->get_node_level(b).value_or(-1) >= minLevel)
+        while (b_info.level.value_or(-1) >= minLevel)
         {
-            //qDebug() << "listaB" << b.id() << G->get_node_level(b).value() << G->get_parent_id(b).value();
-            auto p_node = G->get_parent_node(b);
-            if(not p_node.has_value())
-                break;
-            auto edge_rt = rt->get_edge_RT(p_node.value(), b.id(), edge_type);
-            if (not edge_rt.has_value())
-            {
-                qWarning() << __FUNCTION__ << ":"<<__LINE__ << " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
-                return {};
-            }
-            if( auto rtmat = rt->get_edge_RT_as_rtmat(edge_rt.value(), timestamp, time_query, &edge_info); rtmat.has_value())
-            {
-                note(edge_info);
-                btotal = rtmat.value() * btotal;
-                if(use_cache)
-                    touched.push_back(p_node.value().id());   // committed under the lock at the end
-                b = p_node.value();
-            }
-            else
-                return {};
+            const auto s = climb(b, b_info, btotal);
+            if (s == Step::Stop) break;
+            if (s == Step::Fail) return {};
         }
         // from min_level up tp the common ancestor
-        while (a.id() != b.id())
+        while (a != b)
         {
-            auto p_node = G->get_node(G->get_parent_id(a).value_or(-1));
-            auto q_node = G->get_node(G->get_parent_id(b).value_or(-1));
-            if(p_node.has_value() and q_node.has_value())
+            // -1 as uint64 never names a node: same "non existing nodes" outcome as before
+            const uint64_t pid = a_info.parent.value_or(std::numeric_limits<uint64_t>::max());
+            const uint64_t qid = b_info.parent.value_or(std::numeric_limits<uint64_t>::max());
+            auto p_info = G->get_node_tree_info(pid);
+            auto q_info = G->get_node_tree_info(qid);
+            if(p_info.has_value() and q_info.has_value())
             {
-                //qDebug() << "listas A&B" << p_node.value().id() << q_node.value().id();
-                auto a_edge_rt = rt->get_edge_RT(p_node.value(), a.id(), edge_type);
+                auto a_edge_rt = G->get_edge(pid, a, edge_type);
                 if (not a_edge_rt.has_value())
                 {
-                    qWarning() << __FUNCTION__ << ":"<<__LINE__ << " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
+                    no_edge(pid, a);
                     return {};
                 }
-                auto b_edge_rt = rt->get_edge_RT(q_node.value(), b.id(), edge_type);
+                auto b_edge_rt = G->get_edge(qid, b, edge_type);
                 if (not b_edge_rt.has_value())
                 {
-                    qWarning() << __FUNCTION__ << ":"<<__LINE__ << " Cannot find " << QString::fromStdString(edge_type) << " edge between Parent (" << QString::fromStdString(p_node->name()) << ", " << p_node->id() <<") and son (" << QString::fromStdString(a.name()) << ", " << a.id() <<") nodes going from: " << QString::fromStdString(orig) << " to: " << QString::fromStdString(dest);
+                    no_edge(qid, b);
                     return {};
                 }
-                RT_API::TimeQueryInfo a_info, b_info;
-                auto a_rtmat = rt->get_edge_RT_as_rtmat(a_edge_rt.value(), timestamp, time_query, &a_info);
-                auto b_rtmat = rt->get_edge_RT_as_rtmat(b_edge_rt.value(), timestamp, time_query, &b_info);
-                note(a_info); note(b_info);
+                RT_API::TimeQueryInfo a_ti, b_ti;
+                auto a_rtmat = rt->get_edge_RT_as_rtmat(a_edge_rt.value(), timestamp, time_query, &a_ti);
+                auto b_rtmat = rt->get_edge_RT_as_rtmat(b_edge_rt.value(), timestamp, time_query, &b_ti);
+                note(a_ti); note(b_ti);
                 if(a_rtmat.has_value() and b_rtmat.has_value())
                 {
                     atotal = a_rtmat.value() * atotal;
                     btotal = b_rtmat.value() * btotal;
                     if(use_cache)
                     {
-                        touched.push_back(p_node.value().id());
-                        touched.push_back(q_node.value().id());
+                        touched.push_back(pid);
+                        touched.push_back(qid);
                     }
-                    a = p_node.value();
-                    b = q_node.value();
+                    a = pid; a_info = p_info.value();
+                    b = qid; b_info = q_info.value();
                 }
                 else return {};
             }
             else
             {
-                qWarning() << __FUNCTION__ << ":"<<__LINE__<< " non existing nodes while merging to common ancestor" << QString::fromStdString(a.name()) << QString::fromStdString(b.name());
+                qWarning() << __FUNCTION__ << ":"<<__LINE__<< " non existing nodes while merging to common ancestor" << name_of(a) << name_of(b);
                 return {};
             }
         }
         // update node cache reference
         if(use_cache)
         {
-            touched.push_back(bn.value().id());
-            touched.push_back(an.value().id());
+            touched.push_back(bn_id);
+            touched.push_back(an_id);
         }
+
 
         auto ret = btotal.inverse() * atotal;
         if(use_cache)

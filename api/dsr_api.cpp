@@ -1036,6 +1036,21 @@ std::optional<DSR::Node> DSRGraph::get_parent_node(const Node &n)
     return {};
 }
 
+std::optional<DSRGraph::NodeTreeInfo> DSRGraph::get_node_tree_info(uint64_t id)
+{
+    CORTEX_PROFILE_HOT_N("DSRGraph::get_node_tree_info");
+    std::shared_lock<std::shared_mutex> lock(_mutex);
+    std::optional<NodeTreeInfo> out;
+    with_node_attrs_(id, [&](const SyncEngine::NodeAttrsView& attrs) {
+        NodeTreeInfo info;
+        if (const auto* a = attrs.find(level_att::attr_name.data()); a != nullptr)
+            info.level = get_attrib_by_name<level_att>(*a);
+        if (const auto* a = attrs.find(parent_att::attr_name.data()); a != nullptr)
+            info.parent = get_attrib_by_name<parent_att>(*a);
+        out = info;
+    });
+    return out;
+}
 
 std::string DSRGraph::get_node_type(Node &n)
 {
