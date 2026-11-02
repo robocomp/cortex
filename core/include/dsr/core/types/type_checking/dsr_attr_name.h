@@ -804,6 +804,17 @@ REGISTER_TYPE(object_subtype,               std::string,                        
 REGISTER_TYPE(obj_shape,                    std::string,                                      false)
 REGISTER_TYPE(obj_shape_prob,               float,                                            false)  // [0.5,1]
 
+// ── Object IDENTITY: an instance's persistent id (registered 2026-11-01, active_inference) ─────────────────
+//    object_uid = (agent_id << 40) | N, where N is the number in the node's name (chair_7 ⇒ N = 7) and agent_id is
+//    the writing concept agent's [Agent].id. Issued by common/instance_identity from a counter the agent persists
+//    in etc/instance_identity.csv, so it is NEVER re-issued — not within a run, not across restarts — and it is
+//    unique across agents with no coordination. Written ONCE by the owning concept agent when the instance is
+//    born (or resurrected with its old identity); never changed afterwards, never written by anyone else.
+//    Read by the long-term object memory (ltom_agent), the DINO view atlas archive and episodic memory to key an
+//    object's history; the node name is for people and logs, the uid is the key.
+//    Spec: active_inference/docs/superpowers/specs/2026-11-01-long-term-object-memory-design.md §7.
+REGISTER_TYPE(object_uid,                   std::uint64_t,                                    false)
+
 // ── Display-mesh handoff: a concept agent owns its own appearance and publishes the relative asset path(s)
 //    on its node; the voxelizer's 3D viewer reads them, loads the mesh (cached by path), and renders it
 //    scaled to the node's fitted box — no per-type knowledge in the viewer. Contract for the referenced OBJ:
@@ -856,6 +867,11 @@ REGISTER_TYPE(door_frames_since_detection,    int,                              
 // telling those apart, and in rows that are copied into a durable CSV and read back months later.
 REGISTER_TYPE(door_phi_rad,                   float,                                            false)  // leaf opening angle estimate (rad); 0 = flush in the aperture, -1 = NOT MEASURED
 REGISTER_TYPE(door_open_prob,                 float,                                            false)  // P(clear width >= robot passage width), marginalised over the phi posterior
+// LEAF GEOMETRY as a belief about THIS face (2026-11-02, user: "leaf opening direction gets stored in LTSM and appears as an
+// attribute in the WM instantiated doors"). Written by door_concept on every door node; ltsm persists node attributes, so a
+// remembered face carries them and a restored door starts from them. Probabilities, not flags: 0.5 = no information.
+REGISTER_TYPE(door_leaf_into_room_prob,      float,                                            false)  // P(the leaf swings INTO the room this door node hangs from); 0.5 = unknown
+REGISTER_TYPE(door_leaf_hinge_plus_prob,     float,                                            false)  // P(the hinge is at the +x end of the aperture, in this door node's own frame); 0.5 = unknown
 REGISTER_TYPE(door_reach_prob,                float,                                            false)  // P(the robot is inside this door's actuation zone), under the pose covariance
 REGISTER_TYPE(door_crossing_progress,         float,                                            false)  // -1..+1 along the aperture normal, signed against the side held when the cross claim was made
 REGISTER_TYPE(door_cross_exec_prob,         float,                                            false)  // P(the cross is EXECUTABLE from the robot's current pose) = P(at the door) x P(swept corridor clear of the leaf) x P(passable); the cross contract's pre: clause. -1 = NOT MEASURED
@@ -1158,6 +1174,21 @@ REGISTER_TYPE(joint_buffer_dof,          int,                                   
 //    a runtime attr_name PARAM stay runtime_checked (dynamic name → no compile-time alias).
 REGISTER_TYPE(media_descriptor,         std::string,                                      false)
 REGISTER_TYPE(media_ice_port,           std::string,                                      false)
+
+// ── perception card on each concept agent's OWN agent node ─ registered 2026-10-31 ──────────────────
+//    The agent's sensor model A, p(o|s), made queryable: a small JSON written by the concept agent ITSELF
+//    from the config it actually runs with. It holds:
+//      - its kind level (mass < countable < articulated < animate);
+//      - its channels (zed/helios/bpearl/ricoh), each marked identity | occupancy | both;
+//      - typical geometry;
+//      - per-subtype detector envelope and named terms from the closed list in common/perception_card/card.h;
+//      - blind spots and calibration state.
+//    The shared evaluator in common/perception_card/ turns card + world + a HYPOTHETICAL object/viewpoint
+//    into P(notice), P(recognise) and the limiting factor. chat_agent's can_see reads it.
+//    Writer: only the owning agent, and only on change (startup, config change, envelope fit / blind-spot map
+//    save). Mirrored to <agent>/etc/perception_card.json, so readers also work before this attribute exists.
+//    Design: active_inference/docs/superpowers/specs/2026-10-31-perception-cards-design.md.
+REGISTER_TYPE(perception_card,          std::string,                                      false)
 
 // ── level-2 arrangement channel (ring_metaconcept) ─ registered 2026-07-26 ───────────────────────
 // The TOP-DOWN message from a meta-concept to its constituent objects: the arrangement's empirical
