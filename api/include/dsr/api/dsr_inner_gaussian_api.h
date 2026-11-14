@@ -46,7 +46,7 @@ namespace DSR
                 const std::string &orig,
                 std::uint64_t timestamp = 0,
                 const std::string &edge_type = "RT",
-                RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest) const;
+                RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated) const;
 
             std::optional<GaussianPoint3D> transform_point(
                 const std::string &dest,
@@ -54,7 +54,7 @@ namespace DSR
                 const std::string &orig,
                 std::uint64_t timestamp = 0,
                 const std::string &edge_type = "RT",
-                RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest) const;
+                RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated) const;
 
             std::optional<GaussianPose2D> transform_pose2d(
                 const std::string &dest,
@@ -62,7 +62,7 @@ namespace DSR
                 const std::string &orig,
                 std::uint64_t timestamp = 0,
                 const std::string &edge_type = "RT",
-                RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest) const;
+                RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated) const;
 
             std::optional<GaussianPose3D> transform_pose3d(
                 const std::string &dest,
@@ -70,7 +70,7 @@ namespace DSR
                 const std::string &orig,
                 std::uint64_t timestamp = 0,
                 const std::string &edge_type = "RT",
-                RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest) const;
+                RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated) const;
 
         private:
             struct PathStep

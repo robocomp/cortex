@@ -29,10 +29,10 @@ namespace DSR
             /////////////////////////////////////////////////
             /// Kinematic transformation methods
             ////////////////////////////////////////////////
-            std::optional<Mat::Vector3d> transform( const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
-            std::optional<Mat::Vector3d> transform( const std::string &dest, const Mat::Vector3d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
-            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const std::string & orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
-            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const Mat::Vector6d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Vector3d> transform( const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
+            std::optional<Mat::Vector3d> transform( const std::string &dest, const Mat::Vector3d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
+            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const std::string & orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
+            std::optional<Mat::Vector6d> transform_axis(const std::string &dest, const Mat::Vector6d &vector, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
 
             ////////////////////////////////////////////////
             /// Transformation matrix retrieval methods
@@ -47,11 +47,11 @@ namespace DSR
             // `ring_span_ms` carry the largest magnitude seen, for the same reason — the edges are
             // composed, not travelled in series, so one edge walked 30 ms is a 30 ms prediction, not
             // 30 ms of accumulated error. In practice exactly one edge in a chain carries a twist.
-            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest,
+            std::optional<Mat::RTMat> get_transformation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated,
                                                                 RT_API::TimeQueryInfo *info = nullptr);
-            std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
-            std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
-            std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Nearest);
+            std::optional<Mat::Rot3D> get_rotation_matrix(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
+            std::optional<Mat::Vector3d> get_translation_vector(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
+            std::optional<Mat::Vector3d> get_euler_xyz_angles(const std::string &dest, const std::string &orig, std::uint64_t timestamp = 0, const std::string &edge_type="RT", RT_API::TimeQuery time_query = RT_API::TimeQuery::Interpolated);
 
         public slots:
             void add_or_assign_edge_slot(uint64_t from, uint64_t to, const std::string& edge_type);

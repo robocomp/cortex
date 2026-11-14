@@ -59,6 +59,8 @@ namespace DSR
     class RT_API : public QObject
     {
         public:
+            // ★ DEFAULT = Interpolated (2026-11-11, owner: every consumer of a pose edge interpolates, none takes the nearest
+            //   block). Every query function below defaults to it; Nearest stays available when a caller asks for it by name.
             enum class TimeQuery
             {
                 Nearest,
@@ -279,7 +281,7 @@ namespace DSR
             // Pass `info` to learn what the query did — above all whether it CLAMPED (see TimeQueryInfo).
             // Optional so every existing call site is unchanged; a caller that omits it gets exactly the
             // behaviour it had, including the silent clamp.
-            std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest,
+            std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Interpolated,
                                                            TimeQueryInfo *info = nullptr);
             // `kind` is last so existing pose-covariance call sites keep compiling unchanged.
             // ── ASK WITH THE SAME timestamp AND TimeQuery YOU ASKED THE POSE WITH ──────────────────
@@ -322,11 +324,11 @@ namespace DSR
             // doubles with a doubling of range while sigma_y barely moves. Same geometry, same arm,
             // mean and second moment. Together they are the argument that which way an RT edge is
             // anchored is a GEOMETRIC decision with measurable consequences, not bookkeeping.
-            std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
-            std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
-            std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest);
-            std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
-            std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Nearest, CovarianceKind kind = CovarianceKind::Pose);
+            std::optional<Eigen::Matrix<double, 6, 6>> get_edge_RT_covariance(const Edge &edge, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Interpolated, CovarianceKind kind = CovarianceKind::Pose);
+            std::optional<Eigen::Vector3d> get_translation(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Interpolated);
+            std::optional<Eigen::Vector3d> get_translation(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Interpolated);
+            std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(const Node &n, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Interpolated, CovarianceKind kind = CovarianceKind::Pose);
+            std::optional<Eigen::Matrix<double, 6, 6>> get_covariance_matrix(uint64_t node_id, uint64_t to, std::uint64_t timestamp = 0, TimeQuery time_query = TimeQuery::Interpolated, CovarianceKind kind = CovarianceKind::Pose);
             // std::optional<Mat::RTMat> get_edge_RT_as_rtmat(const Node &n, uint32_t to);
             // std::optional<std::tuple<Mat::Vector3d, Mat::Quaterniond>> get_edge_RT_as_tr_plus_quaternion(const Edge &edge);
             // std::optional<Mat::MatXX> get_jacobian(const Node &base, const Node &tip)
