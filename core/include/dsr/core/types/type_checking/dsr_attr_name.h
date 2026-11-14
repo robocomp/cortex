@@ -875,6 +875,20 @@ REGISTER_TYPE(door_leaf_hinge_plus_prob,     float,                             
 REGISTER_TYPE(door_reach_prob,                float,                                            false)  // P(the robot is inside this door's actuation zone), under the pose covariance
 REGISTER_TYPE(door_crossing_progress,         float,                                            false)  // -1..+1 along the aperture normal, signed against the side held when the cross claim was made
 REGISTER_TYPE(door_cross_exec_prob,         float,                                            false)  // P(the cross is EXECUTABLE from the robot's current pose) = P(at the door) x P(swept corridor clear of the leaf) x P(passable); the cross contract's pre: clause. -1 = NOT MEASURED
+// ── DOOR MEMORY (2026-11-13, active_inference spec 2026-11-13-door-memory-through-ltsm-design.md) ─────────────────
+// Written by door_concept on its own door nodes; ltsm archives them with the node (eviction twin copies every attr) and
+// copies them onto the `remembered_door` metaconcept notes it posts when the room is recalled.
+REGISTER_TYPE(door_exist_evidence, float,    false)   // existence memory: PlaceBelief L_evidence (log-odds)
+REGISTER_TYPE(door_exist_physical, float,    false)   // its physical part (actuation, crossing)
+REGISTER_TYPE(door_crossed,        bool,     false)   // the place was crossed: proof for ever
+REGISTER_TYPE(door_seen_ms,        uint64_t, false)   // wall-clock ms of the last detection (the age of door_exist_evidence)
+REGISTER_TYPE(door_sighted_ms,     uint64_t, false)   // wall-clock ms of the last SIGHTING (the change hazard's exposure)
+REGISTER_TYPE(door_place_sd,       float,    false)   // sigma of the aperture centre along its wall (m)
+REGISTER_TYPE(door_height_sd,      float,    false)   // posterior sd of the fitted height (m)
+REGISTER_TYPE(door_phi_sd,         float,    false)   // sigma of door_phi_rad (rad)
+REGISTER_TYPE(door_view_ledger,    std::reference_wrapper<const std::string>, false)   // ViewLedger::serialise(): one trial per viewpoint
+REGISTER_TYPE(door_visit,          int,      false)   // place-table visit counter
+REGISTER_TYPE(door_adopted,        bool,     false)   // on a remembered_door note: door_concept restored it; ltsm deletes it
 REGISTER_TYPE(interaction_node_id,            std::uint64_t,                                    false)  // affordance → the node defining the robot-object pose (an interaction anchor hanging from the robot)
 
 // ── PASSAGE HISTORY: the crossing record (door_concept writes) and the belief over it (ltsm_agent) ──
