@@ -832,6 +832,11 @@ REGISTER_TYPE(mesh_texture_path,             std::string,                       
 //    the identity. Absent ⇒ render the asset's authored .mtl colours unchanged. Only 3 floats, so a
 //    plain vector (no reference_wrapper) — the zero-copy form is for the big per-slice blobs.
 REGISTER_TYPE(mesh_color_rgb,                std::vector<float>,                               false)
+// color_name / color_prob (registered 2026-11-11): the object's colour NAME, the most probable term of a fixed
+//    12-term palette given its appearance belief (common/appearance_belief/colour_name.h), and that posterior
+//    probability. Written by the concept agent that owns the object; absent = no colour measured yet.
+REGISTER_TYPE(color_name,                    std::string,                                      false)
+REGISTER_TYPE(color_prob,                    float,                                            false)
 
 // ── chair-concept / cabinet-concept: same voxel-memory + ROI channel as table-concept above ────
 //    These agents are copies of the table_concept pattern and carry the identical interface, so they get
@@ -843,6 +848,12 @@ REGISTER_TYPE(chair_roi_valid,                bool,                             
 REGISTER_TYPE(chair_detection_alive,          bool,                                             false)
 REGISTER_TYPE(chair_detection_confidence,     float,                                            false)
 REGISTER_TYPE(chair_frames_since_detection,   int,                                              false)
+// FRONT-camera sighting, separate from chair_detection_alive (which a ricoh 360° slice also keeps alive and
+// which latches for DetectionAliveMaxFrames). Readers: the controller's orient/dwell "did the robot LOOK at it".
+//  - chair_front_seen:       the newest mask frame chair_concept processed gave this chair a ZED slice.
+//  - chair_front_seen_frame: that frame's mask_frame_id (-1 never) — lets a reader count distinct front looks.
+REGISTER_TYPE(chair_front_seen,               bool,                                             false)
+REGISTER_TYPE(chair_front_seen_frame,         int,                                              false)
 REGISTER_TYPE(door_roi_offset,                std::reference_wrapper<const std::vector<float>>, false)  // [ox,oy]
 REGISTER_TYPE(door_roi_fill,                  float,                                            false)
 REGISTER_TYPE(door_roi_valid,                 bool,                                             false)
@@ -1064,6 +1075,10 @@ REGISTER_TYPE(mask_cam_twist,         std::reference_wrapper<const std::vector<f
 REGISTER_TYPE(mask_color_rgb,         std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_color_var,         std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_color_neff,        std::reference_wrapper<const std::vector<float>>,  false)
+// mask_color_lum (registered 2026-11-11, object colour names): 3 per slice — median BRIGHTNESS (R+G+B)/(3*255) over
+//    the interior cells, its between-cell variance, and its own cell count (a pure-black cell has brightness but no
+//    chromaticity, so it counts here and not in mask_color_neff). Chromaticity alone cannot tell black/grey/white apart.
+REGISTER_TYPE(mask_color_lum,         std::reference_wrapper<const std::vector<float>>,  false)
 REGISTER_TYPE(mask_frame_dt_s,        float,                                             false)
 REGISTER_TYPE(mask_rt_lag_s,          float,                                             false)
 REGISTER_TYPE(mask_rt_gap_s,          float,                                             false)
@@ -1331,5 +1346,18 @@ REGISTER_TYPE(recog_mix_n,           std::reference_wrapper<const std::vector<ui
 REGISTER_TYPE(recog_posterior,       std::reference_wrapper<const std::vector<float>>,    false)  // room recognition: per-candidate posterior probability
 REGISTER_TYPE(recall_pose_prior,     std::reference_wrapper<const std::vector<float>>,    false)  // room recognition: pose prior recalled from memory for the matched room
 REGISTER_TYPE(recall_late,           bool,                                                false)  // room recognition: recall arrived after the recogniser had already committed
+
+// ── THE HUMAN AT THE CHAT: claims and answers — registered 2026-11-12 ────────────────────────────────────────────
+// active_inference: docs/superpowers/specs/2026-11-11-human-model-design.md. A claim is posted by language_agent
+// on its own `chat_intention` node, ONLY after the person's yes (human_claim_*); ltom_agent records it in its
+// HumanBook and answers on its `human_1` person node (human_claim_answer*). The chat clears the claim on seeing
+// the answer whose stamp equals its claim's stamp.
+REGISTER_TYPE(human_claim_kind,         std::reference_wrapper<const std::string>,        false)  // "name" | "owns" | "disowns"
+REGISTER_TYPE(human_claim_value,        std::string,                                       false)  // the name, for kind name
+REGISTER_TYPE(human_claim_uid,          std::uint64_t,                                     false)  // object_uid, for owns / disowns
+REGISTER_TYPE(human_claim_words,        std::string,                                       false)  // the person's own words
+REGISTER_TYPE(human_claim_stamp,        std::uint64_t,                                     false)  // unique per claim (ms); the answer echoes it
+REGISTER_TYPE(human_claim_answer,       std::string,                                       false)  // "recorded" | "rejected: <reason>"
+REGISTER_TYPE(human_claim_answer_stamp, std::uint64_t,                                     false)  // the claim stamp this answer is for
 
 #endif //DSR_ATTR_NAME_H

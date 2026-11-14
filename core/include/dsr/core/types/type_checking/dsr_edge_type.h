@@ -71,6 +71,12 @@ REGISTER_EDGE_TYPE(current)
 //    No attributes. Each edge is deleted with its source node, by that node's owner. NON-RT.
 REGISTER_EDGE_TYPE(exit)
 REGISTER_EDGE_TYPE(match)
+// ── `owns`: the human at the chat owns an object — registered 2026-11-12 ─────────────────────────────────────────
+//    active_inference: docs/superpowers/specs/2026-11-11-human-model-design.md. On LTOM's memory graph only:
+//      human_1 (type person) → an object memory node (found by object_uid). Written by ltom_agent ONLY; meaning: the
+//      person said, and confirmed with a yes in the chat, that they own it. A retraction removes the edge (the
+//      history stays in LTOM's file). No attributes. NON-RT.
+REGISTER_EDGE_TYPE(owns)
 
 // ── level-2 meta-concept membership (ring_metaconcept) ─ registered 2026-07-26 ───────────────────
 //    NON-RT edge rig→member (dining_set_* → table_*/chair_*). It is BOTH the structural link and the
