@@ -332,6 +332,32 @@ void Utilities::read_from_json_file(const std::string &json_file_path,  const st
                             {
                                 if (dynamic) rt->insert_or_assign_edge_RT(src.value(), dstn, tr.value(), rot.value());
                                 else         rt->insert_or_assign_edge_RT_static(src.value(), dstn, tr.value(), rot.value());
+                                // ★THE COVARIANCE IS PART OF THE EDGE, NOT DECORATION. Until 2026-11-12 only the
+                                // pose came back from a file, so every saved RT covariance (door faces in an ltsm
+                                // memory: 0.07-0.25 m along the wall) was silently replaced on load by whatever
+                                // prior the reader fell back to. Restore each stated 6x6 block through the RT API's
+                                // own setter, so a ring edge gets it in its head slot and a static one flat.
+                                // A block that is not exactly 36 values is reported, not guessed at.
+                                using CK = DSR::RT_API::CovarianceKind;
+                                for (const auto &[key, kind] : {std::pair{"rt_covariance", CK::Pose},
+                                                                std::pair{"rt_covariance_velocity", CK::Velocity},
+                                                                std::pair{"rt_covariance_acceleration", CK::Acceleration}})
+                                {
+                                    const auto it = linkAttributesMap.find(QString::fromUtf8(key));
+                                    if (it == linkAttributesMap.end()) continue;
+                                    const QVariantList l = it.value().toMap()["value"].toList();
+                                    if (l.size() != 36)
+                                    {
+                                        qWarning() << "WARNING: " << __FILE__ << " " << __FUNCTION__ << " RT link "
+                                                   << srcn << " -> " << dstn << " " << key << " has " << l.size()
+                                                   << " values, not 36 — not restored";
+                                        continue;
+                                    }
+                                    std::vector<float> c;
+                                    c.reserve(36);
+                                    for (const auto &v : l) c.push_back(v.toFloat());
+                                    rt->insert_or_assign_edge_RT_covariance(src->id(), dstn, kind, c);
+                                }
                             }
                             catch (const std::exception &e)
                             {
