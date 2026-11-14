@@ -384,9 +384,13 @@ std::optional<Eigen::Matrix<double, 6, 6>> RT_API::get_edge_RT_covariance(const 
     const auto &covariance_pack = covariance_o->get();
     if (timestamp == 0)
     {
-        if (head_o.has_value() && covariance_pack.size() >= RT_COVARIANCE_BLOCK_SIZE * HISTORY_SIZE)
+        // The ring's depth is the WRITER's (room_concept writes 25 slots); this reader's own HISTORY_SIZE (default 5) must not
+        // index it — (head/3) % 5 on a 25-slot ring picked a stale slot. The slot count is the covariance pack's own length,
+        // as the timestamped branch below and every pose reader already take it.
+        const auto ring_slots = covariance_pack.size() / RT_COVARIANCE_BLOCK_SIZE;
+        if (head_o.has_value() && ring_slots > 0)
         {
-            const auto block_index = latest_slot_from_head(static_cast<std::size_t>(head_o.value()), HISTORY_SIZE) * RT_COVARIANCE_BLOCK_SIZE;
+            const auto block_index = latest_slot_from_head(static_cast<std::size_t>(head_o.value()), ring_slots) * RT_COVARIANCE_BLOCK_SIZE;
             if (block_index + RT_COVARIANCE_BLOCK_SIZE <= covariance_pack.size())
                 return covariance_at(covariance_pack, block_index);
         }
