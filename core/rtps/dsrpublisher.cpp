@@ -263,11 +263,29 @@ bool DSRPublisher::write_impl(const DSR::LWWGraphSnapshot& object)
 void DSRPublisher::PubListener::on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
                                                        const eprosima::fastdds::dds::PublicationMatchedStatus& info)
 {
-    if (info.current_count == eprosima::fastdds::rtps::MatchingStatus::MATCHED_MATCHING) {
+    // current_count_change is +1 for a new match and -1 for a lost one. (The previous test,
+    // `current_count == MATCHED_MATCHING`, compared a COUNT with an enum whose value is 0, so it
+    // logged every match as "unmatched" and the reverse.)
+    const bool matched = info.current_count_change > 0;
+    if (matched) {
         n_matched++;
-        qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] matched " << info.last_subscription_handle.value;// << " self: " << info.remoteEndpointGuid.is_on_same_process_as(pub->getGuid());
+        qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] matched " << info.last_subscription_handle.value;
     } else {
         n_matched--;
-        qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] unmatched" << info.last_subscription_handle.value;// << " self: " <<info.remoteEndpointGuid.is_on_same_process_as(pub->getGuid());
+        qInfo() << "Subscriber [" << writer->get_topic()->get_name().data() <<"] unmatched" << info.last_subscription_handle.value;
+    }
+
+    if (on_match) {
+        // The instance handle of a remote reader carries its GUID; the first 12 bytes (the GUID
+        // prefix) are those of the participant that owns it.
+        eprosima::fastdds::rtps::GUID_t remote;
+        eprosima::fastdds::rtps::iHandle2GUID(remote, info.last_subscription_handle);
+        // A writer also matches the readers of its OWN participant: nothing was lost there.
+        if (remote.guidPrefix == writer->guid().guidPrefix) {
+            return;
+        }
+        DSR::Transport::ParticipantGuidPrefix prefix{};
+        std::copy_n(remote.guidPrefix.value, prefix.size(), prefix.begin());
+        on_match(matched, prefix);
     }
 }

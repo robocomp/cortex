@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -15,9 +16,34 @@ enum class ParticipantDiscoveryStatus : uint8_t
     other
 };
 
+// The 12-byte RTPS GUID prefix. It is the same for a participant and for every reader/writer it owns,
+// so it is what ties "a remote reader matched one of our writers" to "which participant that is".
+using ParticipantGuidPrefix = std::array<uint8_t, 12>;
+
 struct ParticipantDiscoveryInfo
 {
     std::string participant_name;
+    ParticipantGuidPrefix guid_prefix{};
+};
+
+// The built-in graph writers of a participant, in the order used for the per-peer matched bitmask.
+enum class BuiltinWriter : uint8_t
+{
+    node = 0,
+    edge,
+    node_attrs,
+    edge_attrs,
+    graph_answer,
+    graph_request
+};
+
+// One (un)match between one of OUR writers and a reader of ANOTHER participant.
+// Delivered on a FastDDS listener thread: the receiver must not do graph work there.
+struct PublicationMatchInfo
+{
+    BuiltinWriter writer{BuiltinWriter::node};
+    bool matched{false};                    // true: newly matched, false: unmatched
+    ParticipantGuidPrefix remote_prefix{};  // the remote reader's participant
 };
 
 struct ReceivedSampleInfo

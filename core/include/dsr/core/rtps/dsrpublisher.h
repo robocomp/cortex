@@ -9,6 +9,8 @@
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 
+#include <functional>
+
 #include <dsr/core/types/internal_types.h>
 #include <dsr/core/transport/transport_crtp.h>
 
@@ -38,6 +40,12 @@ public:
     bool write_impl(const DSR::LWWEdgeAttrVec &object);
     bool write_impl(const DSR::LWWGraphSnapshot &object);
 
+    // Called for every (un)match of this writer with a reader of ANOTHER participant, with that
+    // participant's GUID prefix. Runs on a FastDDS listener thread. Set it BEFORE init(): a match can
+    // fire as soon as the writer exists.
+    using MatchCallback = std::function<void(bool matched, const DSR::Transport::ParticipantGuidPrefix& remote_prefix)>;
+    void set_match_callback(MatchCallback callback) { m_listener.on_match = std::move(callback); }
+
 private:
     eprosima::fastdds::dds::DomainParticipant *mp_participant;
     eprosima::fastdds::dds::Publisher *mp_publisher;
@@ -51,6 +59,7 @@ private:
 		void on_publication_matched(eprosima::fastdds::dds::DataWriter* writer,
                                     const eprosima::fastdds::dds::PublicationMatchedStatus& info) override;
 		int n_matched;
+        MatchCallback on_match;
 	} m_listener;
 
 };

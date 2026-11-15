@@ -4,6 +4,8 @@
 #include "dsr/api/dsr_api.h"
 #include "catch2/catch_test_macros.hpp"
 #include <map>
+#include <memory>
+#include <mutex>
 #include <set>
 #include <shared_mutex>
 #include <string>
@@ -30,6 +32,25 @@ public:
     static void import_full_graph(DSRGraph& graph, DSR::OrMap&& full_graph)
     {
         graph.engine_->import_full_graph(DSR::FullGraphMessage{std::move(full_graph)});
+    }
+    // The GRAPH_ANSWER reader callback and its state, to feed it samples without a network.
+    using JoinState = DSRGraph::FullGraphJoinState;
+    static std::shared_ptr<JoinState> make_join_state(bool synced, bool accept_server_answers)
+    {
+        auto state = std::make_shared<JoinState>();
+        state->sync = synced;
+        state->accept_server_answers = accept_server_answers;
+        return state;
+    }
+    static void deliver_graph_answer(DSRGraph& graph, const std::shared_ptr<JoinState>& state, DSR::OrMap sample)
+    {
+        auto callback = graph.make_fullgraph_request_functor_impl<DSR::OrMap>("GRAPH_ANSWER", state);
+        callback(std::move(sample), DSR::Transport::ReceivedSampleInfo{.valid_data = true});
+    }
+    static size_t early_pushes(const std::shared_ptr<JoinState>& state)
+    {
+        std::lock_guard<std::mutex> lck(state->mtx);
+        return state->early_pushes.size();
     }
     // The host's edge cache maps for one node, to check they agree with the node's fano.
     static std::set<std::pair<uint64_t, std::string>> cached_out_edges(DSRGraph& graph, uint64_t from)

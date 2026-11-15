@@ -48,6 +48,7 @@ public:
     void apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& batch) override;
     void import_full_graph(FullGraphMessage&& full_graph) override;
     FullGraphMessage export_full_graph() const override;
+    void mark_initial_state_loaded() override { first_full_graph_ = false; }
 
 private:
     const CRDT::Node* get_node_ptr(uint64_t id) const;

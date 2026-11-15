@@ -289,7 +289,16 @@ std::string DSRParticipant::participant_name() const
 
 bool DSRParticipant::init_builtin_publishers()
 {
-    auto init_one = [&](const char* id, DSRPublisher& publisher, eprosima::fastdds::dds::Topic* topic) {
+    using DSR::Transport::BuiltinWriter;
+    auto init_one = [&](const char* id, BuiltinWriter kind, DSRPublisher& publisher, eprosima::fastdds::dds::Topic* topic) {
+        if (publication_match_callback_) {
+            // The callback is copied into the writer's listener, so it does not depend on this
+            // object's members staying put.
+            publisher.set_match_callback(
+                [kind, fn = publication_match_callback_](bool matched, const DSR::Transport::ParticipantGuidPrefix& prefix) {
+                    fn(DSR::Transport::PublicationMatchInfo{kind, matched, prefix});
+                });
+        }
         auto [res, pub, writer] = publisher.init(mp_participant, topic, domain_id_);
         if (res && topic != nullptr) {
             add_publisher(id, std::pair{pub, writer});
@@ -297,12 +306,12 @@ bool DSRParticipant::init_builtin_publishers()
         return res;
     };
 
-    return init_one("node", pub_node_, topic_node) &&
-           init_one("node_attrs", pub_node_attrs_, topic_node_att) &&
-           init_one("edge", pub_edge_, topic_edge) &&
-           init_one("edge_attrs", pub_edge_attrs_, topic_edge_att) &&
-           init_one("graph_request", pub_graph_request_, topic_graph_request) &&
-           init_one("graph_answer", pub_graph_answer_, topic_graph);
+    return init_one("node", BuiltinWriter::node, pub_node_, topic_node) &&
+           init_one("node_attrs", BuiltinWriter::node_attrs, pub_node_attrs_, topic_node_att) &&
+           init_one("edge", BuiltinWriter::edge, pub_edge_, topic_edge) &&
+           init_one("edge_attrs", BuiltinWriter::edge_attrs, pub_edge_attrs_, topic_edge_att) &&
+           init_one("graph_request", BuiltinWriter::graph_request, pub_graph_request_, topic_graph_request) &&
+           init_one("graph_answer", BuiltinWriter::graph_answer, pub_graph_answer_, topic_graph);
 }
 
 void DSRParticipant::remove_participant_and_entities_impl()
