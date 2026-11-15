@@ -169,6 +169,43 @@ TEST_CASE("The join handshake is unchanged by the pushes between peers", "[SYNCH
     REQUIRE(B.size() == S.size());
 }
 
+TEST_CASE("The edge from a known node to an early node arrives with that node", "[SYNCHRONIZATION][RESYNC][DDS]")
+{
+    ScopedQtApp qt;
+    const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
+    CAPTURE(sync_mode_label(sync_mode));
+    auto ctx = make_empty_config_file();
+
+    DSRGraph R(make_test_graph_settings(random_string(10), fresh_agent_id(), ctx, true, kDomain, SignalMode::QT, sync_mode));
+    settle(300ms);
+
+    std::atomic<int> edge_signals{0};
+    std::atomic<uint64_t> early_id{0};
+    QObject::connect(&R, &DSRGraph::update_edge_signal, &R,
+                     [&](uint64_t, uint64_t to, const std::string&, DSR::SignalInfo) {
+                         if (to == early_id.load()) ++edge_signals;
+                     });
+
+    // W inserts a node and hangs it from root at once. The edge root -> early lives in ROOT's
+    // fano, and R already holds root: the edge must not be left behind when the node is healed.
+    DSRGraph W(make_test_graph_settings(random_string(11), fresh_agent_id(), ctx, true, kDomain, SignalMode::QT, sync_mode));
+    const auto root_id = W.get_node("root")->id();
+    auto early = Node::create<testtype_node_type>("early_child");
+    const auto inserted = W.insert_node(early);
+    REQUIRE(inserted.has_value());
+    early_id = inserted.value();
+    REQUIRE(W.insert_or_assign_edge(Edge::create<in_edge_type>(root_id, inserted.value())));
+    REQUIRE(W.insert_or_assign_edge(Edge::create<in_edge_type>(inserted.value(), root_id)));
+
+    REQUIRE(wait_for([&] { return R.get_node("early_child").has_value(); }));
+    REQUIRE(wait_for([&] { return R.get_edge(root_id, inserted.value(), "in").has_value(); }));
+    REQUIRE(R.get_edge(inserted.value(), root_id, "in").has_value());
+    REQUIRE(wait_for([&] { return edge_signals.load() > 0; }));
+    // the host's edge caches follow
+    REQUIRE(R.get_edges_to_id(inserted.value()).size() == 1);
+    REQUIRE(R.get_edges_by_type("in").size() == W.get_edges_by_type("in").size());
+}
+
 // The receiving side, fed by hand: who imports what, and when.
 TEST_CASE("An addressed full graph is imported only by its target, and never as the initial graph", "[SYNCHRONIZATION][RESYNC]")
 {

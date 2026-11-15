@@ -1034,6 +1034,17 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
 
     std::vector<std::tuple<bool, uint64_t, std::string, std::optional<CRDT::Node>, std::optional<CRDT::Node>>> updates;
 
+    // Edges INTO a node this import brings for the first time. An edge lives in the fano of its
+    // SOURCE node; when that source is already held here with the same register, the join below keeps
+    // the local copy untouched (rightly: the sender's nested state may be older than ours), so the
+    // edge "known parent -> new node" would not come with the new node. Such an edge cannot be one
+    // we have deleted — we never held its target — so it is taken from the sender's copy. Edges
+    // between two nodes we already hold are NOT taken: there a missing edge may be a deleted one.
+    struct IncomingEdge { uint64_t from; uint64_t to; std::string type; mvreg<CRDT::Edge> reg; uint32_t agent_id; };
+    std::vector<IncomingEdge> edges_missing_here;
+    std::unordered_set<uint64_t> new_nodes;
+    std::vector<std::tuple<uint64_t, uint64_t, std::string, uint32_t>> adopted_edges;
+
     uint64_t id{0}, timestamp{0};
     uint32_t agent_id_ch{0};
     auto delete_unprocessed_deltas = [&](){
@@ -1127,6 +1138,15 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
             if (it == nodes_.end()) {
                 it = nodes_.emplace(k, mvreg<CRDT::Node>{}).first;
             }
+            if (nd.has_value()) {
+                for (const auto& [dot, incoming] : mv.dk.ds) {
+                    for (const auto& [key, edge_reg] : incoming.fano) {
+                        if (!edge_reg.empty() and !nd->fano.contains(key)) {
+                            edges_missing_here.push_back({k, key.first, key.second, edge_reg, val.agent_id});
+                        }
+                    }
+                }
+            }
             it->second.join(std::move(mv));
             if (mv_empty or it->second.empty()) {
                 host_.update_maps_node_delete(
@@ -1139,12 +1159,41 @@ void CRDTSyncEngine::join_full_graph(OrMap&& full_graph)
                 const auto& reg = it->second.read_reg();
                 host_.update_maps_node_insert(reg.id, reg.name, reg.type, collect_outgoing_edge_keys(reg.fano));
                 updates.emplace_back(true, k, reg.type, nd, reg);
+                if (!nd.has_value()) {
+                    new_nodes.insert(k);
+                }
                 consume_unprocessed_deltas();
             }
         }
     }
     {
+        CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph adopt edges into new nodes");
+        for (auto& [from, to, type, reg, edge_agent_id] : edges_missing_here) {
+            if (!new_nodes.contains(to)) {
+                continue;
+            }
+            auto source = nodes_.find(from);
+            if (source == nodes_.end() or source->second.empty() or source->second.read_reg().fano.contains({to, type})) {
+                continue;  // the source went away, or a parked delta already brought the edge
+            }
+            process_delta_edge(from, to, type, std::move(reg));
+            // Attribute deltas that arrived for this edge while it was unknown here.
+            const auto att_key = std::tuple{from, to, type};
+            auto parked = unprocessed_delta_edge_att_.extract(att_key);
+            while (!parked.empty()) {
+                auto& [att_name, delta, timestamp_edge_att] = parked.mapped();
+                process_delta_edge_attr(from, to, type, att_name, std::move(delta));
+                parked = unprocessed_delta_edge_att_.extract(att_key);
+            }
+            adopted_edges.emplace_back(from, to, type, edge_agent_id);
+        }
+    }
+    {
         CORTEX_PROFILE_DETAIL_N("CRDTSyncEngine::join_full_graph emit phase");
+        if (emit_signals)
+        for (const auto& [from, to, type, edge_agent_id] : adopted_edges) {
+            host_.on_remote_edge_updated(from, to, type, edge_agent_id);
+        }
         if (emit_signals)
         for (auto &[signal, node_id, type, nd, current_nd] : updates) {
             if (signal) {
