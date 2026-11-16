@@ -146,6 +146,9 @@ public:
     virtual void apply_remote_edge_attr_batch(EdgeAttrDeltaBatchMessage&& batch) = 0;
     virtual void import_full_graph(FullGraphMessage&& full_graph) = 0;
     virtual FullGraphMessage export_full_graph() const = 0;
+    // The local state is complete without a full-graph import (it was loaded from a file): the next
+    // import is a re-sync, not the silent initial build. Engines that make no such difference ignore it.
+    virtual void mark_initial_state_loaded() {}
 };
 
 using SyncEnginePtr = std::unique_ptr<SyncEngine>;

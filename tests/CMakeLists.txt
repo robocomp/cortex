@@ -40,6 +40,7 @@ add_executable(tests test.cpp
                      synchronization/graph_signals.cpp
                      synchronization/fake_network_tests.cpp
                      synchronization/rename_node.cpp
+                     synchronization/resync_on_match.cpp
                      transport/fake_network.h
                      utils.h)
 

@@ -806,14 +806,28 @@ namespace DSR
         SampleCallback<Batch> make_edge_attrs_subscription_functor_impl(const char* channel);
         template <typename Batch>
         SampleCallback<Batch> make_node_attrs_subscription_functor_impl(const char* channel);
+        // State of the GRAPH_ANSWER reader. Held by shared_ptr (not raw refs to stack locals) so the
+        // returned callback — stored in a PERMANENT DDS subscription — captures it BY VALUE and keeps it
+        // alive. Previously sync/repeated were refs to stack locals in fullgraph_request_thread() that
+        // dangled after it returned (a later peer's GRAPH_ANSWER then wrote through them into freed
+        // stack memory: the bit-48 wild write). Fixed 2026-07-21.
+        struct FullGraphJoinState
+        {
+            std::atomic<bool> sync{false};       // the initial full graph has been received (and queued)
+            std::atomic<bool> repeated{false};   // the server says our agent id is already in use
+            // A file-loaded agent never joined through a server answer and never read this topic
+            // before; it now reads it only for the pushes addressed to it.
+            bool accept_server_answers{true};
+            std::mutex mtx;
+            // Addressed pushes that arrived BEFORE the initial graph: the latest one per sender.
+            // They are imported right after it, never instead of it (see the functor).
+            std::map<int32_t, FullGraphMessage> early_pushes;
+        };
         template <typename GraphSample>
-        // sync/repeated are shared_ptr (not raw refs) so the returned callback — stored in a PERMANENT DDS
-        // subscription — captures them BY VALUE and keeps them alive. Previously they were refs to stack
-        // locals in fullgraph_request_thread() that dangled after it returned (a later peer's GRAPH_ANSWER
-        // then wrote through them into freed stack memory: the bit-48 wild write). Fixed 2026-07-21.
         SampleCallback<GraphSample> make_fullgraph_request_functor_impl(const char* channel,
-                                                                        std::shared_ptr<std::atomic<bool>> sync,
-                                                                        std::shared_ptr<std::atomic<bool>> repeated);
+                                                                        std::shared_ptr<FullGraphJoinState> state);
+        // Queues one full-graph import on the graph's Qt thread (unique_lock + RemoteApplyScope).
+        void queue_full_graph_import(FullGraphMessage&& message);
 
         //Custom function for each rtps topic
         class ParticipantChangeFn {
@@ -846,6 +860,28 @@ namespace DSR
         void edge_attrs_subscription_thread();
         void fullgraph_server_thread();
         std::pair<bool, bool> fullgraph_request_thread();
+        void addressed_fullgraph_subscription_thread();
+
+        // ── Resync on match ─────────────────────────────────────────────────────────────────────
+        // Heals the samples a RELIABLE+VOLATILE writer loses to a reader that matched it late: when
+        // our writers finish pairing with a remote participant, that participant is sent our full
+        // graph, addressed to it only. The whole story is in the block comment above
+        // DSRGraph::on_builtin_writer_match() in dsr_api.cpp.
+        struct ResyncPeer
+        {
+            uint8_t matched_writers{0};          // bit i = our BuiltinWriter i is matched with this peer
+            std::optional<uint32_t> agent_id;    // from participant discovery; unknown until then
+            bool push_pending{false};            // pairing completed, full graph not yet sent
+        };
+        void on_builtin_writer_match(const DSR::Transport::PublicationMatchInfo& info);  // FastDDS thread
+        void on_peer_discovery(DSR::Transport::ParticipantDiscoveryStatus status,
+                               const DSR::Transport::ParticipantDiscoveryInfo& info);    // FastDDS thread
+        void schedule_resync_drain_locked();                                             // any thread
+        void drain_resync_pending();                                                     // graph's Qt thread
+
+        std::mutex resync_mutex_;
+        std::map<DSR::Transport::ParticipantGuidPrefix, ResyncPeer> resync_peers_;
+        bool resync_drain_scheduled_{false};
 
 
         // RTSP participant

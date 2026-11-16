@@ -17,9 +17,11 @@
 #include <qglobal.h>
 #include <unistd.h>
 #include <algorithm>
+#include <charconv>
 #include <utility>
 #include <cmath>
 #include <dsr/api/dsr_logging.h>
+#include <dsr/core/rtps/env_overrides.h>
 
 #include <fastdds/rtps/RTPSDomain.hpp>
 
@@ -205,6 +207,7 @@ DSRGraph::DSRGraph(GraphSettings settings) :
                                            const DSR::Transport::ParticipantDiscoveryInfo& info)
                                            {
                                                CORTEX_PROFILE_DETAIL_N("DSRGraph::participant discovery callback");
+                                               graph->on_peer_discovery(status, info);
                                                if (status == DSR::Transport::ParticipantDiscoveryStatus::discovered)
                                                {
                                                    std::unique_lock<std::mutex> lck(participant_set_mutex);
@@ -245,6 +248,18 @@ DSRGraph::DSRGraph(GraphSettings settings) :
     static_cast<void>(participant_handle);
     {
         CORTEX_PROFILE_MIN_N("DSRGraph::DSRGraph init publishers");
+        // Resync on match: set BEFORE the writers exist, a match can fire as soon as one does.
+        // DSR_RESYNC_ON_MATCH=0 switches the SENDING side off (addressed pushes are still accepted).
+        if (const auto resync = DSR::RTPS::Env::read_u32("DSR_RESYNC_ON_MATCH");
+            not resync.present() or not resync.value.has_value() or *resync.value != 0)
+        {
+            dsrparticipant.set_publication_match_callback(
+                [this](const DSR::Transport::PublicationMatchInfo& info) { on_builtin_writer_match(info); });
+        }
+        else
+        {
+            qInfo() << "DSR_RESYNC_ON_MATCH=0: this agent will not push its graph to newly matched peers";
+        }
         dsrparticipant.init_builtin_publishers();
     }
 
@@ -262,8 +277,12 @@ DSRGraph::DSRGraph(GraphSettings settings) :
             std::cout << e.what() << '\n';
             qFatal("Aborting program. Cannot continue without intial file");
         }
+        // The graph came from the file: there is no initial full-graph import still to come, so a
+        // later import (an addressed push from a peer) is a re-sync and must emit its signals.
+        engine_->mark_initial_state_loaded();
         start_fullgraph_server_thread();
         start_subscription_threads();
+        addressed_fullgraph_subscription_thread();
     }
     else
     {
@@ -495,13 +514,32 @@ DSRGraph::SampleCallback<Batch> DSRGraph::make_node_attrs_subscription_functor_i
     };
 }
 
-template <typename GraphSample>
-DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::shared_ptr<std::atomic<bool>> sync, std::shared_ptr<std::atomic<bool>> repeated)
+void DSRGraph::queue_full_graph_import(FullGraphMessage&& message)
 {
-    // Capture sync/repeated BY VALUE (shared_ptr): this callback is stored in a permanent DDS subscription
+    QMetaObject::invokeMethod(this, [this, m = std::move(message)]() mutable {
+        CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread apply full graph");
+        RemoteApplyScope defer;
+        {
+            std::unique_lock<std::shared_mutex> lock(_mutex);
+            engine_->import_full_graph(std::move(m));
+        }
+    }, Qt::QueuedConnection);
+}
+
+// What travels on the GRAPH_ANSWER topic, told apart by (id, to_id) alone — no wire change:
+//   id == -1, to_id == requester   "repeated": the server tells a joiner its agent id is taken.
+//   id == sender, to_id == 0       the server's answer to a GRAPH_REQUEST. Broadcast: every agent that
+//                                  joined through a server imports it, as it always did.
+//   id == sender, to_id != 0       an ADDRESSED push (resync on match, see on_builtin_writer_match):
+//                                  imported only by the agent whose id is to_id.
+// to_id == 0 means "not addressed", so an agent whose id is 0 can never be the target of a push.
+template <typename GraphSample>
+DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_impl(const char* channel, std::shared_ptr<FullGraphJoinState> state)
+{
+    // Capture the state BY VALUE (shared_ptr): this callback is stored in a permanent DDS subscription
     // and must keep the flags alive — capturing raw refs to fullgraph_request_thread()'s stack was the
     // dangling-write bug. (Fixed 2026-07-21.)
-    return [this, channel, sync, repeated](GraphSample&& sample, const DSR::Transport::ReceivedSampleInfo& m_info)
+    return [this, channel, state](GraphSample&& sample, const DSR::Transport::ReceivedSampleInfo& m_info)
     {
         [[maybe_unused]] static thread_local bool _named = []{ CORTEX_PROFILE_THREAD_NAME("fg_request"); return true; }();
         CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread callback");
@@ -512,25 +550,199 @@ DSRGraph::SampleCallback<GraphSample> DSRGraph::make_fullgraph_request_functor_i
         if (!network_compatibility_or_fatal(channel, sample.protocol_version, sample.sync_mode, sync_mode)) {
             return;
         }
-        if (static_cast<uint32_t>(sample.id) != get_agent_id()) {
-            if (sample.id != -1) {
-                qDebug() << " Received Full Graph from " << m_info.source_entity_id
-                         << " whith " << full_graph_payload_size(sample) << " elements";
-                QMetaObject::invokeMethod(this, [this, s = std::move(sample)]() mutable {
-                    CORTEX_PROFILE_ZONE_N("DSRGraph::fullgraph_request_thread apply full graph");
-                    RemoteApplyScope defer;
-                    {
-                        std::unique_lock<std::shared_mutex> lock(_mutex);
-                        engine_->import_full_graph(FullGraphMessage{std::move(s)});
-                    }
-                }, Qt::QueuedConnection);
-                qDebug() << "Synchronized.";
-                *sync = true;
-            } else if (!*sync && sample.to_id == agent_id) {
-                *repeated = true;
+        if (static_cast<uint32_t>(sample.id) == get_agent_id()) {
+            return;  // our own sample
+        }
+        if (sample.id == -1) {
+            if (!state->sync && sample.to_id == agent_id) {
+                state->repeated = true;
+            }
+            return;
+        }
+        if (sample.to_id != 0) {
+            // An addressed push: only its target imports it. That is what keeps the cost at one
+            // import per pairing instead of one per agent in the fleet.
+            if (sample.to_id != agent_id) {
+                return;
+            }
+            const int32_t sender = sample.id;
+            std::lock_guard<std::mutex> lck(state->mtx);
+            if (!state->sync) {
+                // Still joining. A push is NOT the initial graph: its sender may itself be a joiner
+                // holding little or nothing, so it must not end the wait for the server, and it must
+                // not be the first import (which builds the copy silently, without signals). Keep it
+                // — a later push from the same sender supersedes an earlier one — and import it
+                // right after the server's answer.
+                state->early_pushes.insert_or_assign(sender, FullGraphMessage{std::move(sample)});
+                return;
+            }
+            qDebug() << " Received addressed Full Graph from agent " << sender
+                     << " whith " << full_graph_payload_size(sample) << " elements";
+            queue_full_graph_import(FullGraphMessage{std::move(sample)});
+            return;
+        }
+        if (!state->accept_server_answers) {
+            return;
+        }
+        qDebug() << " Received Full Graph from " << m_info.source_entity_id
+                 << " whith " << full_graph_payload_size(sample) << " elements";
+        std::lock_guard<std::mutex> lck(state->mtx);
+        queue_full_graph_import(FullGraphMessage{std::move(sample)});
+        // Queued in this order on the same thread: the server's graph first, then what peers pushed
+        // while we were waiting for it.
+        for (auto& [sender, early] : state->early_pushes) {
+            queue_full_graph_import(std::move(early));
+        }
+        state->early_pushes.clear();
+        qDebug() << "Synchronized.";
+        state->sync = true;
+    };
+}
+
+// ── Resync on match ─────────────────────────────────────────────────────────────────────────────
+// THE LOSS. The graph writers are RELIABLE + VOLATILE: a sample written before a remote reader has
+// matched the writer is never delivered to that reader. An agent that inserts a node before its
+// DSR_NODE writer has matched some running peer therefore never gives that peer the node; the later
+// attribute deltas for it are parked for ever in the peer's unprocessed queues, and nothing else
+// repairs it (only the agent that loaded the JSON file answers GRAPH_REQUESTs, once per participant).
+//
+// THE REPAIR. When OUR writers finish pairing with a remote participant, send that participant our
+// full graph, addressed to it only. A full graph is a CRDT state: joining it is idempotent, so the
+// peer simply gains whatever it had missed.
+//
+// 1. WHO. on_publication_matched gives the remote reader's instance handle = its GUID, whose 12-byte
+//    prefix is the participant's. Participant discovery gives the same prefix together with the name
+//    "Participant_<agent_id> ( <name> )". The two arrive on FastDDS threads in either order, so the
+//    peer entry is keyed by prefix and the agent id is filled in whenever discovery brings it.
+// 2. WHEN. The push is itself a GRAPH_ANSWER sample, as lossy as any other until our GRAPH_ANSWER
+//    writer has matched the peer's reader. So the trigger is the moment the LAST of our five writers
+//    (node, edge, node attrs, edge attrs, graph answer) matches the peer: from then on no delta can
+//    be lost to it, everything written earlier is already in our state (a local change is applied
+//    under _mutex before it is published), and the push can be delivered. One event, one push — no
+//    timer and nothing to tune. If a writer is unmatched and matched again, the pairing completes
+//    again and the peer is pushed again, which is right: samples were lost in between.
+//    A peer that never offers all five readers is never pushed to (that is today's behaviour).
+// 3. WHERE. Nothing but bookkeeping happens on the FastDDS listener thread. The export and the write
+//    run in one queued call on the graph's Qt thread; pairings that complete before it runs are
+//    served by that single call, with a single export.
+// 4. COST. One export and one addressed import per ordered pair of agents, per pairing. A fleet of N
+//    agents starting together does N(N-1) of them in total — 56 for N = 8, seven sent and seven
+//    imported by each agent — against the N-1 broadcast answers (each imported by every joined
+//    agent) that the join already costs. In steady state it costs nothing.
+void DSRGraph::on_builtin_writer_match(const DSR::Transport::PublicationMatchInfo& info)
+{
+    using DSR::Transport::BuiltinWriter;
+    if (info.writer == BuiltinWriter::graph_request) {
+        return;  // requests are not graph state
+    }
+    constexpr uint8_t all_writers = (1u << static_cast<uint8_t>(BuiltinWriter::node)) |
+                                    (1u << static_cast<uint8_t>(BuiltinWriter::edge)) |
+                                    (1u << static_cast<uint8_t>(BuiltinWriter::node_attrs)) |
+                                    (1u << static_cast<uint8_t>(BuiltinWriter::edge_attrs)) |
+                                    (1u << static_cast<uint8_t>(BuiltinWriter::graph_answer));
+    const auto bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(info.writer));
+
+    std::lock_guard<std::mutex> lck(resync_mutex_);
+    if (not info.matched) {
+        // find, not operator[]: the unmatches of a participant that has already been removed must
+        // not bring its entry back.
+        if (auto it = resync_peers_.find(info.remote_prefix); it != resync_peers_.end()) {
+            it->second.matched_writers &= static_cast<uint8_t>(~bit);
+            it->second.push_pending = false;  // nothing can be delivered to it now; a re-match asks again
+        }
+        return;
+    }
+    auto& peer = resync_peers_[info.remote_prefix];
+    const bool was_complete = peer.matched_writers == all_writers;
+    peer.matched_writers |= bit;
+    if (not was_complete and peer.matched_writers == all_writers) {
+        peer.push_pending = true;
+        schedule_resync_drain_locked();
+    }
+}
+
+void DSRGraph::on_peer_discovery(DSR::Transport::ParticipantDiscoveryStatus status,
+                                 const DSR::Transport::ParticipantDiscoveryInfo& info)
+{
+    using Status = DSR::Transport::ParticipantDiscoveryStatus;
+    std::lock_guard<std::mutex> lck(resync_mutex_);
+    if (status == Status::removed or status == Status::dropped) {
+        resync_peers_.erase(info.guid_prefix);
+        return;
+    }
+    if (status != Status::discovered) {
+        return;
+    }
+    // "Participant_<agent_id> ( <name> )". Anything else on the domain is not a DSR agent.
+    constexpr std::string_view prefix = "Participant_";
+    const std::string_view name = info.participant_name;
+    if (not name.starts_with(prefix)) {
+        return;
+    }
+    uint32_t peer_id = 0;
+    const auto* first = name.data() + prefix.size();
+    const auto* last = name.data() + name.size();
+    if (std::from_chars(first, last, peer_id).ec != std::errc{}) {
+        return;
+    }
+    auto& peer = resync_peers_[info.guid_prefix];
+    peer.agent_id = peer_id;
+    if (peer.push_pending) {
+        schedule_resync_drain_locked();  // the matches came before the discovery callback
+    }
+}
+
+void DSRGraph::schedule_resync_drain_locked()
+{
+    if (resync_drain_scheduled_) {
+        return;
+    }
+    resync_drain_scheduled_ = true;
+    QMetaObject::invokeMethod(this, [this] { drain_resync_pending(); }, Qt::QueuedConnection);
+}
+
+void DSRGraph::drain_resync_pending()
+{
+    CORTEX_PROFILE_ZONE_N("DSRGraph::drain_resync_pending");
+    std::vector<uint32_t> targets;
+    {
+        std::lock_guard<std::mutex> lck(resync_mutex_);
+        resync_drain_scheduled_ = false;
+        for (auto& [prefix, peer] : resync_peers_) {
+            if (not peer.push_pending or not peer.agent_id.has_value()) {
+                continue;  // not asked for, or not yet known: discovery will schedule again
+            }
+            peer.push_pending = false;
+            // to_id 0 means "not addressed"; our own id on another participant is a duplicate
+            // agent that the join handshake is about to reject.
+            if (*peer.agent_id != 0 and *peer.agent_id != agent_id) {
+                targets.push_back(*peer.agent_id);
             }
         }
-    };
+    }
+    if (targets.empty()) {
+        return;
+    }
+    // Same locking as the server's answer: export_full_graph() reads all of nodes_ and must exclude
+    // the delta-apply writers (unique_lock(_mutex)). The message is a copy, so it is written after
+    // the lock is released.
+    FullGraphMessage message;
+    {
+        std::shared_lock<std::shared_mutex> graph_lock(_mutex);
+        message = engine_->export_full_graph();
+    }
+    std::visit([&](auto& payload) {
+        payload.id = static_cast<int32_t>(agent_id);
+        payload.protocol_version = DSR::DSR_PROTOCOL_VERSION;
+        payload.sync_mode = sync_mode_wire_value(sync_mode);
+        for (const auto target : targets) {
+            payload.to_id = target;
+            const bool ok = dsrparticipant.publish_graph_answer(payload);
+            qInfo() << "[resync] full graph (" << full_graph_payload_size(payload) << "elements )"
+                    << (ok ? "pushed to agent" : "COULD NOT be pushed to agent") << target
+                    << "after its readers matched";
+        }
+    }, message);
 }
 
 //////////////////////////////////////
@@ -1355,12 +1567,13 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
     // GRAPH_ANSWER (on a FastDDS reader thread) ran `*sync = true` through the dangling reference, writing
     // 1 byte into freed/reused stack memory (the bit-48 wild write that randomly smashed cv::Mat headers
     // etc. under peer churn). (Fixed 2026-07-21.)
-    auto sync     = std::make_shared<std::atomic<bool>>(false);
-    auto repeated = std::make_shared<std::atomic<bool>>(false);
+    auto state = std::make_shared<FullGraphJoinState>();
+    auto& sync = state->sync;
+    auto& repeated = state->repeated;
     if (sync_mode == SyncMode::LWW) {
-        dsrparticipant.subscribe_graph_answers<LWWGraphSnapshot>(make_fullgraph_request_functor_impl<LWWGraphSnapshot>("LWW_GRAPH_ANSWER", sync, repeated), mtx_entity_creation);
+        dsrparticipant.subscribe_graph_answers<LWWGraphSnapshot>(make_fullgraph_request_functor_impl<LWWGraphSnapshot>("LWW_GRAPH_ANSWER", state), mtx_entity_creation);
     } else {
-        dsrparticipant.subscribe_graph_answers<OrMap>(make_fullgraph_request_functor_impl<OrMap>("GRAPH_ANSWER", sync, repeated), mtx_entity_creation);
+        dsrparticipant.subscribe_graph_answers<OrMap>(make_fullgraph_request_functor_impl<OrMap>("GRAPH_ANSWER", state), mtx_entity_creation);
     }
 
     {
@@ -1383,7 +1596,7 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
 
     bool timeout = false;
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    while (!*sync and !timeout and !*repeated) {
+    while (!sync and !timeout and !repeated) {
         CORTEX_PROFILE_DETAIL_N("DSRGraph::fullgraph_request_thread wait loop");
         std::this_thread::sleep_for(1000ms);
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -1394,7 +1607,22 @@ std::pair<bool, bool> DSRGraph::fullgraph_request_thread()
         dsrparticipant.publish_graph_request(gr);
     }
 
-    return { sync->load(), repeated->load() };
+    return { sync.load(), repeated.load() };
+}
+
+// The agent that loaded the graph from a file never read GRAPH_ANSWER. It now does, but only for the
+// pushes addressed to it (resync on match): it is as exposed as anyone to a peer's early inserts.
+void DSRGraph::addressed_fullgraph_subscription_thread()
+{
+    CORTEX_PROFILE_MIN_N("DSRGraph::addressed_fullgraph_subscription_thread setup");
+    auto state = std::make_shared<FullGraphJoinState>();
+    state->sync = true;                    // nothing to wait for: the graph is already here
+    state->accept_server_answers = false;  // exactly as before: it does not import another server's answers
+    if (sync_mode == SyncMode::LWW) {
+        dsrparticipant.subscribe_graph_answers<LWWGraphSnapshot>(make_fullgraph_request_functor_impl<LWWGraphSnapshot>("LWW_GRAPH_ANSWER", state), mtx_entity_creation);
+    } else {
+        dsrparticipant.subscribe_graph_answers<OrMap>(make_fullgraph_request_functor_impl<OrMap>("GRAPH_ANSWER", state), mtx_entity_creation);
+    }
 }
 
 

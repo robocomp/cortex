@@ -7,6 +7,9 @@
 #include <fastdds/dds/domain/DomainParticipantListener.hpp>
 #include <fastdds/rtps/builtin/data/ParticipantBuiltinTopicData.hpp>
 
+#include <algorithm>
+#include <functional>
+
 #include <dsr/core/rtps/CRDTPubSubTypes.h>
 #include <dsr/core/types/internal_types.h>
 #include <dsr/core/rtps/dsrpublisher.h>
@@ -49,6 +52,12 @@ public:
     void delete_publisher_impl(const std::string& id);
 
     bool init_builtin_publishers();
+
+    // Reports every (un)match between one of the built-in writers and a reader of another
+    // participant (see DSR::Transport::PublicationMatchInfo). Runs on a FastDDS listener thread.
+    // Must be set BEFORE init_builtin_publishers(): matches fire as soon as a writer exists.
+    using publication_match_callback_type = std::function<void(const DSR::Transport::PublicationMatchInfo&)>;
+    void set_publication_match_callback(publication_match_callback_type fn) { publication_match_callback_ = std::move(fn); }
 
     template <typename Sample, typename Callback>
     bool subscribe_node(Callback&& callback, std::mutex& mtx)
@@ -193,7 +202,9 @@ private:
                 const eprosima::fastdds::rtps::ParticipantBuiltinTopicData& info,
                 bool& should_be_ignored) override
         {
-            f(map_status(status), DSR::Transport::ParticipantDiscoveryInfo{info.participant_name.to_string()});
+            DSR::Transport::ParticipantDiscoveryInfo out{info.participant_name.to_string(), {}};
+            std::copy_n(info.guid.guidPrefix.value, out.guid_prefix.size(), out.guid_prefix.begin());
+            f(map_status(status), out);
         }
 
         static DSR::Transport::ParticipantDiscoveryStatus map_status(eprosima::fastdds::rtps::ParticipantDiscoveryStatus status)
@@ -214,6 +225,7 @@ private:
         //int n_matched;
     };
     std::unique_ptr<ParticpantListener> m_listener;
+    publication_match_callback_type publication_match_callback_;
 };
 
 #endif // _Participant_H_
