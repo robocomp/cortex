@@ -169,41 +169,61 @@ TEST_CASE("The join handshake is unchanged by the pushes between peers", "[SYNCH
     REQUIRE(B.size() == S.size());
 }
 
-TEST_CASE("The edge from a known node to an early node arrives with that node", "[SYNCHRONIZATION][RESYNC][DDS]")
+// The fleet as it runs: ONE agent loaded the file (S), the others joined through it and share its
+// registers. W inserts a node and hangs it from root; R starts right then. No Qt events are
+// processed in between, so S has W's deltas queued but not applied when it answers R's request, and
+// W wrote them before R existed. R therefore gets them from nobody — unless W pushes its graph to
+// R once they have paired.
+TEST_CASE("A peer that joins while a node is being inserted still gets the node and the edge to it", "[SYNCHRONIZATION][RESYNC][DDS]")
 {
     ScopedQtApp qt;
     const auto sync_mode = GENERATE(SyncMode::CRDT, SyncMode::LWW);
     CAPTURE(sync_mode_label(sync_mode));
     auto ctx = make_empty_config_file();
 
-    DSRGraph R(make_test_graph_settings(random_string(10), fresh_agent_id(), ctx, true, kDomain, SignalMode::QT, sync_mode));
-    settle(300ms);
+    DSRGraph S(make_test_graph_settings(random_string(10), fresh_agent_id(), ctx, true, kDomain, SignalMode::QT, sync_mode));
+    DSRGraph W(make_test_graph_settings(random_string(11), fresh_agent_id(), std::string{}, true, kDomain, SignalMode::QT, sync_mode));
+    REQUIRE(wait_for([&] { return W.get_node("root").has_value(); }));
+    settle(500ms);  // S and W are paired and have exchanged their pushes
 
-    std::atomic<int> edge_signals{0};
-    std::atomic<uint64_t> early_id{0};
-    QObject::connect(&R, &DSRGraph::update_edge_signal, &R,
-                     [&](uint64_t, uint64_t to, const std::string&, DSR::SignalInfo) {
-                         if (to == early_id.load()) ++edge_signals;
-                     });
-
-    // W inserts a node and hangs it from root at once. The edge root -> early lives in ROOT's
-    // fano, and R already holds root: the edge must not be left behind when the node is healed.
-    DSRGraph W(make_test_graph_settings(random_string(11), fresh_agent_id(), ctx, true, kDomain, SignalMode::QT, sync_mode));
     const auto root_id = W.get_node("root")->id();
-    auto early = Node::create<testtype_node_type>("early_child");
-    const auto inserted = W.insert_node(early);
+    auto child = Node::create<testtype_node_type>("late_child");
+    const auto inserted = W.insert_node(child);
     REQUIRE(inserted.has_value());
-    early_id = inserted.value();
     REQUIRE(W.insert_or_assign_edge(Edge::create<in_edge_type>(root_id, inserted.value())));
     REQUIRE(W.insert_or_assign_edge(Edge::create<in_edge_type>(inserted.value(), root_id)));
 
-    REQUIRE(wait_for([&] { return R.get_node("early_child").has_value(); }));
+    // R joins now. Its constructor blocks this thread, so S answers from a state without the node.
+    DSRGraph R(make_test_graph_settings(random_string(12), fresh_agent_id(), std::string{}, true, kDomain, SignalMode::QT, sync_mode));
+    std::atomic<int> node_signals{0};
+    std::atomic<int> edge_signals{0};
+    QObject::connect(&R, &DSRGraph::update_node_signal, &R,
+                     [&](uint64_t id, const std::string&, DSR::SignalInfo) {
+                         if (id == inserted.value()) ++node_signals;
+                     });
+    QObject::connect(&R, &DSRGraph::update_edge_signal, &R,
+                     [&](uint64_t, uint64_t to, const std::string&, DSR::SignalInfo) {
+                         if (to == inserted.value()) ++edge_signals;
+                     });
+
+    REQUIRE(wait_for([&] { return R.get_node("root").has_value() and S.get_node("late_child").has_value(); }));
+    const bool reached = wait_for([&] { return R.get_node("late_child").has_value(); });
+    if (std::getenv("DSR_RESYNC_TEST_REPORT") != nullptr) {
+        std::printf("RESYNC_TEST late_child_reached_joiner=%d\n", reached ? 1 : 0);
+    }
+    REQUIRE(reached);
+
+    // The edge root -> late_child lives in ROOT's fano, and R already holds root with the very same
+    // register: it must not be left behind when the node is healed.
     REQUIRE(wait_for([&] { return R.get_edge(root_id, inserted.value(), "in").has_value(); }));
     REQUIRE(R.get_edge(inserted.value(), root_id, "in").has_value());
-    REQUIRE(wait_for([&] { return edge_signals.load() > 0; }));
-    // the host's edge caches follow
+    REQUIRE(wait_for([&] { return node_signals.load() > 0 and edge_signals.load() > 0; }));
+    // the host's edge caches follow, and nobody else was disturbed
     REQUIRE(R.get_edges_to_id(inserted.value()).size() == 1);
-    REQUIRE(R.get_edges_by_type("in").size() == W.get_edges_by_type("in").size());
+    for (auto* g : {&S, &W, &R}) {
+        REQUIRE(g->get_edges_by_type("in").size() == 2);
+        REQUIRE(g->size() == S.size());
+    }
 }
 
 // The receiving side, fed by hand: who imports what, and when.
