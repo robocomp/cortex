@@ -900,6 +900,10 @@ REGISTER_TYPE(door_phi_sd,         float,    false)   // sigma of door_phi_rad (
 REGISTER_TYPE(door_view_ledger,    std::reference_wrapper<const std::string>, false)   // ViewLedger::serialise(): one trial per viewpoint
 REGISTER_TYPE(door_visit,          int,      false)   // place-table visit counter
 REGISTER_TYPE(door_adopted,        bool,     false)   // on a remembered_door note: door_concept restored it; ltsm deletes it
+// Door NAMES and the change hazard through LTSM (2026-11-15): door_concept writes them on its own agent node; ltsm keeps the
+// merge of all it has seen on its memory node ltsm_door_memory (persisted) and hands them back in ltsm_topology at the next start.
+REGISTER_TYPE(door_next_index,    uint64_t, false)   // the next fresh door_<N> (names are never reused)
+REGISTER_TYPE(door_change_hazard, std::reference_wrapper<const std::vector<float>>, false)   // [changes, exposure s]: the Gamma posterior of the door-change hazard
 REGISTER_TYPE(interaction_node_id,            std::uint64_t,                                    false)  // affordance → the node defining the robot-object pose (an interaction anchor hanging from the robot)
 
 // ── PASSAGE HISTORY: the crossing record (door_concept writes) and the belief over it (ltsm_agent) ──
@@ -1359,5 +1363,21 @@ REGISTER_TYPE(human_claim_words,        std::string,                            
 REGISTER_TYPE(human_claim_stamp,        std::uint64_t,                                     false)  // unique per claim (ms); the answer echoes it
 REGISTER_TYPE(human_claim_answer,       std::string,                                       false)  // "recorded" | "rejected: <reason>"
 REGISTER_TYPE(human_claim_answer_stamp, std::uint64_t,                                     false)  // the claim stamp this answer is for
+// Changed object (active_inference spec 2026-11-15-changed-object): a live object's identity link to a memory, LTOM's
+// questions to the person, and the beliefs it learns from their answers.
+REGISTER_TYPE(same_as_uid,          std::uint64_t,                                     false)  // recall uid this live object is believed to be (0 = none)
+REGISTER_TYPE(same_as_prob,         float,                                             false)  // P(same) from identity_link; 1 = the owner confirmed
+REGISTER_TYPE(left_spot_prob,       float,                                             false)  // P(the recalled object left its remembered spot)
+REGISTER_TYPE(question_kind,        std::string,                                       false)  // "moved"
+REGISTER_TYPE(question_live_uid,    std::uint64_t,                                     false)
+REGISTER_TYPE(question_memory_uid,  std::uint64_t,                                     false)
+REGISTER_TYPE(question_old_xy,      std::reference_wrapper<const std::vector<float>>,  false)  // room frame, m
+REGISTER_TYPE(question_new_xy,      std::reference_wrapper<const std::vector<float>>,  false)
+REGISTER_TYPE(question_room,        std::string,                                       false)  // room node name
+REGISTER_TYPE(question_again,       bool,                                              false)  // the memory already holds a move
+REGISTER_TYPE(question_stamp,       std::uint64_t,                                     false)  // ms when opened; the answer claim echoes it
+REGISTER_TYPE(belief_yes,           int,                                               false)
+REGISTER_TYPE(belief_no,            int,                                               false)
+REGISTER_TYPE(belief_evidence,      std::string,                                       false)  // one line per record: "YYYY-MM-DD HH:MM | yes|no | <words> | <object>"
 
 #endif //DSR_ATTR_NAME_H
